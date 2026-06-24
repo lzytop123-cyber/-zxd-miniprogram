@@ -1,0 +1,12 @@
+<view class="card" wx:if="{{store}}">
+  <view class="cover-placeholder" wx:if="{{!store.cover_images || !store.cover_images.length}}">知行岛</view>
+  <swiper wx:else autoplay circular indicator-dots class="cover-swiper">
+    <swiper-item wx:for="{{store.cover_images}}" wx:key="*this">
+      <image src="{{item}}" mode="aspectFill" class="cover-img" />
+    </swiper-item>
+  </swiper>
+  <view class="store-name">{{store.name}}</view>
+  <view class="store-addr">{{store.address}}</view>
+  <view class="btn-primary book-btn" bindtap="goBooking">自助预定</view>
+  <view class="wifi" wx:if="{{store.wifi_name}}">WiFi: {{store.wifi_name}} / {{store.wifi_password}}</view>
+</view>

@@ -1,0 +1,19 @@
+<view class="banner card">
+  <view class="banner-placeholder">知行岛自习室</view>
+</view>
+
+<view class="shortcuts card">
+  <view class="shortcut" bindtap="goExchange">美团兑换</view>
+  <view class="shortcut" bindtap="goDouyin">抖音兑换</view>
+  <view class="shortcut" bindtap="goCards">我的期限卡</view>
+  <view class="shortcut" bindtap="goCoupons">我的优惠券</view>
+</view>
+
+<view class="section-title">附近门店</view>
+<view class="store-list">
+  <view class="card store-item" wx:for="{{stores}}" wx:key="id" bindtap="goStore" data-id="{{item.id}}">
+    <view class="store-name">{{item.name}}</view>
+    <view class="store-addr">{{item.address}}</view>
+    <view class="store-dist" wx:if="{{item.distance}}">距您 {{item.distance}} km</view>
+  </view>
+</view>

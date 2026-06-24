@@ -1,0 +1,27 @@
+<view class="card">
+  <view class="legend">
+    <view class="dot available"></view><text>可约</text>
+    <view class="dot reserved"></view><text>已约</text>
+    <view class="dot occupied"></view><text>使用中</text>
+    <text class="count">共 {{seats.length}} 座</text>
+  </view>
+  <view class="zone-tags">
+    <text class="zone-tag">A区 标准座</text>
+    <text class="zone-tag">B区 靠窗座</text>
+    <text class="zone-tag">C区 帘位座</text>
+  </view>
+  <view class="seat-map">
+    <view
+      wx:for="{{seats}}"
+      wx:key="id"
+      class="seat {{item.status}} {{selectedId===item.id?'selected':''}}"
+      style="left:{{item.pos_x}}rpx;top:{{item.pos_y}}rpx"
+      bindtap="selectSeat"
+      data-id="{{item.id}}"
+      data-code="{{item.seat_code}}"
+      data-status="{{item.status}}"
+    >{{item.seat_code}}</view>
+  </view>
+  <view class="selected" wx:if="{{selectedCode}}">已选：{{selectedCode}}</view>
+  <view class="btn-primary" bindtap="confirm">确认选座</view>
+</view>

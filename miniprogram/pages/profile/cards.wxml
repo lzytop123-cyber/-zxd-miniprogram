@@ -1,0 +1,19 @@
+<view class="card card-item" wx:for="{{cards}}" wx:key="id">
+  <view class="name">{{item.card_name || item.card_type}}</view>
+  <view class="info" wx:if="{{item.card_type === 'monthly' && item.start_date && item.end_date}}">
+    开卡后连续30天 · {{item.start_date}} 至 {{item.end_date}}（不可暂停）
+  </view>
+  <view class="info" wx:elif="{{item.start_date && item.end_date && (item.card_type === 'weekly' || item.card_type === 'quarterly' || item.card_type === 'night_monthly')}}">
+    兑换即开卡 · {{item.start_date}} 至 {{item.end_date}}
+  </view>
+  <view class="info" wx:elif="{{item.end_date}}">有效期至 {{item.end_date}}</view>
+  <view class="info" wx:if="{{item.remaining_hours != null}}">剩余 {{item.remaining_hours}} 小时</view>
+  <view class="info" wx:if="{{item.remaining_sessions != null}}">剩余 {{item.remaining_sessions}} 次</view>
+  <view class="info" wx:if="{{item.card_type === 'monthly'}}">开卡后30天内可预约一次，使用后即失效</view>
+  <view class="info" wx:elif="{{item.card_type === 'weekly'}}">开卡后7天内完成一次预约即核销</view>
+  <view class="info" wx:elif="{{item.card_type === 'quarterly'}}">开卡后90天内完成一次预约即核销</view>
+  <view class="info" wx:elif="{{item.card_type === 'night_monthly'}}">有效期内完成一次预约即核销</view>
+  <view class="info" wx:if="{{item.card_type === 'daily'}}">全天不限时，用一次即核销</view>
+  <view class="info" wx:elif="{{item.card_type === 'session'}}">按自然日扣次，可连续多天预约（连选N天扣N次）</view>
+</view>
+<view class="empty" wx:if="{{!cards.length}}">暂无期限卡</view>

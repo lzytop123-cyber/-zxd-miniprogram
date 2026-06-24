@@ -1,0 +1,34 @@
+# 备案前临时：HTTP + IP（勿用于小程序真机合法域名）
+# 复制到 /etc/nginx/conf.d/zxd-http.conf
+
+upstream zxd_api {
+    server 127.0.0.1:8000;
+}
+
+server {
+    listen 80;
+    server_name _;   # 或你的公网 IP
+
+    client_max_body_size 10m;
+
+    location / {
+        proxy_pass http://zxd_api;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
+
+# 后台静态（可选，同机部署 admin dist）
+server {
+    listen 8080;
+    server_name _;
+
+    root /var/www/zxd-admin;
+    index index.html;
+
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+}

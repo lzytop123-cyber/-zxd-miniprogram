@@ -1,0 +1,19 @@
+.header { display: flex; justify-content: space-between; font-size: 18px; font-weight: bold; margin-bottom: 16px; }
+.scope { font-size: 12px; color: #888; font-weight: normal; }
+.my-rank { text-align: center; margin-bottom: 16px; }
+.rank-no { font-size: 24px; font-weight: bold; color: #FFD000; }
+.title-badge { display: inline-block; background: #FFD000; padding: 2px 8px; border-radius: 4px; font-size: 12px; margin-top: 4px; }
+.stat-row { display: flex; justify-content: space-around; margin-bottom: 12px; }
+.stat { text-align: center; }
+.num { font-size: 16px; font-weight: bold; }
+.label { font-size: 12px; color: #888; margin-top: 4px; }
+.beat { text-align: center; color: #888; font-size: 12px; margin-bottom: 16px; }
+.tabs { display: flex; gap: 8px; margin-bottom: 16px; }
+.tab { padding: 6px 16px; background: #f5f5f5; border-radius: 16px; font-size: 12px; }
+.tab.active { background: #FFD000; }
+.section-title { font-weight: bold; margin-bottom: 8px; }
+.rank-item { display: flex; padding: 10px 0; border-bottom: 1px solid #f0f0f0; align-items: center; }
+.rank-item.self { background: #fff9e0; }
+.rank { width: 40px; font-weight: bold; color: #FFD000; }
+.name { flex: 1; }
+.mins { color: #888; font-size: 12px; }

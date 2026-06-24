@@ -1,0 +1,10 @@
+.hint { color: #666; line-height: 1.6; margin-bottom: 16px; }
+.sub { font-size: 12px; color: #999; }
+.code-input {
+  border: 1px solid #eee;
+  border-radius: 8px;
+  padding: 12px;
+  margin-bottom: 20px;
+}
+.disabled { opacity: 0.6; }
+.link-records { text-align: center; color: #666; font-size: 13px; margin-top: 16px; }

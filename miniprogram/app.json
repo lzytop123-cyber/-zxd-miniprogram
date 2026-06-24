@@ -1,0 +1,65 @@
+{
+  "pages": [
+    "pages/home/index",
+    "pages/store/detail",
+    "pages/store/seats",
+    "pages/booking/index",
+    "pages/booking/order",
+    "pages/checkin/index",
+    "pages/report/index",
+    "pages/profile/index",
+    "pages/profile/wallet",
+    "pages/profile/orders",
+    "pages/profile/cards",
+    "pages/profile/coupons",
+    "pages/profile/points",
+    "pages/profile/invite",
+    "pages/profile/face",
+    "pages/exchange/index",
+    "pages/exchange/records"
+  ],
+  "window": {
+    "navigationBarBackgroundColor": "#FFD000",
+    "navigationBarTitleText": "知行岛自习室",
+    "navigationBarTextStyle": "black",
+    "backgroundColor": "#F5F5F5"
+  },
+  "tabBar": {
+    "color": "#888888",
+    "selectedColor": "#FFD000",
+    "backgroundColor": "#FFFFFF",
+    "list": [
+      {
+        "pagePath": "pages/home/index",
+        "text": "首页",
+        "iconPath": "assets/tab-home.png",
+        "selectedIconPath": "assets/tab-home-active.png"
+      },
+      {
+        "pagePath": "pages/checkin/index",
+        "text": "入座",
+        "iconPath": "assets/tab-checkin.png",
+        "selectedIconPath": "assets/tab-checkin-active.png"
+      },
+      {
+        "pagePath": "pages/report/index",
+        "text": "学习报告",
+        "iconPath": "assets/tab-report.png",
+        "selectedIconPath": "assets/tab-report-active.png"
+      },
+      {
+        "pagePath": "pages/profile/index",
+        "text": "我的",
+        "iconPath": "assets/tab-profile.png",
+        "selectedIconPath": "assets/tab-profile-active.png"
+      }
+    ]
+  },
+  "permission": {
+    "scope.userLocation": {
+      "desc": "用于展示附近门店距离"
+    }
+  },
+  "requiredPrivateInfos": ["getLocation"],
+  "sitemapLocation": "sitemap.json"
+}

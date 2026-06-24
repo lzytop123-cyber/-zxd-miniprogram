@@ -1,0 +1,18 @@
+<view wx:if="{{!reservation}}" class="empty card">
+  <view class="empty-text">暂无订单</view>
+  <view class="btn-primary" bindtap="goBooking">立即预定</view>
+</view>
+
+<view wx:else class="card active-card">
+  <view class="seat-no">{{reservation.seat_code}}</view>
+  <view class="store">{{reservation.store_name}}</view>
+  <view class="time">结束时间：{{endDisplay}}</view>
+  <view class="countdown" wx:if="{{countdown}}">{{countdown}}</view>
+
+  <view class="btn-primary {{canOpen ? '' : 'disabled'}}" bindtap="openDoor">
+    蓝牙开门
+  </view>
+  <view class="tip" wx:if="{{!canOpen}}">提前15分钟可开门</view>
+
+  <view class="sub-btn" bindtap="checkout" wx:if="{{reservation.status === 1}}">提前离座</view>
+</view>

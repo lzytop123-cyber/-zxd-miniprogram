@@ -1,0 +1,14 @@
+<view class="card">
+  <view class="label">我的邀请码</view>
+  <view class="code-row">
+    <text class="code">{{inviteCode || '加载中...'}}</text>
+    <view class="copy-btn" bindtap="copyCode">复制</view>
+  </view>
+  <view class="hint">好友填写您的邀请码，您得 50 积分，好友得 20 积分</view>
+</view>
+
+<view class="card">
+  <view class="label">填写好友邀请码</view>
+  <input class="input" placeholder="请输入邀请码" value="{{inputCode}}" bindinput="onInput" />
+  <view class="btn-primary" bindtap="submit">领取积分</view>
+</view>

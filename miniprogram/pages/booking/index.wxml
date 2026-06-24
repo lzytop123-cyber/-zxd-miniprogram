@@ -1,0 +1,132 @@
+<view class="card">
+  <view class="title">{{storeName}}</view>
+
+  <scroll-view scroll-x class="tabs">
+    <view wx:for="{{billTypes}}" wx:key="type"
+      class="tab {{billType===item.type?'active':''}}"
+      bindtap="switchType" data-type="{{item.type}}">{{item.label}}</view>
+  </scroll-view>
+
+  <!-- 按小时 -->
+  <block wx:if="{{billType==='hourly'}}">
+    <view class="label">开始日期</view>
+    <picker mode="date" value="{{startDate}}" start="{{today}}" bindchange="onStartDateChange">
+      <view class="picker">{{startDate}} ▼</view>
+    </picker>
+    <view class="label">开始时间</view>
+    <picker mode="time" value="{{startClock}}" bindchange="onStartClockChange">
+      <view class="picker">{{startClock}} ▼</view>
+    </picker>
+    <view class="label">结束时间</view>
+    <picker mode="time" value="{{endClock}}" bindchange="onEndClockChange">
+      <view class="picker">{{endClock}} ▼</view>
+    </picker>
+    <view class="quick-btns">
+      <view class="quick" bindtap="setHours" data-h="2">2小时</view>
+      <view class="quick" bindtap="setHours" data-h="4">4小时</view>
+      <view class="quick" bindtap="setHours" data-h="8">8小时</view>
+    </view>
+    <view class="hint">最少2小时，最长24小时</view>
+  </block>
+
+  <!-- 天卡 -->
+  <block wx:if="{{billType==='daily'}}">
+    <view class="label">使用日期</view>
+    <picker mode="date" value="{{startDate}}" start="{{today}}" bindchange="onStartDateChange">
+      <view class="picker">{{startDate}} ▼</view>
+    </picker>
+    <view class="label">结束日期</view>
+    <picker mode="date" value="{{endDate}}" start="{{startDate}}" bindchange="onEndDateChange">
+      <view class="picker">{{endDate}} ▼</view>
+    </picker>
+    <view class="hint">天卡按自然日计费，默认当日有效</view>
+  </block>
+
+  <!-- 次卡（10次/30次，按自然日扣次，可连续多天） -->
+  <block wx:if="{{billType==='session'}}">
+    <view class="label">开始日期</view>
+    <picker mode="date" value="{{startDate}}" start="{{today}}" bindchange="onStartDateChange">
+      <view class="picker">{{startDate}} ▼</view>
+    </picker>
+    <view class="label">结束日期</view>
+    <picker mode="date" value="{{endDate}}" start="{{startDate}}" bindchange="onEndDateChange">
+      <view class="picker">{{endDate}} ▼</view>
+    </picker>
+    <view class="hint">每自然日扣 1 次，连选 3 天扣 3 次；10次卡最多连选10天</view>
+    <view class="quick-btns">
+      <view class="quick" bindtap="setSessionDays" data-d="1">1天</view>
+      <view class="quick" bindtap="setSessionDays" data-d="3">3天</view>
+      <view class="quick" bindtap="setSessionDays" data-d="7">7天</view>
+    </view>
+  </block>
+
+  <!-- 周卡 -->
+  <block wx:if="{{billType==='weekly'}}">
+    <view class="label">开始日期</view>
+    <picker mode="date" value="{{startDate}}" start="{{today}}" bindchange="onStartDateChange">
+      <view class="picker">{{startDate}} ▼</view>
+    </picker>
+    <view class="label">结束日期</view>
+    <picker mode="date" value="{{endDate}}" start="{{startDate}}" bindchange="onEndDateChange">
+      <view class="picker">{{endDate}} ▼</view>
+    </picker>
+    <view class="hint">周卡默认7天，完成一次预约即核销整张卡</view>
+  </block>
+
+  <!-- 月卡 -->
+  <block wx:if="{{billType==='monthly'}}">
+    <view class="label">开始日期</view>
+    <picker mode="date" value="{{startDate}}" start="{{today}}" bindchange="onStartDateChange">
+      <view class="picker">{{startDate}} ▼</view>
+    </picker>
+    <view class="label">结束日期</view>
+    <picker mode="date" value="{{endDate}}" start="{{startDate}}" bindchange="onEndDateChange">
+      <view class="picker">{{endDate}} ▼</view>
+    </picker>
+    <view class="hint">月卡默认30天，完成一次预约即核销</view>
+  </block>
+
+  <!-- 季卡 -->
+  <block wx:if="{{billType==='quarterly'}}">
+    <view class="label">开始日期</view>
+    <picker mode="date" value="{{startDate}}" start="{{today}}" bindchange="onStartDateChange">
+      <view class="picker">{{startDate}} ▼</view>
+    </picker>
+    <view class="label">结束日期</view>
+    <picker mode="date" value="{{endDate}}" start="{{startDate}}" bindchange="onEndDateChange">
+      <view class="picker">{{endDate}} ▼</view>
+    </picker>
+    <view class="hint">季卡默认90天，完成一次预约即核销</view>
+  </block>
+
+  <!-- 夜读 -->
+  <block wx:if="{{billType==='night'}}">
+    <view class="label">使用日期</view>
+    <picker mode="date" value="{{startDate}}" start="{{today}}" bindchange="onStartDateChange">
+      <view class="picker">{{startDate}} ▼</view>
+    </picker>
+    <view class="label">开始时间</view>
+    <picker mode="time" value="{{startClock}}" bindchange="onStartClockChange">
+      <view class="picker">{{startClock}} ▼</view>
+    </picker>
+    <view class="label">结束时间</view>
+    <picker mode="time" value="{{endClock}}" bindchange="onEndClockChange">
+      <view class="picker">{{endClock}} ▼</view>
+    </picker>
+    <view class="hint">夜读时段默认 {{nightHint}}</view>
+  </block>
+
+  <view class="time-summary" wx:if="{{timeSummary}}">{{timeSummary}}</view>
+
+  <view class="seat-row" bindtap="goSeats">
+    <text>选择座位</text>
+    <text class="seat-code">{{seatCode || '自动分配'}} ›</text>
+  </view>
+
+  <view class="price" wx:if="{{preview}}">
+    预估费用：¥{{preview.final_price}}
+    <text class="seat">座位 {{preview.seat_code}}</text>
+  </view>
+
+  <view class="btn-primary" bindtap="goOrder">立即预定</view>
+</view>

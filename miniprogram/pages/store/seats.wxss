@@ -1,0 +1,13 @@
+.legend { display: flex; gap: 16px; font-size: 12px; margin-bottom: 12px; align-items: center; flex-wrap: wrap; }
+.zone-tags { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 8px; }
+.zone-tag { font-size: 11px; color: #666; background: #f0f0f0; padding: 2px 8px; border-radius: 4px; }
+.dot { width: 12px; height: 12px; border-radius: 50%; display: inline-block; margin-right: 4px; }
+.dot.available { background: #4CAF50; }
+.dot.reserved { background: #FFD000; }
+.dot.occupied { background: #ccc; }
+.seat-map { position: relative; height: 720rpx; background: #fafafa; border-radius: 8px; margin-bottom: 16px; overflow: hidden; }
+.seat { position: absolute; width: 72rpx; height: 56rpx; line-height: 56rpx; text-align: center; font-size: 18rpx; border-radius: 8rpx; background: #e8f5e9; border: 2rpx solid #4CAF50; box-sizing: border-box; }
+.seat.reserved { background: #fff9e0; border-color: #FFD000; }
+.seat.occupied { background: #eee; border-color: #ccc; color: #999; }
+.seat.selected { border-color: #FF4444; border-width: 4rpx; font-weight: bold; }
+.selected { text-align: center; margin-bottom: 12px; font-weight: bold; }

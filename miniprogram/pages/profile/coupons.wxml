@@ -1,0 +1,9 @@
+<view class="card coupon-item" wx:for="{{coupons}}" wx:key="id">
+  <view class="name">{{item.coupon_name}}</view>
+  <view class="info" wx:if="{{item.discount_type==='amount'}}">减 ¥{{item.discount_val}}</view>
+  <view class="info" wx:else>折扣 {{100 - item.discount_val}} 折</view>
+  <view class="info" wx:if="{{item.min_amount > 0}}">满 {{item.min_amount}} 元可用</view>
+  <view class="info">有效期至 {{item.expire_date || '长期'}}</view>
+  <view class="status">{{item.status === 0 ? '未使用' : '已使用'}}</view>
+</view>
+<view class="empty" wx:if="{{!coupons.length}}">暂无优惠券</view>

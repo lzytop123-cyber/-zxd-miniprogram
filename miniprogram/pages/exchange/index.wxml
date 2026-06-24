@@ -1,0 +1,7 @@
+<view class="card">
+  <view class="hint">请输入{{platformLabel}}团购券码，核销后将发放对应期限卡。</view>
+  <view class="hint sub">开发环境：券码末位 1~5 对应不同卡种（4小时/天卡/月卡/夜读月卡/10次卡）</view>
+  <input class="code-input" placeholder="请输入券码" value="{{code}}" bindinput="onInput" maxlength="32" />
+  <view class="btn-primary {{loading?'disabled':''}}" bindtap="submit">立即兑换</view>
+  <view class="link-records" bindtap="goRecords">查看兑换记录 ›</view>
+</view>

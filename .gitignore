@@ -1,0 +1,25 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.env
+.env.docker
+backend/.env.docker
+*.pem
+
+# Node
+node_modules/
+dist/
+.DS_Store
+
+# IDE
+.idea/
+.vscode/
+*.swp
+
+# Miniprogram
+miniprogram/node_modules/
+
+# Certs
+backend/certs/

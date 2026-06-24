@@ -1,0 +1,10 @@
+.row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #f0f0f0; }
+.price-row { border: none; margin-top: 8px; }
+.price { color: #FF4444; font-size: 20px; font-weight: bold; }
+.discount { color: #4CAF50; }
+.section-title { font-weight: bold; margin: 12px 0 8px; }
+.picker-row { padding: 10px; border: 1px dashed #ddd; border-radius: 8px; color: #333; margin-bottom: 8px; font-weight: 500; }
+.hint-warn { background: #fff9e0; color: #996600; font-size: 12px; padding: 10px; border-radius: 8px; margin-bottom: 12px; line-height: 1.6; }
+.pay-types { display: flex; gap: 12px; margin: 16px 0; flex-wrap: wrap; }
+.pay-item { flex: 1; text-align: center; padding: 10px; border: 1px solid #eee; border-radius: 8px; }
+.pay-item.active { border-color: #FFD000; background: #fff9e0; }

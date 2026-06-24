@@ -1,0 +1,36 @@
+<view class="card">
+  <view class="row"><text>预定方式</text><text>{{billTypeLabel}}</text></view>
+  <view class="row"><text>座位</text><text>{{seatCode}}</text></view>
+  <view class="row"><text>开始</text><text>{{startDisplay}}</text></view>
+  <view class="row"><text>结束</text><text>{{endDisplay}}</text></view>
+  <view class="row" wx:if="{{discountPrice > 0}}"><text>优惠</text><text class="discount">-¥{{discountPrice}}</text></view>
+  <view class="row price-row"><text>应付</text><text class="price">¥{{price}}</text></view>
+
+  <view class="section-title" wx:if="{{usableCoupons.length}}">优惠券</view>
+  <picker wx:if="{{usableCoupons.length}}" mode="selector" range="{{usableCoupons}}" range-key="coupon_name" bindchange="selectCoupon">
+    <view class="picker-row">
+      {{selectedCouponId ? '已选优惠券' : '选择优惠券（可选）'}}
+    </view>
+  </picker>
+
+  <view class="hint-warn" wx:if="{{billType === 'session' && sessionDays > 0}}">
+    本次预约 {{sessionDays}} 天，使用次卡将扣 {{sessionDays}} 次
+  </view>
+
+  <view class="hint-warn" wx:if="{{cards.length && !usableCards.length}}">
+    您有 {{cards.length}} 张期限卡，但当前「{{billTypeLabel}}」预约不可用。请先在上一页切换对应的预定方式（如周卡选「周卡」）。
+  </view>
+
+  <view class="section-title">支付方式</view>
+  <view class="pay-types">
+    <view class="pay-item {{payType==='wechat'?'active':''}}" bindtap="setPay" data-type="wechat">微信支付</view>
+    <view class="pay-item {{payType==='balance'?'active':''}}" bindtap="setPay" data-type="balance">余额支付</view>
+    <view class="pay-item {{payType==='period_card'?'active':''}}" wx:if="{{usableCards.length}}" bindtap="setPay" data-type="period_card">期限卡</view>
+  </view>
+
+  <picker wx:if="{{payType==='period_card' && usableCards.length}}" mode="selector" range="{{usableCards}}" range-key="card_name" bindchange="selectCard">
+    <view class="picker-row">{{selectedCardName || '选择期限卡'}}</view>
+  </picker>
+
+  <view class="btn-primary" bindtap="submitOrder">立即预定</view>
+</view>

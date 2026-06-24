@@ -1,0 +1,10 @@
+.empty { text-align: center; padding: 40px 16px; }
+.empty-text { color: #888; margin-bottom: 24px; }
+.active-card { text-align: center; }
+.seat-no { font-size: 48px; font-weight: bold; color: #FFD000; }
+.store { margin: 8px 0; color: #888; }
+.time { margin-bottom: 8px; }
+.countdown { font-size: 20px; font-weight: bold; margin-bottom: 24px; }
+.disabled { opacity: 0.5; }
+.tip { font-size: 12px; color: #888; margin-top: 8px; }
+.sub-btn { margin-top: 16px; color: #888; font-size: 14px; }

@@ -1,0 +1,4 @@
+.stats { display: flex; justify-content: space-around; margin-top: 12px; color: #888; font-size: 14px; }
+.menu-item { padding: 14px 0; border-bottom: 1px solid #f0f0f0; }
+.phone-btn { background: none; text-align: left; padding: 14px 0; font-size: 14px; line-height: normal; width: 100%; }
+.phone-btn::after { border: none; }

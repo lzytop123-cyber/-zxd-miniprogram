@@ -1,0 +1,33 @@
+<view class="card">
+  <view class="header">
+    <text>学习报告</text>
+    <picker mode="selector" range="{{['全平台','本店']}}" bindchange="onScopeChange">
+      <view class="scope">{{scopeLabel}} ▼</view>
+    </picker>
+  </view>
+
+  <view class="my-rank" wx:if="{{summary}}">
+    <view class="rank-no" wx:if="{{summary.rank}}">排名 #{{summary.rank}}</view>
+    <view class="title-badge">{{summary.title}}</view>
+  </view>
+
+  <view class="stat-row" wx:if="{{summary}}">
+    <view class="stat"><view class="num">{{summary.total_sessions}}</view><view class="label">次数</view></view>
+    <view class="stat"><view class="num">{{summary.total_hours}}时{{summary.total_minutes_remainder}}分</view><view class="label">时长</view></view>
+    <view class="stat"><view class="num">{{summary.daily_avg_minutes}}分</view><view class="label">日均</view></view>
+  </view>
+
+  <view class="beat" wx:if="{{summary}}">超越了 {{summary.beat_percent}}% 的学员</view>
+
+  <view class="tabs">
+    <view class="tab {{days===7?'active':''}}" bindtap="setDays" data-d="7">近7日</view>
+    <view class="tab {{days===30?'active':''}}" bindtap="setDays" data-d="30">近30日</view>
+  </view>
+
+  <view class="section-title">排行榜</view>
+  <view class="rank-item {{item.is_self?'self':''}}" wx:for="{{leaderboard}}" wx:key="rank">
+    <text class="rank">{{item.rank}}</text>
+    <text class="name">{{item.nickname}}</text>
+    <text class="mins">{{item.total_minutes}}分钟</text>
+  </view>
+</view>
