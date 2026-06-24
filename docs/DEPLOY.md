@@ -2,6 +2,8 @@
 
 本文档对应路线 **① 准备上线**：部署 + 微信/云老板真实对接 + 小程序提审前联调。
 
+> **详细部署与配置步骤**（Docker、`.env` 怎么填、笔记本当服务器、MySQL 要不要装）见 **[SERVER-SETUP.md](./SERVER-SETUP.md)**。
+
 > **小程序/商户审核中？** 可先走 **[无微信阶段](#无微信阶段审核中)**（A + C + 后台 + Nginx），微信审核通过后再补 [B. 微信小程序](#b-微信小程序)。
 
 ---
@@ -37,9 +39,11 @@ MEITUAN_SHOP_ID=...
 **本机 Windows 生成生产 .env**（从当前开发 `.env` 复制云老板凭证，输出 `backend/.env.docker`，**不会覆盖**开发用 `.env`）：
 
 ```powershell
-.\deploy\prepare-production-env.ps1 -ApiBase "http://你的服务器IP:8000"
-# 上传到服务器后改名为 backend/.env
+.\deploy\prepare-production-env.ps1 -ApiBase "https://api.你的域名.com"
+# 上传到服务器：backend/.env.docker → backend/.env，根目录 .env.docker 保持不变
 ```
+
+详细步骤见 **[SERVER-SETUP.md](./SERVER-SETUP.md)** 第三节。
 
 **Linux 服务器一键脚本**：
 
@@ -81,16 +85,21 @@ chmod +x deploy/setup-server.sh
 
 ### A2. Docker 一键启动（推荐）
 
-```bash
-# 1. 复制生产环境变量
-cp backend/.env.production.example backend/.env
-# 编辑 backend/.env，至少改 SECRET_KEY、ADMIN_PASSWORD、MYSQL 密码
+完整配置说明见 **[docs/SERVER-SETUP.md](./SERVER-SETUP.md)** 第三节。
 
-# 2. 启动 MySQL + Redis + API
+```bash
+# 0. 准备两个配置文件（见 SERVER-SETUP.md §3.3）
+#    - 根目录 .env.docker          → MySQL 密码
+#    - backend/.env                → 应用配置（含云老板、管理员密码）
+
+# 1. 启动 MySQL + Redis + API（无需单独安装 MySQL）
 docker compose -f docker-compose.prod.yml --env-file .env.docker up -d --build
 
-# 3. 初始化数据库（首次）
+# 2. 初始化数据库（首次）
 docker compose -f docker-compose.prod.yml --env-file .env.docker exec api python scripts/init_production.py
+
+# 3. 自检
+docker compose -f docker-compose.prod.yml --env-file .env.docker exec api python scripts/deploy_check.py
 ```
 
 验证：`curl http://127.0.0.1:8000/health` → `{"status":"ok"}`

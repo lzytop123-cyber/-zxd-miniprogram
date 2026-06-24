@@ -136,15 +136,17 @@ $env:PYTHONPATH="f:\zxd-pro\backend"
 
 ## 生产上线
 
-完整步骤见 **[docs/DEPLOY.md](docs/DEPLOY.md)**（Docker、HTTPS、微信/云老板/通通锁配置、上线检查清单）。
+| 文档 | 内容 |
+|------|------|
+| **[docs/SERVER-SETUP.md](docs/SERVER-SETUP.md)** | 服务器怎么配：Docker、`.env`、MySQL 要不要装、笔记本当服务器 |
+| **[docs/DEPLOY.md](docs/DEPLOY.md)** | 上线总览：微信 / 云老板 / 通通锁 / 检查清单 |
 
-快速启动生产栈：
+Docker 服务器快速启动（详见 SERVER-SETUP.md）：
 
 ```bash
-cp backend/.env.production.example backend/.env
-# 编辑 .env 后：
-docker compose -f docker-compose.prod.yml up -d --build
-docker compose -f docker-compose.prod.yml exec api python scripts/init_production.py
+# 准备 .env.docker + backend/.env 后：
+docker compose -f docker-compose.prod.yml --env-file .env.docker up -d --build
+docker compose -f docker-compose.prod.yml --env-file .env.docker exec api python scripts/init_production.py
 ```
 
 ## 开发备注
