@@ -1,13 +1,17 @@
+from pathlib import Path
+
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user
+from app.core.config import settings
 from app.core.security import create_access_token
 from app.db.session import get_db
 from app.models import PointLog, User, WechatSubscription
 from app.schemas.common import ResponseModel
 from app.schemas.user import (
+    AvatarUploadRequest,
     BindPhoneRequest,
     FaceUploadRequest,
     InviteApplyRequest,
@@ -22,6 +26,13 @@ from app.services.points import apply_invite_code, ensure_invite_code
 
 router = APIRouter(prefix="/user", tags=["用户"])
 
+DEFAULT_NICKNAME = "知行岛学员"
+AVATAR_DIR = Path(__file__).resolve().parents[3] / "uploads" / "avatars"
+
+
+def _needs_profile_setup(user: User) -> bool:
+    return not user.avatar_url or user.nickname in (None, "", DEFAULT_NICKNAME)
+
 
 def _to_profile(db: Session, user: User) -> UserProfile:
     ensure_invite_code(db, user)
@@ -35,6 +46,7 @@ def _to_profile(db: Session, user: User) -> UserProfile:
         total_points=user.total_points,
         invite_code=user.invite_code,
         face_registered=bool(user.face_image),
+        needs_profile_setup=_needs_profile_setup(user),
     )
 
 
@@ -47,7 +59,7 @@ async def login(body: LoginRequest, db: Session = Depends(get_db)):
 
     user = db.scalar(select(User).where(User.openid == wx_data["openid"]))
     if not user:
-        user = User(openid=wx_data["openid"], nickname="知行岛学员", title="小白")
+        user = User(openid=wx_data["openid"], nickname=DEFAULT_NICKNAME, title="小白")
         db.add(user)
         db.flush()
         ensure_invite_code(db, user)
@@ -73,12 +85,53 @@ def update_profile(
     db: Session = Depends(get_db),
 ):
     if body.nickname is not None:
-        user.nickname = body.nickname
+        nickname = body.nickname.strip()
+        if not nickname:
+            raise HTTPException(status_code=400, detail="昵称不能为空")
+        user.nickname = nickname[:32]
     if body.avatar_url is not None:
-        user.avatar_url = body.avatar_url
+        user.avatar_url = body.avatar_url[:500]
     db.commit()
     db.refresh(user)
     return ResponseModel(data=_to_profile(db, user))
+
+
+@router.post("/avatar", response_model=ResponseModel[UserProfile])
+def upload_avatar(
+    body: AvatarUploadRequest,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """上传微信头像（chooseAvatar 临时文件转存）。"""
+    import base64
+    import re
+
+    raw = body.avatar_image.strip()
+    match = re.match(r"^data:image/(png|jpeg|jpg|webp);base64,(.+)$", raw, re.I)
+    if match:
+        ext = "jpg" if match.group(1).lower() in ("jpeg", "jpg") else match.group(1).lower()
+        data = match.group(2)
+    else:
+        ext = "jpg"
+        data = raw
+
+    try:
+        binary = base64.b64decode(data)
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail="头像数据无效") from exc
+
+    if len(binary) > 200_000:
+        raise HTTPException(status_code=400, detail="头像过大，请换一张")
+
+    AVATAR_DIR.mkdir(parents=True, exist_ok=True)
+    path = AVATAR_DIR / f"{user.id}.{ext}"
+    path.write_bytes(binary)
+
+    base = settings.base_url.rstrip("/")
+    user.avatar_url = f"{base}/static/avatars/{user.id}.{ext}"
+    db.commit()
+    db.refresh(user)
+    return ResponseModel(message="头像已更新", data=_to_profile(db, user))
 
 
 @router.post("/bind-phone", response_model=ResponseModel[UserProfile])

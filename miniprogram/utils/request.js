@@ -1,4 +1,16 @@
-const app = getApp()
+const { API_BASE } = require('../config')
+
+function getApiBase() {
+  try {
+    const app = getApp({ allowDefault: true })
+    if (app && app.globalData && app.globalData.apiBase) {
+      return app.globalData.apiBase
+    }
+  } catch (e) {
+    // App 尚未注册时回退到 config
+  }
+  return API_BASE
+}
 
 function getErrorMessage(res) {
   const data = res.data || {}
@@ -15,7 +27,7 @@ function request({ url, method = 'GET', data, silent = false }) {
   const payload = data === undefined ? undefined : data
   return new Promise((resolve, reject) => {
     wx.request({
-      url: app.globalData.apiBase + url,
+      url: getApiBase() + url,
       method,
       ...(payload !== undefined ? { data: payload } : {}),
       header: {
@@ -39,7 +51,9 @@ function request({ url, method = 'GET', data, silent = false }) {
         }
       },
       fail(err) {
-        wx.showToast({ title: '网络错误，请确认后端已启动', icon: 'none' })
+        if (!silent) {
+          wx.showToast({ title: '网络错误，请确认后端已启动', icon: 'none' })
+        }
         reject(err)
       },
     })

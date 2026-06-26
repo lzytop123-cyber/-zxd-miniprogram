@@ -27,8 +27,13 @@ class UserProfile(BaseModel):
     total_points: int
     invite_code: str | None = None
     face_registered: bool = False
+    needs_profile_setup: bool = False
 
     model_config = {"from_attributes": True}
+
+
+class AvatarUploadRequest(BaseModel):
+    avatar_image: str = Field(min_length=10, max_length=300000)
 
 
 class InviteApplyRequest(BaseModel):

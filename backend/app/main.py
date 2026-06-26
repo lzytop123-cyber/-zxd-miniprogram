@@ -1,10 +1,14 @@
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 
 from app.api.routes import admin, ble, exchange, payment, report, reservation, store, user
 from app.tasks.scheduler import start_scheduler
+
+UPLOADS_DIR = Path(__file__).resolve().parent.parent / "uploads"
 
 
 @asynccontextmanager
@@ -35,6 +39,9 @@ app.include_router(report.router, prefix="/api")
 app.include_router(exchange.router, prefix="/api")
 app.include_router(payment.router, prefix="/api")
 app.include_router(admin.router, prefix="/api")
+
+UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
+app.mount("/static", StaticFiles(directory=str(UPLOADS_DIR)), name="static")
 
 
 @app.get("/health")
