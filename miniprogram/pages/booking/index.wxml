@@ -1,26 +1,42 @@
 <view class="page-booking page-safe-bottom">
-  <view class="card booking-card">
-    <view class="title">{{storeName}}</view>
+  <!-- 门店 Hero -->
+  <view class="bk-hero">
+    <view class="bk-hero-orb"></view>
+    <view class="bk-hero-grid"></view>
+    <view class="bk-hero-label">RESERVE · 预约学习</view>
+    <view class="bk-hero-store">{{storeName}}</view>
+  </view>
 
-    <view class="tabs">
-      <view wx:for="{{billTypes}}" wx:key="type"
-        class="tab-item {{billType===item.type?'active':''}}"
-        bindtap="switchType" data-type="{{item.type}}">{{item.label}}</view>
-    </view>
+  <!-- 套餐类型 -->
+  <view class="bk-card">
+    <view class="bk-sec"><view class="bk-bar"></view><text>选择套餐</text></view>
+    <scroll-view class="type-scroll" scroll-x enable-flex>
+      <view class="type-track">
+        <view
+          wx:for="{{billTypes}}"
+          wx:key="type"
+          class="type-pill {{billType===item.type?'active':''}}"
+          bindtap="switchType"
+          data-type="{{item.type}}"
+        >{{item.label}}</view>
+      </view>
+    </scroll-view>
+  </view>
+
+  <!-- 时间设置 -->
+  <view class="bk-card">
+    <view class="bk-sec"><view class="bk-bar"></view><text>使用时间</text></view>
 
     <!-- 按小时 -->
     <block wx:if="{{billType==='hourly'}}">
-      <view class="label">开始日期</view>
       <picker mode="date" value="{{startDate}}" start="{{today}}" bindchange="onStartDateChange">
-        <view class="picker-box">{{startDate}} ▼</view>
+        <view class="field"><text class="field-key">开始日期</text><text class="field-val">{{startDate}} ›</text></view>
       </picker>
-      <view class="label">开始时间</view>
       <picker mode="time" value="{{startClock}}" bindchange="onStartClockChange">
-        <view class="picker-box">{{startClock}} ▼</view>
+        <view class="field"><text class="field-key">开始时间</text><text class="field-val">{{startClock}} ›</text></view>
       </picker>
-      <view class="label">结束时间</view>
       <picker mode="time" value="{{endClock}}" bindchange="onEndClockChange">
-        <view class="picker-box">{{endClock}} ▼</view>
+        <view class="field"><text class="field-key">结束时间</text><text class="field-val">{{endClock}} ›</text></view>
       </picker>
       <view class="quick-btns">
         <view class="chip" bindtap="setHours" data-h="2">2小时</view>
@@ -32,107 +48,104 @@
 
     <!-- 天卡 -->
     <block wx:if="{{billType==='daily'}}">
-      <view class="label">使用日期</view>
       <picker mode="date" value="{{startDate}}" start="{{today}}" bindchange="onStartDateChange">
-        <view class="picker-box">{{startDate}} ▼</view>
+        <view class="field"><text class="field-key">使用日期</text><text class="field-val">{{startDate}} ›</text></view>
       </picker>
-      <view class="label">结束日期</view>
       <picker mode="date" value="{{endDate}}" start="{{startDate}}" bindchange="onEndDateChange">
-        <view class="picker-box">{{endDate}} ▼</view>
+        <view class="field"><text class="field-key">结束日期</text><text class="field-val">{{endDate}} ›</text></view>
       </picker>
       <view class="hint">天卡按自然日计费，默认当日有效</view>
     </block>
 
     <!-- 次卡 -->
     <block wx:if="{{billType==='session'}}">
-      <view class="label">开始日期</view>
       <picker mode="date" value="{{startDate}}" start="{{today}}" bindchange="onStartDateChange">
-        <view class="picker-box">{{startDate}} ▼</view>
+        <view class="field"><text class="field-key">开始日期</text><text class="field-val">{{startDate}} ›</text></view>
       </picker>
-      <view class="label">结束日期</view>
       <picker mode="date" value="{{endDate}}" start="{{startDate}}" bindchange="onEndDateChange">
-        <view class="picker-box">{{endDate}} ▼</view>
+        <view class="field"><text class="field-key">结束日期</text><text class="field-val">{{endDate}} ›</text></view>
       </picker>
-      <view class="hint">每自然日扣 1 次，连选 3 天扣 3 次；10次卡最多连选10天</view>
       <view class="quick-btns">
         <view class="chip" bindtap="setSessionDays" data-d="1">1天</view>
         <view class="chip" bindtap="setSessionDays" data-d="3">3天</view>
         <view class="chip" bindtap="setSessionDays" data-d="7">7天</view>
       </view>
+      <view class="hint">每自然日扣 1 次，连选 3 天扣 3 次；10次卡最多连选10天</view>
     </block>
 
     <!-- 周卡 -->
     <block wx:if="{{billType==='weekly'}}">
-      <view class="label">开始日期</view>
       <picker mode="date" value="{{startDate}}" start="{{today}}" bindchange="onStartDateChange">
-        <view class="picker-box">{{startDate}} ▼</view>
+        <view class="field"><text class="field-key">开始日期</text><text class="field-val">{{startDate}} ›</text></view>
       </picker>
-      <view class="label">结束日期</view>
       <picker mode="date" value="{{endDate}}" start="{{startDate}}" bindchange="onEndDateChange">
-        <view class="picker-box">{{endDate}} ▼</view>
+        <view class="field"><text class="field-key">结束日期</text><text class="field-val">{{endDate}} ›</text></view>
       </picker>
       <view class="hint">周卡默认7天，完成一次预约即核销整张卡</view>
     </block>
 
     <!-- 月卡 -->
     <block wx:if="{{billType==='monthly'}}">
-      <view class="label">开始日期</view>
       <picker mode="date" value="{{startDate}}" start="{{today}}" bindchange="onStartDateChange">
-        <view class="picker-box">{{startDate}} ▼</view>
+        <view class="field"><text class="field-key">开始日期</text><text class="field-val">{{startDate}} ›</text></view>
       </picker>
-      <view class="label">结束日期</view>
       <picker mode="date" value="{{endDate}}" start="{{startDate}}" bindchange="onEndDateChange">
-        <view class="picker-box">{{endDate}} ▼</view>
+        <view class="field"><text class="field-key">结束日期</text><text class="field-val">{{endDate}} ›</text></view>
       </picker>
       <view class="hint">月卡默认30天，完成一次预约即核销</view>
     </block>
 
     <!-- 季卡 -->
     <block wx:if="{{billType==='quarterly'}}">
-      <view class="label">开始日期</view>
       <picker mode="date" value="{{startDate}}" start="{{today}}" bindchange="onStartDateChange">
-        <view class="picker-box">{{startDate}} ▼</view>
+        <view class="field"><text class="field-key">开始日期</text><text class="field-val">{{startDate}} ›</text></view>
       </picker>
-      <view class="label">结束日期</view>
       <picker mode="date" value="{{endDate}}" start="{{startDate}}" bindchange="onEndDateChange">
-        <view class="picker-box">{{endDate}} ▼</view>
+        <view class="field"><text class="field-key">结束日期</text><text class="field-val">{{endDate}} ›</text></view>
       </picker>
       <view class="hint">季卡默认90天，完成一次预约即核销</view>
     </block>
 
     <!-- 夜读 -->
     <block wx:if="{{billType==='night'}}">
-      <view class="label">使用日期</view>
       <picker mode="date" value="{{startDate}}" start="{{today}}" bindchange="onStartDateChange">
-        <view class="picker-box">{{startDate}} ▼</view>
+        <view class="field"><text class="field-key">使用日期</text><text class="field-val">{{startDate}} ›</text></view>
       </picker>
-      <view class="label">开始时间</view>
       <picker mode="time" value="{{startClock}}" bindchange="onStartClockChange">
-        <view class="picker-box">{{startClock}} ▼</view>
+        <view class="field"><text class="field-key">开始时间</text><text class="field-val">{{startClock}} ›</text></view>
       </picker>
-      <view class="label">结束时间</view>
       <picker mode="time" value="{{endClock}}" bindchange="onEndClockChange">
-        <view class="picker-box">{{endClock}} ▼</view>
+        <view class="field"><text class="field-key">结束时间</text><text class="field-val">{{endClock}} ›</text></view>
       </picker>
       <view class="hint">夜读时段默认 {{nightHint}}</view>
     </block>
 
-    <view class="time-summary" wx:if="{{timeSummary}}">{{timeSummary}}</view>
-
-    <view class="seat-row" bindtap="goSeats">
-      <text class="seat-label">选择座位</text>
-      <text class="seat-code">{{seatCode || '自动分配'}} ›</text>
-    </view>
-
-    <view class="price-box" wx:if="{{preview}}">
-      <view class="price-label">预估费用</view>
-      <view class="price-value">¥{{preview.final_price}}</view>
-      <view class="price-seat">座位 {{preview.seat_code}}</view>
+    <view class="time-summary" wx:if="{{timeSummary}}">
+      <text class="ts-icon">🕑</text>{{timeSummary}}
     </view>
   </view>
 
+  <!-- 座位 -->
+  <view class="bk-card seat-card" bindtap="goSeats">
+    <view class="seat-left">
+      <view class="seat-ic">💺</view>
+      <view>
+        <view class="seat-title">选择座位</view>
+        <view class="seat-tip">在平面图中点选心仪座位</view>
+      </view>
+    </view>
+    <view class="seat-pick">{{seatCode || '自动分配'}} ›</view>
+  </view>
+
   <view class="fixed-bottom-spacer"></view>
-  <view class="fixed-bottom-bar">
-    <view class="btn-primary" bindtap="goOrder">立即预定</view>
+
+  <!-- 底部价格 + CTA -->
+  <view class="bk-bottom">
+    <view class="bk-price">
+      <text class="bk-price-cur" wx:if="{{preview}}">¥</text>
+      <text class="bk-price-val">{{preview ? preview.final_price : '--'}}</text>
+      <text class="bk-price-seat" wx:if="{{preview}}">座位 {{preview.seat_code}}</text>
+    </view>
+    <view class="bk-cta" bindtap="goOrder">立即预定</view>
   </view>
 </view>

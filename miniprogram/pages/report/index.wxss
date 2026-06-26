@@ -2,57 +2,47 @@
   min-height: 100vh;
 }
 
-.assistant-entry {
+/* 助手模式：固定高度，聊天区滚动 + 输入框吸底 */
+.page-report.chat-mode {
+  height: 100vh;
   display: flex;
-  align-items: center;
-  gap: 20rpx;
-  margin: 0 24rpx 32rpx;
-  padding: 28rpx 30rpx;
-  border-radius: 28rpx;
-  background: linear-gradient(120deg, #2D6A4F 0%, #52B788 100%);
-  box-shadow: 0 10rpx 26rpx rgba(45, 106, 79, 0.22);
+  flex-direction: column;
+  overflow: hidden;
 }
 
-.assistant-entry:active {
-  transform: scale(0.99);
+/* ============ 顶部分段切换 ============ */
+.seg-wrap {
+  flex-shrink: 0;
+  padding: 20rpx 24rpx 8rpx;
 }
 
-.ae-icon {
-  width: 76rpx;
-  height: 76rpx;
-  border-radius: 22rpx;
-  background: rgba(255, 255, 255, 0.22);
+.seg {
   display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 40rpx;
+  padding: 6rpx;
+  background: #E4EFE8;
+  border-radius: 40rpx;
 }
 
-.ae-text {
+.seg-item {
   flex: 1;
-  min-width: 0;
+  text-align: center;
+  padding: 16rpx 0;
+  font-size: 28rpx;
+  font-weight: 600;
+  color: #5C7567;
+  border-radius: 36rpx;
+  transition: all 0.2s ease;
 }
 
-.ae-title {
-  font-size: 30rpx;
-  font-weight: 800;
-  color: #FFFFFF;
+.seg-item.on {
+  background: #FFFFFF;
+  color: #2D6A4F;
+  box-shadow: 0 4rpx 14rpx rgba(28, 43, 32, 0.1);
 }
 
-.ae-sub {
-  font-size: 22rpx;
-  color: rgba(255, 255, 255, 0.85);
-  margin-top: 6rpx;
-}
-
-.ae-arrow {
-  color: rgba(255, 255, 255, 0.9);
-  font-size: 40rpx;
-  font-weight: 700;
-}
-
+/* ============ 学习报告 ============ */
 .report-card {
-  margin-bottom: 32rpx;
+  margin-bottom: 24rpx;
 }
 
 .header {
@@ -170,4 +160,207 @@
 .mins {
   color: #8C9BA5;
   font-size: 24rpx;
+}
+
+/* 报告页底部「问问助手」提示卡 */
+.assistant-tip {
+  display: flex;
+  align-items: center;
+  gap: 20rpx;
+  margin: 0 24rpx 32rpx;
+  padding: 28rpx 30rpx;
+  border-radius: 28rpx;
+  background: linear-gradient(120deg, #2D6A4F 0%, #52B788 100%);
+  box-shadow: 0 10rpx 26rpx rgba(45, 106, 79, 0.22);
+}
+
+.assistant-tip:active {
+  transform: scale(0.99);
+}
+
+.at-icon {
+  width: 76rpx;
+  height: 76rpx;
+  border-radius: 22rpx;
+  background: rgba(255, 255, 255, 0.22);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 40rpx;
+}
+
+.at-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.at-title {
+  font-size: 30rpx;
+  font-weight: 800;
+  color: #FFFFFF;
+}
+
+.at-sub {
+  font-size: 22rpx;
+  color: rgba(255, 255, 255, 0.85);
+  margin-top: 6rpx;
+}
+
+.at-arrow {
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 40rpx;
+  font-weight: 700;
+}
+
+/* ============ 内嵌 AI 助手聊天 ============ */
+.chat-scroll {
+  flex: 1;
+  min-height: 0;
+}
+
+.chat-inner {
+  padding: 20rpx 24rpx;
+}
+
+.msg-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 16rpx;
+  margin-bottom: 26rpx;
+}
+
+.msg-row.right {
+  flex-direction: row-reverse;
+}
+
+.avatar {
+  width: 64rpx;
+  height: 64rpx;
+  border-radius: 18rpx;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  font-size: 30rpx;
+}
+
+.avatar.bot {
+  background: linear-gradient(135deg, #52B788, #2D6A4F);
+  color: #FFFFFF;
+}
+
+.bubble {
+  max-width: 74%;
+  padding: 20rpx 24rpx;
+  font-size: 28rpx;
+  line-height: 1.55;
+  border-radius: 24rpx;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.bubble.bot {
+  background: #FFFFFF;
+  color: #1C2B20;
+  border-top-left-radius: 8rpx;
+  box-shadow: 0 4rpx 18rpx rgba(28, 43, 32, 0.06);
+}
+
+.bubble.user {
+  background: linear-gradient(135deg, #52B788, #40916C);
+  color: #FFFFFF;
+  border-top-right-radius: 8rpx;
+}
+
+.suggestions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16rpx;
+  margin: 8rpx 0 26rpx 80rpx;
+}
+
+.sug-chip {
+  padding: 16rpx 26rpx;
+  background: #FFFFFF;
+  border: 2rpx solid #D8F3DC;
+  color: #2D6A4F;
+  font-size: 26rpx;
+  border-radius: 36rpx;
+  box-shadow: 0 4rpx 14rpx rgba(28, 43, 32, 0.05);
+}
+
+.sug-chip:active {
+  background: #D8F3DC;
+}
+
+.typing {
+  display: flex;
+  align-items: center;
+  gap: 10rpx;
+}
+
+.typing .dot {
+  width: 12rpx;
+  height: 12rpx;
+  border-radius: 50%;
+  background: #B7C9BD;
+  animation: blink 1.2s infinite ease-in-out;
+}
+
+.typing .dot:nth-child(2) {
+  animation-delay: 0.2s;
+}
+
+.typing .dot:nth-child(3) {
+  animation-delay: 0.4s;
+}
+
+@keyframes blink {
+  0%, 80%, 100% {
+    opacity: 0.3;
+  }
+  40% {
+    opacity: 1;
+  }
+}
+
+.bottom-anchor {
+  height: 2rpx;
+}
+
+.chat-input-bar {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 16rpx;
+  padding: 16rpx 24rpx calc(16rpx + env(safe-area-inset-bottom));
+  background: #FFFFFF;
+  box-shadow: 0 -4rpx 20rpx rgba(28, 43, 32, 0.06);
+}
+
+.chat-input {
+  flex: 1;
+  height: 76rpx;
+  padding: 0 26rpx;
+  background: #F4FAF6;
+  border-radius: 38rpx;
+  font-size: 28rpx;
+}
+
+.chat-send {
+  flex-shrink: 0;
+  height: 76rpx;
+  line-height: 76rpx;
+  padding: 0 36rpx;
+  background: #52B788;
+  color: #FFFFFF;
+  font-size: 28rpx;
+  font-weight: 700;
+  border-radius: 38rpx;
+}
+
+.chat-send.disabled {
+  background: #CFD8DC;
+  color: #FFFFFF;
 }
