@@ -1,7 +1,12 @@
-/** 选座布局 — 知行岛平面图（1–27 号，按建筑平面图分区） */
+/**
+ * 知行岛座位平面图 — 坐标按原图 1024×990 换算
+ * plan-main = 1024×772（主区），底栏 218
+ * 所有座位 left/top 为 plan-main 内的百分比
+ */
 
 const MAP_WIDTH = 1024
 const MAP_HEIGHT = 990
+const MAIN_HEIGHT = 772
 const PLAN_SEAT_COUNT = 27
 
 const CODE_TO_SLOT = {
@@ -10,22 +15,56 @@ const CODE_TO_SLOT = {
   C01: 1, C02: 2, C03: 11, C04: 12, C05: 13, C06: 25, C07: 26, C08: 27,
 }
 
-/**
- * 第二张建筑平面图
- * - 左上沉浸：左墙 21–24，右墙 19–20
- * - 中上沉浸：左墙 16–18，右墙 14–15
- * - 左下沉浸：左墙 25–27，右侧休息区（虚线）
- * - 标准区：内列上 9–11、下 12–13，靠右列 8–3，入口旁 1–2
- */
-const ZONE_LAYOUT = {
-  immLeft: [[21, 22, 23, 24], [19, 20]],
-  immMid: [[16, 17, 18], [14, 15]],
-  immLow: [25, 26, 27],
-  standardUpper: [9, 10, 11],
-  standardLower: [12, 13],
-  standardRight: [8, 7, 6, 5, 4, 3],
-  standardEntry: [1, 2],
+/** 像素 → plan-main 百分比 */
+function pct(x, y) {
+  return {
+    left: +((x / MAP_WIDTH) * 100).toFixed(2),
+    top: +((y / MAIN_HEIGHT) * 100).toFixed(2),
+  }
 }
+
+/**
+ * 原图座位中心像素（1024×772 主区）
+ * 左墙自上而下编号，与建筑平面图一致
+ */
+const MAIN_POS = {
+  /* 左上沉浸：左墙 24→21，右墙 19-20 */
+  24: pct(35, 58),
+  23: pct(35, 168),
+  22: pct(35, 278),
+  21: pct(35, 388),
+  19: pct(318, 128),
+  20: pct(318, 308),
+
+  /* 中上沉浸：左墙 18→16，右墙 14-15 */
+  18: pct(398, 68),
+  17: pct(398, 238),
+  16: pct(398, 408),
+  14: pct(562, 118),
+  15: pct(562, 318),
+
+  /* 左下沉浸：25-27 */
+  25: pct(35, 578),
+  26: pct(35, 648),
+  27: pct(35, 718),
+
+  /* 标准区：内列 9-11 / 12-13，右墙 8→3，入口 1-2 */
+  9: pct(682, 58),
+  10: pct(682, 133),
+  11: pct(682, 208),
+  12: pct(682, 368),
+  13: pct(682, 443),
+  8: pct(962, 48),
+  7: pct(962, 118),
+  6: pct(962, 188),
+  5: pct(962, 258),
+  4: pct(962, 328),
+  3: pct(962, 398),
+  1: pct(652, 688),
+  2: pct(742, 688),
+}
+
+const ALL_SLOTS = Object.keys(MAIN_POS).map(Number)
 
 function slotFromCode(seatCode) {
   if (!seatCode) return null
@@ -60,34 +99,18 @@ function placeholderSeat(slot) {
   }
 }
 
-function resolveSlot(slot, bySlot) {
-  return bySlot[slot] || placeholderSeat(slot)
-}
-
-function pickColumns(columns, bySlot) {
-  return columns.map((col) => col.map((slot) => resolveSlot(slot, bySlot)))
-}
-
-function pickList(slots, bySlot) {
-  return slots.map((slot) => resolveSlot(slot, bySlot))
-}
-
-function groupSeatsForZones(seats) {
+function buildSeatMarkers(seats) {
   const bySlot = {}
   ;(seats || []).forEach((s) => {
     const item = enrichSeat(s)
     if (item.map_slot) bySlot[item.map_slot] = item
   })
 
-  return {
-    immLeft: pickColumns(ZONE_LAYOUT.immLeft, bySlot),
-    immMid: pickColumns(ZONE_LAYOUT.immMid, bySlot),
-    immLow: pickList(ZONE_LAYOUT.immLow, bySlot),
-    standardUpper: pickList(ZONE_LAYOUT.standardUpper, bySlot),
-    standardLower: pickList(ZONE_LAYOUT.standardLower, bySlot),
-    standardRight: pickList(ZONE_LAYOUT.standardRight, bySlot),
-    standardEntry: pickList(ZONE_LAYOUT.standardEntry, bySlot),
-  }
+  return ALL_SLOTS.map((slot) => {
+    const seat = bySlot[slot] || placeholderSeat(slot)
+    const pos = MAIN_POS[slot]
+    return { ...seat, ...pos }
+  })
 }
 
 function zoneNameBySlot(slot) {
@@ -105,14 +128,14 @@ function getLayout() {
     applySeats(seats) {
       return (seats || []).map(enrichSeat)
     },
-    groupSeatsForZones,
+    buildSeatMarkers,
     zoneNameBySlot,
   }
 }
 
 module.exports = {
   getLayout,
-  groupSeatsForZones,
+  buildSeatMarkers,
   zoneNameBySlot,
   MAP_WIDTH,
   MAP_HEIGHT,

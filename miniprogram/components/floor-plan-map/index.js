@@ -1,4 +1,4 @@
-const { groupSeatsForZones } = require('../../utils/seat-layout')
+const { buildSeatMarkers } = require('../../utils/seat-layout')
 
 Component({
   properties: {
@@ -6,19 +6,11 @@ Component({
     selectedId: { type: Number, value: null },
   },
   data: {
-    zones: {
-      immLeft: [[], []],
-      immMid: [[], []],
-      immLow: [],
-      standardUpper: [],
-      standardLower: [],
-      standardRight: [],
-      standardEntry: [],
-    },
+    markers: [],
   },
   observers: {
     seats(seats) {
-      this.setData({ zones: groupSeatsForZones(seats) })
+      this.setData({ markers: buildSeatMarkers(seats) })
     },
   },
   methods: {
