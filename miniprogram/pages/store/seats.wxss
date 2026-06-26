@@ -71,8 +71,8 @@
 .map-wrap {
   position: relative;
   width: 100%;
-  /* 990/1024 原图比例，含标题约 +4% */
-  padding-bottom: 101%;
+  /* 原图 990/1024 = 96.68%，严格同比叠加保证对齐 */
+  padding-bottom: 96.68%;
   height: 0;
   border-radius: 20rpx;
   border: 2rpx solid #D8F3DC;
