@@ -18,12 +18,12 @@
   z-index: 10;
 }
 
-/* 命中区域略大于编号框，覆盖上下桌线，便于点选 */
+/* 命中区域略大于编号框，覆盖上下桌线，便于点选（相对裁切图 843×647） */
 .seat-anchor {
   position: absolute;
   transform: translate(-50%, -50%);
-  width: 5.6%;
-  height: 5.4%;
+  width: 6.6%;
+  height: 7.2%;
   display: flex;
   align-items: center;
   justify-content: center;

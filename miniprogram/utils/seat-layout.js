@@ -1,11 +1,15 @@
 /**
- * 知行岛座位平面图 — 座位中心坐标来自原图 floor-plan-default.png（1024×990）
- * 通过连通域检测逐个量出每个编号框的几何中心，误差 ≤2px
- * left/top 为相对整张平面图的百分比，叠加层 1:1 铺满原图即可精确对齐
+ * 知行岛座位平面图 — 座位中心坐标来自原图（1024×990）连通域检测，误差 ≤2px
+ * 底图已裁掉标题与四周留白（floor-plan-clean.png），仅保留平面图主体
+ * 裁切区域 = 原图 (91,221)–(934,868)，尺寸 843×647
+ * MAIN_POS 仍用原图像素坐标，经 pct() 换算到裁切图，叠加层 1:1 铺满即对齐
  */
 
-const MAP_WIDTH = 1024
-const MAP_HEIGHT = 990
+// 裁切区域（相对原图）
+const CROP_LEFT = 91
+const CROP_TOP = 221
+const MAP_WIDTH = 843
+const MAP_HEIGHT = 647
 const PLAN_SEAT_COUNT = 27
 
 const CODE_TO_SLOT = {
@@ -14,16 +18,16 @@ const CODE_TO_SLOT = {
   C01: 1, C02: 2, C03: 11, C04: 12, C05: 13, C06: 25, C07: 26, C08: 27,
 }
 
-/** 像素 → 整张平面图百分比 */
+/** 原图像素 → 裁切图百分比 */
 function pct(x, y) {
   return {
-    left: +((x / MAP_WIDTH) * 100).toFixed(3),
-    top: +((y / MAP_HEIGHT) * 100).toFixed(3),
+    left: +(((x - CROP_LEFT) / MAP_WIDTH) * 100).toFixed(3),
+    top: +(((y - CROP_TOP) / MAP_HEIGHT) * 100).toFixed(3),
   }
 }
 
 /**
- * 原图座位编号框中心像素（1024×990 整图）
+ * 座位编号框中心像素（原图 1024×990 坐标系）
  */
 const MAIN_POS = {
   /* 左上沉浸区：左墙 21→24，靠中墙 20/19 */

@@ -5,8 +5,8 @@
 </template>
 
 <view class="plan-canvas">
-  <!-- 原始平面图：1:1 铺满，保证 99% 还原 -->
-  <image class="plan-img" src="/assets/floor-plan-default.png" mode="scaleToFill" />
+  <!-- 平面图（已去标题/留白）：1:1 铺满，保证 99% 还原 -->
+  <image class="plan-img" src="/assets/floor-plan-clean.png" mode="scaleToFill" />
 
   <!-- 可点选座位叠加层 -->
   <view class="seats-layer">
