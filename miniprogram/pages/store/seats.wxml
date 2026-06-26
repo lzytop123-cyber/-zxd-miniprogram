@@ -1,15 +1,15 @@
 <view class="page-seats page-safe-bottom">
   <view class="card seat-card">
     <view class="page-head">
-      <view class="page-title">座位分布图</view>
-      <view class="page-sub">点击座位编号即可选择</view>
+      <view class="page-title">知行岛 · 自习室</view>
+      <view class="page-sub">座位平面图 · 点击编号即可选择</view>
     </view>
 
     <view class="legend">
       <view class="legend-item"><view class="dot available"></view><text>可选</text></view>
       <view class="legend-item"><view class="dot reserved"></view><text>已约</text></view>
       <view class="legend-item"><view class="dot occupied"></view><text>使用中</text></view>
-      <text class="count">共 {{seats.length}} 座</text>
+      <text class="count">平面图 {{planSeatCount}} 座 · 可订 {{seats.length}} 座</text>
     </view>
 
     <view class="map-wrap">

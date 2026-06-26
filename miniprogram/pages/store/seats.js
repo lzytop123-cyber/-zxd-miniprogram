@@ -12,6 +12,7 @@ Page({
     startTime: '',
     endTime: '',
     billType: 'hourly',
+    planSeatCount: 27,
   },
 
   onLoad(options) {
@@ -22,6 +23,7 @@ Page({
       billType: options.billType || 'hourly',
     })
     this._layout = getLayout()
+    this.setData({ planSeatCount: this._layout.planSeatCount })
     this.loadSeats()
   },
 
@@ -37,6 +39,10 @@ Page({
 
   selectSeat(e) {
     const { id, code, status } = e.detail
+    if (!id || status === 'empty') {
+      wx.showToast({ title: '该座位暂未开放', icon: 'none' })
+      return
+    }
     if (status !== 'available') {
       wx.showToast({ title: '该座位不可选', icon: 'none' })
       return
@@ -46,17 +52,13 @@ Page({
       selectedId: Number(id),
       selectedCode: code,
       selectedLabel: seat?.map_label || code,
-      selectedZone: this.zoneName(seat?.seat_code),
+      selectedZone: this._layout.zoneNameBySlot(seat?.map_slot),
     })
   },
 
   zoneName(seatCode) {
-    if (!seatCode) return ''
-    const prefix = String(seatCode).charAt(0).toUpperCase()
-    if (prefix === 'A') return '标准区'
-    if (prefix === 'B') return '沉浸区'
-    if (prefix === 'C') return '入口区'
-    return ''
+    const slot = this._layout.applySeats([{ seat_code: seatCode }])[0]?.map_slot
+    return this._layout.zoneNameBySlot(slot)
   },
 
   confirm() {

@@ -71,6 +71,7 @@
 .map-wrap {
   position: relative;
   width: 100%;
+  /* 990 / 1024 原图宽高比 */
   padding-bottom: 96.68%;
   height: 0;
   border-radius: 20rpx;

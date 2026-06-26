@@ -10,7 +10,10 @@ Component({
       immLeft: [[], []],
       immMid: [[], []],
       immLow: [],
-      standard: [[], [], []],
+      standardUpper: [],
+      standardLower: [],
+      standardRight: [],
+      standardEntry: [],
     },
   },
   observers: {
@@ -21,6 +24,7 @@ Component({
   methods: {
     onTap(e) {
       const { id, code, status } = e.currentTarget.dataset
+      if (!id || status === 'empty') return
       this.triggerEvent('select', { id, code, status })
     },
   },
