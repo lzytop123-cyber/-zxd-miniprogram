@@ -1,111 +1,27 @@
 <template name="seatUnit">
-  <view
-    class="seat-unit {{seat.status}} {{selectedId===seat.id?'is-selected':''}}"
-    bindtap="onTap"
-    data-id="{{seat.id}}"
-    data-code="{{seat.seat_code}}"
-    data-status="{{seat.status}}"
-  >
-    <view class="seat-line"></view>
-    <view class="seat-num">{{seat.map_label}}</view>
-    <view class="seat-line"></view>
+  <view class="seat-cell {{seat.status}} {{selectedId===seat.id?'is-selected':''}}">
+    <text wx:if="{{selectedId===seat.id}}" class="seat-cell-num">{{seat.map_label}}</text>
   </view>
 </template>
 
 <view class="plan-canvas">
-  <view class="plan-frame">
-    <view class="plan-main">
-      <!-- 左上沉浸：左列21-24  右列19-20 -->
-      <view class="zone zone-imm-left">
-        <text class="zone-label">沉浸区</text>
-        <view class="zone-body zone-pair">
-          <view class="seat-col col-wall-left">
-            <block wx:for="{{zones.immLeft[0]}}" wx:for-item="seat" wx:key="map_slot">
-              <template is="seatUnit" data="{{seat: seat, selectedId: selectedId}}" />
-            </block>
-          </view>
-          <view class="seat-col col-wall-right">
-            <block wx:for="{{zones.immLeft[1]}}" wx:for-item="seat" wx:key="map_slot">
-              <template is="seatUnit" data="{{seat: seat, selectedId: selectedId}}" />
-            </block>
-          </view>
-        </view>
-        <view class="door-arc door-imm-left"></view>
-      </view>
+  <!-- 原始平面图：1:1 铺满，保证 99% 还原 -->
+  <image class="plan-img" src="/assets/floor-plan-default.png" mode="scaleToFill" />
 
-      <!-- 中上沉浸：左列16-18  右列14-15 -->
-      <view class="zone zone-imm-mid">
-        <text class="zone-label">沉浸区</text>
-        <view class="zone-body zone-pair">
-          <view class="seat-col col-wall-left">
-            <block wx:for="{{zones.immMid[0]}}" wx:for-item="seat" wx:key="map_slot">
-              <template is="seatUnit" data="{{seat: seat, selectedId: selectedId}}" />
-            </block>
-          </view>
-          <view class="seat-col col-wall-right">
-            <block wx:for="{{zones.immMid[1]}}" wx:for-item="seat" wx:key="map_slot">
-              <template is="seatUnit" data="{{seat: seat, selectedId: selectedId}}" />
-            </block>
-          </view>
-        </view>
-        <view class="door-arc door-imm-mid"></view>
-      </view>
-
-      <!-- 左下沉浸：25-27 + 休息区 -->
-      <view class="zone zone-imm-low">
-        <text class="zone-label">沉浸区</text>
-        <view class="zone-body imm-low-body">
-          <view class="seat-col col-wall-left imm-low-col">
-            <block wx:for="{{zones.immLow}}" wx:for-item="seat" wx:key="map_slot">
-              <template is="seatUnit" data="{{seat: seat, selectedId: selectedId}}" />
-            </block>
-          </view>
-          <view class="imm-low-rest"><text>休息区</text></view>
-        </view>
-        <view class="door-arc door-imm-low"></view>
-      </view>
-
-      <view class="zone zone-wc-room">
-        <text class="zone-label zone-label-center">卫生间</text>
-      </view>
-
-      <!-- 标准区 -->
-      <view class="zone zone-standard">
-        <text class="zone-label">标准区</text>
-        <view class="zone-body standard-body">
-          <view class="seat-col std-inner-col">
-            <view class="seat-group">
-              <block wx:for="{{zones.standardUpper}}" wx:for-item="seat" wx:key="map_slot">
-                <template is="seatUnit" data="{{seat: seat, selectedId: selectedId}}" />
-              </block>
-            </view>
-            <view class="seat-group seat-group-gap">
-              <block wx:for="{{zones.standardLower}}" wx:for-item="seat" wx:key="map_slot">
-                <template is="seatUnit" data="{{seat: seat, selectedId: selectedId}}" />
-              </block>
-            </view>
-          </view>
-          <view class="seat-col std-right-col">
-            <block wx:for="{{zones.standardRight}}" wx:for-item="seat" wx:key="map_slot">
-              <template is="seatUnit" data="{{seat: seat, selectedId: selectedId}}" />
-            </block>
-          </view>
-          <view class="std-entry-row">
-            <block wx:for="{{zones.standardEntry}}" wx:for-item="seat" wx:key="map_slot">
-              <template is="seatUnit" data="{{seat: seat, selectedId: selectedId}}" />
-            </block>
-          </view>
-        </view>
-        <view class="door-arc door-standard"></view>
-      </view>
-    </view>
-
-    <view class="plan-footer">
-      <view class="fac fac-rest"><text>休息区</text></view>
-      <view class="fac fac-wc-bar"><text>卫生间</text></view>
-      <view class="fac fac-pantry"><text>茶水间</text></view>
-      <view class="fac fac-dine"><text>餐厅</text></view>
-      <view class="fac fac-entry"><text>入口</text></view>
+  <!-- 可点选座位叠加层 -->
+  <view class="seats-layer">
+    <view
+      wx:for="{{markers}}"
+      wx:for-item="seat"
+      wx:key="map_slot"
+      class="seat-anchor"
+      style="left: {{seat.left}}%; top: {{seat.top}}%;"
+      bindtap="onTap"
+      data-id="{{seat.id}}"
+      data-code="{{seat.seat_code}}"
+      data-status="{{seat.status}}"
+    >
+      <template is="seatUnit" data="{{seat: seat, selectedId: selectedId}}" />
     </view>
   </view>
 </view>

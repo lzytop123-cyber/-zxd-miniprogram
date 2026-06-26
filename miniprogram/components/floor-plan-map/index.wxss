@@ -1,334 +1,76 @@
 .plan-canvas {
   position: absolute;
   inset: 0;
-  background: #FAFCFB;
-}
-
-.plan-frame {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  flex-direction: column;
-  border: 4rpx solid #4B5563;
-  box-sizing: border-box;
   background: #fff;
 }
 
-.plan-main {
-  position: relative;
-  flex: 0 0 78.99%;
-  height: 78.99%;
-  border-bottom: 4rpx solid #4B5563;
-}
-
-.zone {
-  position: absolute;
-  box-sizing: border-box;
-  border: 3rpx solid #6B7280;
-  background: #fafafa;
-  overflow: hidden;
-}
-
-.zone-label {
-  position: absolute;
-  top: 6rpx;
-  left: 8rpx;
-  font-size: 18rpx;
-  color: #9ca3af;
-  font-weight: 600;
-  z-index: 3;
-}
-
-.zone-label-center {
-  left: 50%;
-  top: 50%;
-  transform: translate(-50%, -50%);
-  font-size: 22rpx;
-  color: #6b7280;
-}
-
-.zone-imm-left {
-  left: 0.78%;
-  top: 1.04%;
-  width: 35.94%;
-  height: 70.47%;
-}
-
-.zone-imm-mid {
-  left: 37.21%;
-  top: 1.04%;
-  width: 21.97%;
-  height: 70.47%;
-}
-
-.zone-imm-low {
-  left: 0.78%;
-  bottom: 1.04%;
-  width: 35.94%;
-  height: 29.53%;
-}
-
-.zone-wc-room {
-  left: 37.21%;
-  bottom: 1.04%;
-  width: 21.97%;
-  height: 29.53%;
-  background: #f3f4f6;
-}
-
-.zone-standard {
-  right: 0.78%;
-  top: 1.04%;
-  bottom: 1.04%;
-  width: 40.04%;
-  background: #eef9f2;
-  border-color: #52b788;
-}
-
-.zone-body {
+/* 原图与容器同比例（1024×990），scaleToFill 不会变形 */
+.plan-img {
   position: absolute;
   inset: 0;
-  padding-top: 30rpx;
-  box-sizing: border-box;
-}
-
-/* 统一竖列：固定间距，整齐对齐 */
-.seat-col {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 10rpx;
-}
-
-.seat-group {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 10rpx;
-}
-
-.seat-group-gap {
-  margin-top: 16rpx;
-}
-
-/* 沉浸区双列布局 */
-.zone-pair {
-  display: flex;
-  justify-content: space-between;
-  align-items: stretch;
+  width: 100%;
   height: 100%;
-  padding: 8rpx 10rpx 10rpx;
-  box-sizing: border-box;
 }
 
-.col-wall-left {
-  align-self: stretch;
-  justify-content: space-evenly;
-  padding-left: 4rpx;
+.seats-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 10;
 }
 
-.col-wall-right {
-  align-self: stretch;
-  justify-content: space-evenly;
-  padding-right: 4rpx;
-}
-
-.zone-imm-mid .col-wall-left,
-.zone-imm-mid .col-wall-right {
-  justify-content: space-evenly;
-}
-
-/* 左下沉浸 */
-.imm-low-body {
-  display: flex;
-  height: 100%;
-  padding: 8rpx 0;
-  box-sizing: border-box;
-}
-
-.imm-low-col {
-  width: 32%;
-  justify-content: space-evenly;
-  padding-left: 8rpx;
-}
-
-.imm-low-rest {
-  flex: 1;
-  margin: 10rpx;
-  border: 2rpx dashed #9ca3af;
+/* 命中区域略大于编号框，覆盖上下桌线，便于点选 */
+.seat-anchor {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  width: 5.6%;
+  height: 5.4%;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 20rpx;
-  color: #9ca3af;
 }
 
-/* 标准区三列 + 底部入口 */
-.standard-body {
-  position: relative;
-  height: 100%;
-}
-
-.std-inner-col {
-  position: absolute;
-  left: 10%;
-  top: 6%;
-  bottom: 18%;
-  justify-content: flex-start;
-  padding-top: 4rpx;
-}
-
-.std-right-col {
-  position: absolute;
-  right: 8%;
-  top: 4%;
-  bottom: 20%;
-  justify-content: space-between;
-}
-
-.std-entry-row {
-  position: absolute;
-  left: 8%;
-  bottom: 6%;
-  display: flex;
-  flex-direction: row;
-  gap: 12rpx;
-}
-
-/* 门洞 */
-.door-arc {
-  position: absolute;
-  pointer-events: none;
-  z-index: 4;
-}
-
-.door-imm-left {
-  right: -3rpx;
-  bottom: 10%;
-  width: 20rpx;
-  height: 20rpx;
-  border-right: 3rpx solid #6b7280;
-  border-bottom: 3rpx solid #6b7280;
-  border-radius: 0 0 20rpx 0;
-}
-
-.door-imm-mid {
-  bottom: -3rpx;
-  left: 50%;
-  margin-left: -12rpx;
-  width: 24rpx;
-  height: 14rpx;
-  border: 3rpx solid #6b7280;
-  border-top: none;
-  border-radius: 0 0 12rpx 12rpx;
-}
-
-.door-imm-low {
-  right: -3rpx;
-  top: 8%;
-  width: 20rpx;
-  height: 20rpx;
-  border-right: 3rpx solid #6b7280;
-  border-top: 3rpx solid #6b7280;
-  border-radius: 0 20rpx 0 0;
-}
-
-.door-standard {
-  bottom: -3rpx;
-  left: 24%;
-  width: 32rpx;
-  height: 16rpx;
-  border: 3rpx solid #52b788;
-  border-top: none;
-  border-radius: 0 0 16rpx 16rpx;
-}
-
-/* 座位 */
-.seat-unit {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  flex-shrink: 0;
-}
-
-.seat-line {
-  width: 34rpx;
-  height: 3rpx;
-  background: #6b7280;
-}
-
-.seat-num {
-  width: 42rpx;
-  height: 38rpx;
-  line-height: 38rpx;
-  text-align: center;
-  font-size: 20rpx;
-  font-weight: 700;
-  color: #2d6a4f;
-  background: #fff;
-  border: 2rpx solid #374151;
+/* 编号框：与原图 ~54×44px 编号框对齐 */
+.seat-cell {
+  width: 94%;
+  height: 82%;
   border-radius: 8rpx;
-  margin: 2rpx 0;
   box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.12s ease;
 }
 
-.seat-unit.reserved .seat-num {
-  background: #fff8e6;
-  border-color: #e6a23c;
-  color: #8a6d3b;
+/* 可选：保持原图清爽外观，仅极淡提示可点 */
+.seat-cell.available {
+  background: rgba(82, 183, 136, 0.08);
 }
 
-.seat-unit.occupied .seat-num {
-  background: #e5e7eb;
-  border-color: #9ca3af;
-  color: #6b7280;
+/* 已约 */
+.seat-cell.reserved {
+  background: rgba(230, 162, 60, 0.34);
 }
 
-.seat-unit.empty .seat-num {
-  background: #f9fafb;
-  border-color: #d1d5db;
-  color: #d1d5db;
+/* 使用中 */
+.seat-cell.occupied {
+  background: rgba(120, 130, 140, 0.42);
 }
 
-.seat-unit.empty .seat-line {
-  background: #e5e7eb;
+/* 平面图有框但当前不可订 */
+.seat-cell.empty {
+  background: rgba(180, 188, 196, 0.40);
 }
 
-.seat-unit.is-selected .seat-num {
+/* 选中：实心绿 + 白字 */
+.seat-cell.is-selected {
   background: #52b788;
-  border-color: #2d6a4f;
-  color: #fff;
+  border: 2rpx solid #2d6a4f;
   box-shadow: 0 0 0 4rpx rgba(82, 183, 136, 0.35);
 }
 
-.plan-footer {
-  flex: 0 0 22.02%;
-  height: 22.02%;
-  display: flex;
-}
-
-.fac {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-right: 3rpx solid #6b7280;
-  background: #f3f4f6;
-  font-size: 18rpx;
-  color: #6b7280;
-  font-weight: 600;
-}
-
-.fac:last-child {
-  border-right: none;
-}
-
-.fac-rest { width: 16.41%; }
-.fac-wc-bar { width: 16.41%; }
-.fac-pantry { width: 20.51%; border-right-style: dashed; }
-.fac-dine { width: 19.53%; }
-.fac-entry {
-  flex: 1;
-  background: #eef9f2;
-  color: #2d6a4f;
+.seat-cell-num {
+  font-size: 20rpx;
   font-weight: 700;
+  color: #fff;
+  line-height: 1;
 }

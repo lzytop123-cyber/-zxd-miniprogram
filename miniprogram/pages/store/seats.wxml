@@ -1,8 +1,7 @@
 <view class="page-seats page-safe-bottom">
   <view class="card seat-card">
     <view class="page-head">
-      <view class="page-title">知行岛 · 自习室</view>
-      <view class="page-sub">座位平面图 · 点击编号即可选择</view>
+      <view class="page-sub">点击平面图中的编号即可选择座位</view>
     </view>
 
     <view class="legend">
