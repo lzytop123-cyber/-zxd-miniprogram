@@ -138,7 +138,7 @@ $env:PYTHONPATH="f:\zxd-pro\backend"
 
 | 文档 | 内容 |
 |------|------|
-| **[docs/SERVER-SETUP.md](docs/SERVER-SETUP.md)** | 服务器怎么配：Docker、`.env`、MySQL 要不要装、笔记本当服务器 |
+| **[docs/POST-DEPLOY.md](docs/POST-DEPLOY.md)** | API/后台上线后：小程序联调、后台配置、验收清单 |
 | **[docs/DEPLOY.md](docs/DEPLOY.md)** | 上线总览：微信 / 云老板 / 通通锁 / 检查清单 |
 
 Docker 服务器快速启动（详见 SERVER-SETUP.md）：

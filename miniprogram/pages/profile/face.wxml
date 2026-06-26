@@ -1,5 +1,10 @@
-<view class="card">
-  <view class="status">{{registered ? '已录入人脸' : '尚未录入人脸'}}</view>
-  <view class="hint">开发环境本地保存，生产环境对接门禁人脸识别设备。</view>
-  <view class="btn-primary" bindtap="chooseFace">{{registered ? '重新录入' : '拍照录入'}}</view>
+<view class="list-page page-safe-bottom">
+  <view class="card">
+    <view class="face-status {{registered ? 'done' : ''}}">
+      <view class="face-icon">{{registered ? '✅' : '👤'}}</view>
+      <view class="status">{{registered ? '已录入人脸' : '尚未录入人脸'}}</view>
+    </view>
+    <view class="hint">开发环境本地保存，生产环境对接门禁人脸识别设备。</view>
+    <view class="btn-primary" bindtap="chooseFace">{{registered ? '重新录入' : '拍照录入'}}</view>
+  </view>
 </view>

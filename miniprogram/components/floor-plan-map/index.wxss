@@ -1,0 +1,242 @@
+.plan-canvas {
+  position: absolute;
+  inset: 0;
+  background: #FAFCFB;
+}
+
+.plan-shell {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+/* 主区域 78% 高，底部功能区 22% —— 与原图 772:218 一致 */
+.plan-main {
+  position: relative;
+  flex: 78 0 0;
+  min-height: 0;
+  border: 3rpx solid #2D6A4F;
+  border-radius: 8rpx 8rpx 0 0;
+  background: #FFFFFF;
+  overflow: hidden;
+}
+
+.zone {
+  position: absolute;
+  box-sizing: border-box;
+  border: 2rpx solid #B7DFC8;
+  border-radius: 6rpx;
+  background: #F7FBF8;
+  overflow: hidden;
+}
+
+.zone-label {
+  position: absolute;
+  top: 4rpx;
+  left: 6rpx;
+  font-size: 16rpx;
+  color: #8C9BA5;
+  font-weight: 600;
+  z-index: 1;
+}
+
+/* 左上沉浸 368/1024 ≈ 36%，高 544/772 ≈ 70% */
+.zone-imm-left {
+  left: 0.8%;
+  top: 1%;
+  width: 35.8%;
+  height: 69.5%;
+}
+
+/* 中上沉浸 225/1024 ≈ 22% */
+.zone-imm-mid {
+  left: 37.2%;
+  top: 1%;
+  width: 22%;
+  height: 69.5%;
+}
+
+/* 左下沉浸 + 休息 228/772 ≈ 30% 高 */
+.zone-imm-low {
+  left: 0.8%;
+  bottom: 1%;
+  width: 35.8%;
+  height: 28.5%;
+}
+
+/* 中部走廊休息 nook */
+.zone-corridor {
+  left: 37.2%;
+  bottom: 1%;
+  width: 22%;
+  height: 28.5%;
+  border-style: dashed;
+  background: #FAFDFB;
+}
+
+/* 标准区 431/1024 ≈ 42% */
+.zone-standard {
+  right: 0.8%;
+  top: 1%;
+  bottom: 1%;
+  width: 39.5%;
+  background: #EEF9F2;
+  border-color: #95D5B2;
+}
+
+.zone-body {
+  position: absolute;
+  inset: 0;
+  padding: 28rpx 6rpx 6rpx;
+  box-sizing: border-box;
+}
+
+.zone-body.cols.spread {
+  display: flex;
+  justify-content: space-between;
+  align-items: stretch;
+  padding-left: 10rpx;
+  padding-right: 10rpx;
+}
+
+.zone-body.cols.spread .col {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-evenly;
+  align-items: center;
+}
+
+.zone-body.cols.spread .col:first-child {
+  align-items: flex-start;
+  padding-left: 4rpx;
+}
+
+.zone-body.cols.spread .col:last-child {
+  align-items: flex-end;
+  padding-right: 4rpx;
+}
+
+.imm-low-split {
+  display: flex;
+  height: 100%;
+  gap: 0;
+}
+
+.imm-low-seats {
+  width: 38%;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-evenly;
+  align-items: center;
+  padding-left: 4rpx;
+}
+
+.imm-low-rest {
+  flex: 1;
+  margin: 8rpx 8rpx 8rpx 0;
+  border: 2rpx dashed #C8E6D4;
+  border-radius: 6rpx;
+  background: #FAFDFB;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.rest-text {
+  font-size: 18rpx;
+  color: #8C9BA5;
+}
+
+.standard-layout {
+  display: flex;
+  justify-content: space-between;
+  align-items: stretch;
+  height: 100%;
+  padding: 0 6rpx;
+}
+
+.std-col {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-evenly;
+  align-items: center;
+}
+
+.std-col-inner {
+  flex: 1;
+}
+
+.std-col:last-child {
+  flex: 0.55;
+  justify-content: flex-end;
+  padding-bottom: 8rpx;
+}
+
+.seat-chip {
+  width: 48rpx;
+  height: 48rpx;
+  line-height: 48rpx;
+  text-align: center;
+  font-size: 20rpx;
+  font-weight: 700;
+  color: #2D6A4F;
+  background: #FFFFFF;
+  border: 2rpx solid #52B788;
+  border-radius: 10rpx;
+  box-sizing: border-box;
+  flex-shrink: 0;
+}
+
+.seat-chip.reserved {
+  background: #FFF8E6;
+  border-color: #E6A23C;
+  color: #8A6D3B;
+}
+
+.seat-chip.occupied {
+  background: #ECEFF1;
+  border-color: #CFD8DC;
+  color: #8C9BA5;
+}
+
+.seat-chip.selected {
+  background: #52B788;
+  border-color: #2D6A4F;
+  color: #FFFFFF;
+  box-shadow: 0 0 0 4rpx rgba(82, 183, 136, 0.35);
+}
+
+.seat-chip:active:not(.occupied):not(.reserved) {
+  transform: scale(1.08);
+}
+
+.plan-footer {
+  flex: 22 0 0;
+  min-height: 72rpx;
+  display: flex;
+  border: 3rpx solid #2D6A4F;
+  border-top: none;
+  border-radius: 0 0 8rpx 8rpx;
+  overflow: hidden;
+}
+
+.fac {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-right: 2rpx solid #C8E6D4;
+  background: #F4FAF6;
+  font-size: 16rpx;
+  color: #8C9BA5;
+  font-weight: 600;
+}
+
+.fac:last-child {
+  border-right: none;
+}
+
+.fac-rest { width: 17%; }
+.fac-wc { width: 17%; }
+.fac-tea { width: 21%; }
+.fac-entry { flex: 1; background: #EEF9F2; color: #2D6A4F; }

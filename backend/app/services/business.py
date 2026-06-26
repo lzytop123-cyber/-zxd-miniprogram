@@ -86,6 +86,16 @@ class TTLockService:
     BASE_URL = "https://cnapi.ttlock.com"
 
     @staticmethod
+    def _password_md5(raw: str) -> str:
+        return hashlib.md5(raw.encode("utf-8")).hexdigest()
+
+    @staticmethod
+    def _api_error(data: dict, default: str = "TTLock 请求失败") -> None:
+        code = data.get("errcode", data.get("errorCode", 0))
+        if code not in (0, None, "0"):
+            raise ValueError(data.get("errmsg") or data.get("description") or default)
+
+    @staticmethod
     async def get_access_token() -> str:
         cached = cache_get("ttlock:access_token")
         if cached:
@@ -101,19 +111,63 @@ class TTLockService:
                     "clientId": settings.ttlock_client_id,
                     "clientSecret": settings.ttlock_client_secret,
                     "username": settings.ttlock_username,
-                    "password": settings.ttlock_password,
+                    "password": TTLockService._password_md5(settings.ttlock_password),
                 },
             )
             data = resp.json()
         token = data.get("access_token")
         if not token:
-            raise ValueError(data.get("errmsg", "TTLock 认证失败"))
+            code = data.get("errcode", data.get("errorCode"))
+            msg = data.get("errmsg") or data.get("description") or "TTLock 认证失败"
+            if code:
+                msg = f"[{code}] {msg}"
+            raise ValueError(msg)
         cache_set("ttlock:access_token", token, 7000)
         return token
 
     @staticmethod
+    async def get_ekey(lock_id: str) -> dict:
+        """获取锁的电子钥匙信息（含 lockData）。"""
+        if not settings.ttlock_client_id or not lock_id:
+            return {}
+        token = await TTLockService.get_access_token()
+        async with httpx.AsyncClient(timeout=15) as client:
+            resp = await client.post(
+                f"{TTLockService.BASE_URL}/v3/key/get",
+                data={
+                    "clientId": settings.ttlock_client_id,
+                    "accessToken": token,
+                    "lockId": lock_id,
+                    "date": int(time.time() * 1000),
+                },
+            )
+            data = resp.json()
+        TTLockService._api_error(data, "获取钥匙失败")
+        return data
+
+    @staticmethod
+    async def remote_unlock(lock_id: str) -> dict:
+        """通过 WiFi 网关远程开锁（个体户可用，无需小程序蓝牙插件）。"""
+        if not settings.ttlock_client_id or not lock_id:
+            return {"mock": True}
+        token = await TTLockService.get_access_token()
+        async with httpx.AsyncClient(timeout=20) as client:
+            resp = await client.post(
+                f"{TTLockService.BASE_URL}/v3/lock/unlock",
+                data={
+                    "clientId": settings.ttlock_client_id,
+                    "accessToken": token,
+                    "lockId": lock_id,
+                    "date": int(time.time() * 1000),
+                },
+            )
+            data = resp.json()
+        TTLockService._api_error(data, "远程开锁失败")
+        return data
+
+    @staticmethod
     async def send_key(lock: BleLock, start: datetime, end: datetime, key_name: str) -> dict:
-        if not settings.ttlock_client_id or not lock.lock_id:
+        if not settings.ttlock_client_id or not lock.lock_id or str(lock.lock_id).startswith("mock_"):
             return {
                 "keyId": f"mock_{lock.id}_{int(time.time())}",
                 "lockData": lock.lock_data or f"mock_lock_data_{lock.id}",
@@ -128,21 +182,32 @@ class TTLockService:
                     "clientId": settings.ttlock_client_id,
                     "accessToken": token,
                     "lockId": lock.lock_id,
+                    "receiverUsername": settings.ttlock_username,
+                    "keyName": key_name,
                     "startDate": int(start.timestamp() * 1000),
                     "endDate": int(end.timestamp() * 1000),
-                    "keyName": key_name,
                     "date": now_ms,
                 },
             )
-            return resp.json()
+            data = resp.json()
+        TTLockService._api_error(data, "发放蓝牙钥匙失败")
+
+        lock_data = data.get("lockData") or lock.lock_data
+        if not lock_data:
+            ekey = await TTLockService.get_ekey(str(lock.lock_id))
+            lock_data = ekey.get("lockData") or lock.lock_data
+        return {
+            "keyId": data.get("keyId", ""),
+            "lockData": lock_data,
+        }
 
     @staticmethod
     async def delete_key(key_id: str) -> None:
-        if not settings.ttlock_client_id or key_id.startswith("mock_"):
+        if not settings.ttlock_client_id or not key_id or str(key_id).startswith("mock_"):
             return
         token = await TTLockService.get_access_token()
         async with httpx.AsyncClient(timeout=15) as client:
-            await client.post(
+            resp = await client.post(
                 f"{TTLockService.BASE_URL}/v3/key/delete",
                 data={
                     "clientId": settings.ttlock_client_id,
@@ -151,6 +216,8 @@ class TTLockService:
                     "date": int(time.time() * 1000),
                 },
             )
+            data = resp.json()
+        TTLockService._api_error(data, "删除钥匙失败")
 
 
 def generate_order_no() -> str:
@@ -279,27 +346,44 @@ async def create_ble_keys_for_reservation(db: Session, reservation: Reservation)
     locks = db.scalars(
         select(BleLock).where(BleLock.store_id == reservation.store_id, BleLock.status == 1)
     ).all()
+    if not locks:
+        return []
+
     keys: list[BleKey] = []
+    key_start = reservation.start_time - timedelta(minutes=15)
+    key_end = reservation.end_time + timedelta(minutes=15)
     for lock in locks:
-        result = await TTLockService.send_key(
-            lock,
-            reservation.start_time - timedelta(minutes=15),
-            reservation.end_time + timedelta(minutes=15),
-            f"知行岛-{reservation.order_no}",
-        )
+        try:
+            result = await TTLockService.send_key(
+                lock,
+                key_start,
+                key_end,
+                f"知行岛-{reservation.order_no}",
+            )
+        except ValueError as e:
+            if not lock.lock_data:
+                continue
+            result = {
+                "keyId": f"fallback_{lock.id}_{int(time.time())}",
+                "lockData": lock.lock_data,
+            }
+        lock_data = result.get("lockData")
+        if not lock_data:
+            continue
         ble_key = BleKey(
             lock_id=lock.id,
             reservation_id=reservation.id,
             user_id=reservation.user_id,
             ttlock_key_id=str(result.get("keyId", "")),
-            lock_data=result.get("lockData"),
-            start_time=reservation.start_time - timedelta(minutes=15),
-            end_time=reservation.end_time + timedelta(minutes=15),
+            lock_data=lock_data,
+            start_time=key_start,
+            end_time=key_end,
         )
         db.add(ble_key)
         keys.append(ble_key)
         expire = int((reservation.end_time - datetime.now()).total_seconds()) + 3600
         if expire > 0:
-            cache_set(f"ble_key:{reservation.id}", result.get("lockData"), expire)
-    db.commit()
+            cache_set(f"ble_key:{reservation.id}", lock_data, expire)
+    if keys:
+        db.commit()
     return keys

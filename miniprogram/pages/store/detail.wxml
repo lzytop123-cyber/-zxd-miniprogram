@@ -1,12 +1,31 @@
-<view class="card" wx:if="{{store}}">
-  <view class="cover-placeholder" wx:if="{{!store.cover_images || !store.cover_images.length}}">知行岛</view>
-  <swiper wx:else autoplay circular indicator-dots class="cover-swiper">
-    <swiper-item wx:for="{{store.cover_images}}" wx:key="*this">
-      <image src="{{item}}" mode="aspectFill" class="cover-img" />
-    </swiper-item>
-  </swiper>
-  <view class="store-name">{{store.name}}</view>
-  <view class="store-addr">{{store.address}}</view>
-  <view class="btn-primary book-btn" bindtap="goBooking">自助预定</view>
-  <view class="wifi" wx:if="{{store.wifi_name}}">WiFi: {{store.wifi_name}} / {{store.wifi_password}}</view>
+<view class="page-detail page-safe-bottom" wx:if="{{store}}">
+  <view class="hero">
+    <view class="cover-placeholder" wx:if="{{!store.cover_images || !store.cover_images.length}}">
+      <text>知行岛</text>
+    </view>
+    <swiper wx:else autoplay circular indicator-dots indicator-color="rgba(255,255,255,0.4)" indicator-active-color="#52B788" class="cover-swiper">
+      <swiper-item wx:for="{{store.cover_images}}" wx:key="*this">
+        <image src="{{item}}" mode="aspectFill" class="cover-img" />
+      </swiper-item>
+    </swiper>
+  </view>
+
+  <view class="info-card card">
+    <view class="store-name">{{store.name}}</view>
+    <view class="store-addr">{{store.address}}</view>
+    <view class="tag-row">
+      <text class="tag" wx:if="{{store.status === 1}}">营业中</text>
+      <text class="tag gray" wx:else>已打烊</text>
+      <text class="tag" wx:if="{{store.wifi_name}}">Wi-Fi</text>
+      <text class="tag">安静自习</text>
+    </view>
+    <view class="wifi" wx:if="{{store.wifi_name}}">
+      WiFi：{{store.wifi_name}} / {{store.wifi_password}}
+    </view>
+  </view>
+
+  <view class="fixed-bottom-spacer"></view>
+  <view class="fixed-bottom-bar">
+    <view class="btn-primary book-btn" bindtap="goBooking">立即预约</view>
+  </view>
 </view>

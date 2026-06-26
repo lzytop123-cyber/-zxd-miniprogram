@@ -1,19 +1,124 @@
-.header { display: flex; justify-content: space-between; font-size: 18px; font-weight: bold; margin-bottom: 16px; }
-.scope { font-size: 12px; color: #888; font-weight: normal; }
-.my-rank { text-align: center; margin-bottom: 16px; }
-.rank-no { font-size: 24px; font-weight: bold; color: #FFD000; }
-.title-badge { display: inline-block; background: #FFD000; padding: 2px 8px; border-radius: 4px; font-size: 12px; margin-top: 4px; }
-.stat-row { display: flex; justify-content: space-around; margin-bottom: 12px; }
-.stat { text-align: center; }
-.num { font-size: 16px; font-weight: bold; }
-.label { font-size: 12px; color: #888; margin-top: 4px; }
-.beat { text-align: center; color: #888; font-size: 12px; margin-bottom: 16px; }
-.tabs { display: flex; gap: 8px; margin-bottom: 16px; }
-.tab { padding: 6px 16px; background: #f5f5f5; border-radius: 16px; font-size: 12px; }
-.tab.active { background: #FFD000; }
-.section-title { font-weight: bold; margin-bottom: 8px; }
-.rank-item { display: flex; padding: 10px 0; border-bottom: 1px solid #f0f0f0; align-items: center; }
-.rank-item.self { background: #fff9e0; }
-.rank { width: 40px; font-weight: bold; color: #FFD000; }
-.name { flex: 1; }
-.mins { color: #888; font-size: 12px; }
+.page-report {
+  min-height: 100vh;
+}
+
+.report-card {
+  margin-bottom: 32rpx;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 32rpx;
+}
+
+.header-title {
+  font-size: 36rpx;
+  font-weight: 700;
+  color: #2D6A4F;
+}
+
+.scope {
+  font-size: 24rpx;
+  color: #52B788;
+  padding: 8rpx 20rpx;
+  background: #D8F3DC;
+  border-radius: 40rpx;
+}
+
+.my-rank {
+  text-align: center;
+  margin-bottom: 32rpx;
+  padding: 32rpx;
+  background: linear-gradient(135deg, #D8F3DC, #F4FAF6);
+  border-radius: 24rpx;
+}
+
+.rank-no {
+  font-size: 56rpx;
+  font-weight: 700;
+  color: #52B788;
+}
+
+.title-badge {
+  display: inline-block;
+  background: #52B788;
+  color: #FFFFFF;
+  padding: 8rpx 24rpx;
+  border-radius: 40rpx;
+  font-size: 24rpx;
+  margin-top: 12rpx;
+}
+
+.stat-row {
+  display: flex;
+  justify-content: space-around;
+  margin-bottom: 24rpx;
+  padding: 24rpx 0;
+  border-top: 2rpx solid #F4FAF6;
+  border-bottom: 2rpx solid #F4FAF6;
+}
+
+.stat {
+  text-align: center;
+}
+
+.num {
+  font-size: 32rpx;
+  font-weight: 700;
+  color: #1C2B20;
+}
+
+.stat-label {
+  font-size: 24rpx;
+  color: #8C9BA5;
+  margin-top: 8rpx;
+}
+
+.beat {
+  text-align: center;
+  color: #8C9BA5;
+  font-size: 24rpx;
+  margin-bottom: 32rpx;
+}
+
+.tabs {
+  display: flex;
+  gap: 16rpx;
+  margin-bottom: 24rpx;
+}
+
+.section-title.inner {
+  padding: 0;
+  margin-bottom: 16rpx;
+}
+
+.rank-item {
+  display: flex;
+  padding: 24rpx 16rpx;
+  border-bottom: 2rpx solid #F4FAF6;
+  align-items: center;
+  border-radius: 16rpx;
+}
+
+.rank-item.self {
+  background: #D8F3DC;
+}
+
+.rank {
+  width: 64rpx;
+  font-weight: 700;
+  color: #52B788;
+  font-size: 28rpx;
+}
+
+.name {
+  flex: 1;
+  color: #1C2B20;
+}
+
+.mins {
+  color: #8C9BA5;
+  font-size: 24rpx;
+}

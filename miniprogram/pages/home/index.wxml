@@ -1,19 +1,56 @@
-<view class="banner card">
-  <view class="banner-placeholder">知行岛自习室</view>
-</view>
+<view class="page-home page-safe-bottom">
+  <view class="home-header">
+    <view class="brand">
+      <view class="brand-logo">岛</view>
+      <view>
+        <view class="brand-name">知行岛自习室</view>
+        <view class="brand-slogan">知行合一 · 专注学习</view>
+      </view>
+    </view>
+  </view>
 
-<view class="shortcuts card">
-  <view class="shortcut" bindtap="goExchange">美团兑换</view>
-  <view class="shortcut" bindtap="goDouyin">抖音兑换</view>
-  <view class="shortcut" bindtap="goCards">我的期限卡</view>
-  <view class="shortcut" bindtap="goCoupons">我的优惠券</view>
-</view>
+  <view class="search-bar">
+    <text class="search-icon">⌕</text>
+    <text class="search-placeholder">搜索门店名称或地址</text>
+  </view>
 
-<view class="section-title">附近门店</view>
-<view class="store-list">
-  <view class="card store-item" wx:for="{{stores}}" wx:key="id" bindtap="goStore" data-id="{{item.id}}">
-    <view class="store-name">{{item.name}}</view>
-    <view class="store-addr">{{item.address}}</view>
-    <view class="store-dist" wx:if="{{item.distance}}">距您 {{item.distance}} km</view>
+  <view class="banner card banner-card">
+    <view class="banner-inner">
+      <view class="banner-title">安静空间，高效学习</view>
+      <view class="banner-sub">预约座位 · 记录时长 · 美团兑换</view>
+    </view>
+  </view>
+
+  <view class="shortcuts card">
+    <view class="shortcut" bindtap="goExchange">
+      <view class="shortcut-icon meituan">美</view>
+      <text>美团兑换</text>
+    </view>
+    <view class="shortcut" bindtap="goDouyin">
+      <view class="shortcut-icon douyin">抖</view>
+      <text>抖音兑换</text>
+    </view>
+    <view class="shortcut" bindtap="goCards">
+      <view class="shortcut-icon period">卡</view>
+      <text>期限卡</text>
+    </view>
+    <view class="shortcut" bindtap="goCoupons">
+      <view class="shortcut-icon coupon">券</view>
+      <text>优惠券</text>
+    </view>
+  </view>
+
+  <view class="section-title">附近门店</view>
+  <view class="store-list">
+    <store-card
+      wx:for="{{stores}}"
+      wx:key="id"
+      store="{{item}}"
+      bind:select="goStore"
+    />
+    <view class="empty" wx:if="{{!stores.length}}">
+      <view class="empty-icon">🌿</view>
+      <view>暂无门店信息</view>
+    </view>
   </view>
 </view>

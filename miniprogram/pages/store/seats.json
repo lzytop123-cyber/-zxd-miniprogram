@@ -1,3 +1,6 @@
 {
-  "navigationBarTitleText": "选择座位"
+  "navigationBarTitleText": "选择座位",
+  "usingComponents": {
+    "floor-plan-map": "../../components/floor-plan-map/index"
+  }
 }

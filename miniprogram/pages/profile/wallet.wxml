@@ -1,18 +1,29 @@
-<view class="card">
-  <view class="balance">当前余额：¥{{balance}}</view>
-  <view class="amounts">
-    <view class="amt {{amount==50?'active':''}}" bindtap="setAmount" data-a="50">50元</view>
-    <view class="amt {{amount==100?'active':''}}" bindtap="setAmount" data-a="100">100元</view>
-    <view class="amt {{amount==200?'active':''}}" bindtap="setAmount" data-a="200">200元</view>
-    <view class="amt {{amount==500?'active':''}}" bindtap="setAmount" data-a="500">500元</view>
+<view class="list-page page-safe-bottom">
+  <view class="wallet-hero">
+    <view class="balance-label">当前余额</view>
+    <view class="balance-val">¥{{balance}}</view>
   </view>
-  <view class="btn-primary" bindtap="recharge">立即充值</view>
-</view>
 
-<view class="card">
-  <view class="title">充值记录</view>
-  <view class="log" wx:for="{{logs}}" wx:key="id">
-    <view>{{item.remark}}</view>
-    <view class="log-amt">+¥{{item.amount}}</view>
+  <view class="card">
+    <view class="section-head">选择充值金额</view>
+    <view class="amounts">
+      <view class="amt {{amount==50?'active':''}}" bindtap="setAmount" data-a="50">50元</view>
+      <view class="amt {{amount==100?'active':''}}" bindtap="setAmount" data-a="100">100元</view>
+      <view class="amt {{amount==200?'active':''}}" bindtap="setAmount" data-a="200">200元</view>
+      <view class="amt {{amount==500?'active':''}}" bindtap="setAmount" data-a="500">500元</view>
+    </view>
+    <view class="btn-primary" bindtap="recharge">立即充值</view>
+  </view>
+
+  <view class="card">
+    <view class="section-head">充值记录</view>
+    <view class="log" wx:for="{{logs}}" wx:key="id">
+      <view>{{item.remark}}</view>
+      <view class="log-amt">+¥{{item.amount}}</view>
+    </view>
+    <view class="empty" wx:if="{{!logs.length}}">
+      <view class="empty-icon">💰</view>
+      <view>暂无充值记录</view>
+    </view>
   </view>
 </view>

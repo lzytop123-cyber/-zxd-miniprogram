@@ -1,12 +1,20 @@
-<view class="card">
-  <view class="total">当前积分：{{total}}</view>
-  <view class="title">积分明细</view>
-  <view class="log" wx:for="{{logs}}" wx:key="id">
-    <view>
-      <view>{{item.remark}}</view>
-      <view class="time">{{item.created_at}}</view>
+<view class="list-page page-safe-bottom">
+  <view class="card">
+    <view class="points-hero">
+      <view class="total">{{total}}</view>
+      <view class="total-label">当前积分</view>
     </view>
-    <view class="pts">+{{item.points}}</view>
+    <view class="section-head">积分明细</view>
+    <view class="log" wx:for="{{logs}}" wx:key="id">
+      <view>
+        <view>{{item.remark}}</view>
+        <view class="time">{{item.created_at}}</view>
+      </view>
+      <view class="pts">+{{item.points}}</view>
+    </view>
+    <view class="empty" wx:if="{{!logs.length}}">
+      <view class="empty-icon">⭐</view>
+      <view>暂无积分记录</view>
+    </view>
   </view>
-  <view class="empty" wx:if="{{!logs.length}}">暂无积分记录</view>
 </view>

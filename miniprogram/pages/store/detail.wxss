@@ -1,7 +1,65 @@
-.cover-placeholder { height: 200px; background: #FFD000; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-weight: bold; margin-bottom: 12px; }
-.cover-swiper { height: 200px; margin-bottom: 12px; }
-.cover-img { width: 100%; height: 200px; border-radius: 8px; }
-.store-name { font-size: 18px; font-weight: bold; }
-.store-addr { color: #888; margin: 8px 0 16px; font-size: 12px; }
-.book-btn { margin-top: 12px; }
-.wifi { margin-top: 12px; font-size: 12px; color: #888; }
+.page-detail {
+  min-height: 100vh;
+}
+
+.hero {
+  height: 440rpx;
+  overflow: hidden;
+}
+
+.cover-placeholder {
+  height: 440rpx;
+  background: linear-gradient(160deg, #D8F3DC, #52B788);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 48rpx;
+  font-weight: 700;
+  color: #2D6A4F;
+}
+
+.cover-swiper,
+.cover-img {
+  width: 100%;
+  height: 440rpx;
+}
+
+.info-card {
+  margin-top: -40rpx;
+  position: relative;
+  z-index: 2;
+}
+
+.store-name {
+  font-size: 36rpx;
+  font-weight: 700;
+  color: #1C2B20;
+}
+
+.store-addr {
+  color: #8C9BA5;
+  margin: 16rpx 0;
+  font-size: 26rpx;
+  line-height: 1.5;
+}
+
+.tag-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12rpx;
+  margin-top: 16rpx;
+}
+
+.wifi {
+  margin-top: 20rpx;
+  font-size: 24rpx;
+  color: #8C9BA5;
+  padding: 16rpx;
+  background: #F4FAF6;
+  border-radius: 16rpx;
+}
+
+.book-btn {
+  margin: 0;
+  width: 100%;
+}

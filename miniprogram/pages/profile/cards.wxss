@@ -1,4 +1,220 @@
-.card-item { margin-bottom: 12px; }
-.name { font-size: 16px; font-weight: bold; }
-.info { font-size: 12px; color: #888; margin-top: 4px; }
-.empty { text-align: center; color: #888; padding: 40px; }
+.list-page {
+  min-height: 100vh;
+  padding-bottom: 32rpx;
+}
+
+.list-card {
+  margin-bottom: 24rpx;
+}
+
+.list-card .name,
+.order .row:first-child {
+  font-size: 30rpx;
+  font-weight: 700;
+  color: #2D6A4F;
+}
+
+.list-card .info,
+.order .sub {
+  font-size: 24rpx;
+  color: #8C9BA5;
+  margin-top: 8rpx;
+  line-height: 1.5;
+}
+
+.order .row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8rpx 0;
+}
+
+.order .status {
+  font-size: 24rpx;
+  color: #52B788;
+  font-weight: 600;
+}
+
+/* 优惠券 */
+.coupon-item {
+  position: relative;
+  border-left: 8rpx solid #52B788;
+  margin-bottom: 24rpx;
+}
+
+.coupon-item .name {
+  font-size: 32rpx;
+  font-weight: 700;
+  color: #2D6A4F;
+}
+
+.coupon-item .info {
+  font-size: 24rpx;
+  color: #8C9BA5;
+  margin-top: 8rpx;
+}
+
+.coupon-item .status {
+  position: absolute;
+  top: 32rpx;
+  right: 32rpx;
+  font-size: 22rpx;
+  padding: 4rpx 16rpx;
+  border-radius: 40rpx;
+  background: #D8F3DC;
+  color: #2D6A4F;
+}
+
+/* 钱包 */
+.wallet-hero {
+  background: linear-gradient(135deg, #52B788 0%, #2D6A4F 100%);
+  color: #FFFFFF;
+  margin: 24rpx;
+  border-radius: 32rpx;
+  padding: 48rpx 32rpx;
+  box-shadow: 0 8rpx 32rpx rgba(45, 106, 79, 0.25);
+}
+
+.wallet-hero .balance-label {
+  font-size: 26rpx;
+  opacity: 0.9;
+}
+
+.wallet-hero .balance-val {
+  font-size: 56rpx;
+  font-weight: 700;
+  margin-top: 8rpx;
+}
+
+.amounts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16rpx;
+  margin: 24rpx 0;
+}
+
+.amt {
+  flex: 1;
+  min-width: 140rpx;
+  text-align: center;
+  padding: 24rpx 16rpx;
+  border-radius: 16rpx;
+  border: 2rpx solid #D8F3DC;
+  color: #2D6A4F;
+  font-size: 28rpx;
+  font-weight: 600;
+}
+
+.amt.active {
+  background: #52B788;
+  border-color: #52B788;
+  color: #FFFFFF;
+}
+
+.section-head {
+  font-size: 30rpx;
+  font-weight: 600;
+  color: #2D6A4F;
+  margin-bottom: 16rpx;
+}
+
+.log {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20rpx 0;
+  border-bottom: 2rpx solid #F4FAF6;
+}
+
+.log:last-child {
+  border-bottom: none;
+}
+
+.log-amt,
+.pts {
+  font-size: 30rpx;
+  font-weight: 700;
+  color: #52B788;
+}
+
+.log .time {
+  font-size: 22rpx;
+  color: #8C9BA5;
+  margin-top: 4rpx;
+}
+
+/* 积分 */
+.points-hero {
+  text-align: center;
+  padding: 16rpx 0 32rpx;
+  border-bottom: 2rpx solid #F4FAF6;
+  margin-bottom: 16rpx;
+}
+
+.points-hero .total {
+  font-size: 56rpx;
+  font-weight: 700;
+  color: #52B788;
+}
+
+.points-hero .total-label {
+  font-size: 26rpx;
+  color: #8C9BA5;
+  margin-top: 8rpx;
+}
+
+/* 邀请 */
+.code-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: #F4FAF6;
+  border-radius: 16rpx;
+  padding: 24rpx;
+  margin: 16rpx 0;
+}
+
+.code {
+  font-size: 36rpx;
+  font-weight: 700;
+  color: #2D6A4F;
+  letter-spacing: 4rpx;
+}
+
+.copy-btn {
+  padding: 12rpx 28rpx;
+  background: #52B788;
+  color: #FFFFFF;
+  border-radius: 40rpx;
+  font-size: 24rpx;
+}
+
+.input {
+  background: #F4FAF6;
+  border: 2rpx solid #D8F3DC;
+  border-radius: 16rpx;
+  padding: 24rpx;
+  margin: 16rpx 0;
+  font-size: 28rpx;
+}
+
+/* 人脸 */
+.face-status {
+  text-align: center;
+  padding: 32rpx 0;
+}
+
+.face-icon {
+  font-size: 80rpx;
+  margin-bottom: 16rpx;
+}
+
+.face-status .status {
+  font-size: 32rpx;
+  font-weight: 600;
+  color: #2D6A4F;
+}
+
+.face-status.done .status {
+  color: #52B788;
+}

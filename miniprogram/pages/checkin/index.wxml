@@ -1,18 +1,52 @@
-<view wx:if="{{!reservation}}" class="empty card">
-  <view class="empty-text">暂无订单</view>
-  <view class="btn-primary" bindtap="goBooking">立即预定</view>
-</view>
-
-<view wx:else class="card active-card">
-  <view class="seat-no">{{reservation.seat_code}}</view>
-  <view class="store">{{reservation.store_name}}</view>
-  <view class="time">结束时间：{{endDisplay}}</view>
-  <view class="countdown" wx:if="{{countdown}}">{{countdown}}</view>
-
-  <view class="btn-primary {{canOpen ? '' : 'disabled'}}" bindtap="openDoor">
-    蓝牙开门
+<view class="page-checkin page-safe-bottom">
+  <view wx:if="{{!reservation}}" class="empty card empty-card">
+    <view class="empty-icon">📚</view>
+    <view class="empty-text">暂无进行中的订单</view>
+    <view class="empty-hint">预约并支付后可在此开门入座</view>
+    <view class="btn-primary" bindtap="goBooking">立即预定</view>
   </view>
-  <view class="tip" wx:if="{{!canOpen}}">提前15分钟可开门</view>
 
-  <view class="sub-btn" bindtap="checkout" wx:if="{{reservation.status === 1}}">提前离座</view>
+  <view wx:else class="active-panel">
+    <view class="info-card card">
+      <view class="store-name">{{reservation.store_name}}</view>
+      <view class="seat-ring">
+        <view class="seat-no">{{reservation.seat_code}}</view>
+        <view class="seat-label">您的座位</view>
+      </view>
+      <view class="time">结束 {{endDisplay}}</view>
+      <view class="countdown" wx:if="{{countdown}}">{{countdown}}</view>
+      <view class="lock-name" wx:if="{{lockName}}">门锁：{{lockName}}</view>
+    </view>
+
+    <view class="open-section">
+      <view class="tip" wx:if="{{!canOpen}}">提前15分钟可开门</view>
+      <view class="tip ok" wx:elif="{{canOpen}}">请在门口操作开门</view>
+
+      <view class="open-actions">
+        <view
+          class="open-btn ble {{canOpen && !opening ? '' : 'disabled'}}"
+          bindtap="openDoorBle"
+        >
+          <view class="open-icon">📶</view>
+          <view class="open-text">蓝牙开门</view>
+          <view class="open-sub" wx:if="{{!pluginReady}}">需企业插件</view>
+        </view>
+
+        <view
+          class="open-btn remote {{canOpen && gatewayUnlock && !opening ? '' : 'disabled'}}"
+          bindtap="openDoorRemote"
+        >
+          <view class="open-icon">☁</view>
+          <view class="open-text">远程开门</view>
+          <view class="open-sub">WiFi网关</view>
+        </view>
+      </view>
+
+      <view class="hint" wx:if="{{!gatewayUnlock}}">
+        远程开门需配置通通锁开放平台 + WiFi 网关，并在通通锁 APP 开启「远程开锁」
+      </view>
+    </view>
+
+    <view class="btn-outline" bindtap="checkout" wx:if="{{reservation.status === 1}}">提前离座</view>
+  </view>
 </view>

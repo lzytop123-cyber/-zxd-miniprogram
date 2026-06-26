@@ -24,7 +24,8 @@ Page({
   },
 
   goStore(e) {
-    wx.navigateTo({ url: `/pages/store/detail?id=${e.currentTarget.dataset.id}` })
+    const id = e.detail?.id ?? e.currentTarget.dataset.id
+    wx.navigateTo({ url: `/pages/store/detail?id=${id}` })
   },
 
   goExchange() {

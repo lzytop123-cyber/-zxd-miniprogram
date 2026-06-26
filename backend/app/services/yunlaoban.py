@@ -1,8 +1,11 @@
 import json
+import logging
 
 import httpx
 
 from app.core.config import settings
+
+logger = logging.getLogger(__name__)
 
 
 def _use_mock() -> bool:
@@ -27,6 +30,8 @@ class YunlaobanService:
     @staticmethod
     async def prepare(platform: int, code: str) -> dict:
         if _use_mock():
+            if settings.app_env == "production" and (settings.coupon_provider or "").lower() == "meituan":
+                logger.warning("COUPON_PROVIDER=meituan but Yunlaoban credentials missing; using mock prepare")
             return _mock_prepare(code, platform)
         shop_id = int(settings.yunlaoban_shop_id)
         base = settings.yunlaoban_base_url.rstrip("/")

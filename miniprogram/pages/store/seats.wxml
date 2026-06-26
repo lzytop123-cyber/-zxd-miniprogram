@@ -1,27 +1,32 @@
-<view class="card">
-  <view class="legend">
-    <view class="dot available"></view><text>可约</text>
-    <view class="dot reserved"></view><text>已约</text>
-    <view class="dot occupied"></view><text>使用中</text>
-    <text class="count">共 {{seats.length}} 座</text>
+<view class="page-seats page-safe-bottom">
+  <view class="card seat-card">
+    <view class="page-head">
+      <view class="page-title">座位分布图</view>
+      <view class="page-sub">点击座位编号即可选择</view>
+    </view>
+
+    <view class="legend">
+      <view class="legend-item"><view class="dot available"></view><text>可选</text></view>
+      <view class="legend-item"><view class="dot reserved"></view><text>已约</text></view>
+      <view class="legend-item"><view class="dot occupied"></view><text>使用中</text></view>
+      <text class="count">共 {{seats.length}} 座</text>
+    </view>
+
+    <view class="map-wrap">
+      <floor-plan-map
+        seats="{{seats}}"
+        selectedId="{{selectedId}}"
+        bind:select="selectSeat"
+      />
+    </view>
   </view>
-  <view class="zone-tags">
-    <text class="zone-tag">A区 标准座</text>
-    <text class="zone-tag">B区 靠窗座</text>
-    <text class="zone-tag">C区 帘位座</text>
+
+  <view class="fixed-bottom-bar">
+    <view class="selected" wx:if="{{selectedCode}}">
+      已选 <text class="selected-code">{{selectedLabel || selectedCode}}</text> 号座
+      <text class="selected-meta" wx:if="{{selectedZone}}">（{{selectedZone}}）</text>
+    </view>
+    <view class="selected placeholder" wx:else>请在分布图中点选座位</view>
+    <view class="btn-primary {{selectedCode ? '' : 'disabled'}}" bindtap="confirm">下一步</view>
   </view>
-  <view class="seat-map">
-    <view
-      wx:for="{{seats}}"
-      wx:key="id"
-      class="seat {{item.status}} {{selectedId===item.id?'selected':''}}"
-      style="left:{{item.pos_x}}rpx;top:{{item.pos_y}}rpx"
-      bindtap="selectSeat"
-      data-id="{{item.id}}"
-      data-code="{{item.seat_code}}"
-      data-status="{{item.status}}"
-    >{{item.seat_code}}</view>
-  </view>
-  <view class="selected" wx:if="{{selectedCode}}">已选：{{selectedCode}}</view>
-  <view class="btn-primary" bindtap="confirm">确认选座</view>
 </view>

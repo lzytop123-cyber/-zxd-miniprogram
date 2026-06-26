@@ -1,0 +1,96 @@
+<view class="plan-canvas">
+  <view class="plan-shell">
+    <view class="plan-main">
+      <!-- 左上沉浸：21-24 | 19-20 -->
+      <view class="zone zone-imm-left">
+        <text class="zone-label">沉浸区</text>
+        <view class="zone-body cols spread">
+          <view class="col" wx:for="{{zones.immLeft}}" wx:key="index">
+            <view
+              wx:for="{{item}}"
+              wx:for-item="seat"
+              wx:key="id"
+              class="seat-chip {{seat.status}} {{selectedId===seat.id?'selected':''}}"
+              bindtap="onTap"
+              data-id="{{seat.id}}"
+              data-code="{{seat.seat_code}}"
+              data-status="{{seat.status}}"
+            >{{seat.map_label}}</view>
+          </view>
+        </view>
+      </view>
+
+      <!-- 中上沉浸：16-18 | 14-15 -->
+      <view class="zone zone-imm-mid">
+        <text class="zone-label">沉浸区</text>
+        <view class="zone-body cols spread">
+          <view class="col" wx:for="{{zones.immMid}}" wx:key="index">
+            <view
+              wx:for="{{item}}"
+              wx:for-item="seat"
+              wx:key="id"
+              class="seat-chip {{seat.status}} {{selectedId===seat.id?'selected':''}}"
+              bindtap="onTap"
+              data-id="{{seat.id}}"
+              data-code="{{seat.seat_code}}"
+              data-status="{{seat.status}}"
+            >{{seat.map_label}}</view>
+          </view>
+        </view>
+      </view>
+
+      <!-- 左下沉浸：25-27 竖排 + 休息区 -->
+      <view class="zone zone-imm-low">
+        <text class="zone-label">沉浸区</text>
+        <view class="zone-body imm-low-split">
+          <view class="imm-low-seats">
+            <view
+              wx:for="{{zones.immLow}}"
+              wx:for-item="seat"
+              wx:key="id"
+              class="seat-chip {{seat.status}} {{selectedId===seat.id?'selected':''}}"
+              bindtap="onTap"
+              data-id="{{seat.id}}"
+              data-code="{{seat.seat_code}}"
+              data-status="{{seat.status}}"
+            >{{seat.map_label}}</view>
+          </view>
+          <view class="imm-low-rest">
+            <text class="rest-text">休息区</text>
+          </view>
+        </view>
+      </view>
+
+      <!-- 走廊休息 nook（原图中部下方） -->
+      <view class="zone zone-corridor">
+        <text class="zone-label">休息区</text>
+      </view>
+
+      <!-- 标准区：9-13 | 8-3 | 1-2 -->
+      <view class="zone zone-standard">
+        <text class="zone-label">标准区</text>
+        <view class="zone-body standard-layout">
+          <view class="std-col std-col-inner" wx:for="{{zones.standard}}" wx:key="index">
+            <view
+              wx:for="{{item}}"
+              wx:for-item="seat"
+              wx:key="id"
+              class="seat-chip {{seat.status}} {{selectedId===seat.id?'selected':''}}"
+              bindtap="onTap"
+              data-id="{{seat.id}}"
+              data-code="{{seat.seat_code}}"
+              data-status="{{seat.status}}"
+            >{{seat.map_label}}</view>
+          </view>
+        </view>
+      </view>
+    </view>
+
+    <view class="plan-footer">
+      <view class="fac fac-rest"><text>休息区</text></view>
+      <view class="fac fac-wc"><text>卫生间</text></view>
+      <view class="fac fac-tea"><text>茶水间</text></view>
+      <view class="fac fac-entry"><text>入口</text></view>
+    </view>
+  </view>
+</view>

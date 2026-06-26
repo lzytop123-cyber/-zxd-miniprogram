@@ -1,14 +1,109 @@
-.title { font-size: 18px; font-weight: bold; }
-.tabs { white-space: nowrap; margin: 12px 0; }
-.tab { display: inline-block; padding: 6px 14px; margin-right: 8px; background: #f5f5f5; border-radius: 16px; font-size: 12px; }
-.tab.active { background: #FFD000; font-weight: bold; }
-.label { margin: 12px 0 4px; font-weight: bold; font-size: 14px; }
-.picker { padding: 10px; background: #f5f5f5; border-radius: 8px; color: #1a1a1a; }
-.hint { font-size: 12px; color: #888; margin: 8px 0; }
-.quick-btns { display: flex; gap: 8px; margin: 8px 0; }
-.quick { padding: 6px 12px; background: #fff3c4; border-radius: 16px; font-size: 12px; }
-.time-summary { background: #f9f9f9; padding: 10px; border-radius: 8px; font-size: 12px; color: #666; margin: 12px 0; }
-.seat-row { display: flex; justify-content: space-between; padding: 14px 0; margin: 12px 0; border-top: 1px solid #f0f0f0; border-bottom: 1px solid #f0f0f0; }
-.seat-code { color: #FFD000; font-weight: bold; }
-.price { margin: 16px 0; font-size: 16px; font-weight: bold; }
-.seat { display: block; font-size: 12px; color: #888; font-weight: normal; margin-top: 4px; }
+.page-booking {
+  min-height: 100vh;
+  padding-bottom: 160rpx;
+}
+
+.booking-card {
+  margin-bottom: 0;
+}
+
+.title {
+  font-size: 36rpx;
+  font-weight: 700;
+  color: #2D6A4F;
+}
+
+.tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16rpx;
+  margin: 24rpx 0;
+}
+
+.tab-item {
+  padding: 14rpx 32rpx;
+  border-radius: 40rpx;
+  font-size: 26rpx;
+  border: 2rpx solid #52B788;
+  color: #52B788;
+  background: #FFFFFF;
+  line-height: 1.4;
+  box-sizing: border-box;
+  flex-shrink: 0;
+}
+
+.tab-item.active {
+  background: #52B788;
+  color: #FFFFFF;
+  border-color: #52B788;
+  font-weight: 600;
+}
+
+.quick-btns .chip {
+  margin-right: 0;
+}
+
+.quick-btns {
+  display: flex;
+  gap: 16rpx;
+  margin: 16rpx 0;
+  flex-wrap: wrap;
+}
+
+.time-summary {
+  background: #D8F3DC;
+  padding: 20rpx 24rpx;
+  border-radius: 16rpx;
+  font-size: 24rpx;
+  color: #2D6A4F;
+  margin: 24rpx 0;
+}
+
+.seat-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 28rpx 0;
+  margin: 16rpx 0 0;
+  border-top: 2rpx solid #F4FAF6;
+}
+
+.seat-label {
+  font-weight: 600;
+  color: #1C2B20;
+}
+
+.seat-code {
+  color: #52B788;
+  font-weight: 600;
+}
+
+.price-box {
+  margin-top: 24rpx;
+  padding: 24rpx;
+  background: #F4FAF6;
+  border-radius: 24rpx;
+  text-align: center;
+}
+
+.price-label {
+  font-size: 24rpx;
+  color: #8C9BA5;
+}
+
+.price-value {
+  font-size: 48rpx;
+  font-weight: 700;
+  color: #52B788;
+  margin: 8rpx 0;
+}
+
+.price-seat {
+  font-size: 24rpx;
+  color: #8C9BA5;
+}
+
+.fixed-bottom-bar .btn-primary {
+  margin: 0;
+  width: 100%;
+}

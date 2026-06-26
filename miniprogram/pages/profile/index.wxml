@@ -1,20 +1,52 @@
-<view class="card profile-card" wx:if="{{user}}">
-  <image class="avatar" src="{{user.avatar_url || 'https://via.placeholder.com/80'}}" />
-  <view class="nickname">{{user.nickname}}</view>
-  <view class="title-badge">{{user.title || '小白'}}</view>
-  <view class="stats">
-    <view>余额 ¥{{user.balance}}</view>
-    <view>积分 {{user.total_points}}</view>
+<view class="page-profile page-safe-bottom">
+  <view class="profile-header" wx:if="{{user}}">
+    <image class="avatar" src="{{user.avatar_url || 'https://via.placeholder.com/80'}}" />
+    <view class="nickname">{{user.nickname}}</view>
+    <view class="title-badge">{{user.title || '小白'}}</view>
+    <view class="stats-row">
+      <view class="stat-pill">
+        <view class="stat-val">¥{{user.balance}}</view>
+        <view class="stat-key">余额</view>
+      </view>
+      <view class="stat-pill">
+        <view class="stat-val">{{user.total_points}}</view>
+        <view class="stat-key">积分</view>
+      </view>
+    </view>
   </view>
-</view>
 
-<view class="card menu">
-  <view class="menu-item" bindtap="go" data-url="/pages/profile/wallet">余额充值 ›</view>
-  <view class="menu-item" bindtap="go" data-url="/pages/profile/orders">预定订单 ›</view>
-  <view class="menu-item" bindtap="go" data-url="/pages/profile/cards">期限卡 ›</view>
-  <view class="menu-item" bindtap="go" data-url="/pages/profile/coupons">优惠券 ›</view>
-  <view class="menu-item" bindtap="go" data-url="/pages/profile/points">我的积分 ›</view>
-  <view class="menu-item" bindtap="go" data-url="/pages/profile/invite">邀请有礼 ›</view>
-  <view class="menu-item" bindtap="go" data-url="/pages/profile/face">人脸录入 ›</view>
-  <button class="menu-item phone-btn" open-type="getPhoneNumber" bindgetphonenumber="bindPhone">绑定手机号 ›</button>
+  <view class="menu-grid card">
+    <view class="menu-item" bindtap="go" data-url="/pages/profile/wallet">
+      <view class="menu-icon">💰</view>
+      <text>钱包</text>
+    </view>
+    <view class="menu-item" bindtap="go" data-url="/pages/profile/orders">
+      <view class="menu-icon">📋</view>
+      <text>我的订单</text>
+    </view>
+    <view class="menu-item" bindtap="go" data-url="/pages/profile/cards">
+      <view class="menu-icon">🎫</view>
+      <text>期限卡</text>
+    </view>
+    <view class="menu-item" bindtap="go" data-url="/pages/profile/coupons">
+      <view class="menu-icon">🏷</view>
+      <text>优惠券</text>
+    </view>
+    <view class="menu-item" bindtap="go" data-url="/pages/profile/points">
+      <view class="menu-icon">⭐</view>
+      <text>积分明细</text>
+    </view>
+    <view class="menu-item" bindtap="go" data-url="/pages/profile/invite">
+      <view class="menu-icon">🎁</view>
+      <text>邀请有礼</text>
+    </view>
+    <view class="menu-item" bindtap="go" data-url="/pages/profile/face">
+      <view class="menu-icon">👤</view>
+      <text>人脸录入</text>
+    </view>
+    <button class="menu-item phone-btn" open-type="getPhoneNumber" bindgetphonenumber="bindPhone">
+      <view class="menu-icon">📱</view>
+      <text>绑定手机</text>
+    </button>
+  </view>
 </view>

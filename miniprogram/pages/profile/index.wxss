@@ -1,4 +1,106 @@
-.stats { display: flex; justify-content: space-around; margin-top: 12px; color: #888; font-size: 14px; }
-.menu-item { padding: 14px 0; border-bottom: 1px solid #f0f0f0; }
-.phone-btn { background: none; text-align: left; padding: 14px 0; font-size: 14px; line-height: normal; width: 100%; }
-.phone-btn::after { border: none; }
+.page-profile {
+  min-height: 100vh;
+  padding-bottom: 32rpx;
+}
+
+.profile-header {
+  background: linear-gradient(160deg, #2D6A4F 0%, #52B788 100%);
+  padding: 48rpx 32rpx 64rpx;
+  border-radius: 0 0 48rpx 48rpx;
+  text-align: center;
+  color: #FFFFFF;
+}
+
+.avatar {
+  width: 128rpx;
+  height: 128rpx;
+  border-radius: 50%;
+  border: 4rpx solid rgba(255, 255, 255, 0.8);
+}
+
+.nickname {
+  font-size: 36rpx;
+  font-weight: 700;
+  margin-top: 20rpx;
+}
+
+.title-badge {
+  display: inline-block;
+  margin-top: 12rpx;
+  padding: 6rpx 20rpx;
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 40rpx;
+  font-size: 24rpx;
+}
+
+.stats-row {
+  display: flex;
+  justify-content: center;
+  gap: 24rpx;
+  margin-top: 32rpx;
+}
+
+.stat-pill {
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 24rpx;
+  padding: 20rpx 40rpx;
+  min-width: 160rpx;
+}
+
+.stat-val {
+  font-size: 32rpx;
+  font-weight: 700;
+}
+
+.stat-key {
+  font-size: 22rpx;
+  opacity: 0.85;
+  margin-top: 4rpx;
+}
+
+.menu-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0;
+  padding: 8rpx 0;
+  margin-top: -24rpx;
+  position: relative;
+  z-index: 2;
+}
+
+.menu-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 32rpx 16rpx;
+  font-size: 26rpx;
+  color: #1C2B20;
+  border-bottom: 2rpx solid #F4FAF6;
+}
+
+.menu-item:nth-child(odd) {
+  border-right: 2rpx solid #F4FAF6;
+}
+
+.menu-icon {
+  width: 72rpx;
+  height: 72rpx;
+  border-radius: 50%;
+  background: #D8F3DC;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 32rpx;
+  margin-bottom: 12rpx;
+}
+
+.phone-btn {
+  background: transparent;
+  line-height: normal;
+  font-weight: normal;
+}
+
+.phone-btn::after {
+  border: none;
+}

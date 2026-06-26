@@ -1,16 +1,18 @@
 const { request } = require('../../utils/request')
 
 let plugin = null
+let pluginReady = false
 try {
   plugin = requirePlugin('ttlock-plugin')
+  pluginReady = true
 } catch (e) {
-  console.log('通通锁插件未加载（测试号可忽略）')
+  console.log('通通锁插件未加载，可使用远程开门')
 }
 
 function formatDate(iso) {
-  const d = new Date(iso)
+  const d = new Date(String(iso).replace(' ', 'T'))
   const pad = (n) => (n < 10 ? '0' + n : '' + n)
-  return `${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`
+  return `${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`
 }
 
 Page({
@@ -20,9 +22,14 @@ Page({
     countdown: '',
     canOpen: false,
     lockData: '',
+    lockName: '',
+    gatewayUnlock: false,
+    pluginReady: false,
+    opening: false,
   },
 
   onShow() {
+    this.setData({ pluginReady })
     this.loadActive()
   },
 
@@ -33,7 +40,7 @@ Page({
           this.setData({ reservation: null })
           return
         }
-        const start = new Date(reservation.start_time.replace(' ', 'T'))
+        const start = new Date(String(reservation.start_time).replace(' ', 'T'))
         const now = new Date()
         const canOpen = now >= new Date(start.getTime() - 15 * 60000)
         this.setData({
@@ -44,22 +51,29 @@ Page({
         this.loadBleKey(reservation.id)
         this.startCountdown(reservation.end_time)
       })
-      .catch((err) => {
-        console.error('loadActive failed', err)
+      .catch(() => {
         this.setData({ reservation: null })
       })
   },
 
   loadBleKey(reservationId) {
-    request({ url: `/ble/key/${reservationId}` }).then((res) => {
-      wx.setStorageSync(`ble_key_${reservationId}`, res.lockData)
-      this.setData({ lockData: res.lockData })
-    }).catch(() => {})
+    request({ url: `/ble/key/${reservationId}` })
+      .then((res) => {
+        wx.setStorageSync(`ble_key_${reservationId}`, res.lockData)
+        this.setData({
+          lockData: res.lockData,
+          lockName: res.lockName || '门店大门',
+          gatewayUnlock: !!res.gatewayUnlock,
+        })
+      })
+      .catch(() => {
+        this.setData({ lockData: '', gatewayUnlock: false })
+      })
   },
 
   startCountdown(endTime) {
     const tick = () => {
-      const diff = new Date(endTime) - new Date()
+      const diff = new Date(String(endTime).replace(' ', 'T')) - new Date()
       if (diff <= 0) {
         this.setData({ countdown: '已结束' })
         return
@@ -78,55 +92,98 @@ Page({
     if (this._timer) clearInterval(this._timer)
   },
 
-  async openDoor() {
-    if (!this.data.canOpen) return
+  afterOpenSuccess(reservation) {
+    wx.hideLoading()
+    wx.showToast({ title: '门已开启', icon: 'success' })
+    wx.vibrateShort()
+    request({
+      url: `/ble/checkin/${reservation.id}`,
+      method: 'POST',
+      data: { reservation_id: reservation.id, result: 'success' },
+    })
+    if (reservation.status === 0) {
+      request({ url: `/reservation/${reservation.id}/checkin`, method: 'POST' })
+        .then(() => this.loadActive())
+    }
+    this.setData({ opening: false })
+  },
+
+  afterOpenFail(reservation, errorMsg, errorCode) {
+    wx.hideLoading()
+    wx.showToast({ title: errorMsg || '开门失败', icon: 'none' })
+    request({
+      url: `/ble/checkin/${reservation.id}`,
+      method: 'POST',
+      data: {
+        reservation_id: reservation.id,
+        result: 'fail',
+        error_code: errorCode ? String(errorCode) : '',
+        error_msg: errorMsg || '',
+      },
+    })
+    this.setData({ opening: false })
+  },
+
+  async openDoorBle() {
+    if (!this.data.canOpen || this.data.opening) return
     const { reservation } = this.data
     if (!reservation) return
 
     try {
       await wx.openBluetoothAdapter()
     } catch (e) {
-      wx.showModal({ title: '请开启蓝牙', content: '开门需要蓝牙权限，请在手机设置中开启' })
+      wx.showModal({
+        title: '请开启蓝牙',
+        content: '蓝牙开门需要开启手机蓝牙，或在通通锁 APP 中确认已打开远程开锁后使用「远程开门」。',
+      })
       return
     }
 
-    wx.showLoading({ title: '正在连接门锁...' })
+    this.setData({ opening: true })
+    wx.showLoading({ title: '蓝牙连接中...' })
     const lockData = wx.getStorageSync(`ble_key_${reservation.id}`) || this.data.lockData
 
-    const onSuccess = () => {
+    if (!plugin) {
       wx.hideLoading()
-      wx.showToast({ title: '门已开启', icon: 'success' })
-      wx.vibrateShort()
-      request({
-        url: `/ble/checkin/${reservation.id}`,
-        method: 'POST',
-        data: { reservation_id: reservation.id, result: 'success' },
+      wx.showModal({
+        title: '蓝牙插件未启用',
+        content: '请在微信后台添加通通锁插件（企业主体），或使用「远程开门」。',
+        showCancel: false,
       })
-      if (reservation.status === 0) {
-        request({ url: `/reservation/${reservation.id}/checkin`, method: 'POST' })
-        this.loadActive()
-      }
+      this.setData({ opening: false })
+      return
     }
 
-    if (!plugin) {
-      setTimeout(onSuccess, 800)
+    if (!lockData) {
+      wx.hideLoading()
+      wx.showToast({ title: '钥匙未生成，请稍后重试', icon: 'none' })
+      this.setData({ opening: false })
       return
     }
 
     plugin.startBleToLock(
       lockData,
       1,
-      onSuccess,
+      () => this.afterOpenSuccess(reservation),
       (errorCode, errorMsg) => {
-        wx.hideLoading()
-        wx.showToast({ title: '开门失败，请靠近门锁重试', icon: 'none' })
-        request({
-          url: `/ble/checkin/${reservation.id}`,
-          method: 'POST',
-          data: { reservation_id: reservation.id, result: 'fail', error_code: String(errorCode), error_msg: errorMsg },
-        })
+        this.afterOpenFail(reservation, '蓝牙开门失败，可试远程开门', errorCode)
       }
     )
+  },
+
+  openDoorRemote() {
+    if (!this.data.canOpen || this.data.opening) return
+    const { reservation } = this.data
+    if (!reservation) return
+
+    this.setData({ opening: true })
+    wx.showLoading({ title: '远程开门中...' })
+    request({ url: `/ble/unlock/${reservation.id}`, method: 'POST' })
+      .then(() => this.afterOpenSuccess(reservation))
+      .catch((err) => {
+        const msg = err.detail || err.message || '远程开门失败'
+        this.afterOpenFail(reservation, msg, '')
+      })
   },
 
   checkout() {

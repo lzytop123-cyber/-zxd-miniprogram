@@ -37,6 +37,25 @@ def admin_login(body: AdminLoginRequest, db: Session = Depends(get_db)):
     return ResponseModel(data=AdminLoginResponse(token=token, username=admin.username))
 
 
+@router.get("/system/coupon", response_model=ResponseModel)
+def coupon_system_status(_: object = Depends(get_current_admin)):
+    """检查云老板/美团核销配置（不暴露密钥）。"""
+    from app.services.yunlaoban import _use_mock
+
+    configured = bool(
+        settings.yunlaoban_client_id and settings.yunlaoban_secret and settings.yunlaoban_shop_id
+    )
+    return ResponseModel(
+        data={
+            "coupon_provider": settings.coupon_provider,
+            "yunlaoban_configured": configured,
+            "use_mock": _use_mock(),
+            "shop_id": settings.yunlaoban_shop_id or None,
+            "base_url": settings.yunlaoban_base_url,
+        }
+    )
+
+
 @router.get("/reservations", response_model=ResponseModel[PageResult[ReservationItem]])
 def admin_reservations(
     page: int = Query(1, ge=1),

@@ -104,6 +104,8 @@ docker compose -f docker-compose.prod.yml --env-file .env.docker exec api python
 
 验证：`curl http://127.0.0.1:8000/health` → `{"status":"ok"}`
 
+**API + 后台已部署？** 继续 **[POST-DEPLOY.md](./POST-DEPLOY.md)**（小程序联调、团购映射、验收）。
+
 ### A3. 手动部署（不用 Docker）
 
 ```bash
@@ -257,7 +259,26 @@ A: 检查合法域名、HTTPS 证书、后端 CORS；真机关闭「不校验域
 A: `WX_APPID` 不能是 `your_wx_appid` 占位符，且 `APP_ENV=production`。
 
 **Q: 团购兑换 400**  
-A: 检查云老板凭证、deal 映射、券码是否已兑换。
+A: 检查云老板凭证、deal 映射、券码是否已兑换。见下方「美团核销不可用」。
+
+**Q: 服务器美团核销用不了 / 假券能兑真券不行**  
+A: 多半是 `backend/.env` **未配置云老板凭证**，API 走了 Mock（按券码末位数字模拟，不调云老板）。  
+在服务器检查：
+
+```bash
+docker compose -f docker-compose.prod.yml --env-file .env.docker exec api python scripts/test_yunlaoban.py
+```
+
+若显示 `use_mock = True`，编辑 `backend/.env` 补上（从本机开发 `.env` 复制）：
+
+```env
+MEITUAN_CLIENT_ID=...
+MEITUAN_SECRET=...
+MEITUAN_SHOP_ID=19762149503545
+COUPON_PROVIDER=meituan
+```
+
+然后 `docker compose ... restart api`。后台登录后也可访问 `GET /api/admin/system/coupon` 查看 `use_mock` 是否为 `false`。
 
 **Q: SQLite 数据如何迁 MySQL**  
 A: 生产请用 `init_production.py` 重新 seed；历史订单需单独导出导入。

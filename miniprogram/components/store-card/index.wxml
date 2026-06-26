@@ -1,0 +1,32 @@
+<view class="store-card" bindtap="onTap">
+  <view class="cover-wrap">
+    <image
+      wx:if="{{store.cover_images && store.cover_images.length && store.cover_images[0] && !coverFailed}}"
+      class="cover"
+      src="{{store.cover_images[0]}}"
+      mode="aspectFill"
+      lazy-load
+      binderror="onCoverError"
+    />
+    <view wx:else class="cover cover-placeholder">
+      <view class="placeholder-bg"></view>
+      <view class="placeholder-content">
+        <view class="placeholder-icon">📚</view>
+        <text class="cover-logo">知行岛自习室</text>
+      </view>
+    </view>
+    <view class="status-tag {{store.status === 1 ? 'open' : 'closed'}}">
+      {{store.status === 1 ? '营业中' : '已打烊'}}
+    </view>
+  </view>
+  <view class="info">
+    <view class="name-row">
+      <text class="name">{{store.name}}</text>
+      <text class="arrow">›</text>
+    </view>
+    <view class="addr-row">
+      <text class="addr">{{store.address}}</text>
+      <text class="dist" wx:if="{{store.distance != null}}">{{store.distance}} km</text>
+    </view>
+  </view>
+</view>

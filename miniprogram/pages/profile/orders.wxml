@@ -1,6 +1,11 @@
-<view class="card order" wx:for="{{orders}}" wx:key="id">
-  <view class="row"><text>{{item.store_name}}</text><text class="status">{{statusText[item.status]}}</text></view>
-  <view class="row sub">座位 {{item.seat_code}} · ¥{{item.final_price}}</view>
-  <view class="row sub">{{item.start_time}} ~ {{item.end_time}}</view>
+<view class="list-page page-safe-bottom">
+  <view class="card list-card order" wx:for="{{orders}}" wx:key="id">
+    <view class="row"><text>{{item.store_name}}</text><text class="status">{{statusText[item.status]}}</text></view>
+    <view class="row sub">座位 {{item.seat_code}} · ¥{{item.final_price}}</view>
+    <view class="row sub">{{item.start_time}} ~ {{item.end_time}}</view>
+  </view>
+  <view class="empty" wx:if="{{!orders.length}}">
+    <view class="empty-icon">📋</view>
+    <view>暂无订单</view>
+  </view>
 </view>
-<view class="empty" wx:if="{{!orders.length}}">暂无订单</view>

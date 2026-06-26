@@ -1,10 +1,123 @@
-.row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #f0f0f0; }
-.price-row { border: none; margin-top: 8px; }
-.price { color: #FF4444; font-size: 20px; font-weight: bold; }
-.discount { color: #4CAF50; }
-.section-title { font-weight: bold; margin: 12px 0 8px; }
-.picker-row { padding: 10px; border: 1px dashed #ddd; border-radius: 8px; color: #333; margin-bottom: 8px; font-weight: 500; }
-.hint-warn { background: #fff9e0; color: #996600; font-size: 12px; padding: 10px; border-radius: 8px; margin-bottom: 12px; line-height: 1.6; }
-.pay-types { display: flex; gap: 12px; margin: 16px 0; flex-wrap: wrap; }
-.pay-item { flex: 1; text-align: center; padding: 10px; border: 1px solid #eee; border-radius: 8px; }
-.pay-item.active { border-color: #FFD000; background: #fff9e0; }
+.page-order {
+  min-height: 100vh;
+  padding-bottom: 200rpx;
+}
+
+.order-card {
+  margin-bottom: 0;
+}
+
+.block-title {
+  font-size: 30rpx;
+  font-weight: 700;
+  color: #2D6A4F;
+  margin-bottom: 16rpx;
+}
+
+.section-title.inner {
+  padding: 0;
+  margin: 32rpx 0 16rpx;
+  font-size: 28rpx;
+}
+
+.row {
+  display: flex;
+  justify-content: space-between;
+  padding: 20rpx 0;
+  border-bottom: 2rpx solid #F4FAF6;
+  font-size: 26rpx;
+}
+
+.row-label {
+  color: #8C9BA5;
+}
+
+.fee-block {
+  margin-top: 16rpx;
+  padding-top: 8rpx;
+}
+
+.price-row {
+  border: none;
+  align-items: center;
+}
+
+.price {
+  color: #52B788;
+  font-size: 40rpx;
+  font-weight: 700;
+}
+
+.discount {
+  color: #52B788;
+  font-weight: 600;
+}
+
+.picker-row {
+  padding: 24rpx;
+  border: 2rpx dashed #D8F3DC;
+  border-radius: 16rpx;
+  color: #1C2B20;
+  margin-bottom: 16rpx;
+  font-size: 26rpx;
+  background: #F4FAF6;
+}
+
+.hint-warn {
+  background: #FFF8E6;
+  color: #8A6D3B;
+  font-size: 24rpx;
+  padding: 20rpx 24rpx;
+  border-radius: 16rpx;
+  margin: 16rpx 0;
+  line-height: 1.6;
+}
+
+.pay-types {
+  display: flex;
+  gap: 16rpx;
+  margin: 16rpx 0;
+  flex-wrap: wrap;
+}
+
+.pay-item {
+  flex: 1;
+  min-width: 180rpx;
+  text-align: center;
+  padding: 20rpx 12rpx;
+  border: 2rpx solid #D8F3DC;
+  border-radius: 16rpx;
+  font-size: 26rpx;
+  color: #1C2B20;
+}
+
+.pay-item.active {
+  border-color: #52B788;
+  background: #D8F3DC;
+  color: #2D6A4F;
+  font-weight: 600;
+}
+
+.pay-summary {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 12rpx;
+  margin-bottom: 16rpx;
+}
+
+.pay-label {
+  font-size: 26rpx;
+  color: #8C9BA5;
+}
+
+.pay-amount {
+  font-size: 44rpx;
+  font-weight: 700;
+  color: #52B788;
+}
+
+.fixed-bottom-bar .submit-btn {
+  margin: 0;
+  width: 100%;
+}

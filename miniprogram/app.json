@@ -19,14 +19,14 @@
     "pages/exchange/records"
   ],
   "window": {
-    "navigationBarBackgroundColor": "#FFD000",
+    "navigationBarBackgroundColor": "#52B788",
     "navigationBarTitleText": "知行岛自习室",
-    "navigationBarTextStyle": "black",
-    "backgroundColor": "#F5F5F5"
+    "navigationBarTextStyle": "white",
+    "backgroundColor": "#F4FAF6"
   },
   "tabBar": {
-    "color": "#888888",
-    "selectedColor": "#FFD000",
+    "color": "#8C9BA5",
+    "selectedColor": "#52B788",
     "backgroundColor": "#FFFFFF",
     "list": [
       {
@@ -58,8 +58,17 @@
   "permission": {
     "scope.userLocation": {
       "desc": "用于展示附近门店距离"
+    },
+    "scope.bluetooth": {
+      "desc": "用于蓝牙开门入座"
     }
   },
   "requiredPrivateInfos": ["getLocation"],
+  "plugins": {
+    "ttlock-plugin": {
+      "version": "3.1.7",
+      "provider": "wx43d5971c94455481"
+    }
+  },
   "sitemapLocation": "sitemap.json"
 }

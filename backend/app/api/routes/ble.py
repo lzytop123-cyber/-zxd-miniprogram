@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
@@ -10,6 +10,7 @@ from app.core.redis_client import cache_get
 from app.db.session import get_db
 from app.models import BleBatteryAlert, BleKey, BleLock, DoorLog, OpenType, Reservation, User
 from app.schemas.common import ResponseModel
+from app.core.config import settings
 from app.services.business import TTLockService
 
 router = APIRouter(tags=["蓝牙"])
@@ -55,9 +56,72 @@ def get_ble_key(
     )
     if not ble_key or not ble_key.lock_data:
         raise HTTPException(status_code=404, detail="蓝牙钥匙未生成")
+
+    lock = db.get(BleLock, ble_key.lock_id)
+    ttlock_configured = bool(settings.ttlock_client_id and settings.ttlock_client_secret)
     return ResponseModel(
-        data={"reservationId": reservation_id, "lockData": ble_key.lock_data}
+        data={
+            "reservationId": reservation_id,
+            "lockData": ble_key.lock_data,
+            "lockName": lock.lock_name if lock else None,
+            "gatewayUnlock": ttlock_configured and lock and lock.lock_id and not str(lock.lock_id).startswith("mock_"),
+            "blePlugin": True,
+        }
     )
+
+
+@router.post("/ble/unlock/{reservation_id}", response_model=ResponseModel)
+async def remote_unlock_door(
+    reservation_id: int,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """通过 WiFi 网关远程开锁（无需蓝牙插件，个体户可用）。"""
+    reservation = db.get(Reservation, reservation_id)
+    if not reservation or reservation.user_id != user.id:
+        raise HTTPException(status_code=404, detail="订单不存在")
+    if reservation.pay_status != 1:
+        raise HTTPException(status_code=400, detail="订单未支付")
+
+    now = datetime.now()
+    if now < reservation.start_time - timedelta(minutes=15):
+        raise HTTPException(status_code=400, detail="提前15分钟内可开门")
+    if now > reservation.end_time + timedelta(minutes=15):
+        raise HTTPException(status_code=400, detail="订单已过期")
+
+    ble_key = db.scalar(
+        select(BleKey).where(
+            BleKey.reservation_id == reservation_id,
+            BleKey.user_id == user.id,
+            BleKey.status == 1,
+        )
+    )
+    if not ble_key:
+        raise HTTPException(status_code=404, detail="钥匙不存在")
+
+    lock = db.get(BleLock, ble_key.lock_id)
+    if not lock or not lock.lock_id:
+        raise HTTPException(status_code=400, detail="门店未配置门锁")
+
+    try:
+        if str(lock.lock_id).startswith("mock_"):
+            result = {"mock": True}
+        else:
+            result = await TTLockService.remote_unlock(str(lock.lock_id))
+    except ValueError as e:
+        raise HTTPException(status_code=502, detail=str(e)) from e
+
+    log = DoorLog(
+        lock_id=ble_key.lock_id,
+        user_id=user.id,
+        reservation_id=reservation_id,
+        open_type=OpenType.remote,
+        result=1,
+    )
+    ble_key.used_at = datetime.now()
+    db.add(log)
+    db.commit()
+    return ResponseModel(message="开门成功", data={"result": result})
 
 
 @router.post("/ble/checkin/{reservation_id}", response_model=ResponseModel)
