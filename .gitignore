@@ -24,3 +24,5 @@ miniprogram/node_modules/
 # Certs
 backend/certs/
 backend/uploads/
+backend/*.db
+*.db
