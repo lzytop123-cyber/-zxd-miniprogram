@@ -44,4 +44,13 @@
       <view class="empty" wx:if="{{!leaderboard.length}}">暂无排行数据</view>
     </view>
   </view>
+
+  <view class="assistant-entry" bindtap="goAssistant">
+    <view class="ae-icon">🌱</view>
+    <view class="ae-text">
+      <view class="ae-title">AI 学习助手 · 小岛</view>
+      <view class="ae-sub">门店问答 · 学习规划 · 随时答疑</view>
+    </view>
+    <view class="ae-arrow">›</view>
+  </view>
 </view>

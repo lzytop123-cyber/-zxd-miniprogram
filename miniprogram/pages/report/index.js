@@ -40,4 +40,8 @@ Page({
     })
     this.loadLeaderboard()
   },
+
+  goAssistant() {
+    wx.navigateTo({ url: '/pages/assistant/index' })
+  },
 })

@@ -7,6 +7,7 @@
     "pages/booking/order",
     "pages/checkin/index",
     "pages/report/index",
+    "pages/assistant/index",
     "pages/profile/index",
     "pages/profile/wallet",
     "pages/profile/orders",

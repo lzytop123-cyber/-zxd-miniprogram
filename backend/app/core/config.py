@@ -61,6 +61,17 @@ class Settings(BaseSettings):
 
     jwt_expire_days: int = 7
 
+    # DeepSeek AI 学习助手（OpenAI 兼容接口）
+    deepseek_api_key: str = ""
+    deepseek_base_url: str = "https://api.deepseek.com"
+    deepseek_model: str = "deepseek-chat"
+    deepseek_timeout_sec: float = 30.0
+
+    @property
+    def assistant_configured(self) -> bool:
+        key = (self.deepseek_api_key or "").strip()
+        return bool(key) and not key.startswith("your_") and "XXXX" not in key
+
     @property
     def wx_login_configured(self) -> bool:
         appid = (self.wx_appid or "").strip()

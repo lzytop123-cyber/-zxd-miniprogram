@@ -1,0 +1,64 @@
+<view class="page-assistant">
+  <scroll-view
+    class="chat-scroll"
+    scroll-y
+    scroll-into-view="{{scrollInto}}"
+    scroll-with-animation
+  >
+    <view class="chat-inner">
+      <!-- 欢迎语 -->
+      <view class="msg-row left" wx:if="{{greeting}}">
+        <view class="avatar bot">岛</view>
+        <view class="bubble bot">{{greeting}}</view>
+      </view>
+
+      <!-- 推荐问题 -->
+      <view class="suggestions" wx:if="{{suggestions.length && !messages.length}}">
+        <view
+          class="sug-chip"
+          wx:for="{{suggestions}}"
+          wx:key="*this"
+          data-q="{{item}}"
+          bindtap="onSuggestionTap"
+        >{{item}}</view>
+      </view>
+
+      <!-- 对话消息 -->
+      <view
+        wx:for="{{messages}}"
+        wx:key="_id"
+        class="msg-row {{item.role === 'user' ? 'right' : 'left'}}"
+        id="msg-{{index}}"
+      >
+        <view wx:if="{{item.role !== 'user'}}" class="avatar bot">岛</view>
+        <view class="bubble {{item.role === 'user' ? 'user' : 'bot'}}">{{item.content}}</view>
+      </view>
+
+      <!-- 思考中 -->
+      <view class="msg-row left" wx:if="{{loading}}">
+        <view class="avatar bot">岛</view>
+        <view class="bubble bot typing">
+          <view class="dot"></view>
+          <view class="dot"></view>
+          <view class="dot"></view>
+        </view>
+      </view>
+
+      <view id="bottom-anchor" class="bottom-anchor"></view>
+    </view>
+  </scroll-view>
+
+  <!-- 输入区 -->
+  <view class="input-bar">
+    <input
+      class="input"
+      value="{{draft}}"
+      placeholder="问点什么吧…"
+      confirm-type="send"
+      bindinput="onInput"
+      bindconfirm="onSend"
+      disabled="{{loading}}"
+    />
+    <view class="send-btn {{(draft && !loading) ? '' : 'disabled'}}" bindtap="onSend">发送</view>
+  </view>
+</view>
