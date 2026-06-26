@@ -5,23 +5,44 @@
 </template>
 
 <view class="plan-canvas">
-  <!-- 平面图（已去标题/留白）：1:1 铺满，保证 99% 还原 -->
-  <image class="plan-img" src="/assets/floor-plan-clean.png" mode="scaleToFill" />
-
-  <!-- 可点选座位叠加层 -->
-  <view class="seats-layer">
-    <view
-      wx:for="{{markers}}"
-      wx:for-item="seat"
-      wx:key="map_slot"
-      class="seat-anchor"
-      style="left: {{seat.left}}%; top: {{seat.top}}%;"
-      bindtap="onTap"
-      data-id="{{seat.id}}"
-      data-code="{{seat.seat_code}}"
-      data-status="{{seat.status}}"
+  <!-- 双指捏合放大 / 拖动查看 -->
+  <movable-area class="plan-area" scale-area>
+    <movable-view
+      class="plan-move"
+      direction="all"
+      scale
+      scale-min="1"
+      scale-max="4"
+      scale-value="{{scaleValue}}"
+      inertia
+      bindscale="onScale"
     >
-      <template is="seatUnit" data="{{seat: seat, selectedId: selectedId}}" />
-    </view>
+      <!-- 平面图（已去标题/留白）：1:1 铺满，保证 99% 还原 -->
+      <image class="plan-img" src="/assets/floor-plan-clean.png" mode="scaleToFill" />
+
+      <!-- 可点选座位叠加层（随底图一起缩放，始终对齐） -->
+      <view class="seats-layer">
+        <view
+          wx:for="{{markers}}"
+          wx:for-item="seat"
+          wx:key="map_slot"
+          class="seat-anchor"
+          style="left: {{seat.left}}%; top: {{seat.top}}%;"
+          catchtap="onTap"
+          data-id="{{seat.id}}"
+          data-code="{{seat.seat_code}}"
+          data-status="{{seat.status}}"
+        >
+          <template is="seatUnit" data="{{seat: seat, selectedId: selectedId}}" />
+        </view>
+      </view>
+    </movable-view>
+  </movable-area>
+
+  <!-- 缩放控制 -->
+  <view class="zoom-bar">
+    <view class="zoom-btn" catchtap="zoomOut">−</view>
+    <view class="zoom-btn" catchtap="zoomIn">+</view>
+    <view class="zoom-btn zoom-reset" catchtap="zoomReset">复位</view>
   </view>
 </view>

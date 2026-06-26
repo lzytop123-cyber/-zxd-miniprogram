@@ -1,10 +1,20 @@
 const { request } = require('../../utils/request')
 
 Page({
-  data: { stores: [] },
+  data: {
+    stores: [],
+    user: null,
+  },
 
   onShow() {
     this.loadStores()
+    this.loadUser()
+  },
+
+  loadUser() {
+    request({ url: '/user/profile', silent: true })
+      .then((user) => this.setData({ user }))
+      .catch(() => {})
   },
 
   loadStores() {
@@ -28,12 +38,18 @@ Page({
     wx.navigateTo({ url: `/pages/store/detail?id=${id}` })
   },
 
-  goExchange() {
-    wx.navigateTo({ url: '/pages/exchange/index?platform=meituan' })
+  goNearestStore() {
+    const { stores } = this.data
+    if (!stores || !stores.length) {
+      wx.showToast({ title: '正在获取门店…', icon: 'none' })
+      this.loadStores()
+      return
+    }
+    wx.navigateTo({ url: `/pages/store/detail?id=${stores[0].id}` })
   },
 
-  goDouyin() {
-    wx.navigateTo({ url: '/pages/exchange/index?platform=douyin' })
+  goExchange() {
+    wx.navigateTo({ url: '/pages/exchange/index?platform=meituan' })
   },
 
   goCards() {
@@ -42,5 +58,29 @@ Page({
 
   goCoupons() {
     wx.navigateTo({ url: '/pages/profile/coupons' })
+  },
+
+  goWallet() {
+    wx.navigateTo({ url: '/pages/profile/wallet' })
+  },
+
+  goPoints() {
+    wx.navigateTo({ url: '/pages/profile/points' })
+  },
+
+  goOrders() {
+    wx.navigateTo({ url: '/pages/profile/orders' })
+  },
+
+  goInvite() {
+    wx.navigateTo({ url: '/pages/profile/invite' })
+  },
+
+  goCheckin() {
+    wx.switchTab({ url: '/pages/checkin/index' })
+  },
+
+  goProfile() {
+    wx.switchTab({ url: '/pages/profile/index' })
   },
 })

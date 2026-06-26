@@ -1,56 +1,197 @@
 .page-home {
   min-height: 100vh;
-  padding-bottom: 16rpx;
+  padding-bottom: 24rpx;
 }
 
-.home-header {
-  padding: 16rpx 32rpx 32rpx;
-  background: linear-gradient(180deg, #52B788 0%, #52B788 55%, #F4FAF6 100%);
+/* ============ Hero ============ */
+.hero {
+  position: relative;
+  padding: 24rpx 32rpx 64rpx;
+  background: linear-gradient(160deg, #2D6A4F 0%, #40916C 46%, #52B788 100%);
+  border-radius: 0 0 44rpx 44rpx;
+  overflow: hidden;
+}
+
+.hero-orb {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(2rpx);
+  opacity: 0.35;
+  pointer-events: none;
+}
+
+.orb-1 {
+  width: 320rpx;
+  height: 320rpx;
+  right: -90rpx;
+  top: -120rpx;
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.55), rgba(255, 255, 255, 0));
+}
+
+.orb-2 {
+  width: 220rpx;
+  height: 220rpx;
+  left: -70rpx;
+  bottom: 40rpx;
+  background: radial-gradient(circle, rgba(255, 183, 3, 0.45), rgba(255, 183, 3, 0));
+}
+
+.hero-grid {
+  position: absolute;
+  inset: 0;
+  background-image: linear-gradient(rgba(255, 255, 255, 0.06) 2rpx, transparent 2rpx),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.06) 2rpx, transparent 2rpx);
+  background-size: 56rpx 56rpx;
+  pointer-events: none;
+}
+
+.hero-top {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
 }
 
 .brand {
   display: flex;
   align-items: center;
-  gap: 20rpx;
+  gap: 18rpx;
 }
 
 .brand-logo {
-  width: 88rpx;
-  height: 88rpx;
-  border-radius: 24rpx;
-  background: rgba(255, 255, 255, 0.95);
+  width: 84rpx;
+  height: 84rpx;
+  border-radius: 22rpx;
+  background: rgba(255, 255, 255, 0.96);
   color: #2D6A4F;
   font-size: 40rpx;
-  font-weight: 700;
+  font-weight: 800;
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 8rpx 24rpx rgba(28, 43, 32, 0.12);
+  box-shadow: 0 10rpx 26rpx rgba(20, 50, 35, 0.28);
 }
 
 .brand-name {
-  font-size: 38rpx;
-  font-weight: 700;
+  font-size: 36rpx;
+  font-weight: 800;
   color: #FFFFFF;
+  letter-spacing: 1rpx;
 }
 
 .brand-slogan {
-  font-size: 24rpx;
-  color: rgba(255, 255, 255, 0.85);
+  font-size: 22rpx;
+  color: rgba(255, 255, 255, 0.82);
   margin-top: 6rpx;
 }
 
+.hero-points {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 10rpx 22rpx;
+  background: rgba(255, 255, 255, 0.16);
+  border: 2rpx solid rgba(255, 255, 255, 0.3);
+  border-radius: 22rpx;
+  backdrop-filter: blur(6rpx);
+}
+
+.hero-points-val {
+  font-size: 32rpx;
+  font-weight: 800;
+  color: #FFE9A8;
+  line-height: 1.1;
+}
+
+.hero-points-key {
+  font-size: 20rpx;
+  color: rgba(255, 255, 255, 0.85);
+}
+
+/* 活动 */
+.campaign {
+  position: relative;
+  z-index: 2;
+  margin-top: 40rpx;
+}
+
+.campaign-ribbon {
+  display: inline-block;
+  padding: 8rpx 22rpx;
+  background: linear-gradient(135deg, #FFB703, #FB8500);
+  color: #4A2A00;
+  font-size: 22rpx;
+  font-weight: 800;
+  border-radius: 8rpx 20rpx 20rpx 8rpx;
+  box-shadow: 0 6rpx 16rpx rgba(251, 133, 0, 0.4);
+}
+
+.campaign-title {
+  margin-top: 20rpx;
+}
+
+.ct-line {
+  display: block;
+  font-size: 56rpx;
+  font-weight: 800;
+  color: #FFFFFF;
+  line-height: 1.18;
+  letter-spacing: 2rpx;
+  text-shadow: 0 4rpx 18rpx rgba(15, 45, 30, 0.25);
+}
+
+.campaign-foot {
+  margin-top: 28rpx;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.campaign-date {
+  display: flex;
+  flex-direction: column;
+}
+
+.cd-label {
+  font-size: 20rpx;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.cd-range {
+  font-size: 30rpx;
+  font-weight: 700;
+  color: #FFFFFF;
+  letter-spacing: 1rpx;
+  margin-top: 2rpx;
+}
+
+.campaign-cta {
+  padding: 18rpx 40rpx;
+  background: #FFFFFF;
+  color: #2D6A4F;
+  font-size: 28rpx;
+  font-weight: 800;
+  border-radius: 40rpx;
+  box-shadow: 0 8rpx 22rpx rgba(15, 45, 30, 0.25);
+}
+
+.campaign-cta:active {
+  transform: scale(0.96);
+}
+
+/* 搜索 */
 .search-bar {
-  margin: -8rpx 32rpx 0;
+  position: relative;
+  z-index: 2;
+  margin-top: 34rpx;
   padding: 22rpx 28rpx;
   background: #FFFFFF;
-  border-radius: 48rpx;
+  border-radius: 44rpx;
   display: flex;
   align-items: center;
   gap: 12rpx;
-  box-shadow: 0 8rpx 32rpx rgba(28, 43, 32, 0.08);
-  position: relative;
-  z-index: 2;
+  box-shadow: 0 10rpx 30rpx rgba(15, 45, 30, 0.18);
 }
 
 .search-icon {
@@ -64,83 +205,288 @@
   color: #8C9BA5;
 }
 
-.banner-card {
-  margin-top: 24rpx;
-  padding: 0;
+/* ============ 两大入口 ============ */
+.entries {
+  display: flex;
+  gap: 24rpx;
+  margin: -36rpx 24rpx 0;
+  position: relative;
+  z-index: 5;
+}
+
+.entry {
+  position: relative;
+  flex: 1;
+  padding: 30rpx 26rpx 28rpx;
+  border-radius: 30rpx;
   overflow: hidden;
-}
-
-.banner-inner {
-  padding: 44rpx 36rpx;
-  background: linear-gradient(135deg, #2D6A4F 0%, #52B788 100%);
-  border-radius: 32rpx;
-}
-
-.banner-title {
-  font-size: 36rpx;
-  font-weight: 700;
   color: #FFFFFF;
+  box-shadow: 0 14rpx 30rpx rgba(28, 43, 32, 0.16);
 }
 
-.banner-sub {
-  font-size: 24rpx;
-  color: rgba(255, 255, 255, 0.88);
-  margin-top: 12rpx;
+.entry:active {
+  transform: translateY(2rpx);
 }
 
-.shortcuts {
+.entry-book {
+  background: linear-gradient(150deg, #2D6A4F, #52B788);
+}
+
+.entry-verify {
+  background: linear-gradient(150deg, #F08C00, #FFB703);
+}
+
+.entry-deco {
+  position: absolute;
+  width: 180rpx;
+  height: 180rpx;
+  right: -60rpx;
+  bottom: -70rpx;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.16);
+}
+
+.entry-en {
+  font-size: 18rpx;
+  letter-spacing: 2rpx;
+  opacity: 0.82;
+  font-weight: 600;
+}
+
+.entry-cn {
+  font-size: 38rpx;
+  font-weight: 800;
+  margin-top: 8rpx;
+}
+
+.entry-desc {
+  font-size: 22rpx;
+  opacity: 0.9;
+  margin-top: 10rpx;
+}
+
+.entry-icon {
+  position: absolute;
+  right: 24rpx;
+  top: 24rpx;
+  font-size: 44rpx;
+  opacity: 0.95;
+}
+
+/* ============ 会员卡 ============ */
+.member {
+  margin: 28rpx 24rpx 0;
+  padding: 28rpx;
+  background: #FFFFFF;
+  border-radius: 30rpx;
+  box-shadow: var(--shadow-card);
+}
+
+.member-top {
+  display: flex;
+  align-items: center;
+  gap: 20rpx;
+}
+
+.member-avatar {
+  width: 88rpx;
+  height: 88rpx;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.member-avatar-ph {
+  background: linear-gradient(135deg, #52B788, #2D6A4F);
+  color: #FFFFFF;
+  font-size: 38rpx;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.member-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.member-hi {
+  font-size: 32rpx;
+  font-weight: 800;
+  color: #1C2B20;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.member-badge {
+  display: inline-block;
+  margin-top: 8rpx;
+  padding: 4rpx 16rpx;
+  font-size: 20rpx;
+  color: #2D6A4F;
+  background: #D8F3DC;
+  border-radius: 20rpx;
+}
+
+.member-arrow {
+  color: #C2CDD6;
+  font-size: 40rpx;
+  font-weight: 700;
+}
+
+.member-stats {
+  display: flex;
+  align-items: center;
+  margin-top: 26rpx;
+  padding-top: 24rpx;
+  border-top: 2rpx solid #F0F4F1;
+}
+
+.mstat {
+  flex: 1;
+  text-align: center;
+}
+
+.mstat-val {
+  font-size: 32rpx;
+  font-weight: 800;
+  color: #2D6A4F;
+}
+
+.mstat-key {
+  font-size: 22rpx;
+  color: #8C9BA5;
+  margin-top: 4rpx;
+}
+
+.mstat-line {
+  width: 2rpx;
+  height: 48rpx;
+  background: #F0F4F1;
+}
+
+/* ============ 快捷功能 ============ */
+.quick {
   display: flex;
   justify-content: space-between;
-  text-align: center;
-  padding: 32rpx 24rpx;
+  padding: 32rpx 16rpx;
+  margin: 24rpx;
 }
 
-.shortcut {
+.q {
   flex: 1;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 12rpx;
-  font-size: 24rpx;
-  color: #1C2B20;
+  gap: 14rpx;
 }
 
-.shortcut-icon {
-  width: 96rpx;
-  height: 96rpx;
-  border-radius: 50%;
-  font-size: 30rpx;
-  font-weight: 700;
+.q-btn {
+  background: transparent;
+  line-height: normal;
+  padding: 0;
+  margin: 0;
+  border: none;
+}
+
+.q-btn::after {
+  border: none;
+}
+
+.q-icon {
+  width: 92rpx;
+  height: 92rpx;
+  border-radius: 26rpx;
+  font-size: 40rpx;
   display: flex;
   align-items: center;
   justify-content: center;
-  box-sizing: border-box;
 }
 
-.shortcut-icon.meituan {
-  background: #FFF4E5;
-  color: #D48806;
+.q-pkg { background: #D8F3DC; }
+.q-chat { background: #E8F4FD; }
+.q-self { background: #FFF4E5; }
+.q-order { background: #F3E8FF; }
+
+.q-text {
+  font-size: 24rpx;
+  color: #1C2B20;
+  font-weight: 500;
 }
 
-.shortcut-icon.douyin {
-  background: #F3E8FF;
-  color: #7C3AED;
+/* ============ 邀请 Banner ============ */
+.promo {
+  display: flex;
+  align-items: center;
+  gap: 18rpx;
+  margin: 4rpx 24rpx 8rpx;
+  padding: 28rpx 30rpx;
+  border-radius: 28rpx;
+  background: linear-gradient(120deg, #FFF8E6 0%, #FDEFD0 100%);
+  border: 2rpx solid #FCE3AE;
 }
 
-.shortcut-icon.period {
-  background: #D8F3DC;
-  color: #2D6A4F;
+.promo:active {
+  transform: scale(0.99);
 }
 
-.shortcut-icon.coupon {
-  background: #E8F4FD;
-  color: #1976D2;
+.promo-spark {
+  width: 72rpx;
+  height: 72rpx;
+  border-radius: 50%;
+  background: #FFFFFF;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 36rpx;
+  box-shadow: 0 4rpx 12rpx rgba(251, 133, 0, 0.18);
+}
+
+.promo-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.promo-title {
+  font-size: 28rpx;
+  font-weight: 800;
+  color: #8A5A00;
+}
+
+.promo-sub {
+  font-size: 22rpx;
+  color: #B6862F;
+  margin-top: 6rpx;
+}
+
+.promo-cta {
+  padding: 14rpx 28rpx;
+  background: linear-gradient(135deg, #FB8500, #FFB703);
+  color: #FFFFFF;
+  font-size: 24rpx;
+  font-weight: 800;
+  border-radius: 36rpx;
+  box-shadow: 0 6rpx 16rpx rgba(251, 133, 0, 0.32);
+}
+
+/* ============ 门店 ============ */
+.section-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  padding: 20rpx 32rpx 4rpx;
+}
+
+.section-row .section-title {
+  padding: 0;
+}
+
+.section-more {
+  font-size: 24rpx;
+  color: #8C9BA5;
 }
 
 .store-list {
-  padding: 0 24rpx 32rpx;
-}
-
-.section-title {
-  padding-top: 8rpx;
+  padding: 8rpx 24rpx 32rpx;
 }

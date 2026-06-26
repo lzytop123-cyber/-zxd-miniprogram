@@ -1,7 +1,7 @@
 <view class="page-seats page-safe-bottom">
   <view class="card seat-card">
     <view class="page-head">
-      <view class="page-sub">点击平面图中的编号即可选择座位</view>
+      <view class="page-sub">点击编号选座 · 双指捏合放大 / 拖动查看</view>
     </view>
 
     <view class="legend">

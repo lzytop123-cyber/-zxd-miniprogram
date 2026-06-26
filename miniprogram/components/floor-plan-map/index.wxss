@@ -2,9 +2,25 @@
   position: absolute;
   inset: 0;
   background: #fff;
+  overflow: hidden;
 }
 
-/* 原图与容器同比例（1024×990），scaleToFill 不会变形 */
+/* 缩放/拖动容器 */
+.plan-area {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+.plan-move {
+  width: 100%;
+  height: 100%;
+  position: relative;
+}
+
+/* 底图随 movable-view 一起缩放 */
 .plan-img {
   position: absolute;
   inset: 0;
@@ -16,6 +32,38 @@
   position: absolute;
   inset: 0;
   z-index: 10;
+}
+
+/* 缩放控制条 */
+.zoom-bar {
+  position: absolute;
+  right: 14rpx;
+  bottom: 14rpx;
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  gap: 10rpx;
+  align-items: stretch;
+}
+
+.zoom-btn {
+  min-width: 56rpx;
+  height: 56rpx;
+  line-height: 56rpx;
+  padding: 0 12rpx;
+  text-align: center;
+  font-size: 34rpx;
+  font-weight: 700;
+  color: #2d6a4f;
+  background: rgba(255, 255, 255, 0.92);
+  border: 2rpx solid #d8f3dc;
+  border-radius: 12rpx;
+  box-shadow: 0 2rpx 8rpx rgba(45, 106, 79, 0.12);
+}
+
+.zoom-reset {
+  font-size: 22rpx;
+  font-weight: 600;
 }
 
 /* 命中区域略大于编号框，覆盖上下桌线，便于点选（相对裁切图 843×647） */

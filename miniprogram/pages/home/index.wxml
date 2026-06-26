@@ -1,46 +1,127 @@
 <view class="page-home page-safe-bottom">
-  <view class="home-header">
-    <view class="brand">
-      <view class="brand-logo">岛</view>
-      <view>
-        <view class="brand-name">知行岛自习室</view>
-        <view class="brand-slogan">知行合一 · 专注学习</view>
+  <!-- Hero：品牌 + 活动 -->
+  <view class="hero">
+    <view class="hero-orb orb-1"></view>
+    <view class="hero-orb orb-2"></view>
+    <view class="hero-grid"></view>
+
+    <view class="hero-top">
+      <view class="brand">
+        <view class="brand-logo">岛</view>
+        <view class="brand-text">
+          <view class="brand-name">知行岛自习室</view>
+          <view class="brand-slogan">知行合一 · 专注当下</view>
+        </view>
+      </view>
+      <view class="hero-points" bindtap="goPoints" wx:if="{{user}}">
+        <text class="hero-points-val">{{user.total_points || 0}}</text>
+        <text class="hero-points-key">积分</text>
+      </view>
+    </view>
+
+    <view class="campaign">
+      <view class="campaign-ribbon">夏日专注计划</view>
+      <view class="campaign-title">
+        <text class="ct-line">上岛泡一个</text>
+        <text class="ct-line">高效的夏天</text>
+      </view>
+      <view class="campaign-foot">
+        <view class="campaign-date">
+          <text class="cd-label">活动期</text>
+          <text class="cd-range">07.01 — 08.31</text>
+        </view>
+        <view class="campaign-cta" bindtap="goNearestStore">立即开启</view>
+      </view>
+    </view>
+
+    <view class="search-bar">
+      <text class="search-icon">⌕</text>
+      <text class="search-placeholder">搜索门店名称或地址</text>
+    </view>
+  </view>
+
+  <!-- 两大主入口 -->
+  <view class="entries">
+    <view class="entry entry-book" bindtap="goNearestStore">
+      <view class="entry-deco"></view>
+      <view class="entry-en">RESERVE SEAT</view>
+      <view class="entry-cn">学习订座</view>
+      <view class="entry-desc">选座 · 计时 · 专注</view>
+      <view class="entry-icon">📖</view>
+    </view>
+    <view class="entry entry-verify" bindtap="goExchange">
+      <view class="entry-deco"></view>
+      <view class="entry-en">VERIFY VOUCHER</view>
+      <view class="entry-cn">团购验券</view>
+      <view class="entry-desc">美团 / 抖音核销</view>
+      <view class="entry-icon">🎟️</view>
+    </view>
+  </view>
+
+  <!-- 会员信息卡 -->
+  <view class="member" bindtap="goProfile">
+    <view class="member-top">
+      <image wx:if="{{user.avatar_url}}" class="member-avatar" src="{{user.avatar_url}}" mode="aspectFill" />
+      <view wx:else class="member-avatar member-avatar-ph">岛</view>
+      <view class="member-info">
+        <view class="member-hi">{{user ? ('Hi，' + user.nickname) : '欢迎来到知行岛'}}</view>
+        <view class="member-badge">{{user.title || '注册即享专注会员权益'}}</view>
+      </view>
+      <view class="member-arrow">›</view>
+    </view>
+    <view class="member-stats">
+      <view class="mstat" catchtap="goPoints">
+        <view class="mstat-val">{{user.total_points || 0}}</view>
+        <view class="mstat-key">积分</view>
+      </view>
+      <view class="mstat-line"></view>
+      <view class="mstat" catchtap="goWallet">
+        <view class="mstat-val">¥{{user.balance || 0}}</view>
+        <view class="mstat-key">余额</view>
+      </view>
+      <view class="mstat-line"></view>
+      <view class="mstat" catchtap="goCoupons">
+        <view class="mstat-val">领券</view>
+        <view class="mstat-key">优惠券</view>
       </view>
     </view>
   </view>
 
-  <view class="search-bar">
-    <text class="search-icon">⌕</text>
-    <text class="search-placeholder">搜索门店名称或地址</text>
-  </view>
-
-  <view class="banner card banner-card">
-    <view class="banner-inner">
-      <view class="banner-title">安静空间，高效学习</view>
-      <view class="banner-sub">预约座位 · 记录时长 · 美团兑换</view>
+  <!-- 快捷功能 -->
+  <view class="quick card">
+    <view class="q" bindtap="goCards">
+      <view class="q-icon q-pkg">🎫</view>
+      <text class="q-text">购买套餐</text>
+    </view>
+    <button class="q q-btn" open-type="contact">
+      <view class="q-icon q-chat">💬</view>
+      <text class="q-text">联系店长</text>
+    </button>
+    <view class="q" bindtap="goCheckin">
+      <view class="q-icon q-self">🪪</view>
+      <text class="q-text">自助入座</text>
+    </view>
+    <view class="q" bindtap="goOrders">
+      <view class="q-icon q-order">📋</view>
+      <text class="q-text">订座记录</text>
     </view>
   </view>
 
-  <view class="shortcuts card">
-    <view class="shortcut" bindtap="goExchange">
-      <view class="shortcut-icon meituan">美</view>
-      <text>美团兑换</text>
+  <!-- 邀请 Banner -->
+  <view class="promo" bindtap="goInvite">
+    <view class="promo-spark">🌱</view>
+    <view class="promo-text">
+      <view class="promo-title">喊上同桌，一起上岛</view>
+      <view class="promo-sub">邀请好友，双方共得积分</view>
     </view>
-    <view class="shortcut" bindtap="goDouyin">
-      <view class="shortcut-icon douyin">抖</view>
-      <text>抖音兑换</text>
-    </view>
-    <view class="shortcut" bindtap="goCards">
-      <view class="shortcut-icon period">卡</view>
-      <text>期限卡</text>
-    </view>
-    <view class="shortcut" bindtap="goCoupons">
-      <view class="shortcut-icon coupon">券</view>
-      <text>优惠券</text>
-    </view>
+    <view class="promo-cta">去邀请</view>
   </view>
 
-  <view class="section-title">附近门店</view>
+  <!-- 附近门店 -->
+  <view class="section-row">
+    <view class="section-title">附近门店</view>
+    <text class="section-more" wx:if="{{stores.length}}">共 {{stores.length}} 家</text>
+  </view>
   <view class="store-list">
     <store-card
       wx:for="{{stores}}"
@@ -50,7 +131,7 @@
     />
     <view class="empty" wx:if="{{!stores.length}}">
       <view class="empty-icon">🌿</view>
-      <view>暂无门店信息</view>
+      <view>正在为你寻找附近的自习室…</view>
     </view>
   </view>
 </view>
