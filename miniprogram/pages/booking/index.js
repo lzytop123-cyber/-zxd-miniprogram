@@ -1,4 +1,5 @@
 const { request } = require('../../utils/request')
+const { getLayout } = require('../../utils/seat-layout')
 const {
   formatLocalDateTime,
   todayStr,
@@ -41,6 +42,10 @@ Page({
     hours: 2,
     seatId: null,
     seatCode: '',
+    selectedId: null,
+    selectedZone: '',
+    seats: [],
+    planSeatCount: 27,
     preview: null,
     startTime: '',
     endTime: '',
@@ -51,12 +56,14 @@ Page({
 
   onLoad(options) {
     const today = todayStr()
+    this._layout = getLayout()
     this.setData({
       storeId: options.storeId,
       startDate: today,
       endDate: today,
       startClock: nowTimeStr(),
       endClock: this._addHoursToClock(nowTimeStr(), 2),
+      planSeatCount: this._layout.planSeatCount,
     })
     request({ url: `/store/${options.storeId}` }).then((s) => {
       this.setData({ storeName: s.name })
@@ -87,7 +94,7 @@ Page({
     const billType = e.currentTarget.dataset.type
     const { startDate } = this.data
     const defaults = BILL_DEFAULTS[billType]
-    const patch = { billType, seatId: null, seatCode: '', preview: null }
+    const patch = { billType, seatId: null, seatCode: '', selectedId: null, selectedZone: '', preview: null }
 
     if (billType === 'hourly') {
       const startClock = startDate === todayStr() ? nowTimeStr() : '09:00'
@@ -261,6 +268,8 @@ Page({
       timeSummary: this._formatSummary(start, end),
     })
 
+    this.loadSeats(start, end)
+
     const body = {
       store_id: Number(storeId),
       bill_type: billType,
@@ -274,15 +283,37 @@ Page({
       .catch(() => this.setData({ preview: null }))
   },
 
-  goSeats() {
-    const { storeId, startTime, endTime, billType } = this.data
-    if (!startTime || !endTime) {
-      wx.showToast({ title: '请先选择有效时间', icon: 'none' })
+  loadSeats(start, end) {
+    const { storeId } = this.data
+    if (!storeId) return
+    const range = `${start}~${end}`
+    if (range === this._seatRange) return
+    this._seatRange = range
+    request({
+      url: `/store/${storeId}/availability?start_time=${encodeURIComponent(start)}&end_time=${encodeURIComponent(end)}`,
+      silent: true,
+    })
+      .then((seats) => this.setData({ seats: this._layout.applySeats(seats) }))
+      .catch(() => {})
+  },
+
+  selectSeat(e) {
+    const { id, code, status } = e.detail
+    if (!id || status === 'empty') {
+      wx.showToast({ title: '该座位暂未开放', icon: 'none' })
       return
     }
-    wx.navigateTo({
-      url: `/pages/store/seats?storeId=${storeId}&start=${encodeURIComponent(startTime)}&end=${encodeURIComponent(endTime)}&billType=${billType}`,
-    })
+    if (status !== 'available') {
+      wx.showToast({ title: '该座位不可选', icon: 'none' })
+      return
+    }
+    const seat = this.data.seats.find((s) => s.id === Number(id))
+    this.setData({
+      seatId: Number(id),
+      seatCode: code,
+      selectedId: Number(id),
+      selectedZone: this._layout.zoneNameBySlot(seat && seat.map_slot),
+    }, () => this.refreshPreview())
   },
 
   goOrder() {

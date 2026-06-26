@@ -125,27 +125,34 @@
     </view>
   </view>
 
-  <!-- 座位 -->
-  <view class="bk-card seat-card" bindtap="goSeats">
-    <view class="seat-left">
-      <view class="seat-ic">💺</view>
-      <view>
-        <view class="seat-title">选择座位</view>
-        <view class="seat-tip">在平面图中点选心仪座位</view>
-      </view>
+  <!-- 选择座位（内嵌平面图） -->
+  <view class="bk-card">
+    <view class="bk-sec">
+      <view class="bk-bar"></view><text>选择座位</text>
+      <text class="seat-now">{{seatCode ? (seatCode + (selectedZone ? ' · ' + selectedZone : '')) : '点选座位'}}</text>
     </view>
-    <view class="seat-pick">{{seatCode || '自动分配'}} ›</view>
+
+    <view class="legend">
+      <view class="legend-item"><view class="dot available"></view><text>可选</text></view>
+      <view class="legend-item"><view class="dot reserved"></view><text>已约</text></view>
+      <view class="legend-item"><view class="dot occupied"></view><text>使用中</text></view>
+      <text class="count">可订 {{seats.length}} 座</text>
+    </view>
+
+    <view class="map-wrap" wx:if="{{startTime && endTime}}">
+      <floor-plan-map
+        seats="{{seats}}"
+        selectedId="{{selectedId}}"
+        bind:select="selectSeat"
+      />
+    </view>
+    <view class="map-empty" wx:else>请先选择有效的使用时间</view>
   </view>
 
   <view class="fixed-bottom-spacer"></view>
 
-  <!-- 底部价格 + CTA -->
+  <!-- 底部 CTA -->
   <view class="bk-bottom">
-    <view class="bk-price">
-      <text class="bk-price-cur" wx:if="{{preview}}">¥</text>
-      <text class="bk-price-val">{{preview ? preview.final_price : '--'}}</text>
-      <text class="bk-price-seat" wx:if="{{preview}}">座位 {{preview.seat_code}}</text>
-    </view>
-    <view class="bk-cta" bindtap="goOrder">立即预定</view>
+    <view class="bk-cta full" bindtap="goOrder">立即预定</view>
   </view>
 </view>
