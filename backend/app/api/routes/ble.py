@@ -32,6 +32,14 @@ class BleLockCreate(BaseModel):
     lock_data: str | None = None
 
 
+class BleLockUpdate(BaseModel):
+    lock_name: str | None = None
+    lock_id: str | None = None
+    mac_address: str | None = None
+    lock_data: str | None = None
+    status: int | None = None
+
+
 @router.get("/ble/key/{reservation_id}", response_model=ResponseModel)
 def get_ble_key(
     reservation_id: int,
@@ -46,7 +54,27 @@ def get_ble_key(
 
     cached = cache_get(f"ble_key:{reservation_id}")
     if cached:
-        return ResponseModel(data={"reservationId": reservation_id, "lockData": cached})
+        ble_key = db.scalar(
+            select(BleKey).where(
+                BleKey.reservation_id == reservation_id,
+                BleKey.user_id == user.id,
+                BleKey.status == 1,
+            )
+        )
+        lock = db.get(BleLock, ble_key.lock_id) if ble_key else None
+        ttlock_configured = bool(settings.ttlock_client_id and settings.ttlock_client_secret)
+        return ResponseModel(
+            data={
+                "reservationId": reservation_id,
+                "lockData": cached,
+                "lockName": lock.lock_name if lock else None,
+                "gatewayUnlock": ttlock_configured
+                and lock
+                and lock.lock_id
+                and not str(lock.lock_id).startswith("mock_"),
+                "blePlugin": True,
+            }
+        )
 
     ble_key = db.scalar(
         select(BleKey).where(
@@ -199,6 +227,23 @@ def admin_create_lock(
     db.commit()
     db.refresh(lock)
     return ResponseModel(data=_lock_to_dict(lock))
+
+
+@router.put("/admin/locks/{lock_id}", response_model=ResponseModel)
+def admin_update_lock(
+    lock_id: int,
+    body: BleLockUpdate,
+    _: object = Depends(get_current_admin),
+    db: Session = Depends(get_db),
+):
+    lock = db.get(BleLock, lock_id)
+    if not lock:
+        raise HTTPException(status_code=404, detail="门锁不存在")
+    for field, value in body.model_dump(exclude_unset=True).items():
+        setattr(lock, field, value)
+    db.commit()
+    db.refresh(lock)
+    return ResponseModel(message="已更新", data=_lock_to_dict(lock))
 
 
 @router.get("/admin/locks/alerts", response_model=ResponseModel)

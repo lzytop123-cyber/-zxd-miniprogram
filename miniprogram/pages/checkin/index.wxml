@@ -17,38 +17,34 @@
       <view class="status-pill" wx:if="{{statusLabel}}">{{statusLabel}}</view>
       <view class="status-hint" wx:if="{{statusHint}}">{{statusHint}}</view>
       <view class="countdown" wx:if="{{countdown}}">{{countdown}}</view>
-      <view class="lock-name" wx:if="{{lockName}}">门锁：{{lockName}}</view>
     </view>
 
     <view class="open-section">
-      <view class="tip" wx:if="{{!canOpen}}">提前15分钟可开门</view>
-      <view class="tip ok" wx:elif="{{canOpen}}">请在门口操作开门</view>
+      <view class="tip" wx:if="{{!canOpen}}">提前 15 分钟可开门</view>
+      <view class="tip ok" wx:elif="{{canOpen}}">已可开门，请站在门口操作</view>
 
-      <view class="open-actions">
-        <view
-          class="open-btn ble {{canOpen && pluginReady && !opening ? '' : 'disabled'}}"
-          bindtap="openDoorBle"
-        >
-          <view class="open-icon">📶</view>
-          <view class="open-text">蓝牙开门</view>
-          <view class="open-sub" wx:if="{{!pluginReady}}">{{pluginHint || '插件未加载'}}</view>
-        </view>
-
-        <view
-          class="open-btn remote {{canOpen && gatewayUnlock && !opening ? '' : 'disabled'}}"
-          bindtap="openDoorRemote"
-        >
-          <view class="open-icon">☁</view>
-          <view class="open-text">远程开门</view>
-          <view class="open-sub">WiFi网关</view>
-        </view>
+      <view
+        class="open-hero {{canOpen && pluginReady && !opening ? '' : 'disabled'}}"
+        bindtap="openDoorBle"
+      >
+        <view class="open-hero-icon">📶</view>
+        <view class="open-hero-text">{{opening ? '开门中…' : '蓝牙开门'}}</view>
+        <view class="open-hero-sub" wx:if="{{!pluginReady}}">{{pluginHint || '插件未加载'}}</view>
+        <view class="open-hero-sub" wx:elif="{{canOpen && pluginReady}}">开启手机蓝牙并靠近门锁</view>
+        <view class="open-hero-sub" wx:elif="{{!canOpen}}">到时间后按钮自动可用</view>
       </view>
 
-      <view class="hint" wx:if="{{!gatewayUnlock}}">
-        远程开门需配置通通锁开放平台 + WiFi 网关，并在通通锁 APP 开启「远程开锁」
+      <view class="open-steps" wx:if="{{canOpen && pluginReady}}">
+        <text>① 打开蓝牙</text>
+        <text class="dot">·</text>
+        <text>② 靠近门锁</text>
+        <text class="dot">·</text>
+        <text>③ 点击上方按钮</text>
       </view>
     </view>
 
-    <view class="btn-outline" bindtap="checkout" wx:if="{{reservation.status === 1}}">提前离座</view>
+    <view class="footer-actions">
+      <view class="btn-outline" bindtap="checkout" wx:if="{{reservation.status === 1}}">提前离座</view>
+    </view>
   </view>
 </view>

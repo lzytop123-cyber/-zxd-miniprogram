@@ -14,6 +14,11 @@
       <el-form-item label="用户ID">
         <el-input-number v-model="filters.user_id" :min="1" controls-position="right" style="width:120px" />
       </el-form-item>
+      <el-form-item label="门店">
+        <el-select v-model="filters.store_id" clearable placeholder="全部" style="width:140px">
+          <el-option v-for="s in stores" :key="s.id" :label="s.name" :value="s.id" />
+        </el-select>
+      </el-form-item>
       <el-form-item label="支付">
         <el-select v-model="filters.pay_status" clearable placeholder="全部" style="width:110px">
           <el-option label="待付款" :value="0" />
@@ -204,12 +209,14 @@ const loading = ref(false)
 const page = ref(1)
 const pageSize = ref(20)
 const total = ref(0)
-const filters = reactive<{ order_no: string; user_id: number | null; pay_status: number | null; status: number | null }>({
+const filters = reactive<{ order_no: string; user_id: number | null; store_id: number | null; pay_status: number | null; status: number | null }>({
   order_no: '',
   user_id: null,
+  store_id: null,
   pay_status: null,
   status: null,
 })
+const stores = ref<any[]>([])
 
 async function load() {
   loading.value = true
@@ -217,6 +224,7 @@ async function load() {
     const params: Record<string, unknown> = { page: page.value, page_size: pageSize.value }
     if (filters.order_no) params.order_no = filters.order_no
     if (filters.user_id) params.user_id = filters.user_id
+    if (filters.store_id) params.store_id = filters.store_id
     if (filters.pay_status !== null && filters.pay_status !== undefined) params.pay_status = filters.pay_status
     if (filters.status !== null && filters.status !== undefined) params.status = filters.status
     const res = await http.get('/admin/reservations', { params })
@@ -235,6 +243,7 @@ function search() {
 function reset() {
   filters.order_no = ''
   filters.user_id = null
+  filters.store_id = null
   filters.pay_status = null
   filters.status = null
   search()
@@ -322,7 +331,11 @@ async function submitChangeSeat() {
   }
 }
 
-onMounted(load)
+onMounted(async () => {
+  const res = await http.get('/admin/stores')
+  stores.value = res.data || []
+  load()
+})
 </script>
 
 <style scoped>
