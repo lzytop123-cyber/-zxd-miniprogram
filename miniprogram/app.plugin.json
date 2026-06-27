@@ -1,7 +1,7 @@
 {
   "plugins": {
     "ttlock-plugin": {
-      "version": "3.1.7",
+      "version": "3.1.4",
       "provider": "wx43d5971c94455481"
     }
   }

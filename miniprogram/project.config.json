@@ -34,10 +34,12 @@
     }
   },
   "compileType": "miniprogram",
-  "libVersion": "3.0.2",
-  "appid": "touristappid",
+  "libVersion": "3.7.12",
+  "appid": "wx4d3a834429fc6538",
   "projectname": "zxd-miniprogram",
   "condition": {},
-  "simulatorPluginLibVersion": {},
+  "simulatorPluginLibVersion": {
+    "ttlock-plugin": "3.1.4"
+  },
   "editorSetting": {}
 }

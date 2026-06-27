@@ -31,7 +31,7 @@
         >
           <view class="open-icon">📶</view>
           <view class="open-text">蓝牙开门</view>
-          <view class="open-sub" wx:if="{{!pluginReady}}">模拟器不可用</view>
+          <view class="open-sub" wx:if="{{!pluginReady}}">{{pluginHint || '插件未加载'}}</view>
         </view>
 
         <view
