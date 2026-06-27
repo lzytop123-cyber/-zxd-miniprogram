@@ -223,3 +223,92 @@ def get_mapping_by_deal_id(db: Session, deal_id: str) -> MeituanDealMapping | No
             MeituanDealMapping.is_active == 1,
         )
     )
+
+
+PURCHASABLE_BILL_TYPES = frozenset({
+    BillType.daily,
+    BillType.weekly,
+    BillType.monthly,
+    BillType.quarterly,
+    BillType.session,
+    BillType.night_monthly,
+})
+
+BILL_TYPE_LABELS = {
+    BillType.daily: "天卡",
+    BillType.weekly: "周卡",
+    BillType.monthly: "月卡",
+    BillType.quarterly: "季卡",
+    BillType.session: "次卡",
+    BillType.night_monthly: "夜读月卡",
+}
+
+
+def _reward_from_pricing_rule(rule) -> tuple[RewardType, int]:
+    bt = rule.bill_type
+    if bt == BillType.daily:
+        return RewardType.day_pass, rule.valid_days or 1
+    if bt == BillType.weekly:
+        return RewardType.week_pass, rule.valid_days or 7
+    if bt == BillType.monthly:
+        return RewardType.month_pass, rule.valid_days or 30
+    if bt == BillType.quarterly:
+        return RewardType.quarter_pass, rule.valid_days or 90
+    if bt == BillType.session:
+        return RewardType.session, rule.valid_days or 10
+    if bt == BillType.night_monthly:
+        return RewardType.night_monthly, rule.valid_days or 30
+    raise ValueError("该套餐不支持在线购买")
+
+
+def issue_period_card_from_pricing(
+    db: Session,
+    user_id: int,
+    store_id: int,
+    rule,
+    receipt: str | None = None,
+) -> PeriodCard:
+    from types import SimpleNamespace
+
+    reward_type, reward_value = _reward_from_pricing_rule(rule)
+    label = BILL_TYPE_LABELS.get(rule.bill_type, rule.bill_type.value)
+    deal_name = (rule.remark or label).strip() or label
+    mapping = SimpleNamespace(
+        deal_name=deal_name,
+        reward_type=reward_type,
+        reward_value=reward_value,
+        store_id=store_id,
+        night_start=rule.night_start,
+        night_end=rule.night_end,
+    )
+    return issue_period_card(
+        db,
+        user_id,
+        mapping,
+        CardSource.purchase,
+        receipt=receipt,
+        store_id=store_id,
+    )
+
+
+def fulfill_card_purchase(db: Session, order) -> PeriodCard:
+    """支付成功后发卡（幂等）。"""
+    from app.models import CardPurchaseOrder, PricingRule
+
+    if order.period_card_id:
+        card = db.get(PeriodCard, order.period_card_id)
+        if card:
+            return card
+    rule = db.get(PricingRule, order.pricing_rule_id)
+    if not rule:
+        raise ValueError("定价规则不存在")
+    card = issue_period_card_from_pricing(
+        db,
+        order.user_id,
+        order.store_id,
+        rule,
+        receipt=order.order_no,
+    )
+    order.period_card_id = card.id
+    order.pay_status = 1
+    return card

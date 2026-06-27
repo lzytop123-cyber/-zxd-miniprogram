@@ -1,7 +1,16 @@
 const { request } = require('./request')
+const { normalizeUser } = require('./user')
 
 const DEFAULT_NICKNAME = '知行岛学员'
 const DEFAULT_AVATAR = ''
+const MANUAL_LOGOUT_KEY = 'manualLogout'
+const LOGIN_PAGE = '/pages/profile/login'
+const TAB_PAGES = [
+  '/pages/home/index',
+  '/pages/checkin/index',
+  '/pages/report/index',
+  '/pages/profile/index',
+]
 
 function getAppSafe() {
   try {
@@ -11,6 +20,10 @@ function getAppSafe() {
   }
 }
 
+function isLoggedIn() {
+  return !!(wx.getStorageSync('token') && !wx.getStorageSync(MANUAL_LOGOUT_KEY))
+}
+
 function syncAppUser(user) {
   const app = getAppSafe()
   if (!app) return
@@ -18,7 +31,14 @@ function syncAppUser(user) {
   app.globalData.user = user
   app.globalData.loginReady = true
   app.globalData.loginError = ''
-  if (user) wx.setStorageSync('userInfo', user)
+  if (user) {
+    wx.setStorageSync('userInfo', user)
+    normalizeUser(user).then((normalized) => {
+      if (!app.globalData) return
+      app.globalData.user = normalized
+      wx.setStorageSync('userInfo', normalized)
+    })
+  }
 }
 
 function syncAppError(message) {
@@ -29,8 +49,25 @@ function syncAppError(message) {
   app.globalData.loginError = message || '登录失败'
 }
 
+function logout() {
+  wx.setStorageSync(MANUAL_LOGOUT_KEY, true)
+  wx.removeStorageSync('token')
+  wx.removeStorageSync('userInfo')
+  const app = getAppSafe()
+  if (app?.globalData) {
+    app.globalData.user = null
+    app.globalData.loginReady = false
+    app.globalData.loginError = ''
+    app.globalData.loginPromise = null
+  }
+}
+
 function login(options = {}) {
-  const { silent = true } = options
+  const { silent = true, force = false } = options
+  if (!force && wx.getStorageSync(MANUAL_LOGOUT_KEY)) {
+    return Promise.reject(new Error('logged out'))
+  }
+
   return new Promise((resolve, reject) => {
     wx.login({
       success: ({ code }) => {
@@ -46,6 +83,7 @@ function login(options = {}) {
           silent,
         })
           .then((res) => {
+            wx.removeStorageSync(MANUAL_LOGOUT_KEY)
             wx.setStorageSync('token', res.token)
             syncAppUser(res.user)
             resolve(res)
@@ -66,14 +104,15 @@ function login(options = {}) {
 }
 
 function waitForLogin() {
+  if (!isLoggedIn()) {
+    return Promise.reject(new Error('not logged in'))
+  }
   const app = getAppSafe()
-  if (app && app.globalData) {
-    if (app.globalData.loginReady && app.globalData.user) {
-      return Promise.resolve(app.globalData.user)
-    }
-    if (app.globalData.loginPromise) {
-      return app.globalData.loginPromise.then((res) => (res ? res.user : null))
-    }
+  if (app?.globalData?.loginReady && app.globalData.user) {
+    return Promise.resolve(app.globalData.user)
+  }
+  if (app?.globalData?.loginPromise) {
+    return app.globalData.loginPromise.then((res) => (res ? res.user : null))
   }
   return login({ silent: true }).then((res) => res.user)
 }
@@ -90,25 +129,33 @@ function readAvatarBase64(tempPath) {
 }
 
 async function uploadAvatar(tempPath) {
+  const lower = String(tempPath || '').toLowerCase()
+  let mime = 'jpeg'
+  if (lower.includes('.png')) mime = 'png'
+  else if (lower.includes('.webp')) mime = 'webp'
   const data = await readAvatarBase64(tempPath)
   return request({
     url: '/user/avatar',
     method: 'POST',
-    data: { avatar_image: `data:image/jpeg;base64,${data}` },
+    data: { avatar_image: `data:image/${mime};base64,${data}` },
+  })
+}
+
+async function updateProfile(fields) {
+  return request({
+    url: '/user/profile',
+    method: 'PUT',
+    data: fields,
   })
 }
 
 async function updateNickname(nickname) {
   const name = String(nickname || '').trim()
   if (!name) throw new Error('请输入昵称')
-  return request({
-    url: '/user/profile',
-    method: 'PUT',
-    data: { nickname: name },
-  })
+  return updateProfile({ nickname: name })
 }
 
-async function saveProfile({ nickname, avatarTempPath }) {
+async function saveProfile({ nickname, avatarTempPath, studyGoal }) {
   let user = null
   if (avatarTempPath) {
     user = await uploadAvatar(avatarTempPath)
@@ -116,16 +163,64 @@ async function saveProfile({ nickname, avatarTempPath }) {
   if (nickname !== undefined && nickname !== null) {
     user = await updateNickname(nickname)
   }
+  if (studyGoal !== undefined) {
+    user = await updateProfile({ study_goal: studyGoal || '' })
+  }
   if (user) syncAppUser(user)
   return user
+}
+
+function goLogin(redirect, options = {}) {
+  const query = redirect ? `?redirect=${encodeURIComponent(redirect)}` : ''
+  const url = `${LOGIN_PAGE}${query}`
+  if (options.replace) {
+    wx.redirectTo({ url })
+  } else {
+    wx.navigateTo({ url })
+  }
+}
+
+function requireLogin(redirect) {
+  if (isLoggedIn()) return true
+  goLogin(redirect || '')
+  return false
+}
+
+function finishLoginRedirect(redirect, fallback) {
+  const target = redirect || fallback || '/pages/profile/index'
+  const path = target.split('?')[0]
+  if (TAB_PAGES.includes(path)) {
+    wx.switchTab({ url: path })
+    return
+  }
+  wx.redirectTo({
+    url: target,
+    fail: () => {
+      if (getCurrentPages().length > 1) {
+        wx.navigateBack()
+      } else {
+        wx.switchTab({ url: '/pages/profile/index' })
+      }
+    },
+  })
 }
 
 module.exports = {
   DEFAULT_NICKNAME,
   DEFAULT_AVATAR,
+  MANUAL_LOGOUT_KEY,
+  LOGIN_PAGE,
+  TAB_PAGES,
+  getAppSafe,
+  isLoggedIn,
   login,
+  logout,
+  goLogin,
+  requireLogin,
+  finishLoginRedirect,
   waitForLogin,
   saveProfile,
+  updateProfile,
   uploadAvatar,
   updateNickname,
   syncAppUser,

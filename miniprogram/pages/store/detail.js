@@ -1,4 +1,5 @@
 const { request } = require('../../utils/request')
+const auth = require('../../utils/auth')
 
 Page({
   data: { store: null, storeId: null },
@@ -11,6 +12,8 @@ Page({
   },
 
   goBooking() {
-    wx.navigateTo({ url: `/pages/booking/index?storeId=${this.data.storeId}` })
+    const url = `/pages/booking/index?storeId=${this.data.storeId}`
+    if (!auth.requireLogin(url)) return
+    wx.navigateTo({ url })
   },
 })

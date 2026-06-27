@@ -5,7 +5,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
-from app.api.routes import admin, assistant, ble, exchange, payment, report, reservation, store, user
+from app.api.routes import admin, assistant, ble, card, exchange, home, payment, report, reservation, store, user
 from app.tasks.scheduler import start_scheduler
 
 UPLOADS_DIR = Path(__file__).resolve().parent.parent / "uploads"
@@ -37,8 +37,10 @@ app.include_router(reservation.router, prefix="/api")
 app.include_router(ble.router, prefix="/api")
 app.include_router(report.router, prefix="/api")
 app.include_router(exchange.router, prefix="/api")
+app.include_router(card.router, prefix="/api")
 app.include_router(payment.router, prefix="/api")
 app.include_router(assistant.router, prefix="/api")
+app.include_router(home.router, prefix="/api")
 app.include_router(admin.router, prefix="/api")
 
 UPLOADS_DIR.mkdir(parents=True, exist_ok=True)

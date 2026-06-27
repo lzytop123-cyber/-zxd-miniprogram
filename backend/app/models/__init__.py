@@ -104,6 +104,7 @@ class User(Base):
     real_name: Mapped[str | None] = mapped_column(String(50))
     face_image: Mapped[str | None] = mapped_column(String(500))
     title: Mapped[str | None] = mapped_column(String(20), default="小白")
+    study_goal: Mapped[str | None] = mapped_column(String(20))
     balance: Mapped[Decimal] = mapped_column(Numeric(10, 2), default=Decimal("0.00"))
     total_points: Mapped[int] = mapped_column(Integer, default=0)
     invite_code: Mapped[str | None] = mapped_column(String(20), unique=True)
@@ -242,6 +243,24 @@ class PeriodCard(Base):
     meituan_receipt: Mapped[str | None] = mapped_column(String(100))
     status: Mapped[int] = mapped_column(Integer, default=1)
     remark: Mapped[str | None] = mapped_column(String(200))
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+
+class CardPurchaseOrder(Base):
+    """在线购买期限卡订单"""
+
+    __tablename__ = "card_purchase_orders"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    order_no: Mapped[str] = mapped_column(String(32), unique=True, nullable=False)
+    user_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"), nullable=False)
+    store_id: Mapped[int] = mapped_column(Integer, ForeignKey("stores.id"), nullable=False)
+    bill_type: Mapped[BillType] = mapped_column(Enum(BillType), nullable=False)
+    pricing_rule_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("pricing_rules.id"))
+    amount: Mapped[Decimal] = mapped_column(Numeric(10, 2), nullable=False)
+    pay_type: Mapped[PayType] = mapped_column(Enum(PayType), nullable=False)
+    pay_status: Mapped[int] = mapped_column(Integer, default=0)
+    period_card_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("period_cards.id"))
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
 
@@ -418,3 +437,34 @@ class WechatSubscription(Base):
     scene: Mapped[str | None] = mapped_column(String(50))
     status: Mapped[int] = mapped_column(Integer, default=1)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+
+class HomeBanner(Base):
+    __tablename__ = "home_banners"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    ribbon: Mapped[str | None] = mapped_column(String(50))
+    title_line1: Mapped[str | None] = mapped_column(String(100))
+    title_line2: Mapped[str | None] = mapped_column(String(100))
+    date_label: Mapped[str | None] = mapped_column(String(30))
+    date_range: Mapped[str | None] = mapped_column(String(50))
+    cta_text: Mapped[str | None] = mapped_column(String(30), default="立即开启")
+    layout_type: Mapped[str] = mapped_column(String(20), default="text")
+    image_url: Mapped[str | None] = mapped_column(String(500))
+    link_path: Mapped[str | None] = mapped_column(String(200))
+    is_active: Mapped[int] = mapped_column(Integer, default=1)
+    sort_order: Mapped[int] = mapped_column(Integer, default=0)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+
+class HomeCarouselSetting(Base):
+    __tablename__ = "home_carousel_settings"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    autoplay: Mapped[int] = mapped_column(Integer, default=1)
+    interval: Mapped[int] = mapped_column(Integer, default=5000)
+    circular: Mapped[int] = mapped_column(Integer, default=1)
+    indicator_dots: Mapped[int] = mapped_column(Integer, default=1)
+    hero_height: Mapped[int] = mapped_column(Integer, default=680)
+    hero_mode: Mapped[str] = mapped_column(String(20), default="fullscreen")
+    updated_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), onupdate=func.now())

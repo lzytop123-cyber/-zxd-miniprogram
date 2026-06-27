@@ -3,6 +3,12 @@ from decimal import Decimal
 
 from pydantic import BaseModel, Field
 
+STUDY_GOAL_LABELS = {
+    "kaoyan": "考研",
+    "kaogong": "考公",
+    "other": "其他",
+}
+
 
 class LoginRequest(BaseModel):
     code: str
@@ -15,6 +21,7 @@ class BindPhoneRequest(BaseModel):
 class UserProfileUpdate(BaseModel):
     nickname: str | None = None
     avatar_url: str | None = None
+    study_goal: str | None = None
 
 
 class UserProfile(BaseModel):
@@ -23,6 +30,8 @@ class UserProfile(BaseModel):
     avatar_url: str | None = None
     phone: str | None = None
     title: str | None = None
+    study_goal: str | None = None
+    study_goal_label: str | None = None
     balance: Decimal
     total_points: int
     invite_code: str | None = None

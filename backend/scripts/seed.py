@@ -14,6 +14,8 @@ from app.models import (
     BleLock,
     Coupon,
     MeituanDealMapping,
+    HomeBanner,
+    HomeCarouselSetting,
     PricingRule,
     RewardType,
     Seat,
@@ -22,13 +24,21 @@ from app.models import (
     Zone,
 )
 
-# 每区 8 座，共 24 个可选座位（4 列 × 2 行）
+# A/B/C 各 8 座 + D 区 3 座（平面图左墙 22–24），共 27 座
 SEAT_ZONE_SPECS = (
     ("A区", "A", "standard", 0, 40),
     ("B区", "B", "window", 1, 180),
     ("C区", "C", "standard", 2, 320),
 )
 SEATS_PER_ZONE = 8
+# 平面图编号 22–24，左墙沉浸区
+EXTRA_SEAT_SPECS = (
+    ("D区", "D", "standard", 3, (
+        ("D01", 30, 400),
+        ("D02", 30, 470),
+        ("D03", 30, 540),
+    )),
+)
 
 
 # 云老板验券返回的 dealId → 期限卡权益（美团后台 ID 可能不同，以验券返回为准）
@@ -140,7 +150,40 @@ def _ensure_store_seats(db, store: Store) -> int:
             seat.zone_id = zones[prefix].id
             seat.seat_type = zone_type
 
-    return len(added)
+    extra_new = 0
+    for zone_name, prefix, zone_type, sort_order, seats in EXTRA_SEAT_SPECS:
+        zone = db.scalar(select(Zone).where(Zone.store_id == store.id, Zone.name == zone_name))
+        if not zone:
+            zone = Zone(store_id=store.id, name=zone_name, type=zone_type, sort_order=sort_order)
+            db.add(zone)
+            db.flush()
+        for code, pos_x, pos_y in seats:
+            if code in existing_codes:
+                seat = db.scalar(
+                    select(Seat).where(Seat.store_id == store.id, Seat.seat_code == code)
+                )
+                if seat:
+                    seat.zone_id = zone.id
+                    seat.seat_type = zone_type
+                    seat.pos_x = pos_x
+                    seat.pos_y = pos_y
+                    seat.status = 1
+                continue
+            db.add(
+                Seat(
+                    store_id=store.id,
+                    zone_id=zone.id,
+                    seat_code=code,
+                    seat_type=zone_type,
+                    has_outlet=1,
+                    has_curtain=0,
+                    pos_x=pos_x,
+                    pos_y=pos_y,
+                )
+            )
+            extra_new += 1
+
+    return len(added) + extra_new
 
 
 def _ensure_quarterly_pricing(db, store: Store) -> bool:
@@ -177,6 +220,7 @@ def _ensure_session_pricing(db, store: Store) -> bool:
     if row:
         row.price = Decimal("58.00")
         row.remark = "按自然日计费，每天扣1次"
+        row.valid_days = 10
         row.min_hours = None
         row.max_hours = None
         return False
@@ -186,6 +230,7 @@ def _ensure_session_pricing(db, store: Store) -> bool:
             bill_type=BillType.session,
             seat_type="standard",
             price=Decimal("58.00"),
+            valid_days=10,
             remark="按自然日计费，每天扣1次",
             sort_order=2,
             is_active=1,
@@ -394,6 +439,8 @@ def seed():
             )
 
         _backfill_invite_codes(db)
+        _ensure_home_banner(db)
+        _ensure_carousel_settings(db)
 
         db.commit()
         print("Seed completed.")
@@ -409,12 +456,46 @@ def _backfill_invite_codes(db):
         ensure_invite_code(db, u)
 
 
+def _ensure_carousel_settings(db) -> None:
+    row = db.get(HomeCarouselSetting, 1)
+    if not row:
+        db.add(HomeCarouselSetting(id=1, hero_height=680, hero_mode="fullscreen"))
+        return
+    if not row.hero_height or row.hero_height <= 520:
+        row.hero_height = 680
+    if not row.hero_mode:
+        row.hero_mode = "fullscreen"
+
+
+def _ensure_home_banner(db) -> None:
+    if db.scalar(select(HomeBanner).limit(1)):
+        return
+    db.add(
+        HomeBanner(
+            ribbon="夏日专注计划",
+            title_line1="上岛泡一个",
+            title_line2="高效的夏天",
+            date_label="活动期",
+            date_range="07.01 — 08.31",
+            cta_text="立即开启",
+            is_active=1,
+            sort_order=0,
+        )
+    )
+
+
 def _ensure_sqlite_columns():
     if "sqlite" not in str(engine.url):
         return
     stmts = [
         "ALTER TABLE users ADD COLUMN invite_code VARCHAR(20)",
         "ALTER TABLE users ADD COLUMN invited_by INTEGER",
+        "ALTER TABLE users ADD COLUMN study_goal VARCHAR(20)",
+        "ALTER TABLE home_banners ADD COLUMN layout_type VARCHAR(20) DEFAULT 'text'",
+        "ALTER TABLE home_banners ADD COLUMN image_url VARCHAR(500)",
+        "ALTER TABLE home_banners ADD COLUMN link_path VARCHAR(200)",
+        "ALTER TABLE home_carousel_settings ADD COLUMN hero_height INTEGER DEFAULT 520",
+        "ALTER TABLE home_carousel_settings ADD COLUMN hero_mode VARCHAR(20) DEFAULT 'fullscreen'",
     ]
     with engine.begin() as conn:
         for stmt in stmts:

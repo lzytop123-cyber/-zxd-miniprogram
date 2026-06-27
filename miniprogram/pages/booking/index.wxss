@@ -170,76 +170,8 @@
 }
 
 /* ============ 选座 ============ */
-.seat-now {
-  margin-left: auto;
-  font-size: 24rpx;
-  font-weight: 700;
-  color: #2D6A4F;
-}
-
-.legend {
-  display: flex;
-  align-items: center;
-  gap: 22rpx;
-  font-size: 22rpx;
-  color: #8C9BA5;
-  margin-bottom: 16rpx;
-  flex-wrap: wrap;
-}
-
-.legend-item {
-  display: flex;
-  align-items: center;
-  gap: 8rpx;
-}
-
-.count {
-  margin-left: auto;
-  color: #52B788;
-  font-weight: 600;
-}
-
-.dot {
-  width: 22rpx;
-  height: 22rpx;
-  border-radius: 50%;
-  border: 2rpx solid transparent;
-}
-
-.dot.available {
-  background: #D8F3DC;
-  border-color: #52B788;
-}
-
-.dot.reserved {
-  background: #FFF8E6;
-  border-color: #E6A23C;
-}
-
-.dot.occupied {
-  background: #ECEFF1;
-  border-color: #CFD8DC;
-}
-
-.map-wrap {
-  position: relative;
-  width: 100%;
-  /* 裁切图 647/843 = 76.75%，严格同比铺满 */
-  padding-bottom: 76.75%;
-  height: 0;
-  border-radius: 20rpx;
-  border: 2rpx solid #D8F3DC;
-  overflow: hidden;
-  background: #FAFCFB;
-}
-
-.map-empty {
-  padding: 60rpx 0;
-  text-align: center;
-  font-size: 26rpx;
-  color: #9CACA2;
-  background: #F7FAF8;
-  border-radius: 20rpx;
+.bk-card--seat {
+  padding-bottom: 26rpx;
 }
 
 /* ============ 底部 CTA ============ */
@@ -271,4 +203,13 @@
 
 .bk-cta:active {
   transform: scale(0.98);
+}
+
+.bk-cta--disabled {
+  opacity: 0.42;
+  box-shadow: none;
+}
+
+.bk-cta--disabled:active {
+  transform: none;
 }

@@ -1,24 +1,36 @@
-<view class="list-page page-safe-bottom">
-  <view class="card list-card card-item" wx:for="{{cards}}" wx:key="id">
-    <view class="name">{{item.card_name || item.card_type}}</view>
-    <view class="info" wx:if="{{item.card_type === 'monthly' && item.start_date && item.end_date}}">
-      开卡后连续30天 · {{item.start_date}} 至 {{item.end_date}}（不可暂停）
+<view class="cards-page page-safe-bottom">
+  <view class="cards-hero">
+    <view class="hero-main">
+      <view class="hero-count">{{activeCount}}</view>
+      <view class="hero-label">可用期限卡</view>
     </view>
-    <view class="info" wx:elif="{{item.start_date && item.end_date && (item.card_type === 'weekly' || item.card_type === 'quarterly' || item.card_type === 'night_monthly')}}">
-      兑换即开卡 · {{item.start_date}} 至 {{item.end_date}}
+    <view class="hero-actions">
+      <view class="hero-btn primary" bindtap="goBuy">直接购买</view>
+      <view class="hero-btn" bindtap="goExchange">团购验券</view>
     </view>
-    <view class="info" wx:elif="{{item.end_date}}">有效期至 {{item.end_date}}</view>
-    <view class="info" wx:if="{{item.remaining_hours != null}}">剩余 {{item.remaining_hours}} 小时</view>
-    <view class="info" wx:if="{{item.remaining_sessions != null}}">剩余 {{item.remaining_sessions}} 次</view>
-    <view class="info" wx:if="{{item.card_type === 'monthly'}}">开卡后30天内可预约一次，使用后即失效</view>
-    <view class="info" wx:elif="{{item.card_type === 'weekly'}}">开卡后7天内完成一次预约即核销</view>
-    <view class="info" wx:elif="{{item.card_type === 'quarterly'}}">开卡后90天内完成一次预约即核销</view>
-    <view class="info" wx:elif="{{item.card_type === 'night_monthly'}}">有效期内完成一次预约即核销</view>
-    <view class="info" wx:if="{{item.card_type === 'daily'}}">全天不限时，用一次即核销</view>
-    <view class="info" wx:elif="{{item.card_type === 'session'}}">按自然日扣次，可连续多天预约（连选N天扣N次）</view>
   </view>
-  <view class="empty" wx:if="{{!cards.length}}">
+
+  <view class="cards-list" wx:if="{{cards.length}}">
+    <view class="ticket-card ticket-{{item.card_type}}" wx:for="{{cards}}" wx:key="id">
+      <view class="ticket-deco"></view>
+      <view class="ticket-top">
+        <view class="ticket-type">{{item.typeLabel}}</view>
+        <view class="ticket-badge">可用</view>
+      </view>
+      <view class="ticket-name">{{item.card_name || item.typeLabel}}</view>
+      <view class="ticket-meta" wx:if="{{item.validityText}}">{{item.validityText}}</view>
+      <view class="ticket-meta highlight" wx:if="{{item.remainText}}">{{item.remainText}}</view>
+      <view class="ticket-rule" wx:if="{{item.ruleText}}">{{item.ruleText}}</view>
+    </view>
+  </view>
+
+  <view class="cards-empty" wx:else>
     <view class="empty-icon">🎫</view>
-    <view>暂无期限卡</view>
+    <view class="empty-title">暂无期限卡</view>
+    <view class="empty-desc">购买或验券兑换后，可在此查看并使用</view>
+    <view class="empty-actions">
+      <view class="empty-btn primary" bindtap="goBuy">去购买</view>
+      <view class="empty-btn" bindtap="goExchange">验券兑换</view>
+    </view>
   </view>
 </view>

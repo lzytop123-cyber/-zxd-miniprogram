@@ -160,3 +160,141 @@ page {
 .fixed-bottom-spacer {
   height: 180rpx;
 }
+
+/* ============ 选座平面图 · 共用 ============ */
+.seat-legend {
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+  margin-bottom: 20rpx;
+  flex-wrap: wrap;
+}
+
+.seat-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 8rpx;
+  padding: 10rpx 18rpx;
+  background: var(--color-bg-page);
+  border-radius: 999rpx;
+  font-size: 22rpx;
+  color: var(--color-text-secondary);
+}
+
+.seat-dot {
+  width: 20rpx;
+  height: 20rpx;
+  border-radius: 6rpx;
+  border: 2rpx solid transparent;
+  box-sizing: border-box;
+}
+
+.seat-dot.available {
+  background: #FFFFFF;
+  border-color: var(--color-primary);
+  box-shadow: inset 0 0 0 4rpx rgba(82, 183, 136, 0.25);
+}
+
+.seat-dot.selected {
+  background: rgba(82, 183, 136, 0.22);
+  border-color: #2d6a4f;
+  box-shadow: 0 0 0 3rpx rgba(82, 183, 136, 0.28);
+}
+
+.seat-dot.reserved {
+  background: rgba(255, 193, 94, 0.35);
+  border-color: #C9A227;
+}
+
+.seat-dot.occupied {
+  background: rgba(45, 106, 79, 0.28);
+  border-color: rgba(45, 106, 79, 0.55);
+}
+
+.seat-count {
+  margin-left: auto;
+  display: flex;
+  align-items: baseline;
+  gap: 6rpx;
+  padding: 10rpx 20rpx;
+  background: linear-gradient(120deg, #EAF7EF, #F4FAF6);
+  border-radius: 999rpx;
+  font-size: 22rpx;
+  color: var(--color-primary-dark);
+  font-weight: 600;
+}
+
+.seat-count-num {
+  font-size: 28rpx;
+  font-weight: 800;
+  color: var(--color-primary);
+}
+
+.seat-badge {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 8rpx;
+  padding: 10rpx 22rpx;
+  background: var(--color-bg-page);
+  border-radius: 999rpx;
+  font-size: 24rpx;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+}
+
+.seat-badge--on {
+  background: linear-gradient(135deg, #52B788, #2D6A4F);
+  color: #FFFFFF;
+  box-shadow: 0 6rpx 16rpx rgba(45, 106, 79, 0.28);
+}
+
+.seat-badge-no {
+  font-size: 26rpx;
+  font-weight: 800;
+}
+
+.seat-badge-dot {
+  opacity: 0.75;
+  font-weight: 700;
+}
+
+.seat-badge-zone {
+  font-size: 22rpx;
+  font-weight: 500;
+  opacity: 0.95;
+}
+
+.seat-badge:not(.seat-badge--on) .seat-badge-zone {
+  opacity: 1;
+}
+
+.seat-map-tip {
+  font-size: 23rpx;
+  color: var(--color-text-secondary);
+  margin: -12rpx 0 20rpx;
+  line-height: 1.5;
+}
+
+.seat-map-frame {
+  position: relative;
+  width: 100%;
+  padding-bottom: 76.75%;
+  height: 0;
+  border-radius: 24rpx;
+  overflow: hidden;
+  background: linear-gradient(160deg, #EAF7EF 0%, #F4FAF6 100%);
+  box-shadow:
+    inset 0 0 0 2rpx rgba(82, 183, 136, 0.28),
+    0 8rpx 24rpx rgba(45, 106, 79, 0.08);
+}
+
+.seat-map-empty {
+  padding: 64rpx 32rpx;
+  text-align: center;
+  font-size: 26rpx;
+  color: var(--color-text-secondary);
+  background: linear-gradient(160deg, #EAF7EF 0%, #F4FAF6 100%);
+  border-radius: 24rpx;
+  border: 2rpx dashed rgba(82, 183, 136, 0.35);
+}

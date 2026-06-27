@@ -40,6 +40,13 @@ def load_knowledge() -> str:
         return ""
 
 
+def save_knowledge(content: str) -> None:
+    """保存知识文档并清除缓存。"""
+    KNOWLEDGE_PATH.parent.mkdir(parents=True, exist_ok=True)
+    KNOWLEDGE_PATH.write_text(content.strip() + "\n", encoding="utf-8")
+    load_knowledge.cache_clear()
+
+
 def build_user_context(db: Session, user: User) -> str:
     """根据 StudyStat 拼出该用户的学习概况（口径与 report.summary 一致）。"""
     total_minutes = int(

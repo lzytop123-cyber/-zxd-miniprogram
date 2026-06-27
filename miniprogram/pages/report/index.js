@@ -2,7 +2,7 @@ const { request } = require('../../utils/request')
 
 Page({
   data: {
-    tab: 'report',
+    tab: 'assistant',
 
     // 学习报告
     summary: null,
@@ -23,6 +23,9 @@ Page({
 
   onShow() {
     this.load()
+    if (this.data.tab === 'assistant' && !this.data.introLoaded) {
+      this.loadIntro()
+    }
   },
 
   load() {

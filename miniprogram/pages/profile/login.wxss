@@ -1,0 +1,170 @@
+.page-login {
+  min-height: 100vh;
+}
+
+.login-loading {
+  padding: 120rpx 32rpx;
+  text-align: center;
+}
+
+.loading-text {
+  font-size: 28rpx;
+  color: #8C9BA5;
+}
+
+.login-panel {
+  margin-top: 48rpx;
+  text-align: center;
+}
+
+.login-logo {
+  width: 120rpx;
+  height: 120rpx;
+  margin: 0 auto;
+  border-radius: 32rpx;
+  background: linear-gradient(160deg, #2D6A4F 0%, #52B788 100%);
+  color: #fff;
+  font-size: 56rpx;
+  font-weight: 800;
+  line-height: 120rpx;
+}
+
+.login-title {
+  margin-top: 32rpx;
+  font-size: 40rpx;
+  font-weight: 800;
+  color: #1C2B20;
+}
+
+.login-desc {
+  margin-top: 16rpx;
+  font-size: 26rpx;
+  color: #8C9BA5;
+  line-height: 1.6;
+}
+
+.login-error {
+  margin-top: 24rpx;
+  font-size: 24rpx;
+  color: #E07A5F;
+}
+
+.login-btn {
+  margin-top: 48rpx;
+}
+
+.login-note {
+  margin-top: 24rpx;
+  font-size: 22rpx;
+  color: #8C9BA5;
+}
+
+.setup-card {
+  margin-top: 24rpx;
+  text-align: center;
+}
+
+.setup-title {
+  font-size: 34rpx;
+  font-weight: 700;
+  color: #1C2B20;
+}
+
+.setup-desc {
+  margin-top: 12rpx;
+  font-size: 24rpx;
+  color: #8C9BA5;
+  line-height: 1.5;
+}
+
+.avatar-picker {
+  margin: 32rpx auto 0;
+  padding: 0;
+  background: transparent;
+  line-height: normal;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  overflow: visible;
+}
+
+.avatar-picker .avatar {
+  display: block;
+}
+
+.avatar-picker::after {
+  border: none;
+}
+
+.avatar {
+  width: 128rpx;
+  height: 128rpx;
+  border-radius: 50%;
+  border: 4rpx solid #52B788;
+  background: #D8F3DC;
+}
+
+.avatar-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 48rpx;
+  font-weight: 700;
+  color: #2D6A4F;
+}
+
+.avatar-tip {
+  margin-top: 12rpx;
+  font-size: 24rpx;
+  color: #52B788;
+}
+
+.nickname-field,
+.goal-field {
+  margin-top: 28rpx;
+  text-align: left;
+}
+
+.field-label {
+  font-size: 24rpx;
+  color: #8C9BA5;
+  margin-bottom: 12rpx;
+}
+
+.nickname-input {
+  height: 88rpx;
+  padding: 0 24rpx;
+  background: #F4FAF6;
+  border-radius: 16rpx;
+  font-size: 28rpx;
+  color: #1C2B20;
+}
+
+.goal-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16rpx;
+}
+
+.goal-chip {
+  padding: 14rpx 32rpx;
+  border-radius: 999rpx;
+  font-size: 26rpx;
+  color: #2D6A4F;
+  background: #E8F5E9;
+}
+
+.goal-chip.active {
+  background: #2D6A4F;
+  color: #fff;
+}
+
+.setup-save {
+  margin-top: 32rpx;
+}
+
+.setup-note {
+  margin-top: 20rpx;
+  font-size: 22rpx;
+  color: #8C9BA5;
+}

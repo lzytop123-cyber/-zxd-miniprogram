@@ -2,7 +2,7 @@
   <view class="card order-card">
     <view class="block-title">订单信息</view>
     <view class="row"><text class="row-label">预定方式</text><text>{{billTypeLabel}}</text></view>
-    <view class="row"><text class="row-label">座位</text><text>{{seatCode}}</text></view>
+    <view class="row"><text class="row-label">座位</text><text>{{seatDisplay || seatCode}}</text></view>
     <view class="row"><text class="row-label">开始</text><text>{{startDisplay}}</text></view>
     <view class="row"><text class="row-label">结束</text><text>{{endDisplay}}</text></view>
 

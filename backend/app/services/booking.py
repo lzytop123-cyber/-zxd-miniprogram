@@ -116,6 +116,120 @@ def validate_seat_for_booking(db: Session, seat: Seat | None, store_id: int, sta
     return seat
 
 
+def seat_conflict_excluding(
+    db: Session,
+    seat_id: int,
+    start: datetime,
+    end: datetime,
+    exclude_reservation_id: int | None = None,
+) -> Reservation | None:
+    query = _seat_conflict_query(seat_id, start, end)
+    if exclude_reservation_id:
+        query = query.where(Reservation.id != exclude_reservation_id)
+    return db.scalar(query)
+
+
+def change_reservation_seat(db: Session, reservation: Reservation, new_seat_id: int) -> tuple[Seat, Seat]:
+    if reservation.status not in (0, 1):
+        raise ValueError("当前订单状态不可换座")
+    if reservation.pay_status != 1:
+        raise ValueError("仅已付款订单可换座")
+    if reservation.end_time <= datetime.now():
+        raise ValueError("预约已结束，不可换座")
+
+    old_seat = db.get(Seat, reservation.seat_id)
+    if not old_seat:
+        raise ValueError("原座位不存在")
+
+    new_seat = db.get(Seat, new_seat_id)
+    if not new_seat:
+        raise ValueError("目标座位不存在")
+    if new_seat.id == reservation.seat_id:
+        raise ValueError("已是该座位，无需更换")
+    if new_seat.store_id != reservation.store_id or new_seat.is_buffer or new_seat.status != 1:
+        raise ValueError("目标座位不可用")
+
+    conflict = seat_conflict_excluding(
+        db,
+        new_seat.id,
+        reservation.start_time,
+        reservation.end_time,
+        exclude_reservation_id=reservation.id,
+    )
+    if conflict:
+        raise ValueError(f"座位 {new_seat.seat_code} 在该时段已被占用")
+
+    reservation.seat_id = new_seat.id
+    return new_seat, old_seat
+
+
+def seat_options_for_change(db: Session, reservation: Reservation) -> list[dict]:
+    from app.models import Zone
+
+    zones = {
+        z.id: z.name
+        for z in db.scalars(select(Zone).where(Zone.store_id == reservation.store_id)).all()
+    }
+    seats = db.scalars(
+        select(Seat)
+        .where(Seat.store_id == reservation.store_id, Seat.is_buffer == 0)
+        .order_by(Seat.seat_code)
+    ).all()
+
+    options: list[dict] = []
+    for seat in seats:
+        if seat.id == reservation.seat_id:
+            options.append(
+                {
+                    "id": seat.id,
+                    "seat_code": seat.seat_code,
+                    "zone_name": zones.get(seat.zone_id, "-"),
+                    "selectable": False,
+                    "reason": "当前座位",
+                }
+            )
+            continue
+        if seat.status != 1:
+            options.append(
+                {
+                    "id": seat.id,
+                    "seat_code": seat.seat_code,
+                    "zone_name": zones.get(seat.zone_id, "-"),
+                    "selectable": False,
+                    "reason": "座位已停用",
+                }
+            )
+            continue
+        conflict = seat_conflict_excluding(
+            db,
+            seat.id,
+            reservation.start_time,
+            reservation.end_time,
+            exclude_reservation_id=reservation.id,
+        )
+        if conflict:
+            options.append(
+                {
+                    "id": seat.id,
+                    "seat_code": seat.seat_code,
+                    "zone_name": zones.get(seat.zone_id, "-"),
+                    "selectable": False,
+                    "reason": "时段冲突",
+                }
+            )
+        else:
+            options.append(
+                {
+                    "id": seat.id,
+                    "seat_code": seat.seat_code,
+                    "zone_name": zones.get(seat.zone_id, "-"),
+                    "selectable": True,
+                    "reason": None,
+                }
+            )
+    return options
+
+
 def record_study_on_checkout(db: Session, reservation: Reservation, user: User) -> None:
     check_in = reservation.check_in_time or reservation.start_time
     end = reservation.actual_end_time or datetime.now()
@@ -187,3 +301,81 @@ def add_wallet_log(
     )
     db.add(log)
     return log
+
+
+EARLY_CHECKIN_MINUTES = 15
+
+
+def _fmt_status_time(dt: datetime) -> str:
+    return dt.strftime("%m月%d日 %H:%M")
+
+
+def auto_checkin_reservation(
+    db: Session,
+    reservation: Reservation,
+    *,
+    when: datetime | None = None,
+) -> bool:
+    """预约时段内自动入座，无需用户手动签到。"""
+    now = when or datetime.now()
+    if reservation.pay_status != 1 or reservation.status != 0:
+        return False
+    if now < reservation.start_time - timedelta(minutes=EARLY_CHECKIN_MINUTES):
+        return False
+    if now > reservation.end_time:
+        return False
+    reservation.status = 1
+    reservation.check_in_time = now
+    return True
+
+
+def auto_checkin_due_batch(db: Session) -> int:
+    now = datetime.now()
+    rows = db.scalars(
+        select(Reservation).where(
+            Reservation.pay_status == 1,
+            Reservation.status == 0,
+            Reservation.end_time > now,
+        )
+    ).all()
+    count = 0
+    for row in rows:
+        if auto_checkin_reservation(db, row, when=now):
+            count += 1
+    if count:
+        db.commit()
+    return count
+
+
+def reservation_status_display(
+    reservation: Reservation,
+    now: datetime | None = None,
+) -> tuple[str, str | None]:
+    now = now or datetime.now()
+    if reservation.pay_status != 1:
+        return "待支付", "请完成支付后使用"
+    if reservation.status == 3:
+        return "已取消", None
+    if reservation.status == 2:
+        hint = None
+        if reservation.actual_end_time:
+            hint = f"结束于 {_fmt_status_time(reservation.actual_end_time)}"
+        return "已完成", hint
+    if reservation.status == 1:
+        if reservation.check_in_time:
+            return "使用中", f"自 {_fmt_status_time(reservation.check_in_time)} 起"
+        return "使用中", "可到店开门或直接入座"
+    early = reservation.start_time - timedelta(minutes=EARLY_CHECKIN_MINUTES)
+    if now < early:
+        return "已预约", f"{_fmt_status_time(reservation.start_time)} 起可到店"
+    if now <= reservation.end_time:
+        return "已预约", "到达时段后自动开始，到店开门即可"
+    return "已过期", None
+
+
+async def finalize_reservation_after_pay(db: Session, reservation: Reservation) -> None:
+    from app.services.business import create_ble_keys_for_reservation
+
+    await create_ble_keys_for_reservation(db, reservation)
+    auto_checkin_reservation(db, reservation)
+    db.commit()

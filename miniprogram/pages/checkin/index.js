@@ -1,10 +1,11 @@
 const { request } = require('../../utils/request')
+const auth = require('../../utils/auth')
 
 let plugin = null
 let pluginReady = false
 try {
   plugin = requirePlugin('ttlock-plugin')
-  pluginReady = true
+  pluginReady = typeof plugin?.startBleToLock === 'function'
 } catch (e) {
   console.log('通通锁插件未加载，可使用远程开门')
 }
@@ -19,6 +20,8 @@ Page({
   data: {
     reservation: null,
     endDisplay: '',
+    statusLabel: '',
+    statusHint: '',
     countdown: '',
     canOpen: false,
     lockData: '',
@@ -46,6 +49,8 @@ Page({
         this.setData({
           reservation,
           endDisplay: formatDate(reservation.end_time),
+          statusLabel: reservation.status_label || '',
+          statusHint: reservation.status_hint || '',
           canOpen,
         })
         this.loadBleKey(reservation.id)
@@ -100,11 +105,7 @@ Page({
       url: `/ble/checkin/${reservation.id}`,
       method: 'POST',
       data: { reservation_id: reservation.id, result: 'success' },
-    })
-    if (reservation.status === 0) {
-      request({ url: `/reservation/${reservation.id}/checkin`, method: 'POST' })
-        .then(() => this.loadActive())
-    }
+    }).finally(() => this.loadActive())
     this.setData({ opening: false })
   },
 
@@ -126,6 +127,14 @@ Page({
 
   async openDoorBle() {
     if (!this.data.canOpen || this.data.opening) return
+    if (!pluginReady) {
+      wx.showModal({
+        title: '蓝牙开门不可用',
+        content: '模拟器或未配置通通锁插件时无法蓝牙开门，请使用「远程开门」。',
+        showCancel: false,
+      })
+      return
+    }
     const { reservation } = this.data
     if (!reservation) return
 
@@ -143,11 +152,11 @@ Page({
     wx.showLoading({ title: '蓝牙连接中...' })
     const lockData = wx.getStorageSync(`ble_key_${reservation.id}`) || this.data.lockData
 
-    if (!plugin) {
+    if (!plugin || typeof plugin.startBleToLock !== 'function') {
       wx.hideLoading()
       wx.showModal({
-        title: '蓝牙插件未启用',
-        content: '请在微信后台添加通通锁插件（企业主体），或使用「远程开门」。',
+        title: '蓝牙开门不可用',
+        content: '当前环境未加载通通锁插件（模拟器常见）。请使用「远程开门」，或在真机/企业主体小程序中重试。',
         showCancel: false,
       })
       this.setData({ opening: false })
@@ -161,14 +170,23 @@ Page({
       return
     }
 
-    plugin.startBleToLock(
-      lockData,
-      1,
-      () => this.afterOpenSuccess(reservation),
-      (errorCode, errorMsg) => {
-        this.afterOpenFail(reservation, '蓝牙开门失败，可试远程开门', errorCode)
-      }
-    )
+    try {
+      plugin.startBleToLock(
+        lockData,
+        1,
+        () => this.afterOpenSuccess(reservation),
+        (errorCode, errorMsg) => {
+          this.afterOpenFail(reservation, '蓝牙开门失败，可试远程开门', errorCode)
+        }
+      )
+    } catch (err) {
+      wx.hideLoading()
+      this.afterOpenFail(
+        reservation,
+        '蓝牙插件调用失败，请使用远程开门或在真机重试',
+        err?.message || ''
+      )
+    }
   },
 
   openDoorRemote() {
@@ -203,6 +221,10 @@ Page({
   },
 
   goBooking() {
+    if (!auth.isLoggedIn()) {
+      auth.goLogin('')
+      return
+    }
     wx.switchTab({ url: '/pages/home/index' })
   },
 })

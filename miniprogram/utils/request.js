@@ -1,16 +1,4 @@
-const { API_BASE } = require('../config')
-
-function getApiBase() {
-  try {
-    const app = getApp({ allowDefault: true })
-    if (app && app.globalData && app.globalData.apiBase) {
-      return app.globalData.apiBase
-    }
-  } catch (e) {
-    // App 尚未注册时回退到 config
-  }
-  return API_BASE
-}
+const { getApiBase } = require('../config')
 
 function getErrorMessage(res) {
   const data = res.data || {}

@@ -59,6 +59,8 @@ class ReservationItem(BaseModel):
     status: int
     check_in_time: datetime | None = None
     created_at: datetime
+    status_label: str | None = None
+    status_hint: str | None = None
 
     model_config = {"from_attributes": True}
 

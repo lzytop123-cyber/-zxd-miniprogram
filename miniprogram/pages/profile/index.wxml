@@ -1,64 +1,40 @@
 <view class="page-profile page-safe-bottom">
-  <!-- 登录失败 -->
-  <view class="login-error card" wx:if="{{loginState === 'error'}}">
-    <view class="login-error-title">登录未成功</view>
-    <view class="login-error-desc">{{loginError}}</view>
-    <view class="btn-primary login-retry" bindtap="retryLogin">重新登录</view>
-    <view class="login-hint">打开小程序时会自动微信登录，无需输入账号密码</view>
-  </view>
-
-  <!-- 加载中 -->
-  <view class="login-loading" wx:elif="{{loginState === 'loading'}}">
-    <view class="loading-text">正在登录...</view>
-  </view>
-
-  <block wx:elif="{{loginState === 'ready' && user}}">
-    <!-- 首次完善资料 -->
-    <view class="setup-card card" wx:if="{{needsSetup}}">
-      <view class="setup-title">完善个人资料</view>
-      <view class="setup-desc">选择头像和昵称，方便预约与入座识别</view>
-
-      <button class="avatar-picker" open-type="chooseAvatar" bindchooseavatar="onChooseAvatar">
-        <image
-          wx:if="{{draftAvatar || user.avatar_url}}"
-          class="avatar"
-          src="{{draftAvatar || user.avatar_url}}"
-          mode="aspectFill"
-        />
-        <view wx:else class="avatar avatar-placeholder">岛</view>
-        <view class="avatar-tip">点击选择头像</view>
-      </button>
-
-      <view class="nickname-field">
-        <view class="field-label">昵称</view>
-        <input
-          type="nickname"
-          class="nickname-input"
-          placeholder="请输入昵称"
-          value="{{draftNickname}}"
-          bindinput="onNicknameInput"
-        />
+  <view class="profile-header {{loginState === 'guest' ? 'guest' : ''}}">
+    <block wx:if="{{loginState === 'guest'}}">
+      <view class="guest-header" bindtap="goLogin">
+        <view class="avatar avatar-placeholder guest">?</view>
+        <view class="nickname">未登录</view>
+        <view class="guest-login-tip">点击登录 · 预约座位、查看订单与积分</view>
       </view>
+    </block>
 
-      <view class="btn-primary setup-save" bindtap="saveProfile">保存并继续</view>
-      <view class="setup-note">头像与昵称仅用于本小程序内展示</view>
-    </view>
+    <block wx:elif="{{loginState === 'loading'}}">
+      <view class="avatar avatar-placeholder">岛</view>
+      <view class="nickname">加载中...</view>
+    </block>
 
-    <!-- 已登录头部 -->
-    <view class="profile-header" wx:else>
-      <button class="avatar-picker inline" open-type="chooseAvatar" bindchooseavatar="onChooseAvatar">
+    <block wx:elif="{{loginState === 'ready' && user}}">
+      <button class="avatar-picker inline" hover-class="none" open-type="chooseAvatar" bindchooseavatar="onChooseAvatar">
         <image
-          wx:if="{{draftAvatar || user.avatar_url}}"
+          wx:if="{{avatarDisplay}}"
           class="avatar"
-          src="{{draftAvatar || user.avatar_url}}"
+          src="{{avatarDisplay}}"
           mode="aspectFill"
         />
         <view wx:else class="avatar avatar-placeholder">岛</view>
       </button>
       <view class="nickname">{{user.nickname}}</view>
       <view class="title-badge">{{user.title || '小白'}}</view>
+
+      <view class="id-row" bindtap="copyUserId">
+        <text class="id-label">学号</text>
+        <text class="id-val">#{{user.id}}</text>
+        <text class="id-copy">复制</text>
+      </view>
+
       <view class="phone-line" wx:if="{{user.phone}}">手机 {{user.phone}}</view>
-      <view class="phone-line muted" wx:else>未绑定手机</view>
+      <view class="phone-line muted" wx:else>未绑定手机 · 建议绑定便于店长联系</view>
+
       <view class="stats-row">
         <view class="stat-pill">
           <view class="stat-val">¥{{user.balance}}</view>
@@ -69,45 +45,77 @@
           <view class="stat-key">积分</view>
         </view>
       </view>
-      <view class="edit-row" wx:if="{{draftAvatar}}">
-        <view class="btn-outline small" bindtap="saveProfile">保存新头像</view>
-      </view>
-    </view>
 
-    <!-- 功能菜单（完善资料后再展示） -->
-    <view class="menu-grid card" wx:if="{{!needsSetup}}">
-      <view class="menu-item" bindtap="go" data-url="/pages/profile/wallet">
-        <view class="menu-icon">💰</view>
-        <text>钱包</text>
+      <view class="edit-row" wx:if="{{avatarUploading}}">
+        <view class="btn-outline small">头像更新中...</view>
       </view>
-      <view class="menu-item" bindtap="go" data-url="/pages/profile/orders">
-        <view class="menu-icon">📋</view>
-        <text>我的订单</text>
-      </view>
-      <view class="menu-item" bindtap="go" data-url="/pages/profile/cards">
-        <view class="menu-icon">🎫</view>
-        <text>期限卡</text>
-      </view>
-      <view class="menu-item" bindtap="go" data-url="/pages/profile/coupons">
-        <view class="menu-icon">🏷</view>
-        <text>优惠券</text>
-      </view>
-      <view class="menu-item" bindtap="go" data-url="/pages/profile/points">
-        <view class="menu-icon">⭐</view>
-        <text>积分明细</text>
-      </view>
-      <view class="menu-item" bindtap="go" data-url="/pages/profile/invite">
-        <view class="menu-icon">🎁</view>
-        <text>邀请有礼</text>
-      </view>
-      <view class="menu-item" bindtap="go" data-url="/pages/profile/face">
-        <view class="menu-icon">👤</view>
-        <text>人脸录入</text>
-      </view>
-      <button class="menu-item phone-btn" open-type="getPhoneNumber" bindgetphonenumber="bindPhone">
-        <view class="menu-icon">📱</view>
-        <text>{{user.phone ? '更换手机' : '绑定手机'}}</text>
-      </button>
+    </block>
+  </view>
+
+  <view class="goal-card card" wx:if="{{loginState === 'ready' && user}}">
+    <view class="goal-card-title">备考方向（选填）</view>
+    <view class="goal-card-desc">方便我们了解同学需求，可不选</view>
+    <view class="goal-chips">
+      <view
+        wx:for="{{goalOptions}}"
+        wx:key="value"
+        class="goal-chip {{user.study_goal === item.value ? 'active' : ''}}"
+        data-value="{{item.value}}"
+        bindtap="saveStudyGoal"
+      >{{item.label}}</view>
     </view>
-  </block>
+    <view class="goal-current" wx:if="{{user.study_goal_label}}">当前：{{user.study_goal_label}}</view>
+  </view>
+
+  <view class="menu-grid card">
+    <view class="menu-item" bindtap="go" data-url="/pages/profile/wallet">
+      <view class="menu-icon">💰</view>
+      <text>钱包</text>
+    </view>
+    <view class="menu-item" bindtap="go" data-url="/pages/profile/orders">
+      <view class="menu-icon">📋</view>
+      <text>我的订单</text>
+    </view>
+        <view class="menu-item" bindtap="goPackages">
+          <view class="menu-icon">🎫</view>
+          <text>我的期限卡</text>
+        </view>
+    <view class="menu-item" bindtap="go" data-url="/pages/profile/coupons">
+      <view class="menu-icon">🏷</view>
+      <text>优惠券</text>
+    </view>
+    <view class="menu-item" bindtap="go" data-url="/pages/profile/points">
+      <view class="menu-icon">⭐</view>
+      <text>积分明细</text>
+    </view>
+    <view class="menu-item" bindtap="go" data-url="/pages/profile/invite">
+      <view class="menu-icon">🎁</view>
+      <text>邀请有礼</text>
+    </view>
+    <!-- <view class="menu-item" bindtap="go" data-url="/pages/profile/face">
+      <view class="menu-icon">👤</view>
+      <text>人脸录入</text>
+    </view> -->
+    <button class="menu-item phone-btn" open-type="contact">
+      <view class="menu-icon">💬</view>
+      <text>联系店长</text>
+    </button>
+    <button
+      wx:if="{{loginState === 'ready' && user}}"
+      class="menu-item phone-btn"
+      open-type="getPhoneNumber"
+      bindgetphonenumber="bindPhone"
+    >
+      <view class="menu-icon">📱</view>
+      <text>{{user.phone ? '更换手机' : '绑定手机'}}</text>
+    </button>
+    <view wx:else class="menu-item" bindtap="goLogin">
+      <view class="menu-icon">📱</view>
+      <text>绑定手机</text>
+    </view>
+  </view>
+
+  <view class="logout-row" wx:if="{{loginState === 'ready' && user}}">
+    <view class="btn-logout" bindtap="doLogout">退出登录</view>
+  </view>
 </view>

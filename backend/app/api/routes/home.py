@@ -1,0 +1,111 @@
+from fastapi import APIRouter, Depends
+from sqlalchemy import select
+from sqlalchemy.orm import Session
+
+from app.db.session import get_db
+from app.core.static_url import public_static_path
+from app.models import HomeBanner, HomeCarouselSetting
+from app.schemas.common import ResponseModel
+
+router = APIRouter(prefix="/home", tags=["首页"])
+
+EMPTY_BANNER = {
+    "id": 0,
+    "ribbon": "",
+    "title_line1": "",
+    "title_line2": "",
+    "date_label": "",
+    "date_range": "",
+    "cta_text": "",
+    "layout_type": "text",
+    "image_url": "",
+    "link_path": "",
+}
+
+DEFAULT_CAROUSEL = {
+    "autoplay": True,
+    "interval": 5000,
+    "circular": True,
+    "indicator_dots": True,
+    "hero_height": 680,
+    "hero_mode": "fullscreen",
+}
+
+
+def _banner_field(value: str | None) -> str:
+    return (value or "").strip()
+
+
+def _banner_from_row(row: HomeBanner) -> dict:
+    return {
+        "id": row.id,
+        "ribbon": _banner_field(row.ribbon),
+        "title_line1": _banner_field(row.title_line1),
+        "title_line2": _banner_field(row.title_line2),
+        "date_label": _banner_field(row.date_label),
+        "date_range": _banner_field(row.date_range),
+        "cta_text": _banner_field(row.cta_text),
+        "layout_type": _banner_field(row.layout_type) or "text",
+        "image_url": public_static_path(row.image_url),
+        "link_path": _banner_field(row.link_path),
+    }
+
+
+def _banner_visible(data: dict) -> bool:
+    layout = data.get("layout_type") or "text"
+    if layout in ("image", "image_text"):
+        return bool(data.get("image_url"))
+    return any(
+        data.get(key)
+        for key in ("ribbon", "title_line1", "title_line2", "date_label", "date_range", "cta_text")
+    )
+
+
+def _carousel_from_row(row: HomeCarouselSetting | None) -> dict:
+    if not row:
+        return DEFAULT_CAROUSEL.copy()
+    return {
+        "autoplay": bool(row.autoplay),
+        "interval": max(2000, row.interval or 5000),
+        "circular": bool(row.circular),
+        "indicator_dots": bool(row.indicator_dots),
+        "hero_height": max(360, min(row.hero_height or 680, 880)),
+        "hero_mode": (row.hero_mode or "fullscreen").strip() or "fullscreen",
+    }
+
+
+def _get_carousel_settings(db: Session) -> dict:
+    row = db.get(HomeCarouselSetting, 1)
+    return _carousel_from_row(row)
+
+
+def _list_active_banners(db: Session) -> list[dict]:
+    rows = db.scalars(
+        select(HomeBanner)
+        .where(HomeBanner.is_active == 1)
+        .order_by(HomeBanner.sort_order, HomeBanner.id.desc())
+    ).all()
+    items = []
+    for row in rows:
+        data = _banner_from_row(row)
+        if _banner_visible(data):
+            items.append(data)
+    return items
+
+
+@router.get("/banners", response_model=ResponseModel)
+def get_home_banners(db: Session = Depends(get_db)):
+    return ResponseModel(
+        data={
+            "items": _list_active_banners(db),
+            "carousel": _get_carousel_settings(db),
+        }
+    )
+
+
+@router.get("/banner", response_model=ResponseModel)
+def get_home_banner(db: Session = Depends(get_db)):
+    items = _list_active_banners(db)
+    if not items:
+        return ResponseModel(data=EMPTY_BANNER)
+    return ResponseModel(data=items[0])

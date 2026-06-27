@@ -3,8 +3,9 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
-from app.models import Coupon, PayType, Reservation
-from app.services.business import create_ble_keys_for_reservation
+from app.models import CardPurchaseOrder, Coupon, PayType, Reservation
+from app.services.booking import auto_checkin_reservation, finalize_reservation_after_pay
+from app.services.card_service import fulfill_card_purchase
 from app.services.coupon_service import mark_coupon_used
 from app.services.wechat_pay import WechatPayService
 
@@ -33,11 +34,18 @@ async def wechat_pay_notify(request: Request, db: Session = Depends(get_db)):
 
     order_no = result.get("out_trade_no")
     if order_no and result.get("trade_state") == "SUCCESS":
+        if str(order_no).startswith("CRD"):
+            order = db.scalar(select(CardPurchaseOrder).where(CardPurchaseOrder.order_no == order_no))
+            if order and order.pay_status != 1:
+                fulfill_card_purchase(db, order)
+                db.commit()
+            return {"code": "SUCCESS", "message": "成功"}
+
         reservation = db.scalar(select(Reservation).where(Reservation.order_no == order_no))
         if reservation and reservation.pay_status != 1:
             reservation.pay_status = 1
             reservation.pay_type = PayType.wechat
             _apply_coupon_from_attach(db, reservation, result.get("attach"))
             db.commit()
-            await create_ble_keys_for_reservation(db, reservation)
+            await finalize_reservation_after_pay(db, reservation)
     return {"code": "SUCCESS", "message": "成功"}

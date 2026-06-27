@@ -1,0 +1,246 @@
+.page-buy {
+  min-height: 100vh;
+  padding-bottom: calc(180rpx + env(safe-area-inset-bottom));
+  background: var(--color-bg-page);
+}
+
+.buy-header {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: #fff;
+  box-shadow: 0 4rpx 20rpx rgba(28, 43, 32, 0.06);
+}
+
+.store-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24rpx;
+  padding: 24rpx 32rpx 12rpx;
+}
+
+.store-name {
+  flex: 1;
+  min-width: 0;
+  font-size: 30rpx;
+  font-weight: 700;
+  color: #1C2B20;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.store-switch {
+  flex-shrink: 0;
+  font-size: 24rpx;
+  color: #52B788;
+  font-weight: 600;
+}
+
+.tab-scroll {
+  width: 100%;
+  white-space: nowrap;
+}
+
+.tab-row {
+  display: inline-flex;
+  padding: 8rpx 24rpx 20rpx;
+  gap: 32rpx;
+}
+
+.tab-item {
+  position: relative;
+  padding: 8rpx 4rpx 16rpx;
+  font-size: 28rpx;
+  color: #8C9BA5;
+  font-weight: 500;
+}
+
+.tab-item.active {
+  color: #2D6A4F;
+  font-weight: 700;
+}
+
+.tab-item.active::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  bottom: 0;
+  transform: translateX(-50%);
+  width: 40rpx;
+  height: 6rpx;
+  border-radius: 999rpx;
+  background: #52B788;
+}
+
+.buy-body {
+  padding: 8rpx 24rpx 24rpx;
+}
+
+.loading {
+  padding: 80rpx;
+  text-align: center;
+  color: #8C9BA5;
+  font-size: 28rpx;
+}
+
+.pkg-list {
+  padding-top: 8rpx;
+}
+
+.pkg-ticket {
+  position: relative;
+  overflow: hidden;
+  margin-bottom: 24rpx;
+  padding: 32rpx;
+  border-radius: 28rpx;
+  background: linear-gradient(135deg, #2D6A4F 0%, #40916C 55%, #52B788 100%);
+  color: #fff;
+  box-shadow: 0 16rpx 40rpx rgba(45, 106, 79, 0.22);
+}
+
+.pkg-deco {
+  position: absolute;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  width: 160rpx;
+  background: repeating-linear-gradient(
+    -45deg,
+    transparent,
+    transparent 10rpx,
+    rgba(255, 255, 255, 0.05) 10rpx,
+    rgba(255, 255, 255, 0.05) 20rpx
+  );
+  pointer-events: none;
+}
+
+.pkg-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 24rpx;
+  padding-right: 40rpx;
+}
+
+.pkg-name {
+  flex: 1;
+  font-size: 36rpx;
+  font-weight: 800;
+  line-height: 1.3;
+}
+
+.pkg-price {
+  flex-shrink: 0;
+  font-size: 28rpx;
+  font-weight: 600;
+  opacity: 0.95;
+}
+
+.pkg-price-num {
+  font-size: 44rpx;
+  font-weight: 800;
+}
+
+.pkg-tag {
+  display: inline-block;
+  margin-top: 16rpx;
+  padding: 6rpx 18rpx;
+  border-radius: 999rpx;
+  background: rgba(255, 255, 255, 0.18);
+  font-size: 22rpx;
+}
+
+.pkg-rule {
+  margin-top: 16rpx;
+  font-size: 24rpx;
+  line-height: 1.55;
+  opacity: 0.9;
+  padding-right: 60rpx;
+}
+
+.pkg-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20rpx;
+  margin-top: 28rpx;
+  padding-top: 24rpx;
+  border-top: 2rpx dashed rgba(255, 255, 255, 0.22);
+}
+
+.pkg-tip {
+  flex: 1;
+  font-size: 22rpx;
+  opacity: 0.78;
+  line-height: 1.4;
+}
+
+.pkg-buy {
+  flex-shrink: 0;
+  padding: 14rpx 32rpx;
+  border-radius: 999rpx;
+  background: #fff;
+  color: #2D6A4F;
+  font-size: 26rpx;
+  font-weight: 700;
+}
+
+.pkg-buy:active {
+  opacity: 0.88;
+}
+
+.buy-empty {
+  margin-top: 48rpx;
+  padding: 80rpx 32rpx;
+  text-align: center;
+  background: #fff;
+  border-radius: 32rpx;
+  color: #8C9BA5;
+  font-size: 28rpx;
+  box-shadow: var(--shadow-card);
+}
+
+.buy-empty .empty-icon {
+  font-size: 64rpx;
+  margin-bottom: 16rpx;
+}
+
+.buy-footer {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 20;
+  padding: 20rpx 32rpx calc(20rpx + env(safe-area-inset-bottom));
+  background: #fff;
+  box-shadow: 0 -4rpx 24rpx rgba(28, 43, 32, 0.08);
+}
+
+.footer-label {
+  font-size: 24rpx;
+  color: #8C9BA5;
+  margin-bottom: 12rpx;
+}
+
+.pay-row {
+  display: flex;
+  gap: 16rpx;
+}
+
+.pay-chip {
+  flex: 1;
+  text-align: center;
+  padding: 18rpx 0;
+  border-radius: 999rpx;
+  font-size: 26rpx;
+  font-weight: 600;
+  color: #2D6A4F;
+  background: #E8F5E9;
+}
+
+.pay-chip.active {
+  background: #2D6A4F;
+  color: #fff;
+}

@@ -1,6 +1,7 @@
 {
   "pages": [
     "pages/home/index",
+    "pages/packages/index",
     "pages/store/detail",
     "pages/store/seats",
     "pages/booking/index",
@@ -9,9 +10,11 @@
     "pages/report/index",
     "pages/assistant/index",
     "pages/profile/index",
+    "pages/profile/login",
     "pages/profile/wallet",
     "pages/profile/orders",
     "pages/profile/cards",
+    "pages/profile/cards-buy",
     "pages/profile/coupons",
     "pages/profile/points",
     "pages/profile/invite",
@@ -37,6 +40,12 @@
         "selectedIconPath": "assets/tab-home-active.png"
       },
       {
+        "pagePath": "pages/packages/index",
+        "text": "套餐",
+        "iconPath": "assets/tab-packages.png",
+        "selectedIconPath": "assets/tab-packages-active.png"
+      },
+      {
         "pagePath": "pages/checkin/index",
         "text": "入座",
         "iconPath": "assets/tab-checkin.png",
@@ -44,7 +53,7 @@
       },
       {
         "pagePath": "pages/report/index",
-        "text": "学习报告",
+        "text": "学习助手",
         "iconPath": "assets/tab-report.png",
         "selectedIconPath": "assets/tab-report-active.png"
       },

@@ -13,6 +13,7 @@ Page({
     endTime: '',
     billType: 'hourly',
     planSeatCount: 27,
+    availableSeatCount: 0,
   },
 
   onLoad(options) {
@@ -33,7 +34,11 @@ Page({
       ? `/store/${storeId}/availability?start_time=${encodeURIComponent(startTime)}&end_time=${encodeURIComponent(endTime)}`
       : `/store/${storeId}/seats`
     request({ url }).then((seats) => {
-      this.setData({ seats: this._layout.applySeats(seats) })
+      const applied = this._layout.applySeats(seats)
+      this.setData({
+        seats: applied,
+        availableSeatCount: applied.filter((s) => s.status === 'available').length,
+      })
     })
   },
 
@@ -48,21 +53,21 @@ Page({
       return
     }
     const seat = this.data.seats.find((s) => s.id === Number(id))
+    const display = this._layout.seatDisplay(seat)
     this.setData({
       selectedId: Number(id),
       selectedCode: code,
-      selectedLabel: seat?.map_label || code,
-      selectedZone: this._layout.zoneNameBySlot(seat?.map_slot),
+      selectedLabel: display.mapLabel,
+      selectedZone: display.zoneName,
     })
   },
 
   zoneName(seatCode) {
-    const slot = this._layout.applySeats([{ seat_code: seatCode }])[0]?.map_slot
-    return this._layout.zoneNameBySlot(slot)
+    return this._layout.seatDisplay({ seat_code: seatCode }).zoneName
   },
 
   confirm() {
-    const { selectedId, selectedCode } = this.data
+    const { selectedId, selectedCode, selectedLabel, selectedZone } = this.data
     if (!selectedId) {
       wx.showToast({ title: '请先选择座位', icon: 'none' })
       return
@@ -70,7 +75,13 @@ Page({
     const pages = getCurrentPages()
     const prev = pages[pages.length - 2]
     if (prev) {
-      prev.setData({ seatId: selectedId, seatCode: selectedCode })
+      prev.setData({
+        seatId: selectedId,
+        seatCode: selectedCode,
+        selectedId,
+        selectedLabel,
+        selectedZone,
+      })
       prev.refreshPreview && prev.refreshPreview()
     }
     wx.navigateBack()

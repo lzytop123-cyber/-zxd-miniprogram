@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user
 from app.core.config import settings
+from app.core.static_url import public_static_path, public_static_url
 from app.core.security import create_access_token
 from app.db.session import get_db
 from app.models import PointLog, User, WechatSubscription
@@ -17,6 +18,7 @@ from app.schemas.user import (
     InviteApplyRequest,
     LoginRequest,
     LoginResponse,
+    STUDY_GOAL_LABELS,
     SubscribeRequest,
     UserProfile,
     UserProfileUpdate,
@@ -36,12 +38,15 @@ def _needs_profile_setup(user: User) -> bool:
 
 def _to_profile(db: Session, user: User) -> UserProfile:
     ensure_invite_code(db, user)
+    goal = user.study_goal if user.study_goal in STUDY_GOAL_LABELS else None
     return UserProfile(
         id=user.id,
         nickname=user.nickname,
-        avatar_url=user.avatar_url,
+        avatar_url=public_static_path(user.avatar_url),
         phone=user.phone,
         title=user.title,
+        study_goal=goal,
+        study_goal_label=STUDY_GOAL_LABELS.get(goal) if goal else None,
         balance=user.balance,
         total_points=user.total_points,
         invite_code=user.invite_code,
@@ -91,6 +96,11 @@ def update_profile(
         user.nickname = nickname[:32]
     if body.avatar_url is not None:
         user.avatar_url = body.avatar_url[:500]
+    if body.study_goal is not None:
+        goal = body.study_goal.strip() if body.study_goal else ""
+        if goal and goal not in STUDY_GOAL_LABELS:
+            raise HTTPException(status_code=400, detail="备考方向无效")
+        user.study_goal = goal or None
     db.commit()
     db.refresh(user)
     return ResponseModel(data=_to_profile(db, user))
@@ -127,8 +137,7 @@ def upload_avatar(
     path = AVATAR_DIR / f"{user.id}.{ext}"
     path.write_bytes(binary)
 
-    base = settings.base_url.rstrip("/")
-    user.avatar_url = f"{base}/static/avatars/{user.id}.{ext}"
+    user.avatar_url = f"/static/avatars/{user.id}.{ext}"
     db.commit()
     db.refresh(user)
     return ResponseModel(message="头像已更新", data=_to_profile(db, user))

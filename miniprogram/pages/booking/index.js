@@ -1,4 +1,5 @@
 const { request } = require('../../utils/request')
+const auth = require('../../utils/auth')
 const { getLayout } = require('../../utils/seat-layout')
 const {
   formatLocalDateTime,
@@ -43,8 +44,10 @@ Page({
     seatId: null,
     seatCode: '',
     selectedId: null,
+    selectedLabel: '',
     selectedZone: '',
     seats: [],
+    availableSeatCount: 0,
     planSeatCount: 27,
     preview: null,
     startTime: '',
@@ -55,6 +58,18 @@ Page({
   },
 
   onLoad(options) {
+    const redirect = `/pages/booking/index?storeId=${options.storeId || ''}`
+    if (!auth.isLoggedIn()) {
+      auth.goLogin(redirect, { replace: true })
+      return
+    }
+
+    if (!options.storeId) {
+      wx.showToast({ title: '门店信息缺失', icon: 'none' })
+      setTimeout(() => wx.navigateBack(), 1500)
+      return
+    }
+
     const today = todayStr()
     this._layout = getLayout()
     this.setData({
@@ -94,7 +109,7 @@ Page({
     const billType = e.currentTarget.dataset.type
     const { startDate } = this.data
     const defaults = BILL_DEFAULTS[billType]
-    const patch = { billType, seatId: null, seatCode: '', selectedId: null, selectedZone: '', preview: null }
+    const patch = { billType, seatId: null, seatCode: '', selectedId: null, selectedLabel: '', selectedZone: '', preview: null }
 
     if (billType === 'hourly') {
       const startClock = startDate === todayStr() ? nowTimeStr() : '09:00'
@@ -279,7 +294,13 @@ Page({
     if (seatId) body.seat_id = seatId
 
     request({ url: '/reservation/preview', method: 'POST', data: body })
-      .then((preview) => this.setData({ preview, seatCode: preview.seat_code }))
+      .then((preview) => {
+        const patch = { preview }
+        if (this.data.seatId && preview.seat_id === this.data.seatId) {
+          patch.seatCode = preview.seat_code
+        }
+        this.setData(patch)
+      })
       .catch(() => this.setData({ preview: null }))
   },
 
@@ -293,7 +314,24 @@ Page({
       url: `/store/${storeId}/availability?start_time=${encodeURIComponent(start)}&end_time=${encodeURIComponent(end)}`,
       silent: true,
     })
-      .then((seats) => this.setData({ seats: this._layout.applySeats(seats) }))
+      .then((seats) => {
+        const applied = this._layout.applySeats(seats)
+        const availableSeatCount = applied.filter((s) => s.status === 'available').length
+        const patch = { seats: applied, availableSeatCount }
+        if (this.data.seatId) {
+          const current = applied.find((s) => s.id === this.data.seatId)
+          if (!current || current.status !== 'available') {
+            Object.assign(patch, {
+              seatId: null,
+              seatCode: '',
+              selectedId: null,
+              selectedLabel: '',
+              selectedZone: '',
+            })
+          }
+        }
+        this.setData(patch)
+      })
       .catch(() => {})
   },
 
@@ -308,18 +346,34 @@ Page({
       return
     }
     const seat = this.data.seats.find((s) => s.id === Number(id))
+    const display = this._layout.seatDisplay(seat)
     this.setData({
       seatId: Number(id),
       seatCode: code,
       selectedId: Number(id),
-      selectedZone: this._layout.zoneNameBySlot(seat && seat.map_slot),
+      selectedLabel: display.mapLabel,
+      selectedZone: display.zoneName,
     }, () => this.refreshPreview())
   },
 
   goOrder() {
-    const { storeId, preview, billType } = this.data
+    const { storeId, preview, billType, seatId } = this.data
+    if (!auth.isLoggedIn()) {
+      const redirect = `/pages/booking/index?storeId=${storeId}`
+      auth.requireLogin(redirect)
+      return
+    }
+    if (!seatId) {
+      wx.showToast({ title: '请先点击平面图选座', icon: 'none' })
+      return
+    }
     if (!preview) {
       wx.showToast({ title: '请检查时间并等待价格计算', icon: 'none' })
+      return
+    }
+    if (preview.seat_id !== seatId) {
+      wx.showToast({ title: '座位信息同步中，请稍候', icon: 'none' })
+      this.refreshPreview()
       return
     }
     wx.navigateTo({

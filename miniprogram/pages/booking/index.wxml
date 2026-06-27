@@ -126,33 +126,46 @@
   </view>
 
   <!-- 选择座位（内嵌平面图） -->
-  <view class="bk-card">
+  <view class="bk-card bk-card--seat">
     <view class="bk-sec">
       <view class="bk-bar"></view><text>选择座位</text>
-      <text class="seat-now">{{seatCode ? (seatCode + (selectedZone ? ' · ' + selectedZone : '')) : '点选座位'}}</text>
+      <view class="seat-badge {{selectedLabel ? 'seat-badge--on' : ''}}">
+        <block wx:if="{{selectedLabel}}">
+          <text class="seat-badge-no">{{selectedLabel}}号</text>
+          <text class="seat-badge-dot">·</text>
+          <text class="seat-badge-zone">{{selectedZone}}</text>
+        </block>
+        <text wx:else>点选座位</text>
+      </view>
     </view>
 
-    <view class="legend">
-      <view class="legend-item"><view class="dot available"></view><text>可选</text></view>
-      <view class="legend-item"><view class="dot reserved"></view><text>已约</text></view>
-      <view class="legend-item"><view class="dot occupied"></view><text>使用中</text></view>
-      <text class="count">可订 {{seats.length}} 座</text>
+    <view class="seat-map-tip">点击平面图编号选座 · 双指缩放 / 右下角可放大</view>
+
+    <view class="seat-legend">
+      <view class="seat-legend-item"><view class="seat-dot available"></view><text>可选</text></view>
+      <view class="seat-legend-item"><view class="seat-dot selected"></view><text>已选</text></view>
+      <view class="seat-legend-item"><view class="seat-dot reserved"></view><text>已约</text></view>
+      <view class="seat-legend-item"><view class="seat-dot occupied"></view><text>使用中</text></view>
+      <view class="seat-count">
+        <text class="seat-count-num">{{availableSeatCount}}</text>
+        <text>座可订</text>
+      </view>
     </view>
 
-    <view class="map-wrap" wx:if="{{startTime && endTime}}">
+    <view class="seat-map-frame" wx:if="{{startTime && endTime}}">
       <floor-plan-map
         seats="{{seats}}"
         selectedId="{{selectedId}}"
         bind:select="selectSeat"
       />
     </view>
-    <view class="map-empty" wx:else>请先选择有效的使用时间</view>
+    <view class="seat-map-empty" wx:else>请先选择有效的使用时间</view>
   </view>
 
   <view class="fixed-bottom-spacer"></view>
 
   <!-- 底部 CTA -->
   <view class="bk-bottom">
-    <view class="bk-cta full" bindtap="goOrder">立即预定</view>
+    <view class="bk-cta full {{seatId ? '' : 'bk-cta--disabled'}}" bindtap="goOrder">立即预定</view>
   </view>
 </view>

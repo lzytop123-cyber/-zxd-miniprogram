@@ -1,17 +1,25 @@
 <view class="page-seats page-safe-bottom">
   <view class="card seat-card">
-    <view class="page-head">
-      <view class="page-sub">点击编号选座 · 双指捏合放大 / 拖动查看</view>
+    <view class="seat-head">
+      <view class="seat-head-bar"></view>
+      <text class="seat-head-title">选择座位</text>
+    </view>
+    <view class="seat-map-tip">点击编号选座 · 双指捏合放大 / 拖动查看</view>
+
+    <view class="seat-map-tip">点击平面图编号选座 · 双指缩放 / 右下角可放大</view>
+
+    <view class="seat-legend">
+      <view class="seat-legend-item"><view class="seat-dot available"></view><text>可选</text></view>
+      <view class="seat-legend-item"><view class="seat-dot selected"></view><text>已选</text></view>
+      <view class="seat-legend-item"><view class="seat-dot reserved"></view><text>已约</text></view>
+      <view class="seat-legend-item"><view class="seat-dot occupied"></view><text>使用中</text></view>
+      <view class="seat-count">
+        <text class="seat-count-num">{{availableSeatCount}}</text>
+        <text>/ {{planSeatCount}} 可订</text>
+      </view>
     </view>
 
-    <view class="legend">
-      <view class="legend-item"><view class="dot available"></view><text>可选</text></view>
-      <view class="legend-item"><view class="dot reserved"></view><text>已约</text></view>
-      <view class="legend-item"><view class="dot occupied"></view><text>使用中</text></view>
-      <text class="count">平面图 {{planSeatCount}} 座 · 可订 {{seats.length}} 座</text>
-    </view>
-
-    <view class="map-wrap">
+    <view class="seat-map-frame">
       <floor-plan-map
         seats="{{seats}}"
         selectedId="{{selectedId}}"
@@ -20,12 +28,12 @@
     </view>
   </view>
 
-  <view class="fixed-bottom-bar">
-    <view class="selected" wx:if="{{selectedCode}}">
-      已选 <text class="selected-code">{{selectedLabel || selectedCode}}</text> 号座
-      <text class="selected-meta" wx:if="{{selectedZone}}">（{{selectedZone}}）</text>
+  <view class="fixed-bottom-bar seat-bottom">
+    <view class="seat-selected" wx:if="{{selectedCode}}">
+      已选 <text class="seat-selected-code">{{selectedLabel}}号</text>
+      <text class="seat-selected-meta" wx:if="{{selectedZone}}"> · {{selectedZone}}</text>
     </view>
-    <view class="selected placeholder" wx:else>请在分布图中点选座位</view>
+    <view class="seat-selected seat-selected--ph" wx:else>请在分布图中点选座位</view>
     <view class="btn-primary {{selectedCode ? '' : 'disabled'}}" bindtap="confirm">下一步</view>
   </view>
 </view>

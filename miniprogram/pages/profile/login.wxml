@@ -1,0 +1,57 @@
+<view class="page-login page-safe-bottom">
+  <view class="login-loading" wx:if="{{step === 'loading'}}">
+    <view class="loading-text">加载中...</view>
+  </view>
+
+  <view class="login-panel card" wx:elif="{{step === 'login'}}">
+    <view class="login-logo">岛</view>
+    <view class="login-title">登录知行岛</view>
+    <view class="login-desc">微信一键登录，即可预约座位、查看订单与积分</view>
+    <view class="login-error" wx:if="{{loginError}}">{{loginError}}</view>
+    <view class="btn-primary login-btn" bindtap="doLogin">微信登录</view>
+    <view class="login-note">无需账号密码，使用当前微信身份登录</view>
+  </view>
+
+  <view class="setup-card card" wx:elif="{{step === 'setup' && user}}">
+    <view class="setup-title">完善个人资料</view>
+    <view class="setup-desc">点击头像同步微信头像，昵称可一键选用微信昵称</view>
+
+    <button class="avatar-picker" hover-class="none" open-type="chooseAvatar" bindchooseavatar="onChooseAvatar">
+      <image
+        wx:if="{{avatarDisplay}}"
+        class="avatar"
+        src="{{avatarDisplay}}"
+        mode="aspectFill"
+      />
+      <view wx:else class="avatar avatar-placeholder">岛</view>
+      <view class="avatar-tip">{{avatarUploading ? '同步中...' : '点击使用微信头像'}}</view>
+    </button>
+
+    <view class="nickname-field">
+      <view class="field-label">昵称</view>
+      <input
+        type="nickname"
+        class="nickname-input"
+        placeholder="点击输入或选用微信昵称"
+        value="{{draftNickname}}"
+        bindinput="onNicknameInput"
+      />
+    </view>
+
+    <view class="goal-field">
+      <view class="field-label">备考方向（选填）</view>
+      <view class="goal-chips">
+        <view
+          wx:for="{{goalOptions}}"
+          wx:key="value"
+          class="goal-chip {{draftStudyGoal === item.value ? 'active' : ''}}"
+          data-value="{{item.value}}"
+          bindtap="onGoalSelect"
+        >{{item.label}}</view>
+      </view>
+    </view>
+
+    <view class="btn-primary setup-save" bindtap="saveProfile">完成登录</view>
+    <view class="setup-note">学号 #{{user.id}} · 店长可通过学号或手机号识别你</view>
+  </view>
+</view>

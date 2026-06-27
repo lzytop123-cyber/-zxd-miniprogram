@@ -1,6 +1,7 @@
 {
   "usingComponents": {
-    "store-card": "../../components/store-card/index"
+    "store-card": "../../components/store-card/index",
+    "booking-flow": "../../components/booking-flow/index"
   },
   "navigationBarTitleText": "首页"
 }

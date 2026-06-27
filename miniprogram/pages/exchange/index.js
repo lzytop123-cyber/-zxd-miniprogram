@@ -41,7 +41,7 @@ Page({
         title: '兑换成功',
         content: `已获得：${result.card_name || '期限卡'}`,
         showCancel: false,
-        success: () => wx.navigateTo({ url: '/pages/profile/cards' }),
+        success: () => wx.switchTab({ url: '/pages/packages/index' }),
       })
     } catch (e) {
       wx.hideLoading()

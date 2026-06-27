@@ -1,22 +1,32 @@
-const { API_BASE } = require('./config')
+const { getApiBase } = require('./config')
 
 App({
   globalData: {
-    apiBase: API_BASE,
+    apiBase: '',
     user: wx.getStorageSync('userInfo') || null,
     loginReady: !!wx.getStorageSync('token'),
     loginError: '',
     loginPromise: null,
+    packagesTab: null,
   },
 
   onLaunch() {
+    this.globalData.apiBase = getApiBase()
     const auth = require('./utils/auth')
-    this.globalData.loginPromise = auth.login({ silent: true }).catch(() => null)
+    // 不再启动时静默 wx.login；仅恢复已有 token 的会话
+    if (auth.isLoggedIn()) {
+      this.globalData.loginReady = true
+      this.globalData.loginPromise = Promise.resolve(this.globalData.user)
+    } else {
+      this.globalData.loginPromise = Promise.resolve(null)
+      this.globalData.loginReady = false
+      this.globalData.user = null
+    }
   },
 
   relogin() {
     const auth = require('./utils/auth')
-    this.globalData.loginPromise = auth.login({ silent: false })
+    this.globalData.loginPromise = auth.login({ silent: false, force: true })
     return this.globalData.loginPromise
   },
 })

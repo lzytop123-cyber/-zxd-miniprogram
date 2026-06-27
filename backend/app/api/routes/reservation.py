@@ -22,11 +22,18 @@ from app.schemas.reservation import (
 )
 from app.services.business import (
     calc_price,
-    create_ble_keys_for_reservation,
     find_available_seat,
     generate_order_no,
 )
-from app.services.booking import add_wallet_log, record_study_on_checkout, resolve_booking_window, validate_seat_for_booking
+from app.services.booking import (
+    add_wallet_log,
+    auto_checkin_reservation,
+    finalize_reservation_after_pay,
+    record_study_on_checkout,
+    reservation_status_display,
+    resolve_booking_window,
+    validate_seat_for_booking,
+)
 from app.services.card_service import consume_period_card, validate_period_card_for_reservation
 from app.services.coupon_service import apply_coupon, mark_coupon_used
 from app.services.wechat_pay import WechatPayService
@@ -103,6 +110,7 @@ def _resolve_coupon_price(
 def _to_item(db: Session, r: Reservation) -> ReservationItem:
     seat = db.get(Seat, r.seat_id)
     store = db.get(Store, r.store_id)
+    label, hint = reservation_status_display(r)
     return ReservationItem(
         id=r.id,
         order_no=r.order_no,
@@ -118,6 +126,8 @@ def _to_item(db: Session, r: Reservation) -> ReservationItem:
         status=r.status,
         check_in_time=r.check_in_time,
         created_at=r.created_at,
+        status_label=label,
+        status_hint=hint,
     )
 
 
@@ -225,7 +235,7 @@ async def pay(
         reservation.pay_status = 1
         reservation.final_price = Decimal("0.00")
         db.commit()
-        await create_ble_keys_for_reservation(db, reservation)
+        await finalize_reservation_after_pay(db, reservation)
         return ResponseModel(
             data=ReservationPayResponse(order_no=body.order_no, pay_type=PayType.period_card)
         )
@@ -241,7 +251,7 @@ async def pay(
         reservation.pay_status = 1
         _mark_pay_coupon(db, user.id, body.coupon_id, reservation)
         db.commit()
-        await create_ble_keys_for_reservation(db, reservation)
+        await finalize_reservation_after_pay(db, reservation)
         return ResponseModel(
             data=ReservationPayResponse(order_no=body.order_no, pay_type=PayType.balance)
         )
@@ -287,7 +297,7 @@ async def mock_pay(
     reservation.pay_type = PayType.wechat
     _mark_pay_coupon(db, user.id, coupon_id, reservation)
     db.commit()
-    await create_ble_keys_for_reservation(db, reservation)
+    await finalize_reservation_after_pay(db, reservation)
     return ResponseModel(message="模拟支付成功")
 
 
@@ -299,6 +309,12 @@ def list_reservations(user: User = Depends(get_current_user), db: Session = Depe
         .order_by(Reservation.created_at.desc())
         .limit(50)
     ).all()
+    changed = False
+    for row in rows:
+        if auto_checkin_reservation(db, row):
+            changed = True
+    if changed:
+        db.commit()
     return ResponseModel(data=[_to_item(db, r) for r in rows])
 
 
@@ -315,6 +331,9 @@ def active_reservation(user: User = Depends(get_current_user), db: Session = Dep
         )
         .order_by(Reservation.start_time)
     )
+    if row and auto_checkin_reservation(db, row):
+        db.commit()
+        db.refresh(row)
     return ResponseModel(data=_to_item(db, row) if row else None)
 
 

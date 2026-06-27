@@ -2,7 +2,7 @@
   <view wx:if="{{!reservation}}" class="empty card empty-card">
     <view class="empty-icon">📚</view>
     <view class="empty-text">暂无进行中的订单</view>
-    <view class="empty-hint">预约并支付后可在此开门入座</view>
+    <view class="empty-hint">预约成功后到店开门即可，无需手动签到</view>
     <view class="btn-primary" bindtap="goBooking">立即预定</view>
   </view>
 
@@ -14,6 +14,8 @@
         <view class="seat-label">您的座位</view>
       </view>
       <view class="time">结束 {{endDisplay}}</view>
+      <view class="status-pill" wx:if="{{statusLabel}}">{{statusLabel}}</view>
+      <view class="status-hint" wx:if="{{statusHint}}">{{statusHint}}</view>
       <view class="countdown" wx:if="{{countdown}}">{{countdown}}</view>
       <view class="lock-name" wx:if="{{lockName}}">门锁：{{lockName}}</view>
     </view>
@@ -24,12 +26,12 @@
 
       <view class="open-actions">
         <view
-          class="open-btn ble {{canOpen && !opening ? '' : 'disabled'}}"
+          class="open-btn ble {{canOpen && pluginReady && !opening ? '' : 'disabled'}}"
           bindtap="openDoorBle"
         >
           <view class="open-icon">📶</view>
           <view class="open-text">蓝牙开门</view>
-          <view class="open-sub" wx:if="{{!pluginReady}}">需企业插件</view>
+          <view class="open-sub" wx:if="{{!pluginReady}}">模拟器不可用</view>
         </view>
 
         <view

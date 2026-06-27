@@ -1,16 +1,21 @@
 const auth = require('../../utils/auth')
 const { request } = require('../../utils/request')
+const { normalizeUser, pickAvatarDisplay } = require('../../utils/user')
+
+const GOAL_OPTIONS = [
+  { value: 'kaoyan', label: '考研' },
+  { value: 'kaogong', label: '考公' },
+  { value: 'other', label: '其他' },
+]
 
 Page({
   data: {
     loginState: 'loading',
-    loginError: '',
     user: null,
-    needsSetup: false,
-    draftNickname: '',
-    draftAvatar: '',
+    avatarDisplay: '',
+    avatarUploading: false,
     saving: false,
-    defaultAvatar: auth.DEFAULT_AVATAR,
+    goalOptions: GOAL_OPTIONS,
   },
 
   onShow() {
@@ -18,104 +23,119 @@ Page({
   },
 
   async bootstrap() {
-    this.setData({ loginState: 'loading', loginError: '' })
+    if (!auth.isLoggedIn()) {
+      this.setData({ loginState: 'guest', user: null, avatarDisplay: '' })
+      return
+    }
+
+    this.setData({ loginState: 'loading' })
     try {
       await auth.waitForLogin()
       const user = await request({ url: '/user/profile', silent: true })
       auth.syncAppUser(user)
-      this.applyUser(user)
-    } catch (err) {
-      const app = getAppSafe()
-      const cached = wx.getStorageSync('userInfo')
-      if (cached && wx.getStorageSync('token')) {
-        this.applyUser(cached)
+      if (user.needs_profile_setup) {
+        auth.goLogin('/pages/profile/index')
         return
       }
-      this.setData({
-        loginState: 'error',
-        loginError: (app && app.globalData && app.globalData.loginError) || err.detail || '登录失败，请重试',
-        user: null,
-      })
+      await this.applyUser(user)
+    } catch (err) {
+      const cached = wx.getStorageSync('userInfo')
+      if (cached && auth.isLoggedIn() && !cached.needs_profile_setup) {
+        await this.applyUser(cached)
+        return
+      }
+      auth.goLogin('/pages/profile/index')
     }
   },
 
-  applyUser(user) {
+  async applyUser(user, localAvatar) {
+    const normalized = await normalizeUser(user)
     this.setData({
       loginState: 'ready',
-      user,
-      needsSetup: !!user.needs_profile_setup,
-      draftNickname: user.nickname === auth.DEFAULT_NICKNAME ? '' : (user.nickname || ''),
-      draftAvatar: '',
-      loginError: '',
+      user: normalized,
+      avatarDisplay: pickAvatarDisplay(localAvatar, normalized),
     })
   },
 
-  onChooseAvatar(e) {
+  async onChooseAvatar(e) {
     const { avatarUrl } = e.detail
-    if (avatarUrl) this.setData({ draftAvatar: avatarUrl })
-  },
+    if (!avatarUrl || this.data.avatarUploading) return
 
-  onNicknameInput(e) {
-    this.setData({ draftNickname: e.detail.value })
-  },
-
-  async saveProfile() {
-    const { draftNickname, draftAvatar, saving, needsSetup } = this.data
-    if (saving) return
-
-    const nickname = draftNickname.trim()
-    if (needsSetup && !draftAvatar && !this.data.user.avatar_url) {
-      wx.showToast({ title: '请选择头像', icon: 'none' })
-      return
-    }
-    if (needsSetup && !nickname) {
-      wx.showToast({ title: '请填写昵称', icon: 'none' })
-      return
-    }
-
-    this.setData({ saving: true })
-    wx.showLoading({ title: '保存中...' })
+    this.setData({ avatarDisplay: avatarUrl, avatarUploading: true })
+    wx.showLoading({ title: '更新头像...' })
     try {
-      const user = await auth.saveProfile({
-        nickname: nickname || undefined,
-        avatarTempPath: draftAvatar || undefined,
-      })
-      wx.hideLoading()
-      wx.showToast({ title: '保存成功', icon: 'success' })
-      this.applyUser(user)
+      const user = await auth.uploadAvatar(avatarUrl)
+      auth.syncAppUser(user)
+      await this.applyUser(user, avatarUrl)
+      wx.showToast({ title: '头像已更新', icon: 'success' })
     } catch (err) {
+      wx.showToast({ title: err.detail || err.message || '更新失败', icon: 'none' })
+    } finally {
       wx.hideLoading()
-      wx.showToast({ title: err.detail || err.message || '保存失败', icon: 'none' })
+      this.setData({ avatarUploading: false })
+    }
+  },
+
+  async saveStudyGoal(e) {
+    const value = e.currentTarget.dataset.value
+    const next = this.data.user?.study_goal === value ? '' : value
+    if (this.data.saving) return
+    this.setData({ saving: true })
+    try {
+      const user = await auth.saveProfile({ studyGoal: next })
+      wx.showToast({ title: '已更新', icon: 'success' })
+      await this.applyUser(user, this.data.avatarDisplay)
+    } catch (err) {
+      wx.showToast({ title: err.detail || '保存失败', icon: 'none' })
     } finally {
       this.setData({ saving: false })
     }
   },
 
-  retryLogin() {
-    const app = getApp({ allowDefault: true })
-    if (app && app.relogin) {
-      app.relogin().then(() => this.bootstrap())
-      return
-    }
-    const auth = require('../../utils/auth')
-    auth.login({ silent: false }).then(() => this.bootstrap())
+  goLogin() {
+    auth.goLogin('/pages/profile/index')
+  },
+
+  doLogout() {
+    wx.showModal({
+      title: '退出登录',
+      content: '退出后需重新微信登录才能使用预约等功能',
+      confirmColor: '#2D6A4F',
+      success: (res) => {
+        if (!res.confirm) return
+        auth.logout()
+        this.setData({ loginState: 'guest', user: null, avatarDisplay: '' })
+        wx.showToast({ title: '已退出', icon: 'none' })
+      },
+    })
+  },
+
+  copyUserId() {
+    const id = this.data.user?.id
+    if (!id) return
+    wx.setClipboardData({
+      data: String(id),
+      success: () => wx.showToast({ title: '学号已复制', icon: 'success' }),
+    })
   },
 
   bindPhone(e) {
     const { code } = e.detail
     if (!code) return
     request({ url: '/user/bind-phone', method: 'POST', data: { code } })
-      .then((user) => {
+      .then(async (user) => {
         wx.showToast({ title: '绑定成功' })
-        this.applyUser(user)
+        await this.applyUser(user, this.data.avatarDisplay)
       })
   },
 
   go(e) {
-    if (this.data.loginState !== 'ready') {
-      wx.showToast({ title: '请先完成登录', icon: 'none' })
-      return
-    }
-    wx.navigateTo({ url: e.currentTarget.dataset.url })
+    const url = e.currentTarget.dataset.url
+    if (!auth.requireLogin(url)) return
+    wx.navigateTo({ url })
+  },
+
+  goPackages() {
+    wx.switchTab({ url: '/pages/packages/index' })
   },
 })

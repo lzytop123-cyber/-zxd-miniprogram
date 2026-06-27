@@ -5,6 +5,7 @@ from sqlalchemy import select
 
 from app.db.session import SessionLocal
 from app.models import BleBatteryAlert, BleLock, Reservation
+from app.services.booking import auto_checkin_due_batch
 
 BATTERY_LOW_THRESHOLD = 20
 
@@ -78,9 +79,18 @@ def check_ble_battery():
         db.close()
 
 
+def auto_checkin_due_orders():
+    db = SessionLocal()
+    try:
+        auto_checkin_due_batch(db)
+    finally:
+        db.close()
+
+
 def start_scheduler():
     scheduler = BackgroundScheduler()
     scheduler.add_job(cancel_unpaid_orders, "interval", minutes=5)
     scheduler.add_job(expire_finished_orders, "interval", minutes=5)
+    scheduler.add_job(auto_checkin_due_orders, "interval", minutes=1)
     scheduler.add_job(check_ble_battery, "interval", hours=1)
     scheduler.start()

@@ -1,4 +1,5 @@
 const { request } = require('../../utils/request')
+const { getLayout } = require('../../utils/seat-layout')
 
 const BILL_LABELS = { hourly: '按小时', daily: '天卡', weekly: '周卡', session: '次卡', monthly: '月卡', quarterly: '季卡', night: '夜读' }
 
@@ -31,6 +32,7 @@ Page({
     endTime: '',
     seatId: null,
     seatCode: '',
+    seatDisplay: '',
     originalPrice: 0,
     discountPrice: 0,
     price: 0,
@@ -52,12 +54,18 @@ Page({
   },
 
   onLoad(options) {
+    const layout = getLayout()
+    const display = layout.seatDisplay({ seat_code: options.seatCode || '' })
+    const seatDisplay = display.mapLabel
+      ? `${display.mapLabel} 号 · ${display.zoneName}`
+      : (options.seatCode || '-')
     this.setData({
       storeId: options.storeId,
       startTime: decodeURIComponent(options.start),
       endTime: decodeURIComponent(options.end),
       seatId: options.seatId,
       seatCode: options.seatCode,
+      seatDisplay,
       originalPrice: options.price,
       price: options.price,
       billType: options.billType || 'hourly',
@@ -244,8 +252,8 @@ Page({
       }
 
       wx.hideLoading()
-      wx.showToast({ title: '支付成功', icon: 'success' })
-      setTimeout(() => wx.switchTab({ url: '/pages/checkin/index' }), 1500)
+      wx.showToast({ title: '预约成功', icon: 'success' })
+      setTimeout(() => wx.switchTab({ url: '/pages/checkin/index' }), 1200)
     } catch (e) {
       wx.hideLoading()
       wx.showToast({ title: e.message || '下单失败', icon: 'none' })

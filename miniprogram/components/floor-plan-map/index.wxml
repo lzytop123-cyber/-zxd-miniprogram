@@ -1,6 +1,9 @@
 <template name="seatUnit">
-  <view class="seat-cell {{seat.status}} {{selectedId===seat.id?'is-selected':''}}">
-    <text wx:if="{{selectedId===seat.id}}" class="seat-cell-num">{{seat.map_label}}</text>
+  <view class="seat-cell {{seat.status}} {{selectedId===seat.id?'is-selected':''}} {{seat.status==='empty'?'is-hidden':''}}">
+    <text
+      wx:if="{{selectedId===seat.id && seat.map_label}}"
+      class="seat-cell-num seat-cell-num--on"
+    >{{seat.map_label}}</text>
   </view>
 </template>
 
@@ -39,10 +42,10 @@
     </movable-view>
   </movable-area>
 
-  <!-- 缩放控制 -->
-  <view class="zoom-bar">
-    <view class="zoom-btn" catchtap="zoomOut">−</view>
+  <!-- 缩放：右下角 -->
+  <!-- <view class="zoom-bar">
     <view class="zoom-btn" catchtap="zoomIn">+</view>
-    <view class="zoom-btn zoom-reset" catchtap="zoomReset">复位</view>
-  </view>
+    <view class="zoom-btn" catchtap="zoomOut">−</view>
+    <view class="zoom-btn zoom-reset" catchtap="zoomReset">1:1</view>
+  </view> -->
 </view>

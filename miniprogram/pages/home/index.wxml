@@ -1,42 +1,32 @@
 <view class="page-home page-safe-bottom">
-  <!-- Hero：品牌 + 活动 -->
-  <view class="hero">
-    <view class="hero-orb orb-1"></view>
-    <view class="hero-orb orb-2"></view>
-    <view class="hero-grid"></view>
+  <view
+    class="hero hero--{{carousel.hero_mode || 'fullscreen'}}"
+    style="height: {{heroHeight}}rpx;"
+  >
+    <!-- 轮播：第 1 屏固定流程指引，后续为运营 Banner -->
+    <view class="hero-media">
+      <swiper
+        wx:if="{{heroSlideCount > 1}}"
+        class="hero-swiper"
+        style="height: {{heroHeight}}rpx;"
+        indicator-dots="{{carousel.indicator_dots}}"
+        indicator-color="rgba(255,255,255,0.35)"
+        indicator-active-color="#FFFFFF"
+        autoplay="{{carousel.autoplay}}"
+        interval="{{carousel.interval}}"
+        circular="{{carousel.circular}}"
+      >
+        <swiper-item class="hero-swiper-item">
+          <booking-flow mode="hero" hero-height="{{heroHeight}}" />
+        </swiper-item>
+        <swiper-item wx:for="{{banners}}" wx:key="id" class="hero-swiper-item">
+          <template is="heroSlide" data="{{item: item, index: index, heroMode: carousel.hero_mode}}" />
+        </swiper-item>
+      </swiper>
 
-    <view class="hero-top">
-      <view class="brand">
-        <view class="brand-logo">岛</view>
-        <view class="brand-text">
-          <view class="brand-name">知行岛自习室</view>
-          <view class="brand-slogan">知行合一 · 专注当下</view>
-        </view>
+      <view wx:else class="hero-swiper hero-swiper--single" style="height: {{heroHeight}}rpx;">
+        <booking-flow mode="hero" hero-height="{{heroHeight}}" />
       </view>
-      <view class="hero-points" bindtap="goPoints" wx:if="{{user}}">
-        <text class="hero-points-val">{{user.total_points || 0}}</text>
-        <text class="hero-points-key">积分</text>
-      </view>
-    </view>
-
-    <view class="campaign">
-      <view class="campaign-ribbon">夏日专注计划</view>
-      <view class="campaign-title">
-        <text class="ct-line">上岛泡一个</text>
-        <text class="ct-line">高效的夏天</text>
-      </view>
-      <view class="campaign-foot">
-        <view class="campaign-date">
-          <text class="cd-label">活动期</text>
-          <text class="cd-range">07.01 — 08.31</text>
-        </view>
-        <view class="campaign-cta" bindtap="goNearestStore">立即开启</view>
-      </view>
-    </view>
-
-    <view class="search-bar">
-      <text class="search-icon">⌕</text>
-      <text class="search-placeholder">搜索门店名称或地址</text>
     </view>
   </view>
 
@@ -53,7 +43,7 @@
       <view class="entry-deco"></view>
       <view class="entry-en">VERIFY VOUCHER</view>
       <view class="entry-cn">团购验券</view>
-      <view class="entry-desc">美团 / 抖音核销</view>
+      <view class="entry-desc">美团 / 抖音 / 大众点评核销</view>
       <view class="entry-icon">🎟️</view>
     </view>
   </view>
@@ -64,7 +54,7 @@
       <image wx:if="{{user.avatar_url}}" class="member-avatar" src="{{user.avatar_url}}" mode="aspectFill" />
       <view wx:else class="member-avatar member-avatar-ph">岛</view>
       <view class="member-info">
-        <view class="member-hi">{{user ? ('Hi，' + user.nickname) : '欢迎来到知行岛'}}</view>
+        <view class="member-hi">{{user ? (user.nickname) : '欢迎来到知行岛'}}</view>
         <view class="member-badge">{{user.title || '注册即享专注会员权益'}}</view>
       </view>
       <view class="member-arrow">›</view>
@@ -75,47 +65,42 @@
         <view class="mstat-key">积分</view>
       </view>
       <view class="mstat-line"></view>
-      <view class="mstat" catchtap="goWallet">
-        <view class="mstat-val">¥{{user.balance || 0}}</view>
-        <view class="mstat-key">余额</view>
-      </view>
-      <view class="mstat-line"></view>
-      <view class="mstat" catchtap="goCoupons">
-        <view class="mstat-val">领券</view>
-        <view class="mstat-key">优惠券</view>
+      <view class="mstat" catchtap="goPackages">
+        <view class="mstat-val">{{user ? cardCount : 0}}</view>
+        <view class="mstat-key">期限卡</view>
       </view>
     </view>
   </view>
 
   <!-- 快捷功能 -->
   <view class="quick card">
-    <view class="q" bindtap="goCards">
+    <view class="q" bindtap="goPackages">
       <view class="q-icon q-pkg">🎫</view>
-      <text class="q-text">购买套餐</text>
+      <text class="q-text">套餐</text>
     </view>
-    <button class="q q-btn" open-type="contact">
-      <view class="q-icon q-chat">💬</view>
-      <text class="q-text">联系店长</text>
-    </button>
     <view class="q" bindtap="goCheckin">
       <view class="q-icon q-self">🪪</view>
-      <text class="q-text">自助入座</text>
+      <text class="q-text">开门</text>
     </view>
     <view class="q" bindtap="goOrders">
       <view class="q-icon q-order">📋</view>
       <text class="q-text">订座记录</text>
     </view>
+    <view class="q" bindtap="goReport">
+      <view class="q-icon q-report">📊</view>
+      <text class="q-text">学习助手</text>
+    </view>
   </view>
 
   <!-- 邀请 Banner -->
-  <view class="promo" bindtap="goInvite">
+  <!-- <view class="promo" bindtap="goInvite">
     <view class="promo-spark">🌱</view>
     <view class="promo-text">
       <view class="promo-title">喊上同桌，一起上岛</view>
       <view class="promo-sub">邀请好友，双方共得积分</view>
     </view>
     <view class="promo-cta">去邀请</view>
-  </view>
+  </view> -->
 
   <!-- 附近门店 -->
   <view class="section-row">
@@ -135,3 +120,64 @@
     </view>
   </view>
 </view>
+
+<template name="heroSlide">
+  <view class="hero-slide hero-slide--{{heroMode || 'fullscreen'}}">
+    <!-- 背景：图片铺满或默认绿 -->
+    <image
+      wx:if="{{item.image_url && (item.layout_type === 'image' || item.layout_type === 'image_text')}}"
+      class="hero-slide-bg {{heroMode === 'card' ? 'hero-slide-bg--card' : ''}}"
+      src="{{item.image_url}}"
+      mode="aspectFill"
+    />
+    <view wx:else class="hero-slide-bg hero-slide-bg--text">
+      <view class="hero-grid"></view>
+    </view>
+
+    <!-- 纯图片：整页可点 -->
+    <view
+      wx:if="{{item.layout_type === 'image' && item.image_url}}"
+      class="hero-slide-tap"
+      bindtap="onCampaignTap"
+      data-index="{{index}}"
+    ></view>
+
+    <!-- 文字内容（纯文字布局） -->
+    <view
+      class="hero-slide-content {{heroMode === 'card' ? 'hero-slide-content--card' : ''}}"
+      wx:if="{{item.layout_type === 'text' && (item.ribbon || item.title_line1 || item.title_line2 || item.date_label || item.date_range || item.cta_text)}}"
+    >
+      <view class="campaign-ribbon" wx:if="{{item.ribbon}}">{{item.ribbon}}</view>
+      <view class="campaign-title" wx:if="{{item.title_line1 || item.title_line2}}">
+        <text class="ct-line" wx:if="{{item.title_line1}}">{{item.title_line1}}</text>
+        <text class="ct-line ct-line--sm" wx:if="{{item.title_line2}}">{{item.title_line2}}</text>
+      </view>
+      <view class="campaign-foot" wx:if="{{item.date_label || item.date_range || item.cta_text}}">
+        <view class="campaign-date" wx:if="{{item.date_label || item.date_range}}">
+          <text class="cd-label" wx:if="{{item.date_label}}">{{item.date_label}}</text>
+          <text class="cd-range" wx:if="{{item.date_range}}">{{item.date_range}}</text>
+        </view>
+        <view class="campaign-cta" wx:if="{{item.cta_text}}" bindtap="onCampaignTap" data-index="{{index}}">{{item.cta_text}}</view>
+      </view>
+    </view>
+
+    <!-- 图文叠加 -->
+    <view
+      class="hero-slide-content hero-slide-content--overlay"
+      wx:elif="{{item.layout_type === 'image_text' && item.image_url && (item.ribbon || item.title_line1 || item.title_line2 || item.date_label || item.date_range || item.cta_text)}}"
+    >
+      <view class="campaign-ribbon" wx:if="{{item.ribbon}}">{{item.ribbon}}</view>
+      <view class="campaign-title" wx:if="{{item.title_line1 || item.title_line2}}">
+        <text class="ct-line" wx:if="{{item.title_line1}}">{{item.title_line1}}</text>
+        <text class="ct-line ct-line--sm" wx:if="{{item.title_line2}}">{{item.title_line2}}</text>
+      </view>
+      <view class="campaign-foot" wx:if="{{item.date_label || item.date_range || item.cta_text}}">
+        <view class="campaign-date" wx:if="{{item.date_label || item.date_range}}">
+          <text class="cd-label" wx:if="{{item.date_label}}">{{item.date_label}}</text>
+          <text class="cd-range" wx:if="{{item.date_range}}">{{item.date_range}}</text>
+        </view>
+        <view class="campaign-cta" wx:if="{{item.cta_text}}" bindtap="onCampaignTap" data-index="{{index}}">{{item.cta_text}}</view>
+      </view>
+    </view>
+  </view>
+</template>

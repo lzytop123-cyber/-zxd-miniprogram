@@ -1,10 +1,22 @@
-<view class="list-page page-safe-bottom">
-  <view class="card list-card order" wx:for="{{orders}}" wx:key="id">
-    <view class="row"><text>{{item.store_name}}</text><text class="status">{{statusText[item.status]}}</text></view>
-    <view class="row sub">座位 {{item.seat_code}} · ¥{{item.final_price}}</view>
-    <view class="row sub">{{item.start_time}} ~ {{item.end_time}}</view>
+<view class="orders-page page-safe-bottom">
+  <view class="order-card card" wx:for="{{orders}}" wx:key="id">
+    <view class="order-head">
+      <view class="order-store">{{item.store_name}}</view>
+      <view class="order-status status-{{item.statusTone}}">{{item.statusLabel}}</view>
+    </view>
+    <view class="order-seat">座位 {{item.seat_code}} · ¥{{item.final_price}}</view>
+    <view class="order-time">{{item.timeRange}}</view>
+    <view class="order-hint" wx:if="{{item.statusHint}}">{{item.statusHint}}</view>
+    <view class="order-action" wx:if="{{item.canOpen}}">
+      <view class="action-btn" catchtap="goOpen">去开门</view>
+    </view>
   </view>
-  <view class="empty" wx:if="{{!orders.length}}">
+
+  <view class="orders-tip card" wx:if="{{orders.length}}">
+    预约时段内自动入座，到店开门即可，无需手动签到
+  </view>
+
+  <view class="empty card" wx:if="{{!orders.length}}">
     <view class="empty-icon">📋</view>
     <view>暂无订单</view>
   </view>

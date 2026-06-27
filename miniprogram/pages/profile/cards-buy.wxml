@@ -1,0 +1,54 @@
+<view class="page-buy page-safe-bottom">
+  <view class="buy-header">
+    <view class="store-row">
+      <view class="store-name">{{storeName || '请选择门店'}}</view>
+      <picker mode="selector" range="{{stores}}" range-key="name" bindchange="onStoreChange">
+        <view class="store-switch">切换门店 ›</view>
+      </picker>
+    </view>
+    <scroll-view class="tab-scroll" scroll-x enhanced show-scrollbar="{{false}}">
+      <view class="tab-row">
+        <view
+          class="tab-item {{activeTab === item.key ? 'active' : ''}}"
+          wx:for="{{tabs}}"
+          wx:key="key"
+          data-key="{{item.key}}"
+          bindtap="switchTab"
+        >{{item.label}}</view>
+      </view>
+    </scroll-view>
+  </view>
+
+  <view class="buy-body">
+    <view class="loading" wx:if="{{loading}}">加载中...</view>
+
+    <view class="pkg-list" wx:elif="{{displayPackages.length}}">
+      <view class="pkg-ticket" wx:for="{{displayPackages}}" wx:key="pricing_rule_id">
+        <view class="pkg-deco"></view>
+        <view class="pkg-head">
+          <view class="pkg-name">{{item.label}}</view>
+          <view class="pkg-price">¥<text class="pkg-price-num">{{item.priceText}}</text></view>
+        </view>
+        <view class="pkg-tag" wx:if="{{item.tagText}}">{{item.tagText}}</view>
+        <view class="pkg-rule">{{item.ruleText}}</view>
+        <view class="pkg-foot">
+          <view class="pkg-tip">购买后发放至「我的期限卡」</view>
+          <view class="pkg-buy" data-type="{{item.bill_type}}" bindtap="buy">立即购买</view>
+        </view>
+      </view>
+    </view>
+
+    <view class="buy-empty" wx:else>
+      <view class="empty-icon">🎫</view>
+      <view>该分类暂无可购套餐</view>
+    </view>
+  </view>
+
+  <view class="buy-footer">
+    <view class="footer-label">支付方式</view>
+    <view class="pay-row">
+      <view class="pay-chip {{payType === 'wechat' ? 'active' : ''}}" data-type="wechat" bindtap="setPayType">微信支付</view>
+      <view class="pay-chip {{payType === 'balance' ? 'active' : ''}}" data-type="balance" bindtap="setPayType">余额支付</view>
+    </view>
+  </view>
+</view>

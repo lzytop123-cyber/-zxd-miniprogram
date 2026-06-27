@@ -2,8 +2,8 @@
   <!-- 顶部分段切换 -->
   <view class="seg-wrap">
     <view class="seg">
-      <view class="seg-item {{tab==='report' ? 'on' : ''}}" bindtap="switchTab" data-tab="report">学习报告</view>
       <view class="seg-item {{tab==='assistant' ? 'on' : ''}}" bindtap="switchTab" data-tab="assistant">AI 助手</view>
+      <view class="seg-item {{tab==='report' ? 'on' : ''}}" bindtap="switchTab" data-tab="report">学习报告</view>
     </view>
   </view>
 
@@ -53,15 +53,6 @@
         </view>
         <view class="empty" wx:if="{{!leaderboard.length}}">暂无排行数据</view>
       </view>
-    </view>
-
-    <view class="assistant-tip" bindtap="switchTab" data-tab="assistant">
-      <view class="at-icon">🌱</view>
-      <view class="at-text">
-        <view class="at-title">问问 AI 学习助手小岛</view>
-        <view class="at-sub">门店问答 · 学习规划 · 随时答疑</view>
-      </view>
-      <view class="at-arrow">›</view>
     </view>
   </view>
 

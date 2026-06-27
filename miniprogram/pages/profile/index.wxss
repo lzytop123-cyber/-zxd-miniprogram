@@ -79,6 +79,10 @@
   margin-top: 0;
 }
 
+.avatar-picker .avatar {
+  display: block;
+}
+
 .avatar {
   width: 128rpx;
   height: 128rpx;
@@ -252,4 +256,153 @@
 
 .phone-btn::after {
   border: none;
+}
+
+.profile-header.guest {
+  padding-bottom: 48rpx;
+}
+
+.guest-header {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.avatar.guest {
+  border-color: rgba(255, 255, 255, 0.5);
+  color: rgba(255, 255, 255, 0.85);
+  background: rgba(255, 255, 255, 0.15);
+}
+
+.guest-login-tip {
+  margin-top: 12rpx;
+  font-size: 24rpx;
+  opacity: 0.85;
+}
+
+.guest-card {
+  display: flex;
+  align-items: center;
+  gap: 24rpx;
+  margin-top: 24rpx;
+}
+
+.guest-avatar {
+  width: 96rpx;
+  height: 96rpx;
+  border-radius: 50%;
+  background: #E8F5E9;
+  color: #8C9BA5;
+  font-size: 40rpx;
+  font-weight: 700;
+  line-height: 96rpx;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+.guest-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.guest-title {
+  font-size: 32rpx;
+  font-weight: 700;
+  color: #1C2B20;
+}
+
+.guest-desc {
+  margin-top: 8rpx;
+  font-size: 24rpx;
+  color: #8C9BA5;
+}
+
+.guest-arrow {
+  font-size: 40rpx;
+  color: #CFD8DC;
+  flex-shrink: 0;
+}
+
+.goal-field {
+  margin-top: 28rpx;
+  text-align: left;
+}
+
+.goal-card {
+  margin: 24rpx;
+  padding: 28rpx 32rpx;
+}
+
+.goal-card-title {
+  font-size: 30rpx;
+  font-weight: 700;
+  color: #1C2B20;
+}
+
+.goal-card-desc {
+  margin-top: 8rpx;
+  font-size: 24rpx;
+  color: #8C9BA5;
+}
+
+.goal-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16rpx;
+  margin-top: 20rpx;
+}
+
+.goal-chip {
+  padding: 14rpx 32rpx;
+  border-radius: 999rpx;
+  font-size: 26rpx;
+  color: #2D6A4F;
+  background: #E8F5E9;
+  border: 2rpx solid transparent;
+}
+
+.goal-chip.active {
+  background: #2D6A4F;
+  color: #fff;
+}
+
+.goal-current {
+  margin-top: 16rpx;
+  font-size: 24rpx;
+  color: #52B788;
+}
+
+.id-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 12rpx;
+  margin-top: 16rpx;
+  padding: 10rpx 24rpx;
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 999rpx;
+  font-size: 24rpx;
+}
+
+.id-val {
+  font-weight: 700;
+  letter-spacing: 1rpx;
+}
+
+.id-copy {
+  opacity: 0.8;
+  font-size: 22rpx;
+  padding-left: 8rpx;
+  border-left: 2rpx solid rgba(255, 255, 255, 0.35);
+}
+
+.logout-row {
+  margin: 8rpx 24rpx 32rpx;
+  text-align: center;
+}
+
+.btn-logout {
+  display: inline-block;
+  padding: 20rpx 48rpx;
+  font-size: 26rpx;
+  color: #8C9BA5;
 }

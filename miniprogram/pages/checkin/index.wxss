@@ -72,6 +72,24 @@
   color: #1C2B20;
 }
 
+.status-pill {
+  display: inline-block;
+  margin-top: 16rpx;
+  padding: 6rpx 20rpx;
+  border-radius: 999rpx;
+  background: #D8F3DC;
+  color: #2D6A4F;
+  font-size: 24rpx;
+  font-weight: 600;
+}
+
+.status-hint {
+  margin-top: 10rpx;
+  font-size: 24rpx;
+  color: #8C9BA5;
+  line-height: 1.5;
+}
+
 .countdown {
   font-size: 36rpx;
   font-weight: 700;

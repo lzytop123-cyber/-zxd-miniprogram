@@ -1,21 +1,60 @@
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, time, timedelta
 from decimal import Decimal
+import uuid
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from pathlib import Path
+
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
 from pydantic import BaseModel
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_admin, get_current_user
 from app.core.config import settings
+from app.core.static_url import public_static_url
 from app.core.security import create_access_token, hash_password, verify_password
 from app.db.session import get_db
-from app.models import AdminUser, Coupon, MeituanDealMapping, PendingDealMapping, Reservation, RewardType, Seat, Store, User, Zone
+from app.models import (
+    AdminUser,
+    BillType,
+    CardPurchaseOrder,
+    Coupon,
+    HomeBanner,
+    HomeCarouselSetting,
+    MeituanDealMapping,
+    MeituanOrder,
+    PendingDealMapping,
+    PayType,
+    PeriodCard,
+    PointLog,
+    PricingRule,
+    Reservation,
+    RewardType,
+    Seat,
+    Store,
+    StudyStat,
+    User,
+    WalletLog,
+    Zone,
+)
 from app.schemas.common import PageParams, PageResult, ResponseModel
 from app.schemas.reservation import ReservationItem
+from app.schemas.user import STUDY_GOAL_LABELS
+from app.services import assistant as assistant_service
+from app.services.booking import add_wallet_log, auto_checkin_reservation, change_reservation_seat, seat_options_for_change
+from app.services.card_service import BILL_TYPE_LABELS
 from app.services.deal_mapping_service import mark_pending_resolved_by_deal_id, resolve_pending_deal
+from app.services.wechat_pay import WechatPayService
 
 router = APIRouter(prefix="/admin", tags=["后台管理"])
+
+BANNER_DIR = Path(__file__).resolve().parents[3] / "uploads" / "banners"
+BANNER_IMAGE_TYPES = {
+    "image/jpeg": "jpg",
+    "image/png": "png",
+    "image/webp": "webp",
+    "image/gif": "gif",
+}
 
 
 class AdminLoginRequest(BaseModel):
@@ -56,12 +95,15 @@ def coupon_system_status(_: object = Depends(get_current_admin)):
     )
 
 
-@router.get("/reservations", response_model=ResponseModel[PageResult[ReservationItem]])
+@router.get("/reservations", response_model=ResponseModel)
 def admin_reservations(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
     store_id: int | None = None,
     pay_status: int | None = None,
+    status: int | None = None,
+    order_no: str | None = None,
+    user_id: int | None = None,
     _: object = Depends(get_current_admin),
     db: Session = Depends(get_db),
 ):
@@ -70,16 +112,35 @@ def admin_reservations(
         query = query.where(Reservation.store_id == store_id)
     if pay_status is not None:
         query = query.where(Reservation.pay_status == pay_status)
+    if status is not None:
+        query = query.where(Reservation.status == status)
+    if order_no:
+        query = query.where(Reservation.order_no.contains(order_no.strip()))
+    if user_id:
+        query = query.where(Reservation.user_id == user_id)
     total = db.scalar(select(func.count()).select_from(query.subquery()))
     rows = db.scalars(
         query.order_by(Reservation.created_at.desc()).offset((page - 1) * page_size).limit(page_size)
     ).all()
 
+    changed = False
+    for r in rows:
+        if auto_checkin_reservation(db, r):
+            changed = True
+    if changed:
+        db.commit()
+
+    from app.api.routes.reservation import _to_item
+
     items = []
     for r in rows:
-        from app.api.routes.reservation import _to_item
-
-        items.append(_to_item(db, r))
+        base = _to_item(db, r).model_dump()
+        user = db.get(User, r.user_id)
+        base["user_id"] = r.user_id
+        base["user_nickname"] = user.nickname if user else None
+        base["user_phone"] = user.phone if user else None
+        base["pay_type"] = r.pay_type.value if r.pay_type else None
+        items.append(base)
 
     return ResponseModel(
         data=PageResult(items=items, total=total or 0, page=page, page_size=page_size)
@@ -189,6 +250,110 @@ class CouponCreateRequest(BaseModel):
     discount_val: float
     min_amount: float = 0
     expire_days: int = 30
+
+
+class AdminStoreItem(BaseModel):
+    id: int
+    name: str
+    address: str | None = None
+    latitude: float | None = None
+    longitude: float | None = None
+    open_time: str | None = None
+    close_time: str | None = None
+    wifi_name: str | None = None
+    wifi_password: str | None = None
+    floor_plan: str | None = None
+    status: int
+
+    model_config = {"from_attributes": True}
+
+
+class AdminStoreUpdateRequest(BaseModel):
+    name: str | None = None
+    address: str | None = None
+    latitude: float | None = None
+    longitude: float | None = None
+    open_time: str | None = None
+    close_time: str | None = None
+    wifi_name: str | None = None
+    wifi_password: str | None = None
+    floor_plan: str | None = None
+    status: int | None = None
+
+
+class AdminPricingCreateRequest(BaseModel):
+    bill_type: BillType
+    seat_type: str = "standard"
+    price: float
+    min_hours: int | None = None
+    max_hours: int | None = None
+    night_start: str | None = None
+    night_end: str | None = None
+    valid_days: int | None = None
+    remark: str | None = None
+    sort_order: int = 0
+    is_active: int = 1
+
+
+class AdminPricingUpdateRequest(BaseModel):
+    price: float | None = None
+    min_hours: int | None = None
+    max_hours: int | None = None
+    night_start: str | None = None
+    night_end: str | None = None
+    valid_days: int | None = None
+    remark: str | None = None
+    sort_order: int | None = None
+    is_active: int | None = None
+
+
+def _time_to_str(value: time | None) -> str | None:
+    if value is None:
+        return None
+    return value.strftime("%H:%M")
+
+
+def _parse_time(value: str | None) -> time | None:
+    if value is None or value == "":
+        return None
+    parts = value.strip().split(":")
+    if len(parts) < 2:
+        raise ValueError("时间格式应为 HH:MM")
+    return time(int(parts[0]), int(parts[1]), int(parts[2]) if len(parts) > 2 else 0)
+
+
+def _store_to_admin_item(store: Store) -> dict:
+    return {
+        "id": store.id,
+        "name": store.name,
+        "address": store.address,
+        "latitude": float(store.latitude) if store.latitude is not None else None,
+        "longitude": float(store.longitude) if store.longitude is not None else None,
+        "open_time": _time_to_str(store.open_time),
+        "close_time": _time_to_str(store.close_time),
+        "wifi_name": store.wifi_name,
+        "wifi_password": store.wifi_password,
+        "floor_plan": store.floor_plan,
+        "status": store.status,
+    }
+
+
+def _pricing_to_dict(rule: PricingRule) -> dict:
+    return {
+        "id": rule.id,
+        "store_id": rule.store_id,
+        "bill_type": rule.bill_type.value,
+        "seat_type": rule.seat_type,
+        "price": float(rule.price),
+        "min_hours": rule.min_hours,
+        "max_hours": rule.max_hours,
+        "night_start": _time_to_str(rule.night_start),
+        "night_end": _time_to_str(rule.night_end),
+        "valid_days": rule.valid_days,
+        "remark": rule.remark,
+        "sort_order": rule.sort_order,
+        "is_active": rule.is_active,
+    }
 
 
 @router.get("/deal-mappings", response_model=ResponseModel)
@@ -401,3 +566,1111 @@ def update_seat_status(
     seat.status = status
     db.commit()
     return ResponseModel(message="已更新")
+
+
+@router.get("/stores", response_model=ResponseModel)
+def list_stores_admin(_: object = Depends(get_current_admin), db: Session = Depends(get_db)):
+    stores = db.scalars(select(Store).order_by(Store.id)).all()
+    return ResponseModel(data=[_store_to_admin_item(s) for s in stores])
+
+
+@router.get("/stores/{store_id}", response_model=ResponseModel)
+def get_store_admin(
+    store_id: int,
+    _: object = Depends(get_current_admin),
+    db: Session = Depends(get_db),
+):
+    store = db.get(Store, store_id)
+    if not store:
+        raise HTTPException(status_code=404, detail="门店不存在")
+    return ResponseModel(data=_store_to_admin_item(store))
+
+
+@router.put("/stores/{store_id}", response_model=ResponseModel)
+def update_store_admin(
+    store_id: int,
+    body: AdminStoreUpdateRequest,
+    _: object = Depends(get_current_admin),
+    db: Session = Depends(get_db),
+):
+    store = db.get(Store, store_id)
+    if not store:
+        raise HTTPException(status_code=404, detail="门店不存在")
+
+    data = body.model_dump(exclude_unset=True)
+    for field in ("open_time", "close_time"):
+        if field in data:
+            try:
+                data[field] = _parse_time(data[field])
+            except ValueError as e:
+                raise HTTPException(status_code=400, detail=str(e))
+
+    for key, value in data.items():
+        if key in ("latitude", "longitude") and value is not None:
+            setattr(store, key, Decimal(str(value)))
+        else:
+            setattr(store, key, value)
+
+    db.commit()
+    db.refresh(store)
+    return ResponseModel(message="已保存", data=_store_to_admin_item(store))
+
+
+@router.get("/stores/{store_id}/pricing", response_model=ResponseModel)
+def list_store_pricing(
+    store_id: int,
+    _: object = Depends(get_current_admin),
+    db: Session = Depends(get_db),
+):
+    store = db.get(Store, store_id)
+    if not store:
+        raise HTTPException(status_code=404, detail="门店不存在")
+    rules = db.scalars(
+        select(PricingRule)
+        .where(PricingRule.store_id == store_id)
+        .order_by(PricingRule.sort_order, PricingRule.id)
+    ).all()
+    return ResponseModel(data=[_pricing_to_dict(r) for r in rules])
+
+
+@router.post("/stores/{store_id}/pricing", response_model=ResponseModel)
+def create_store_pricing(
+    store_id: int,
+    body: AdminPricingCreateRequest,
+    _: object = Depends(get_current_admin),
+    db: Session = Depends(get_db),
+):
+    store = db.get(Store, store_id)
+    if not store:
+        raise HTTPException(status_code=404, detail="门店不存在")
+
+    try:
+        night_start = _parse_time(body.night_start)
+        night_end = _parse_time(body.night_end)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    rule = PricingRule(
+        store_id=store_id,
+        bill_type=body.bill_type,
+        seat_type=body.seat_type,
+        price=Decimal(str(body.price)),
+        min_hours=body.min_hours,
+        max_hours=body.max_hours,
+        night_start=night_start,
+        night_end=night_end,
+        valid_days=body.valid_days,
+        remark=body.remark,
+        sort_order=body.sort_order,
+        is_active=body.is_active,
+    )
+    db.add(rule)
+    db.commit()
+    db.refresh(rule)
+    return ResponseModel(message="已添加", data=_pricing_to_dict(rule))
+
+
+@router.patch("/pricing/{rule_id}", response_model=ResponseModel)
+def update_pricing_rule(
+    rule_id: int,
+    body: AdminPricingUpdateRequest,
+    _: object = Depends(get_current_admin),
+    db: Session = Depends(get_db),
+):
+    rule = db.get(PricingRule, rule_id)
+    if not rule:
+        raise HTTPException(status_code=404, detail="价格规则不存在")
+
+    data = body.model_dump(exclude_unset=True)
+    for field in ("night_start", "night_end"):
+        if field in data:
+            try:
+                data[field] = _parse_time(data[field])
+            except ValueError as e:
+                raise HTTPException(status_code=400, detail=str(e))
+
+    if "price" in data and data["price"] is not None:
+        data["price"] = Decimal(str(data["price"]))
+
+    for key, value in data.items():
+        setattr(rule, key, value)
+
+    db.commit()
+    db.refresh(rule)
+    return ResponseModel(message="已更新", data=_pricing_to_dict(rule))
+
+
+class AdminBalanceAdjustRequest(BaseModel):
+    amount: float
+    remark: str = "管理员调整余额"
+
+
+class AdminStudyGoalUpdateRequest(BaseModel):
+    study_goal: str | None = None
+
+
+DEFAULT_NICKNAME = "知行岛学员"
+
+
+def _needs_profile_setup(user: User) -> bool:
+    return not user.avatar_url or user.nickname in (None, "", DEFAULT_NICKNAME)
+
+
+def _user_admin_item(user: User) -> dict:
+    goal = user.study_goal if user.study_goal in STUDY_GOAL_LABELS else None
+    return {
+        "id": user.id,
+        "nickname": user.nickname,
+        "phone": user.phone,
+        "avatar_url": user.avatar_url,
+        "title": user.title,
+        "balance": float(user.balance or 0),
+        "total_points": user.total_points or 0,
+        "invite_code": user.invite_code,
+        "study_goal": goal,
+        "study_goal_label": STUDY_GOAL_LABELS.get(goal) if goal else None,
+        "needs_profile_setup": _needs_profile_setup(user),
+        "created_at": user.created_at.isoformat() if user.created_at else None,
+    }
+
+
+def _reservation_admin_item(db: Session, r: Reservation) -> dict:
+    from app.api.routes.reservation import _to_item
+
+    base = _to_item(db, r).model_dump()
+    user = db.get(User, r.user_id)
+    base["user_id"] = r.user_id
+    base["user_nickname"] = user.nickname if user else None
+    base["user_phone"] = user.phone if user else None
+    base["pay_type"] = r.pay_type.value if r.pay_type else None
+    return base
+
+
+@router.post("/reservations/{reservation_id}/cancel", response_model=ResponseModel)
+def admin_cancel_reservation(
+    reservation_id: int,
+    _: object = Depends(get_current_admin),
+    db: Session = Depends(get_db),
+):
+    reservation = db.get(Reservation, reservation_id)
+    if not reservation:
+        raise HTTPException(status_code=404, detail="订单不存在")
+    if reservation.status == 3:
+        raise HTTPException(status_code=400, detail="订单已取消")
+    if reservation.status == 2:
+        raise HTTPException(status_code=400, detail="订单已完成，不可取消")
+    if reservation.status == 1:
+        raise HTTPException(status_code=400, detail="使用中，请用户先离座")
+
+    user = db.get(User, reservation.user_id)
+    if reservation.pay_status == 1 and user:
+        amount = reservation.final_price or Decimal("0")
+        if reservation.pay_type == PayType.balance and amount > 0:
+            add_wallet_log(
+                db, user, "refund", amount,
+                f"预约退款-{reservation.order_no}", reservation.order_no,
+            )
+            reservation.pay_status = 2
+        elif reservation.pay_type == PayType.wechat and amount > 0:
+            WechatPayService.refund(
+                reservation.order_no, amount, amount, "管理员取消预约",
+            )
+            reservation.pay_status = 2
+
+    reservation.status = 3
+    db.commit()
+    return ResponseModel(message="订单已取消")
+
+
+class AdminChangeSeatRequest(BaseModel):
+    seat_id: int
+
+
+@router.get("/reservations/{reservation_id}/seat-options", response_model=ResponseModel)
+def admin_reservation_seat_options(
+    reservation_id: int,
+    _: object = Depends(get_current_admin),
+    db: Session = Depends(get_db),
+):
+    reservation = db.get(Reservation, reservation_id)
+    if not reservation:
+        raise HTTPException(status_code=404, detail="订单不存在")
+    if reservation.pay_status != 1:
+        raise HTTPException(status_code=400, detail="仅已付款订单可换座")
+    if reservation.status not in (0, 1):
+        raise HTTPException(status_code=400, detail="当前订单状态不可换座")
+    if reservation.end_time <= datetime.now():
+        raise HTTPException(status_code=400, detail="预约已结束，不可换座")
+
+    current = db.get(Seat, reservation.seat_id)
+    return ResponseModel(
+        data={
+            "reservation_id": reservation.id,
+            "order_no": reservation.order_no,
+            "store_id": reservation.store_id,
+            "current_seat_id": reservation.seat_id,
+            "current_seat_code": current.seat_code if current else None,
+            "start_time": reservation.start_time.isoformat(),
+            "end_time": reservation.end_time.isoformat(),
+            "seats": seat_options_for_change(db, reservation),
+        }
+    )
+
+
+@router.post("/reservations/{reservation_id}/change-seat", response_model=ResponseModel)
+def admin_change_reservation_seat(
+    reservation_id: int,
+    body: AdminChangeSeatRequest,
+    _: object = Depends(get_current_admin),
+    db: Session = Depends(get_db),
+):
+    reservation = db.get(Reservation, reservation_id)
+    if not reservation:
+        raise HTTPException(status_code=404, detail="订单不存在")
+    try:
+        new_seat, old_seat = change_reservation_seat(db, reservation, body.seat_id)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    db.commit()
+    db.refresh(reservation)
+    return ResponseModel(
+        message=f"已换座：{old_seat.seat_code} → {new_seat.seat_code}",
+        data=_reservation_admin_item(db, reservation),
+    )
+
+
+@router.get("/users", response_model=ResponseModel)
+def list_users_admin(
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
+    keyword: str | None = None,
+    study_goal: str | None = Query(None, description="kaoyan|kaogong|other|unset"),
+    _: object = Depends(get_current_admin),
+    db: Session = Depends(get_db),
+):
+    query = select(User)
+    if keyword:
+        kw = keyword.strip()
+        if kw.isdigit():
+            query = query.where(
+                or_(User.id == int(kw), User.phone.contains(kw), User.invite_code.contains(kw))
+            )
+        else:
+            query = query.where(or_(User.nickname.contains(kw), User.phone.contains(kw)))
+    if study_goal == "unset":
+        query = query.where(or_(User.study_goal.is_(None), User.study_goal == ""))
+    elif study_goal in STUDY_GOAL_LABELS:
+        query = query.where(User.study_goal == study_goal)
+    total = db.scalar(select(func.count()).select_from(query.subquery()))
+    rows = db.scalars(
+        query.order_by(User.created_at.desc()).offset((page - 1) * page_size).limit(page_size)
+    ).all()
+    return ResponseModel(
+        data=PageResult(
+            items=[_user_admin_item(u) for u in rows],
+            total=total or 0,
+            page=page,
+            page_size=page_size,
+        )
+    )
+
+
+@router.get("/users/study-goal-stats", response_model=ResponseModel)
+def user_study_goal_stats(
+    _: object = Depends(get_current_admin),
+    db: Session = Depends(get_db),
+):
+    total = db.scalar(select(func.count()).select_from(User)) or 0
+    breakdown = []
+    filled = 0
+    for key, label in STUDY_GOAL_LABELS.items():
+        count = db.scalar(select(func.count()).where(User.study_goal == key)) or 0
+        filled += count
+        breakdown.append({"key": key, "label": label, "count": count})
+    unset = total - filled
+    breakdown.append({"key": "unset", "label": "未填写", "count": unset})
+    return ResponseModel(
+        data={
+            "total": total,
+            "filled": filled,
+            "unset": unset,
+            "breakdown": breakdown,
+        }
+    )
+
+
+@router.get("/users/{user_id}", response_model=ResponseModel)
+def get_user_admin(
+    user_id: int,
+    _: object = Depends(get_current_admin),
+    db: Session = Depends(get_db),
+):
+    user = db.get(User, user_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="用户不存在")
+    order_count = db.scalar(
+        select(func.count()).where(Reservation.user_id == user_id, Reservation.pay_status == 1)
+    )
+    card_count = db.scalar(
+        select(func.count()).where(PeriodCard.user_id == user_id, PeriodCard.status == 1)
+    )
+    data = _user_admin_item(user)
+    data["paid_order_count"] = order_count or 0
+    data["active_card_count"] = card_count or 0
+    return ResponseModel(data=data)
+
+
+@router.post("/users/{user_id}/adjust-balance", response_model=ResponseModel)
+def adjust_user_balance(
+    user_id: int,
+    body: AdminBalanceAdjustRequest,
+    _: object = Depends(get_current_admin),
+    db: Session = Depends(get_db),
+):
+    user = db.get(User, user_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="用户不存在")
+    amount = Decimal(str(body.amount))
+    if amount == 0:
+        raise HTTPException(status_code=400, detail="调整金额不能为 0")
+    if amount < 0 and user.balance + amount < 0:
+        raise HTTPException(status_code=400, detail="余额不足，无法扣减")
+    log_type = "recharge" if amount > 0 else "consume"
+    add_wallet_log(db, user, log_type, abs(amount), body.remark)
+    db.commit()
+    db.refresh(user)
+    return ResponseModel(message="余额已调整", data=_user_admin_item(user))
+
+
+@router.put("/users/{user_id}/study-goal", response_model=ResponseModel)
+def update_user_study_goal(
+    user_id: int,
+    body: AdminStudyGoalUpdateRequest,
+    _: object = Depends(get_current_admin),
+    db: Session = Depends(get_db),
+):
+    user = db.get(User, user_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="用户不存在")
+    if body.study_goal is not None and body.study_goal != "":
+        if body.study_goal not in STUDY_GOAL_LABELS:
+            raise HTTPException(status_code=400, detail="备考方向无效")
+        user.study_goal = body.study_goal
+    else:
+        user.study_goal = None
+    db.commit()
+    db.refresh(user)
+    return ResponseModel(message="备考方向已更新", data=_user_admin_item(user))
+
+
+@router.get("/period-cards", response_model=ResponseModel)
+def list_period_cards_admin(
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
+    user_id: int | None = None,
+    status: int | None = None,
+    _: object = Depends(get_current_admin),
+    db: Session = Depends(get_db),
+):
+    query = select(PeriodCard)
+    if user_id:
+        query = query.where(PeriodCard.user_id == user_id)
+    if status is not None:
+        query = query.where(PeriodCard.status == status)
+    total = db.scalar(select(func.count()).select_from(query.subquery()))
+    rows = db.scalars(
+        query.order_by(PeriodCard.created_at.desc()).offset((page - 1) * page_size).limit(page_size)
+    ).all()
+    items = []
+    for card in rows:
+        user = db.get(User, card.user_id)
+        items.append({
+            "id": card.id,
+            "user_id": card.user_id,
+            "user_nickname": user.nickname if user else None,
+            "user_phone": user.phone if user else None,
+            "card_name": card.card_name,
+            "card_type": card.card_type.value,
+            "remaining_hours": float(card.remaining_hours) if card.remaining_hours is not None else None,
+            "remaining_sessions": card.remaining_sessions,
+            "start_date": str(card.start_date) if card.start_date else None,
+            "end_date": str(card.end_date) if card.end_date else None,
+            "source": card.source.value,
+            "status": card.status,
+            "created_at": card.created_at.isoformat() if card.created_at else None,
+        })
+    return ResponseModel(
+        data=PageResult(items=items, total=total or 0, page=page, page_size=page_size)
+    )
+
+
+@router.get("/card-purchase-orders", response_model=ResponseModel)
+def list_card_purchase_orders_admin(
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
+    user_id: int | None = None,
+    store_id: int | None = None,
+    pay_status: int | None = None,
+    order_no: str | None = None,
+    _: object = Depends(get_current_admin),
+    db: Session = Depends(get_db),
+):
+    query = select(CardPurchaseOrder)
+    if user_id:
+        query = query.where(CardPurchaseOrder.user_id == user_id)
+    if store_id:
+        query = query.where(CardPurchaseOrder.store_id == store_id)
+    if pay_status is not None:
+        query = query.where(CardPurchaseOrder.pay_status == pay_status)
+    if order_no:
+        query = query.where(CardPurchaseOrder.order_no.contains(order_no.strip()))
+    total = db.scalar(select(func.count()).select_from(query.subquery()))
+    rows = db.scalars(
+        query.order_by(CardPurchaseOrder.created_at.desc()).offset((page - 1) * page_size).limit(page_size)
+    ).all()
+    items = []
+    for order in rows:
+        user = db.get(User, order.user_id)
+        store = db.get(Store, order.store_id)
+        card = db.get(PeriodCard, order.period_card_id) if order.period_card_id else None
+        items.append({
+            "id": order.id,
+            "order_no": order.order_no,
+            "user_id": order.user_id,
+            "user_nickname": user.nickname if user else None,
+            "user_phone": user.phone if user else None,
+            "store_id": order.store_id,
+            "store_name": store.name if store else None,
+            "bill_type": order.bill_type.value,
+            "bill_type_label": BILL_TYPE_LABELS.get(order.bill_type, order.bill_type.value),
+            "amount": float(order.amount),
+            "pay_type": order.pay_type.value if order.pay_type else None,
+            "pay_status": order.pay_status,
+            "period_card_id": order.period_card_id,
+            "card_name": card.card_name if card else None,
+            "created_at": order.created_at.isoformat() if order.created_at else None,
+        })
+    return ResponseModel(
+        data=PageResult(items=items, total=total or 0, page=page, page_size=page_size)
+    )
+
+
+@router.get("/exchange-records", response_model=ResponseModel)
+def list_exchange_records_admin(
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
+    user_id: int | None = None,
+    status: str | None = None,
+    _: object = Depends(get_current_admin),
+    db: Session = Depends(get_db),
+):
+    query = select(MeituanOrder)
+    if user_id:
+        query = query.where(MeituanOrder.user_id == user_id)
+    if status:
+        query = query.where(MeituanOrder.status == status)
+    total = db.scalar(select(func.count()).select_from(query.subquery()))
+    rows = db.scalars(
+        query.order_by(MeituanOrder.created_at.desc()).offset((page - 1) * page_size).limit(page_size)
+    ).all()
+    items = []
+    for row in rows:
+        user = db.get(User, row.user_id) if row.user_id else None
+        items.append({
+            "id": row.id,
+            "user_id": row.user_id,
+            "user_nickname": user.nickname if user else None,
+            "coupon_code": row.coupon_code,
+            "deal_name": row.deal_name,
+            "deal_type": row.deal_type,
+            "status": row.status.value,
+            "verified_at": row.verified_at.isoformat() if row.verified_at else None,
+            "created_at": row.created_at.isoformat() if row.created_at else None,
+        })
+    return ResponseModel(
+        data=PageResult(items=items, total=total or 0, page=page, page_size=page_size)
+    )
+
+
+@router.get("/wallet-logs", response_model=ResponseModel)
+def list_wallet_logs_admin(
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
+    user_id: int | None = None,
+    log_type: str | None = None,
+    _: object = Depends(get_current_admin),
+    db: Session = Depends(get_db),
+):
+    query = select(WalletLog)
+    if user_id:
+        query = query.where(WalletLog.user_id == user_id)
+    if log_type:
+        query = query.where(WalletLog.type == log_type)
+    total = db.scalar(select(func.count()).select_from(query.subquery()))
+    rows = db.scalars(
+        query.order_by(WalletLog.created_at.desc()).offset((page - 1) * page_size).limit(page_size)
+    ).all()
+    items = []
+    for log in rows:
+        user = db.get(User, log.user_id)
+        items.append({
+            "id": log.id,
+            "user_id": log.user_id,
+            "user_nickname": user.nickname if user else None,
+            "type": log.type,
+            "amount": float(log.amount or 0),
+            "balance_after": float(log.balance_after or 0),
+            "remark": log.remark,
+            "created_at": log.created_at.isoformat() if log.created_at else None,
+        })
+    return ResponseModel(
+        data=PageResult(items=items, total=total or 0, page=page, page_size=page_size)
+    )
+
+
+class KnowledgeUpdateRequest(BaseModel):
+    content: str
+
+
+@router.get("/knowledge", response_model=ResponseModel)
+def get_knowledge_admin(_: object = Depends(get_current_admin)):
+    content = assistant_service.load_knowledge()
+    return ResponseModel(
+        data={
+            "content": content,
+            "path": "backend/app/knowledge/zhixingdao_kb.md",
+            "chars": len(content),
+        }
+    )
+
+
+@router.put("/knowledge", response_model=ResponseModel)
+def update_knowledge_admin(
+    body: KnowledgeUpdateRequest,
+    _: object = Depends(get_current_admin),
+):
+    assistant_service.save_knowledge(body.content)
+    content = assistant_service.load_knowledge()
+    return ResponseModel(
+        message="知识库已保存，AI 助手将使用最新内容",
+        data={"chars": len(content)},
+    )
+
+
+@router.get("/system/status", response_model=ResponseModel)
+def system_status_admin(_: object = Depends(get_current_admin)):
+    from app.services.yunlaoban import _use_mock
+
+    pay_cert = Path(settings.wx_pay_key_path)
+    kb_content = assistant_service.load_knowledge()
+    yunlaoban_ok = bool(
+        settings.yunlaoban_client_id and settings.yunlaoban_secret and settings.yunlaoban_shop_id
+    )
+    appid = (settings.wx_appid or "").strip()
+    masked_appid = f"{appid[:6]}***" if len(appid) >= 6 else None
+
+    checks = [
+        {
+            "key": "wx_login",
+            "name": "微信登录",
+            "ok": settings.wx_login_configured or settings.pre_wechat_launch,
+            "detail": "已配置 AppID" if settings.wx_login_configured else "审核期可用 dev 登录",
+        },
+        {
+            "key": "wx_pay",
+            "name": "微信支付",
+            "ok": settings.wx_pay_configured and pay_cert.is_file(),
+            "detail": "商户号+证书就绪" if settings.wx_pay_configured and pay_cert.is_file() else "未配置或证书缺失",
+        },
+        {
+            "key": "ttlock",
+            "name": "通通锁",
+            "ok": bool((settings.ttlock_client_id or "").strip()),
+            "detail": "已填凭证" if settings.ttlock_client_id else "未配置",
+        },
+        {
+            "key": "yunlaoban",
+            "name": "团购核销",
+            "ok": yunlaoban_ok and not _use_mock(),
+            "detail": f"provider={settings.coupon_provider}, mock={_use_mock()}",
+        },
+        {
+            "key": "deepseek",
+            "name": "AI 助手",
+            "ok": settings.assistant_configured,
+            "detail": "DeepSeek 已配置" if settings.assistant_configured else "缺少 DEEPSEEK_API_KEY",
+        },
+        {
+            "key": "knowledge",
+            "name": "AI 知识库",
+            "ok": len(kb_content) > 100,
+            "detail": f"{len(kb_content)} 字",
+        },
+    ]
+
+    return ResponseModel(
+        data={
+            "app_env": settings.app_env,
+            "base_url": settings.base_url,
+            "pre_wechat_launch": settings.pre_wechat_launch,
+            "wx_appid": masked_appid,
+            "checks": checks,
+            "all_ok": all(c["ok"] for c in checks),
+        }
+    )
+
+
+@router.get("/study/overview", response_model=ResponseModel)
+def study_overview_admin(_: object = Depends(get_current_admin), db: Session = Depends(get_db)):
+    today = date.today()
+    week_since = today - timedelta(days=6)
+
+    total_minutes = int(
+        db.scalar(select(func.coalesce(func.sum(StudyStat.total_minutes), 0))) or 0
+    )
+    total_sessions = int(
+        db.scalar(select(func.coalesce(func.sum(StudyStat.session_count), 0))) or 0
+    )
+    learner_count = db.scalar(select(func.count(func.distinct(StudyStat.user_id)))) or 0
+    week_minutes = int(
+        db.scalar(
+            select(func.coalesce(func.sum(StudyStat.total_minutes), 0)).where(
+                StudyStat.stat_date >= week_since
+            )
+        )
+        or 0
+    )
+    week_learners = db.scalar(
+        select(func.count(func.distinct(StudyStat.user_id))).where(StudyStat.stat_date >= week_since)
+    ) or 0
+    today_minutes = int(
+        db.scalar(
+            select(func.coalesce(func.sum(StudyStat.total_minutes), 0)).where(
+                StudyStat.stat_date == today
+            )
+        )
+        or 0
+    )
+
+    daily_rows = db.execute(
+        select(
+            StudyStat.stat_date,
+            func.sum(StudyStat.total_minutes).label("minutes"),
+            func.sum(StudyStat.session_count).label("sessions"),
+        )
+        .where(StudyStat.stat_date >= week_since)
+        .group_by(StudyStat.stat_date)
+        .order_by(StudyStat.stat_date)
+    ).all()
+
+    return ResponseModel(
+        data={
+            "total_minutes": total_minutes,
+            "total_hours": total_minutes // 60,
+            "total_sessions": total_sessions,
+            "learner_count": learner_count,
+            "week_minutes": week_minutes,
+            "week_learners": week_learners,
+            "today_minutes": today_minutes,
+            "daily": [
+                {
+                    "date": str(r.stat_date),
+                    "minutes": int(r.minutes or 0),
+                    "sessions": int(r.sessions or 0),
+                }
+                for r in daily_rows
+            ],
+            "study_goal_breakdown": _study_goal_breakdown(db),
+        }
+    )
+
+
+def _study_goal_breakdown(db: Session) -> list[dict]:
+    items = []
+    for key, label in STUDY_GOAL_LABELS.items():
+        count = db.scalar(select(func.count()).where(User.study_goal == key)) or 0
+        items.append({"key": key, "label": label, "count": count})
+    unset = db.scalar(
+        select(func.count()).where(or_(User.study_goal.is_(None), User.study_goal == ""))
+    ) or 0
+    items.append({"key": "unset", "label": "未填写", "count": unset})
+    return items
+
+
+@router.get("/study/leaderboard", response_model=ResponseModel)
+def study_leaderboard_admin(
+    days: int = Query(30, ge=1, le=365),
+    store_id: int | None = None,
+    limit: int = Query(50, ge=1, le=100),
+    _: object = Depends(get_current_admin),
+    db: Session = Depends(get_db),
+):
+    since = date.today() - timedelta(days=days - 1)
+    query = (
+        select(
+            StudyStat.user_id,
+            func.sum(StudyStat.total_minutes).label("total_minutes"),
+            func.sum(StudyStat.session_count).label("session_count"),
+        )
+        .where(StudyStat.stat_date >= since)
+        .group_by(StudyStat.user_id)
+    )
+    if store_id:
+        query = query.where(StudyStat.store_id == store_id)
+    query = query.order_by(func.sum(StudyStat.total_minutes).desc()).limit(limit)
+    rows = db.execute(query).all()
+
+    items = []
+    for i, row in enumerate(rows, 1):
+        user = db.get(User, row.user_id)
+        items.append({
+            "rank": i,
+            "user_id": row.user_id,
+            "nickname": user.nickname if user else "学员",
+            "phone": user.phone if user else None,
+            "title": user.title if user else "小白",
+            "study_goal": user.study_goal if user and user.study_goal in STUDY_GOAL_LABELS else None,
+            "study_goal_label": (
+                STUDY_GOAL_LABELS.get(user.study_goal)
+                if user and user.study_goal in STUDY_GOAL_LABELS
+                else None
+            ),
+            "total_minutes": int(row.total_minutes or 0),
+            "session_count": int(row.session_count or 0),
+        })
+    return ResponseModel(data=items)
+
+
+class AdminStoreCreateRequest(BaseModel):
+    name: str
+    address: str | None = None
+    latitude: float | None = None
+    longitude: float | None = None
+    open_time: str | None = None
+    close_time: str | None = None
+    wifi_name: str | None = None
+    wifi_password: str | None = None
+
+
+class AdminBannerCreateRequest(BaseModel):
+    ribbon: str | None = None
+    title_line1: str | None = None
+    title_line2: str | None = None
+    date_label: str | None = None
+    date_range: str | None = None
+    cta_text: str | None = None
+    layout_type: str = "text"
+    image_url: str | None = None
+    link_path: str | None = None
+    is_active: int = 1
+    sort_order: int = 0
+
+
+class AdminBannerUpdateRequest(BaseModel):
+    ribbon: str | None = None
+    title_line1: str | None = None
+    title_line2: str | None = None
+    date_label: str | None = None
+    date_range: str | None = None
+    cta_text: str | None = None
+    layout_type: str | None = None
+    image_url: str | None = None
+    link_path: str | None = None
+    is_active: int | None = None
+    sort_order: int | None = None
+
+
+class AdminCreateRequest(BaseModel):
+    username: str
+    password: str
+    name: str | None = None
+
+
+def _banner_dict(row: HomeBanner) -> dict:
+    return {
+        "id": row.id,
+        "ribbon": row.ribbon,
+        "title_line1": row.title_line1,
+        "title_line2": row.title_line2,
+        "date_label": row.date_label,
+        "date_range": row.date_range,
+        "cta_text": row.cta_text,
+        "layout_type": row.layout_type or "text",
+        "image_url": public_static_url(row.image_url),
+        "link_path": row.link_path,
+        "is_active": row.is_active,
+        "sort_order": row.sort_order,
+        "created_at": row.created_at.isoformat() if row.created_at else None,
+    }
+
+
+@router.post("/stores", response_model=ResponseModel)
+def create_store_admin(
+    body: AdminStoreCreateRequest,
+    _: object = Depends(get_current_admin),
+    db: Session = Depends(get_db),
+):
+    try:
+        open_time = _parse_time(body.open_time)
+        close_time = _parse_time(body.close_time)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    store = Store(
+        name=body.name.strip(),
+        address=body.address,
+        latitude=Decimal(str(body.latitude)) if body.latitude is not None else None,
+        longitude=Decimal(str(body.longitude)) if body.longitude is not None else None,
+        open_time=open_time,
+        close_time=close_time,
+        wifi_name=body.wifi_name,
+        wifi_password=body.wifi_password,
+        status=1,
+    )
+    db.add(store)
+    db.commit()
+    db.refresh(store)
+    return ResponseModel(message="门店已创建", data=_store_to_admin_item(store))
+
+
+class AdminCarouselSettingRequest(BaseModel):
+    autoplay: bool = True
+    interval: int = 5000
+    circular: bool = True
+    indicator_dots: bool = True
+    hero_height: int = 680
+    hero_mode: str = "fullscreen"
+
+
+def _carousel_setting_dict(row: HomeCarouselSetting) -> dict:
+    return {
+        "autoplay": bool(row.autoplay),
+        "interval": row.interval,
+        "circular": bool(row.circular),
+        "indicator_dots": bool(row.indicator_dots),
+        "hero_height": row.hero_height,
+        "hero_mode": row.hero_mode or "fullscreen",
+    }
+
+
+def _get_or_create_carousel_setting(db: Session) -> HomeCarouselSetting:
+    row = db.get(HomeCarouselSetting, 1)
+    if row:
+        return row
+    row = HomeCarouselSetting(id=1)
+    db.add(row)
+    db.commit()
+    db.refresh(row)
+    return row
+
+
+@router.get("/banners/carousel-settings", response_model=ResponseModel)
+def get_carousel_settings_admin(_: object = Depends(get_current_admin), db: Session = Depends(get_db)):
+    row = _get_or_create_carousel_setting(db)
+    return ResponseModel(data=_carousel_setting_dict(row))
+
+
+@router.put("/banners/carousel-settings", response_model=ResponseModel)
+def update_carousel_settings_admin(
+    body: AdminCarouselSettingRequest,
+    _: object = Depends(get_current_admin),
+    db: Session = Depends(get_db),
+):
+    row = _get_or_create_carousel_setting(db)
+    row.autoplay = 1 if body.autoplay else 0
+    row.interval = max(2000, min(body.interval, 20000))
+    row.circular = 1 if body.circular else 0
+    row.indicator_dots = 1 if body.indicator_dots else 0
+    row.hero_height = max(360, min(body.hero_height, 880))
+    row.hero_mode = body.hero_mode if body.hero_mode in ("fullscreen", "card") else "fullscreen"
+    db.commit()
+    db.refresh(row)
+    return ResponseModel(message="轮播设置已保存", data=_carousel_setting_dict(row))
+
+
+@router.get("/banners", response_model=ResponseModel)
+def list_banners_admin(_: object = Depends(get_current_admin), db: Session = Depends(get_db)):
+    rows = db.scalars(select(HomeBanner).order_by(HomeBanner.sort_order, HomeBanner.id.desc())).all()
+    return ResponseModel(data=[_banner_dict(r) for r in rows])
+
+
+@router.post("/banners/upload-image", response_model=ResponseModel)
+async def upload_banner_image_admin(
+    file: UploadFile = File(...),
+    _: object = Depends(get_current_admin),
+):
+    content_type = (file.content_type or "").lower()
+    if content_type not in BANNER_IMAGE_TYPES:
+        raise HTTPException(status_code=400, detail="仅支持 jpg / png / webp / gif")
+
+    content = await file.read()
+    if len(content) > 2_000_000:
+        raise HTTPException(status_code=400, detail="图片不能超过 2MB")
+
+    ext = BANNER_IMAGE_TYPES[content_type]
+    BANNER_DIR.mkdir(parents=True, exist_ok=True)
+    filename = f"{uuid.uuid4().hex}.{ext}"
+    (BANNER_DIR / filename).write_bytes(content)
+
+    base = settings.base_url.rstrip("/")
+    return ResponseModel(data={"url": public_static_url(f"/static/banners/{filename}")})
+
+
+@router.post("/banners", response_model=ResponseModel)
+def create_banner_admin(
+    body: AdminBannerCreateRequest,
+    _: object = Depends(get_current_admin),
+    db: Session = Depends(get_db),
+):
+    row = HomeBanner(**body.model_dump())
+    db.add(row)
+    db.commit()
+    db.refresh(row)
+    return ResponseModel(message="已创建", data=_banner_dict(row))
+
+
+@router.put("/banners/{banner_id}", response_model=ResponseModel)
+def update_banner_admin(
+    banner_id: int,
+    body: AdminBannerUpdateRequest,
+    _: object = Depends(get_current_admin),
+    db: Session = Depends(get_db),
+):
+    row = db.get(HomeBanner, banner_id)
+    if not row:
+        raise HTTPException(status_code=404, detail="活动不存在")
+    for key, value in body.model_dump(exclude_unset=True).items():
+        setattr(row, key, value)
+    db.commit()
+    db.refresh(row)
+    return ResponseModel(message="已更新", data=_banner_dict(row))
+
+
+@router.get("/point-logs", response_model=ResponseModel)
+def list_point_logs_admin(
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
+    user_id: int | None = None,
+    log_type: str | None = None,
+    _: object = Depends(get_current_admin),
+    db: Session = Depends(get_db),
+):
+    query = select(PointLog)
+    if user_id:
+        query = query.where(PointLog.user_id == user_id)
+    if log_type:
+        query = query.where(PointLog.type == log_type)
+    total = db.scalar(select(func.count()).select_from(query.subquery()))
+    rows = db.scalars(
+        query.order_by(PointLog.created_at.desc()).offset((page - 1) * page_size).limit(page_size)
+    ).all()
+    type_labels = {
+        "study": "自习",
+        "invite": "邀请奖励",
+        "invite_reward": "邀请好友",
+        "exchange": "兑换",
+    }
+    items = []
+    for log in rows:
+        user = db.get(User, log.user_id)
+        items.append({
+            "id": log.id,
+            "user_id": log.user_id,
+            "user_nickname": user.nickname if user else None,
+            "type": log.type,
+            "type_label": type_labels.get(log.type, log.type),
+            "points": log.points,
+            "remark": log.remark,
+            "created_at": log.created_at.isoformat() if log.created_at else None,
+        })
+    return ResponseModel(
+        data=PageResult(items=items, total=total or 0, page=page, page_size=page_size)
+    )
+
+
+@router.get("/invites", response_model=ResponseModel)
+def list_invites_admin(
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
+    _: object = Depends(get_current_admin),
+    db: Session = Depends(get_db),
+):
+    query = select(User).where(User.invited_by.isnot(None))
+    total = db.scalar(select(func.count()).select_from(query.subquery()))
+    rows = db.scalars(
+        query.order_by(User.created_at.desc()).offset((page - 1) * page_size).limit(page_size)
+    ).all()
+    items = []
+    for user in rows:
+        inviter = db.get(User, user.invited_by) if user.invited_by else None
+        items.append({
+            "user_id": user.id,
+            "nickname": user.nickname,
+            "phone": user.phone,
+            "invited_at": user.created_at.isoformat() if user.created_at else None,
+            "inviter_id": inviter.id if inviter else None,
+            "inviter_nickname": inviter.nickname if inviter else None,
+            "inviter_code": inviter.invite_code if inviter else None,
+        })
+
+    total_invites = db.scalar(select(func.count()).where(User.invited_by.isnot(None))) or 0
+    inviter_count = db.scalar(
+        select(func.count(func.distinct(User.invited_by))).where(User.invited_by.isnot(None))
+    ) or 0
+
+    return ResponseModel(
+        data={
+            "stats": {
+                "total_invites": total_invites,
+                "inviter_count": inviter_count,
+            },
+            "items": items,
+            "total": total or 0,
+            "page": page,
+            "page_size": page_size,
+        }
+    )
+
+
+@router.get("/admins", response_model=ResponseModel)
+def list_admins(_: object = Depends(get_current_admin), db: Session = Depends(get_db)):
+    rows = db.scalars(select(AdminUser).order_by(AdminUser.id)).all()
+    return ResponseModel(
+        data=[
+            {
+                "id": a.id,
+                "username": a.username,
+                "name": a.name,
+                "status": a.status,
+                "created_at": a.created_at.isoformat() if a.created_at else None,
+            }
+            for a in rows
+        ]
+    )
+
+
+@router.post("/admins", response_model=ResponseModel)
+def create_admin_user(
+    body: AdminCreateRequest,
+    _: object = Depends(get_current_admin),
+    db: Session = Depends(get_db),
+):
+    if len(body.password) < 6:
+        raise HTTPException(status_code=400, detail="密码至少 6 位")
+    exists = db.scalar(select(AdminUser).where(AdminUser.username == body.username))
+    if exists:
+        raise HTTPException(status_code=400, detail="用户名已存在")
+    admin = AdminUser(
+        username=body.username.strip(),
+        password_hash=hash_password(body.password),
+        name=body.name,
+        status=1,
+    )
+    db.add(admin)
+    db.commit()
+    db.refresh(admin)
+    return ResponseModel(
+        message="管理员已创建",
+        data={"id": admin.id, "username": admin.username, "name": admin.name},
+    )

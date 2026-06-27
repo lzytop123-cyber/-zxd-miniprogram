@@ -16,6 +16,7 @@ const CODE_TO_SLOT = {
   A01: 3, A02: 4, A03: 5, A04: 6, A05: 7, A06: 8, A07: 9, A08: 10,
   B01: 14, B02: 15, B03: 16, B04: 17, B05: 18, B06: 19, B07: 20, B08: 21,
   C01: 1, C02: 2, C03: 11, C04: 12, C05: 13, C06: 25, C07: 26, C08: 27,
+  D01: 22, D02: 23, D03: 24,
 }
 
 /** 原图像素 → 裁切图百分比 */
@@ -68,12 +69,23 @@ const MAIN_POS = {
 
 const ALL_SLOTS = Object.keys(MAIN_POS).map(Number)
 
+/** 与平面图分区一致：1–13 标准区，14–27 三个沉浸区块均为沉浸区 */
+const SLOT_ZONE = {
+  1: '标准区', 2: '标准区', 3: '标准区', 4: '标准区', 5: '标准区',
+  6: '标准区', 7: '标准区', 8: '标准区', 9: '标准区', 10: '标准区',
+  11: '标准区', 12: '标准区', 13: '标准区',
+  14: '沉浸区', 15: '沉浸区', 16: '沉浸区', 17: '沉浸区', 18: '沉浸区',
+  19: '沉浸区', 20: '沉浸区', 21: '沉浸区', 22: '沉浸区', 23: '沉浸区', 24: '沉浸区',
+  25: '沉浸区', 26: '沉浸区', 27: '沉浸区',
+}
+
 function slotFromCode(seatCode) {
   if (!seatCode) return null
   const code = String(seatCode).toUpperCase()
-  if (CODE_TO_SLOT[code]) return CODE_TO_SLOT[code]
-  const num = parseInt(code.replace(/\D/g, ''), 10)
-  return Number.isFinite(num) && num >= 1 && num <= PLAN_SEAT_COUNT ? num : null
+  if (Object.prototype.hasOwnProperty.call(CODE_TO_SLOT, code)) {
+    return CODE_TO_SLOT[code]
+  }
+  return null
 }
 
 function displayLabel(seatCode, slot) {
@@ -117,9 +129,17 @@ function buildSeatMarkers(seats) {
 
 function zoneNameBySlot(slot) {
   if (!slot) return ''
-  if (slot >= 14) return '沉浸区'
-  if (slot >= 1 && slot <= 13) return '标准区'
-  return ''
+  return SLOT_ZONE[slot] || ''
+}
+
+function seatDisplay(seat) {
+  if (!seat) return { mapLabel: '', zoneName: '', seatCode: '' }
+  const enriched = seat.map_slot != null ? seat : enrichSeat(seat)
+  return {
+    mapLabel: enriched.map_label || '',
+    zoneName: zoneNameBySlot(enriched.map_slot),
+    seatCode: enriched.seat_code || '',
+  }
 }
 
 function getLayout() {
@@ -132,6 +152,7 @@ function getLayout() {
     },
     buildSeatMarkers,
     zoneNameBySlot,
+    seatDisplay,
   }
 }
 
@@ -139,6 +160,8 @@ module.exports = {
   getLayout,
   buildSeatMarkers,
   zoneNameBySlot,
+  seatDisplay,
+  enrichSeat,
   MAP_WIDTH,
   MAP_HEIGHT,
   PLAN_SEAT_COUNT,

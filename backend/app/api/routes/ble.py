@@ -12,6 +12,7 @@ from app.models import BleBatteryAlert, BleKey, BleLock, DoorLog, OpenType, Rese
 from app.schemas.common import ResponseModel
 from app.core.config import settings
 from app.services.business import TTLockService
+from app.services.booking import auto_checkin_reservation
 
 router = APIRouter(tags=["蓝牙"])
 
@@ -119,6 +120,7 @@ async def remote_unlock_door(
         result=1,
     )
     ble_key.used_at = datetime.now()
+    auto_checkin_reservation(db, reservation)
     db.add(log)
     db.commit()
     return ResponseModel(message="开门成功", data={"result": result})
@@ -137,6 +139,8 @@ def report_door_log(
     if not ble_key:
         raise HTTPException(status_code=404, detail="钥匙不存在")
 
+    reservation = db.get(Reservation, reservation_id)
+
     log = DoorLog(
         lock_id=ble_key.lock_id,
         user_id=user.id,
@@ -150,6 +154,8 @@ def report_door_log(
         lock = db.get(BleLock, ble_key.lock_id)
         if lock and lock.battery_level is not None and lock.battery_level > 0:
             lock.battery_level = max(lock.battery_level - 1, 0)
+        if reservation:
+            auto_checkin_reservation(db, reservation)
     db.add(log)
     db.commit()
     return ResponseModel(message="记录成功")

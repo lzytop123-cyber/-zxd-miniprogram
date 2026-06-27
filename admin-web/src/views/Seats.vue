@@ -2,7 +2,12 @@
   <el-card>
     <template #header>
       <div class="header">
-        <span>座位管理（门店 {{ storeId }}）</span>
+        <div class="left">
+          <span>座位管理</span>
+          <el-select v-model="storeId" style="width: 200px; margin-left: 12px" @change="load">
+            <el-option v-for="s in stores" :key="s.id" :label="s.name" :value="s.id" />
+          </el-select>
+        </div>
         <el-tag type="info">共 {{ list.length }} 座 · 启用 {{ enabledCount }} 座</el-tag>
       </div>
     </template>
@@ -50,8 +55,9 @@ import { ElMessage } from 'element-plus'
 import http from '../api/http'
 
 const list = ref<any[]>([])
+const stores = ref<any[]>([])
 const loading = ref(false)
-const storeId = 1
+const storeId = ref<number | null>(null)
 
 const enabledCount = computed(() => list.value.filter((s) => s.status === 1).length)
 
@@ -61,9 +67,10 @@ function seatTypeLabel(t: string) {
 }
 
 async function load() {
+  if (!storeId.value) return
   loading.value = true
   try {
-    const res = await http.get('/admin/seats', { params: { store_id: storeId } })
+    const res = await http.get('/admin/seats', { params: { store_id: storeId.value } })
     list.value = res.data
   } finally {
     loading.value = false
@@ -77,9 +84,17 @@ async function toggle(row: any) {
   load()
 }
 
-onMounted(load)
+onMounted(async () => {
+  const res = await http.get('/admin/stores')
+  stores.value = res.data
+  if (stores.value.length) {
+    storeId.value = stores.value[0].id
+    await load()
+  }
+})
 </script>
 
 <style scoped>
 .header { display: flex; justify-content: space-between; align-items: center; }
+.left { display: flex; align-items: center; }
 </style>

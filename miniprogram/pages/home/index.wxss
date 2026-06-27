@@ -6,10 +6,150 @@
 /* ============ Hero ============ */
 .hero {
   position: relative;
-  padding: 24rpx 32rpx 64rpx;
-  background: linear-gradient(160deg, #2D6A4F 0%, #40916C 46%, #52B788 100%);
-  border-radius: 0 0 44rpx 44rpx;
   overflow: hidden;
+  border-radius: 0 0 52rpx 52rpx;
+  background: linear-gradient(160deg, #2D6A4F 0%, #40916C 46%, #52B788 100%);
+  box-shadow: 0 24rpx 48rpx rgba(45, 106, 79, 0.18);
+}
+
+.hero-decor {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.hero-media {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+}
+
+.hero-swiper,
+.hero-swiper--single {
+  width: 100%;
+}
+
+.hero-swiper--single {
+  overflow: hidden;
+}
+
+.hero-swiper-item {
+  height: 100%;
+  overflow: hidden;
+}
+
+.hero-slide {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+.hero-slide-bg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.hero-slide-bg--text {
+  background: linear-gradient(160deg, #2D6A4F 0%, #40916C 46%, #52B788 100%);
+}
+
+.hero-slide-bg--card {
+  top: 132rpx;
+  bottom: 132rpx;
+  left: 0;
+  right: 0;
+  border-radius: 28rpx;
+  overflow: hidden;
+  box-shadow: 0 16rpx 40rpx rgba(15, 45, 30, 0.22);
+}
+
+.hero-slide-tap {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+}
+
+.hero-slide-content {
+  position: absolute;
+  z-index: 3;
+  left: 0;
+  right: 0;
+  top: 132rpx;
+  bottom: 148rpx;
+  padding: 0 36rpx;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  box-sizing: border-box;
+}
+
+.hero-slide-content--card {
+  top: 152rpx;
+  bottom: 168rpx;
+  justify-content: flex-end;
+}
+
+.hero-slide-content--overlay {
+  background: linear-gradient(180deg, rgba(15, 45, 30, 0.05) 0%, rgba(15, 45, 30, 0.55) 100%);
+  justify-content: flex-end;
+  padding-bottom: 24rpx;
+}
+
+.hero-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  padding: 28rpx 32rpx 36rpx;
+  box-sizing: border-box;
+  pointer-events: none;
+}
+
+.hero-overlay::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 200rpx;
+  background: linear-gradient(180deg, rgba(10, 30, 20, 0.48) 0%, rgba(10, 30, 20, 0.12) 55%, transparent 100%);
+  pointer-events: none;
+}
+
+.hero-overlay::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 220rpx;
+  background: linear-gradient(0deg, rgba(10, 30, 20, 0.42) 0%, rgba(10, 30, 20, 0.08) 60%, transparent 100%);
+  pointer-events: none;
+}
+
+.hero-top {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  pointer-events: auto;
+}
+
+.hero-search {
+  position: relative;
+  z-index: 2;
+  margin-top: auto;
+  pointer-events: auto;
+}
+
+.hero--card .hero-slide-bg--card {
+  left: 32rpx;
+  right: 32rpx;
 }
 
 .hero-orb {
@@ -43,14 +183,6 @@
     linear-gradient(90deg, rgba(255, 255, 255, 0.06) 2rpx, transparent 2rpx);
   background-size: 56rpx 56rpx;
   pointer-events: none;
-}
-
-.hero-top {
-  position: relative;
-  z-index: 2;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
 }
 
 .brand {
@@ -109,13 +241,7 @@
   color: rgba(255, 255, 255, 0.85);
 }
 
-/* 活动 */
-.campaign {
-  position: relative;
-  z-index: 2;
-  margin-top: 40rpx;
-}
-
+/* 活动内容样式 */
 .campaign-ribbon {
   display: inline-block;
   padding: 8rpx 22rpx;
@@ -133,12 +259,17 @@
 
 .ct-line {
   display: block;
-  font-size: 56rpx;
+  font-size: 48rpx;
   font-weight: 800;
   color: #FFFFFF;
   line-height: 1.18;
   letter-spacing: 2rpx;
   text-shadow: 0 4rpx 18rpx rgba(15, 45, 30, 0.25);
+}
+
+.ct-line--sm {
+  font-size: 40rpx;
+  margin-top: 4rpx;
 }
 
 .campaign-foot {
@@ -184,14 +315,15 @@
 .search-bar {
   position: relative;
   z-index: 2;
-  margin-top: 34rpx;
-  padding: 22rpx 28rpx;
-  background: #FFFFFF;
-  border-radius: 44rpx;
+  margin-top: 0;
+  padding: 24rpx 30rpx;
+  background: rgba(255, 255, 255, 0.98);
+  border-radius: 999rpx;
   display: flex;
   align-items: center;
   gap: 12rpx;
-  box-shadow: 0 10rpx 30rpx rgba(15, 45, 30, 0.18);
+  box-shadow: 0 12rpx 32rpx rgba(15, 45, 30, 0.16);
+  backdrop-filter: blur(12rpx);
 }
 
 .search-icon {
@@ -405,9 +537,9 @@
 }
 
 .q-pkg { background: #D8F3DC; }
-.q-chat { background: #E8F4FD; }
 .q-self { background: #FFF4E5; }
 .q-order { background: #F3E8FF; }
+.q-report { background: #E8F4FD; }
 
 .q-text {
   font-size: 24rpx;
