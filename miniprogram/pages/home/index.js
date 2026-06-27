@@ -82,8 +82,10 @@ Page({
   },
 
   loadStores() {
-    const applyStores = (stores) => {
-      this.setData({ stores: stores || [] })
+    const { resolveStoreList } = require('../../utils/media')
+    const applyStores = async (stores) => {
+      const list = await resolveStoreList(stores)
+      this.setData({ stores: list || [] })
     }
 
     const fetchList = (query = '') =>

@@ -5,10 +5,13 @@ Page({
   data: { store: null, storeId: null },
 
   onLoad(options) {
+    const { resolveStoreList } = require('../../utils/media')
     this.setData({ storeId: options.id })
-    request({ url: `/store/${options.id}` }).then((store) => {
-      this.setData({ store })
-    })
+    request({ url: `/store/${options.id}` })
+      .then(async (store) => {
+        const list = await resolveStoreList([store])
+        this.setData({ store: list[0] || store })
+      })
   },
 
   goBooking() {

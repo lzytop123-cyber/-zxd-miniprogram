@@ -5,6 +5,7 @@ from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.core.static_url import public_static_path
 from app.db.session import get_db
 from app.models import PricingRule, Reservation, Seat, Store, Zone
 from app.schemas.common import ResponseModel
@@ -12,6 +13,32 @@ from app.schemas.store import PricingItem, SeatItem, StoreDetail, StoreListItem
 from app.services.business import calc_distance, get_seat_status
 
 router = APIRouter(prefix="/store", tags=["门店"])
+
+
+def _normalize_cover_images(images: list | None) -> list | None:
+    if not images:
+        return images
+    out = []
+    for item in images:
+        if not item:
+            continue
+        path = public_static_path(str(item))
+        out.append(path or str(item))
+    return out or None
+
+
+def _store_list_item(store: Store, **extra) -> StoreListItem:
+    item = StoreListItem.model_validate(store)
+    item.cover_images = _normalize_cover_images(item.cover_images)
+    for key, value in extra.items():
+        setattr(item, key, value)
+    return item
+
+
+def _store_detail(store: Store) -> StoreDetail:
+    item = StoreDetail.model_validate(store)
+    item.cover_images = _normalize_cover_images(item.cover_images)
+    return item
 
 
 class AvailabilityQuery(BaseModel):
@@ -74,12 +101,12 @@ def list_stores(
     stores = db.scalars(select(Store).where(Store.status == 1)).all()
     items: list[StoreListItem] = []
     for store in stores:
-        item = StoreListItem.model_validate(store)
+        distance = None
         if latitude and longitude and store.latitude and store.longitude:
-            item.distance = calc_distance(
+            distance = calc_distance(
                 latitude, longitude, float(store.latitude), float(store.longitude)
             )
-        items.append(item)
+        items.append(_store_list_item(store, distance=distance))
     if latitude and longitude:
         items.sort(key=lambda x: x.distance if x.distance is not None else 99999)
     return ResponseModel(data=items)
@@ -90,7 +117,7 @@ def get_store(store_id: int, db: Session = Depends(get_db)):
     store = db.get(Store, store_id)
     if not store or store.status != 1:
         raise HTTPException(status_code=404, detail="门店不存在")
-    return ResponseModel(data=StoreDetail.model_validate(store))
+    return ResponseModel(data=_store_detail(store))
 
 
 @router.get("/{store_id}/seats", response_model=ResponseModel[list[SeatItem]])

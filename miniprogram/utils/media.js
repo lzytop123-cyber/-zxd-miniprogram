@@ -1,4 +1,10 @@
-const { resolveStaticUrl, USE_PROD, DEV_LAN_HOST, DEV_LOCAL_HOST } = require('../config')
+const {
+  resolveStaticUrl,
+  USE_PROD,
+  DEV_LAN_HOST,
+  DEV_LOCAL_HOST,
+  isWechatDevtools,
+} = require('../config')
 
 const localCache = {}
 
@@ -27,8 +33,30 @@ function isLocalPath(url) {
   )
 }
 
+/** 真机必须走 downloadFile/request，且域名需在公众平台配置；仅开发者工具可 HTTPS 直链 */
 function canUseRemoteDirectly(url) {
-  return USE_PROD || url.startsWith('https://')
+  if (!url.startsWith('https://')) return false
+  return isWechatDevtools() && USE_PROD
+}
+
+function downloadHttpsImage(fullUrl) {
+  if (localCache[fullUrl]) {
+    return Promise.resolve(localCache[fullUrl])
+  }
+  return new Promise((resolve, reject) => {
+    wx.downloadFile({
+      url: fullUrl,
+      success(res) {
+        if (res.statusCode !== 200 || !res.tempFilePath) {
+          reject(new Error(`download failed: ${res.statusCode}`))
+          return
+        }
+        localCache[fullUrl] = res.tempFilePath
+        resolve(res.tempFilePath)
+      },
+      fail: reject,
+    })
+  })
 }
 
 function downloadHttpImage(fullUrl) {
@@ -81,7 +109,14 @@ function downloadHttpImage(fullUrl) {
   })
 }
 
-/** 供 <image src> 使用：本地 HTTP 先下载到沙箱，HTTPS 可直接用 */
+function downloadRemoteImage(fullUrl) {
+  if (fullUrl.startsWith('https://')) {
+    return downloadHttpsImage(fullUrl)
+  }
+  return downloadHttpImage(fullUrl)
+}
+
+/** 供 <image src> 使用：真机先下载到本地，开发者工具生产环境可 HTTPS 直链 */
 function resolveImageForDisplay(url) {
   if (!url) return Promise.resolve('')
   if (isLocalPath(url)) return Promise.resolve(url)
@@ -90,7 +125,7 @@ function resolveImageForDisplay(url) {
   if (!fullUrl) return Promise.resolve('')
   if (canUseRemoteDirectly(fullUrl)) return Promise.resolve(fullUrl)
 
-  return downloadHttpImage(fullUrl)
+  return downloadRemoteImage(fullUrl)
 }
 
 async function resolveBannerImages(banners) {
@@ -109,7 +144,26 @@ async function resolveBannerImages(banners) {
   )
 }
 
+async function resolveStoreList(stores) {
+  const list = stores || []
+  return Promise.all(
+    list.map(async (store) => {
+      if (!store?.cover_images?.length) return store
+      try {
+        const cover_images = await Promise.all(
+          store.cover_images.map((url) => resolveImageForDisplay(url))
+        )
+        return { ...store, cover_images }
+      } catch (err) {
+        console.error('[media] store cover fail', store.id, err)
+        return store
+      }
+    })
+  )
+}
+
 module.exports = {
   resolveImageForDisplay,
   resolveBannerImages,
+  resolveStoreList,
 }

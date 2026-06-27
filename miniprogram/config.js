@@ -52,6 +52,10 @@ function resolveStaticUrl(url) {
   if (idx >= 0) {
     return getStaticBase() + url.slice(idx)
   }
+  // 生产环境真机禁止 http 直链，统一升 HTTPS
+  if (USE_PROD && url.startsWith('http://')) {
+    return url.replace(/^http:\/\//i, 'https://')
+  }
   return url
 }
 
