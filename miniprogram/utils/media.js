@@ -119,14 +119,14 @@ function downloadRemoteImage(fullUrl) {
 /** 供 <image src> 使用：真机先下载到本地，开发者工具生产环境可 HTTPS 直链 */
 function resolveImageForDisplay(url) {
   if (!url) return Promise.resolve('')
-  if (isLocalPath(url)) return Promise.resolve(url)
-
   const fullUrl = resolveStaticUrl(url)
   if (!fullUrl) return Promise.resolve('')
+  if (isLocalPath(fullUrl)) return Promise.resolve(fullUrl)
   if (canUseRemoteDirectly(fullUrl)) return Promise.resolve(fullUrl)
 
   return downloadRemoteImage(fullUrl)
 }
+
 
 async function resolveBannerImages(banners) {
   const list = banners || []
