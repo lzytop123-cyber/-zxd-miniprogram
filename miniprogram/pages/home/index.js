@@ -24,7 +24,6 @@ Page({
       hero_mode: 'fullscreen',
     },
     heroHeight: 680,
-    heroSlideCount: 1,
     cardCount: 0,
   },
 
@@ -36,25 +35,22 @@ Page({
   },
 
   loadBanners() {
+    const { resolveBannerImages } = require('../../utils/media')
     request({ url: '/home/banners', silent: true })
-      .then((data) => {
-        const { resolveStaticUrl } = require('../../config')
-        const banners = (data.items || []).map((item) => ({
-          ...item,
-          image_url: item.image_url ? resolveStaticUrl(item.image_url) : '',
-        }))
+      .then(async (data) => {
+        const raw = data.items || []
+        const banners = await resolveBannerImages(raw)
         const carousel = data.carousel || this.data.carousel
         const heroHeight = carousel.hero_height || 680
         this.setData({
           banners,
           showBanners: banners.length > 0,
-          heroSlideCount: 1 + banners.length,
           carousel,
           heroHeight,
         })
       })
       .catch(() => {
-        this.setData({ banners: [], showBanners: false, heroSlideCount: 1, heroHeight: 520 })
+        this.setData({ banners: [], showBanners: false, heroHeight: 520 })
       })
   },
 

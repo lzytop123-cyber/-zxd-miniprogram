@@ -33,6 +33,29 @@
   overflow: hidden;
 }
 
+.hero-fallback {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(160deg, #2D6A4F 0%, #40916C 46%, #52B788 100%);
+}
+
+.hero-fallback .hero-grid {
+  position: absolute;
+  inset: 0;
+  opacity: 0.15;
+}
+
+.hero-fallback-text {
+  position: relative;
+  z-index: 1;
+  font-size: 40rpx;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.92);
+  letter-spacing: 4rpx;
+}
+
 .hero-swiper-item {
   height: 100%;
   overflow: hidden;

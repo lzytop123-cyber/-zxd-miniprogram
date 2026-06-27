@@ -3,29 +3,27 @@
     class="hero hero--{{carousel.hero_mode || 'fullscreen'}}"
     style="height: {{heroHeight}}rpx;"
   >
-    <!-- 轮播：第 1 屏固定流程指引，后续为运营 Banner -->
+    <!-- 轮播：仅展示后台配置的活动 Banner -->
     <view class="hero-media">
       <swiper
-        wx:if="{{heroSlideCount > 1}}"
+        wx:if="{{banners.length > 0}}"
         class="hero-swiper"
         style="height: {{heroHeight}}rpx;"
-        indicator-dots="{{carousel.indicator_dots}}"
+        indicator-dots="{{carousel.indicator_dots && banners.length > 1}}"
         indicator-color="rgba(255,255,255,0.35)"
         indicator-active-color="#FFFFFF"
-        autoplay="{{carousel.autoplay}}"
+        autoplay="{{carousel.autoplay && banners.length > 1}}"
         interval="{{carousel.interval}}"
-        circular="{{carousel.circular}}"
+        circular="{{carousel.circular && banners.length > 1}}"
       >
-        <swiper-item class="hero-swiper-item">
-          <booking-flow mode="hero" hero-height="{{heroHeight}}" />
-        </swiper-item>
         <swiper-item wx:for="{{banners}}" wx:key="id" class="hero-swiper-item">
           <template is="heroSlide" data="{{item: item, index: index, heroMode: carousel.hero_mode}}" />
         </swiper-item>
       </swiper>
 
-      <view wx:else class="hero-swiper hero-swiper--single" style="height: {{heroHeight}}rpx;">
-        <booking-flow mode="hero" hero-height="{{heroHeight}}" />
+      <view wx:else class="hero-swiper hero-swiper--single hero-fallback" style="height: {{heroHeight}}rpx;">
+        <view class="hero-grid"></view>
+        <view class="hero-fallback-text">知行岛自习室</view>
       </view>
     </view>
   </view>
