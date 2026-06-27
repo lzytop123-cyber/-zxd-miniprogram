@@ -20,7 +20,8 @@
     </view>
 
     <view class="open-section">
-      <view class="tip" wx:if="{{!canOpen}}">提前 15 分钟可开门</view>
+      <view class="tip ended" wx:if="{{countdown === '已结束'}}">订单已结束，无法开门</view>
+      <view class="tip" wx:elif="{{!canOpen}}">提前 15 分钟可开门</view>
       <view class="tip ok" wx:elif="{{canOpen}}">已可开门，请站在门口操作</view>
 
       <view

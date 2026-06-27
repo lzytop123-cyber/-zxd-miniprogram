@@ -109,7 +109,18 @@ Page({
         (c) => c.status === 0 && originalPrice >= (c.min_amount || 0)
       )
       const patch = { cards, usableCards, coupons, usableCoupons }
-      if (this.data.payType === 'period_card' && usableCards.length) {
+      if (
+        usableCards.length
+        && this.data.payType === 'wechat'
+        && !this.data.orderNo
+      ) {
+        const cur = usableCards[0]
+        patch.payType = 'period_card'
+        patch.selectedCardId = cur.id
+        patch.selectedCardName = cur.card_name || cur.card_type
+        patch.price = 0
+        patch.discountPrice = 0
+      } else if (this.data.payType === 'period_card' && usableCards.length) {
         const cur = usableCards.find((c) => c.id === this.data.selectedCardId) || usableCards[0]
         patch.selectedCardId = cur.id
         patch.selectedCardName = cur.card_name || cur.card_type

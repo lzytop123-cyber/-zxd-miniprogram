@@ -86,6 +86,12 @@ function formatRemain(card) {
   return ''
 }
 
+function isCardUsable(card) {
+  if (card.card_type === 'hourly') return Number(card.remaining_hours) > 0
+  if (card.card_type === 'session') return Number(card.remaining_sessions) > 0
+  return true
+}
+
 function formatCard(card) {
   return {
     ...card,
@@ -167,6 +173,7 @@ module.exports = {
   TYPE_LABELS,
   PKG_CATEGORY_TABS,
   formatCard,
+  isCardUsable,
   enrichPackage,
   filterPackages,
   buildCardDetail,

@@ -12,7 +12,7 @@ from app.models import BleBatteryAlert, BleKey, BleLock, DoorLog, OpenType, Rese
 from app.schemas.common import ResponseModel
 from app.core.config import settings
 from app.services.business import TTLockService
-from app.services.booking import auto_checkin_reservation
+from app.services.booking import auto_checkin_reservation, reservation_unlock_allowed
 
 router = APIRouter(tags=["蓝牙"])
 
@@ -51,6 +51,8 @@ def get_ble_key(
         raise HTTPException(status_code=404, detail="订单不存在")
     if reservation.pay_status != 1:
         raise HTTPException(status_code=400, detail="订单未支付")
+    if not reservation_unlock_allowed(reservation):
+        raise HTTPException(status_code=400, detail="订单已结束，无法开门")
 
     cached = cache_get(f"ble_key:{reservation_id}")
     if cached:
@@ -112,11 +114,8 @@ async def remote_unlock_door(
     if reservation.pay_status != 1:
         raise HTTPException(status_code=400, detail="订单未支付")
 
-    now = datetime.now()
-    if now < reservation.start_time - timedelta(minutes=15):
-        raise HTTPException(status_code=400, detail="提前15分钟内可开门")
-    if now > reservation.end_time + timedelta(minutes=15):
-        raise HTTPException(status_code=400, detail="订单已过期")
+    if not reservation_unlock_allowed(reservation):
+        raise HTTPException(status_code=400, detail="订单已结束，无法开门")
 
     ble_key = db.scalar(
         select(BleKey).where(

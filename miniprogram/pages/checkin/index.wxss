@@ -119,6 +119,11 @@
   font-weight: 600;
 }
 
+.tip.ended {
+  color: #c45c5c;
+  font-weight: 600;
+}
+
 .open-hero {
   width: 100%;
   padding: 48rpx 32rpx;

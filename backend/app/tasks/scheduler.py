@@ -5,7 +5,7 @@ from sqlalchemy import select
 
 from app.db.session import SessionLocal
 from app.models import BleBatteryAlert, BleLock, Reservation
-from app.services.booking import auto_checkin_due_batch
+from app.services.booking import auto_checkin_due_batch, finalize_expired_reservation
 
 BATTERY_LOW_THRESHOLD = 20
 
@@ -38,13 +38,12 @@ def expire_finished_orders():
                 Reservation.end_time <= now,
             )
         ).all()
+        changed = False
         for r in rows:
-            if r.status == 1:
-                r.status = 2
-                r.actual_end_time = r.end_time
-            elif r.status == 0:
-                r.status = 3
-        db.commit()
+            if finalize_expired_reservation(db, r, now):
+                changed = True
+        if changed:
+            db.commit()
     finally:
         db.close()
 

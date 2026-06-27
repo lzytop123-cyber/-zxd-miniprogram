@@ -3,6 +3,7 @@ const { request } = require('../../utils/request')
 const {
   PKG_CATEGORY_TABS,
   formatCard,
+  isCardUsable,
   enrichPackage,
   filterPackages,
   buildCardDetail,
@@ -42,7 +43,7 @@ Page({
     }
     request({ url: '/user/cards', silent: true })
       .then((cards) => {
-        const list = (cards || []).map(formatCard)
+        const list = (cards || []).filter(isCardUsable).map(formatCard)
         this.setData({ cards: list, activeCount: list.length, loggedIn: true })
       })
       .catch(() => this.setData({ cards: [], activeCount: 0 }))

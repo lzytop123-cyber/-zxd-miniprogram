@@ -28,9 +28,11 @@ from app.services.business import (
 from app.services.booking import (
     add_wallet_log,
     auto_checkin_reservation,
+    finalize_expired_reservation,
     finalize_reservation_after_pay,
     record_study_on_checkout,
     reservation_status_display,
+    reservation_unlock_allowed,
     resolve_booking_window,
     validate_seat_for_booking,
 )
@@ -321,6 +323,18 @@ def list_reservations(user: User = Depends(get_current_user), db: Session = Depe
 @router.get("/active", response_model=ResponseModel[ReservationItem | None])
 def active_reservation(user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     now = datetime.now()
+    stale = db.scalars(
+        select(Reservation).where(
+            Reservation.user_id == user.id,
+            Reservation.pay_status == 1,
+            Reservation.status.in_([0, 1]),
+            Reservation.end_time <= now,
+        )
+    ).all()
+    changed = False
+    for row in stale:
+        if finalize_expired_reservation(db, row, now):
+            changed = True
     row = db.scalar(
         select(Reservation)
         .where(
@@ -332,9 +346,15 @@ def active_reservation(user: User = Depends(get_current_user), db: Session = Dep
         .order_by(Reservation.start_time)
     )
     if row and auto_checkin_reservation(db, row):
+        changed = True
+    if changed:
         db.commit()
-        db.refresh(row)
-    return ResponseModel(data=_to_item(db, row) if row else None)
+        if row:
+            db.refresh(row)
+    item = _to_item(db, row) if row else None
+    if item and not reservation_unlock_allowed(row, now):
+        return ResponseModel(data=None)
+    return ResponseModel(data=item)
 
 
 @router.get("/{reservation_id}", response_model=ResponseModel[ReservationItem])

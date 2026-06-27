@@ -306,6 +306,44 @@ def add_wallet_log(
 EARLY_CHECKIN_MINUTES = 15
 
 
+def reservation_unlock_allowed(
+    reservation: Reservation,
+    now: datetime | None = None,
+) -> bool:
+    """是否在允许开门的时间窗内（开始前15分钟至预约结束）。"""
+    now = now or datetime.now()
+    if reservation.pay_status != 1:
+        return False
+    if reservation.status == 3:
+        return False
+    if reservation.status == 2:
+        return False
+    early = reservation.start_time - timedelta(minutes=EARLY_CHECKIN_MINUTES)
+    return early <= now <= reservation.end_time
+
+
+def finalize_expired_reservation(
+    db: Session,
+    reservation: Reservation,
+    now: datetime | None = None,
+) -> bool:
+    """预约时段结束后自动完结（未入座视为取消，已入座视为完成）。"""
+    now = now or datetime.now()
+    if reservation.status not in (0, 1):
+        return False
+    if reservation.end_time > now:
+        return False
+    if reservation.status == 1:
+        reservation.status = 2
+        reservation.actual_end_time = reservation.end_time
+        user = db.get(User, reservation.user_id)
+        if user:
+            record_study_on_checkout(db, reservation, user)
+    else:
+        reservation.status = 3
+    return True
+
+
 def _fmt_status_time(dt: datetime) -> str:
     return dt.strftime("%m月%d日 %H:%M")
 
@@ -370,7 +408,7 @@ def reservation_status_display(
         return "已预约", f"{_fmt_status_time(reservation.start_time)} 起可到店"
     if now <= reservation.end_time:
         return "已预约", "到达时段后自动开始，到店开门即可"
-    return "已过期", None
+    return "已结束", "预约时段已结束"
 
 
 async def finalize_reservation_after_pay(db: Session, reservation: Reservation) -> None:

@@ -30,6 +30,18 @@ function formatDate(iso) {
   return `${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`
 }
 
+const OPEN_EARLY_MS = 15 * 60000
+
+function parseTime(iso) {
+  return new Date(String(iso).replace(' ', 'T'))
+}
+
+function computeCanOpen(startTime, endTime, now = new Date()) {
+  const start = parseTime(startTime)
+  const end = parseTime(endTime)
+  return now >= new Date(start.getTime() - OPEN_EARLY_MS) && now <= end
+}
+
 Page({
   data: {
     reservation: null,
@@ -58,12 +70,11 @@ Page({
     request({ url: '/reservation/active' })
       .then((reservation) => {
         if (!reservation) {
-          this.setData({ reservation: null })
+          this._expiredReloadFor = null
+          this.setData({ reservation: null, canOpen: false })
           return
         }
-        const start = new Date(String(reservation.start_time).replace(' ', 'T'))
-        const now = new Date()
-        const canOpen = now >= new Date(start.getTime() - 15 * 60000)
+        const canOpen = computeCanOpen(reservation.start_time, reservation.end_time)
         this.setData({
           reservation,
           endDisplay: formatDate(reservation.end_time),
@@ -71,15 +82,19 @@ Page({
           statusHint: reservation.status_hint || '',
           canOpen,
         })
-        this.loadBleKey(reservation.id)
-        this.startCountdown(reservation.end_time)
+        this.loadBleKey(canOpen ? reservation.id : null)
+        this.startCountdown(reservation)
       })
       .catch(() => {
-        this.setData({ reservation: null })
+        this.setData({ reservation: null, canOpen: false })
       })
   },
 
   loadBleKey(reservationId) {
+    if (!reservationId) {
+      this.setData({ lockData: '', gatewayUnlock: false })
+      return
+    }
     request({ url: `/ble/key/${reservationId}` })
       .then((res) => {
         wx.setStorageSync(`ble_key_${reservationId}`, res.lockData)
@@ -94,17 +109,27 @@ Page({
       })
   },
 
-  startCountdown(endTime) {
+  startCountdown(reservation) {
     const tick = () => {
-      const diff = new Date(String(endTime).replace(' ', 'T')) - new Date()
+      const now = new Date()
+      const end = parseTime(reservation.end_time)
+      const diff = end - now
+      const canOpen = computeCanOpen(reservation.start_time, reservation.end_time, now)
       if (diff <= 0) {
-        this.setData({ countdown: '已结束' })
+        this.setData({ countdown: '已结束', canOpen: false })
+        if (this._expiredReloadFor !== reservation.id) {
+          this._expiredReloadFor = reservation.id
+          this.loadActive()
+        }
         return
       }
       const h = Math.floor(diff / 3600000)
       const m = Math.floor((diff % 3600000) / 60000)
       const s = Math.floor((diff % 60000) / 1000)
-      this.setData({ countdown: `剩余 ${h}时${m}分${s}秒` })
+      this.setData({
+        countdown: `剩余 ${h}时${m}分${s}秒`,
+        canOpen,
+      })
     }
     tick()
     if (this._timer) clearInterval(this._timer)
