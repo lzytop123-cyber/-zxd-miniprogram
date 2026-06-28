@@ -117,6 +117,7 @@ async def _exchange(
             "card_type": card.card_type.value,
             "end_date": str(card.end_date) if card.end_date else None,
             "remaining_hours": float(card.remaining_hours) if card.remaining_hours else None,
+            "total_hours": float(card.total_hours) if card.total_hours else None,
             "remaining_sessions": card.remaining_sessions,
         },
     )

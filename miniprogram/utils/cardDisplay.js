@@ -1,3 +1,30 @@
+function hourlyAllowsPartialUse(card) {
+  if (card.total_hours != null) return Number(card.total_hours) >= 50
+  if (Number(card.remaining_hours) >= 50) return true
+  const name = card.card_name || ''
+  return name.includes('50') && name.includes('小时')
+}
+
+function hourlyRuleText(card) {
+  if (hourlyAllowsPartialUse(card)) {
+    return '按小时扣减，可多次预约直至小时用完'
+  }
+  return '须一次性预约用完剩余时长，核销后失效'
+}
+
+function hourlyDetailLines(card) {
+  if (hourlyAllowsPartialUse(card)) {
+    return [
+      '按小时扣减，预约时自动抵扣',
+      '可在有效期内多次使用直至小时用完',
+    ]
+  }
+  return [
+    '须一次性预约用完剩余全部时长',
+    '核销后该卡失效，不可分次使用',
+  ]
+}
+
 const TYPE_LABELS = {
   daily: '天卡',
   weekly: '周卡',
@@ -14,7 +41,7 @@ const RULE_LINES = {
   monthly: '开卡后30天内可预约一次，使用后即失效',
   quarterly: '90天内完成一次预约即核销',
   session: '按自然日扣次，连选N天扣N次',
-  hourly: '按小时扣减，预约时自动抵扣',
+  hourly: '须一次性预约用完剩余时长',
   night_monthly: '夜读时段内完成一次预约即核销',
 }
 
@@ -93,17 +120,21 @@ function isCardUsable(card) {
 }
 
 function formatCard(card) {
+  const ruleText = card.card_type === 'hourly' ? hourlyRuleText(card) : (RULE_LINES[card.card_type] || '')
   return {
     ...card,
     typeLabel: TYPE_LABELS[card.card_type] || '期限卡',
     validityText: formatValidity(card),
     remainText: formatRemain(card),
-    ruleText: RULE_LINES[card.card_type] || '',
+    ruleText,
+    hourlyMultiUse: card.card_type === 'hourly' ? hourlyAllowsPartialUse(card) : false,
   }
 }
 
 function buildCardDetail(card) {
-  const lines = [...(CARD_DETAIL_LINES[card.card_type] || [])]
+  const lines = card.card_type === 'hourly'
+    ? [...hourlyDetailLines(card)]
+    : [...(CARD_DETAIL_LINES[card.card_type] || [])]
   if (card.validityText) lines.unshift(card.validityText)
   if (card.remainText) lines.unshift(card.remainText)
   if (card.daily_start) lines.push(`可用时段：${card.daily_start} 起`)
@@ -174,6 +205,7 @@ module.exports = {
   PKG_CATEGORY_TABS,
   formatCard,
   isCardUsable,
+  hourlyAllowsPartialUse,
   enrichPackage,
   filterPackages,
   buildCardDetail,

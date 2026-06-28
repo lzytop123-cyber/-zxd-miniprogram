@@ -12,6 +12,9 @@ from app.models import (
     PeriodCard,
     RewardType,
 )
+MULTI_USE_HOURLY_THRESHOLD = Decimal("50")
+
+
 REWARD_TO_CARD: dict[RewardType, CardType] = {
     RewardType.hours: CardType.hourly,
     RewardType.day_pass: CardType.daily,
@@ -46,7 +49,9 @@ def issue_period_card(
     )
 
     if mapping.reward_type == RewardType.hours:
-        card.remaining_hours = Decimal(str(value))
+        hours = Decimal(str(value))
+        card.remaining_hours = hours
+        card.total_hours = hours
     elif mapping.reward_type == RewardType.session:
         card.total_sessions = value
         card.remaining_sessions = value
@@ -118,6 +123,21 @@ def _session_days(start_time: datetime, end_time: datetime) -> int:
     return (end_time.date() - start_time.date()).days + 1
 
 
+def _reservation_hours(start_time: datetime, end_time: datetime) -> Decimal:
+    return Decimal(str((end_time - start_time).total_seconds() / 3600)).quantize(Decimal("0.1"))
+
+
+def hourly_allows_partial_use(card: PeriodCard) -> bool:
+    """仅 50 小时档支持多次预约按实际时长扣减；其余小时卡须一次性约满剩余时长。"""
+    if card.total_hours is not None:
+        return card.total_hours >= MULTI_USE_HOURLY_THRESHOLD
+    remaining = card.remaining_hours or Decimal(0)
+    if remaining >= MULTI_USE_HOURLY_THRESHOLD:
+        return True
+    name = card.card_name or ""
+    return "50" in name and "小时" in name
+
+
 def validate_period_card_for_reservation(
     db: Session,
     card: PeriodCard,
@@ -137,9 +157,13 @@ def validate_period_card_for_reservation(
     if card.card_type == CardType.hourly:
         if reservation_bill_type != BillType.hourly:
             raise ValueError("小时卡仅可用于按小时预约")
-        hours = Decimal(str((end_time - start_time).total_seconds() / 3600))
-        if not card.remaining_hours or card.remaining_hours < hours:
-            raise ValueError("小时卡余额不足")
+        hours = _reservation_hours(start_time, end_time)
+        remaining = (card.remaining_hours or Decimal(0)).quantize(Decimal("0.1"))
+        if hourly_allows_partial_use(card):
+            if remaining < hours:
+                raise ValueError("小时卡余额不足")
+        elif hours != remaining:
+            raise ValueError(f"该小时卡须一次性用完，请预约 {remaining} 小时")
         return
 
     if card.card_type == CardType.session:
@@ -192,8 +216,11 @@ def consume_period_card(
         db, card, reservation_bill_type, start_time, end_time, store_id
     )
     if card.card_type == CardType.hourly:
-        hours = Decimal(str((end_time - start_time).total_seconds() / 3600)).quantize(Decimal("0.1"))
-        card.remaining_hours -= hours
+        if hourly_allows_partial_use(card):
+            hours = _reservation_hours(start_time, end_time)
+            card.remaining_hours = (card.remaining_hours - hours).quantize(Decimal("0.1"))
+        else:
+            card.remaining_hours = Decimal("0")
     elif card.card_type == CardType.session:
         days = _session_days(start_time, end_time)
         card.remaining_sessions -= days

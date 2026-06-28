@@ -496,6 +496,7 @@ def _ensure_sqlite_columns():
         "ALTER TABLE home_banners ADD COLUMN link_path VARCHAR(200)",
         "ALTER TABLE home_carousel_settings ADD COLUMN hero_height INTEGER DEFAULT 520",
         "ALTER TABLE home_carousel_settings ADD COLUMN hero_mode VARCHAR(20) DEFAULT 'fullscreen'",
+        "ALTER TABLE period_cards ADD COLUMN total_hours NUMERIC(5, 1)",
     ]
     with engine.begin() as conn:
         for stmt in stmts:
@@ -503,6 +504,15 @@ def _ensure_sqlite_columns():
                 conn.execute(text(stmt))
             except Exception:
                 pass
+        try:
+            conn.execute(
+                text(
+                    "UPDATE period_cards SET total_hours = remaining_hours "
+                    "WHERE card_type = 'hourly' AND total_hours IS NULL"
+                )
+            )
+        except Exception:
+            pass
 
 
 if __name__ == "__main__":

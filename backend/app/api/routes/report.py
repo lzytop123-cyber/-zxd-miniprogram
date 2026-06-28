@@ -202,6 +202,7 @@ def get_cards(user: User = Depends(get_current_user), db: Session = Depends(get_
                 "card_name": c.card_name,
                 "card_type": c.card_type.value,
                 "remaining_hours": float(c.remaining_hours) if c.remaining_hours else None,
+                "total_hours": float(c.total_hours) if c.total_hours else None,
                 "remaining_sessions": c.remaining_sessions,
                 "start_date": str(c.start_date) if c.start_date else None,
                 "end_date": str(c.end_date) if c.end_date else None,

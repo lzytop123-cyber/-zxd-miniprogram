@@ -1,5 +1,6 @@
 const { request } = require('../../utils/request')
 const { getLayout } = require('../../utils/seat-layout')
+const { hourlyAllowsPartialUse } = require('../../utils/cardDisplay')
 
 const BILL_LABELS = { hourly: '按小时', daily: '天卡', weekly: '周卡', session: '次卡', monthly: '月卡', quarterly: '季卡', night: '夜读' }
 
@@ -17,6 +18,12 @@ function countSessionDays(startIso, endIso) {
   const s = new Date(startIso.replace(' ', 'T'))
   const e = new Date(endIso.replace(' ', 'T'))
   return Math.floor((e - s) / 86400000) + 1
+}
+
+function bookingHours(startIso, endIso) {
+  const s = new Date(startIso.replace(' ', 'T'))
+  const e = new Date(endIso.replace(' ', 'T'))
+  return Math.round((e - s) / 3600000 * 10) / 10
 }
 
 function formatDate(iso) {
@@ -90,12 +97,19 @@ Page({
       ])
       const storeId = Number(this.data.storeId)
       const billType = this.data.billType
+      const bookingH = billType === 'hourly' ? bookingHours(this.data.startTime, this.data.endTime) : 0
       const allowedTypes = CARD_BILL_MAP[billType] || [billType]
       const usableCards = (cards || []).filter((c) => {
         if (c.store_id && c.store_id !== storeId) return false
         if (c.card_type === 'hourly' && !(c.remaining_hours > 0)) return false
         if (c.card_type === 'session' && !(c.remaining_sessions > 0)) return false
-        if (c.card_type === 'hourly') return billType === 'hourly'
+        if (c.card_type === 'hourly') {
+          if (billType !== 'hourly') return false
+          if (!hourlyAllowsPartialUse(c)) {
+            return Math.abs(bookingH - Number(c.remaining_hours)) < 0.05
+          }
+          return bookingH <= Number(c.remaining_hours)
+        }
         if (c.card_type === 'session') return billType === 'session'
         if (c.card_type === 'night_monthly') return billType === 'night'
         if (c.card_type === 'daily') return billType === 'daily'

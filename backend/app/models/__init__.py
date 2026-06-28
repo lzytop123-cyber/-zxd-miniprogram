@@ -237,6 +237,7 @@ class PeriodCard(Base):
     start_date: Mapped[date | None] = mapped_column(Date)
     end_date: Mapped[date | None] = mapped_column(Date)
     remaining_hours: Mapped[Decimal | None] = mapped_column(Numeric(5, 1))
+    total_hours: Mapped[Decimal | None] = mapped_column(Numeric(5, 1))
     daily_start: Mapped[time | None] = mapped_column(Time)
     daily_end: Mapped[time | None] = mapped_column(Time)
     source: Mapped[CardSource] = mapped_column(Enum(CardSource), default=CardSource.purchase)
