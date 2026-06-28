@@ -71,12 +71,22 @@ Page({
       this._preferredId = Number(preferred)
     }
     this.setData({ ...pluginState, runtimeAppId })
-    this.loadActive()
+    this.loadActive({ silent: true })
   },
 
-  loadActive() {
-    this.setData({ pageLoading: true })
-    request({ url: '/reservation/active/list' })
+  onPullDownRefresh() {
+    this.loadActive({ force: true }).finally(() => wx.stopPullDownRefresh())
+  },
+
+  loadActive(options = {}) {
+    const { force = false, silent = false } = options
+    const hasList = (this.data.activeList || []).length > 0
+    if (!hasList || force) {
+      if (!silent || !hasList) {
+        this.setData({ pageLoading: !hasList })
+      }
+    }
+    return request({ url: '/reservation/active/list', silent: true, force })
       .then((list) => {
         const items = list || []
         if (!items.length) {
@@ -106,13 +116,17 @@ Page({
         this.applyReservation(reservation)
       })
       .catch(() => {
-        this.setData({
-          activeList: [],
-          selectedId: null,
-          reservation: null,
-          canOpen: false,
-          pageLoading: false,
-        })
+        if (!hasList) {
+          this.setData({
+            activeList: [],
+            selectedId: null,
+            reservation: null,
+            canOpen: false,
+            pageLoading: false,
+          })
+        } else {
+          this.setData({ pageLoading: false })
+        }
       })
   },
 

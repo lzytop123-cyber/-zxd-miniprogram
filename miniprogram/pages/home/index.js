@@ -62,10 +62,10 @@ Page({
     const { silent = false, force = false } = options
     return Promise.all([
       this.loadBanners({ silent, force }),
-      this.loadAnnouncements(),
+      this.loadAnnouncements({ force }),
       this.loadStores({ silent, force }),
-      this.loadUser(),
-      this.loadCardCount(),
+      this.loadUser({ force }),
+      this.loadCardCount({ force }),
     ])
   },
 
@@ -93,8 +93,9 @@ Page({
     }
   },
 
-  loadAnnouncements() {
-    return request({ url: '/home/announcements', silent: true })
+  loadAnnouncements(options = {}) {
+    const { force = false } = options
+    return request({ url: '/home/announcements', silent: true, force })
       .then((data) => {
         const items = data.items || []
         this.setData({ announcements: items })
@@ -145,13 +146,14 @@ Page({
   },
 
   loadBanners(options = {}) {
+    const { force = false } = options
     const hasBanners = this.data.banners.length > 0
 
     if (!hasBanners) {
       this.setData({ bannerReady: false, bannersLoading: true })
     }
 
-    return request({ url: '/home/banners', silent: true })
+    return request({ url: '/home/banners', silent: true, force })
       .then(async (data) => {
         const raw = data.items || []
         const carousel = data.carousel || this.data.carousel
@@ -201,12 +203,13 @@ Page({
       })
   },
 
-  loadUser() {
+  loadUser(options = {}) {
+    const { force = false } = options
     if (!auth.isLoggedIn()) {
       this.setData({ user: null, cardCount: 0 })
       return Promise.resolve()
     }
-    return request({ url: '/user/profile', silent: true })
+    return request({ url: '/user/profile', silent: true, force })
       .then(async (user) => {
         auth.syncAppUser(user)
         const normalized = await normalizeUser(user)
@@ -218,17 +221,19 @@ Page({
       })
   },
 
-  loadCardCount() {
+  loadCardCount(options = {}) {
+    const { force = false } = options
     if (!auth.isLoggedIn()) {
       this.setData({ cardCount: 0 })
       return Promise.resolve()
     }
-    return request({ url: '/user/cards', silent: true })
+    return request({ url: '/user/cards', silent: true, force })
       .then((cards) => this.setData({ cardCount: (cards || []).length }))
       .catch(() => this.setData({ cardCount: 0 }))
   },
 
   loadStores(options = {}) {
+    const { force = false } = options
     const hasStores = this.data.stores.length > 0
     const { resolveStoreList } = require('../../utils/media')
     const { getUserLocation, isLocationDenied, formatDistance } = require('../../utils/location')
@@ -256,7 +261,7 @@ Page({
     }
 
     const fetchWithoutLocation = (hint) => {
-      return request({ url: '/store/list', silent: true })
+      return request({ url: '/store/list', silent: true, force })
         .then((stores) => finishList(stores, hint))
         .catch(() => {
           if (token !== this._storeFetchToken) return
@@ -274,6 +279,7 @@ Page({
           request({
             url: `/store/list?latitude=${latitude}&longitude=${longitude}`,
             silent: true,
+            force,
           })
         )
         .then((stores) => finishList(stores, ''))

@@ -1,5 +1,5 @@
 const auth = require('../../utils/auth')
-const { request } = require('../../utils/request')
+const { request, invalidateCache } = require('../../utils/request')
 const { completeWechatPay } = require('../../utils/pay')
 const {
   PKG_CATEGORY_TABS,
@@ -33,30 +33,52 @@ Page({
 
   onShow() {
     this.setData({ loggedIn: auth.isLoggedIn() })
-    this.loadCards()
-    this.ensureBuyLoaded()
+    this.refreshPage({ silent: true })
   },
 
-  loadCards() {
+  onPullDownRefresh() {
+    this.refreshPage({ force: true }).finally(() => wx.stopPullDownRefresh())
+  },
+
+  refreshPage(options = {}) {
+    const { force = false, silent = false } = options
+    this.loadCards({ force, silent })
+    return this.ensureBuyLoaded({ force, silent })
+  },
+
+  loadCards(options = {}) {
+    const { force = false } = options
     if (!auth.isLoggedIn()) {
       this.setData({ cards: [], activeCount: 0, loggedIn: false })
-      return
+      return Promise.resolve()
     }
-    request({ url: '/user/cards', silent: true })
+    return request({ url: '/user/cards', silent: true, force })
       .then((cards) => {
         const list = (cards || []).filter(isCardUsable).map(formatCard)
         this.setData({ cards: list, activeCount: list.length, loggedIn: true })
       })
-      .catch(() => this.setData({ cards: [], activeCount: 0 }))
+      .catch(() => {
+        if (!this.data.cards.length) {
+          this.setData({ cards: [], activeCount: 0 })
+        }
+      })
   },
 
-  ensureBuyLoaded() {
-    if (this.data.buyLoaded && this.data.stores.length) return
-    this.loadStores()
+  ensureBuyLoaded(options = {}) {
+    const { force = false, silent = false } = options
+    if (!force && this.data.buyLoaded && this.data.stores.length) {
+      if (this.data.storeId) {
+        return this.loadPackages(this.data.storeId, { silent: true })
+      }
+      return Promise.resolve()
+    }
+    return this.loadStores({ force, silent })
   },
 
-  loadStores() {
-    request({ url: '/store/list', silent: true })
+  loadStores(options = {}) {
+    const { force = false, silent = false } = options
+    const hasStores = this.data.stores.length > 0
+    return request({ url: '/store/list', silent: true, force })
       .then((stores) => {
         const list = stores || []
         const storeId = this.data.storeId || list[0]?.id || null
@@ -67,9 +89,11 @@ Page({
           storeName: store?.name || '',
           buyLoaded: true,
         })
-        if (store?.id) this.loadPackages(store.id)
+        if (store?.id) return this.loadPackages(store.id, { force, silent: silent || hasStores })
       })
-      .catch(() => wx.showToast({ title: '加载门店失败', icon: 'none' }))
+      .catch(() => {
+        if (!hasStores) wx.showToast({ title: '加载门店失败', icon: 'none' })
+      })
   },
 
   onStoreChange(e) {
@@ -77,12 +101,18 @@ Page({
     const store = this.data.stores[idx]
     if (!store) return
     this.setData({ storeId: store.id, storeName: store.name, activeCategory: 'all' })
-    this.loadPackages(store.id)
+    this.loadPackages(store.id, { force: true })
   },
 
-  loadPackages(storeId) {
-    this.setData({ loading: true, packages: [], displayPackages: [] })
-    request({ url: `/card/packages?store_id=${storeId}`, silent: true })
+  loadPackages(storeId, options = {}) {
+    const { force = false, silent = false } = options
+    const hasPackages = this.data.packages.length > 0 && this.data.storeId === storeId
+    if (!hasPackages || force) {
+      if (!silent || !hasPackages) {
+        this.setData({ loading: !hasPackages, packages: hasPackages ? this.data.packages : [], displayPackages: hasPackages ? this.data.displayPackages : [] })
+      }
+    }
+    return request({ url: `/card/packages?store_id=${storeId}`, silent: true, force })
       .then((data) => {
         const packages = (data.items || []).map(enrichPackage)
         this.setData({
@@ -94,7 +124,7 @@ Page({
       })
       .catch(() => {
         this.setData({ loading: false })
-        wx.showToast({ title: '加载套餐失败', icon: 'none' })
+        if (!hasPackages) wx.showToast({ title: '加载套餐失败', icon: 'none' })
       })
   },
 
@@ -185,11 +215,12 @@ Page({
       )
 
       wx.hideLoading()
+      invalidateCache('/user/cards')
       wx.showModal({
         title: '购买成功',
         content: `已购买：${res.label || '期限卡'}`,
         showCancel: false,
-        success: () => this.loadCards(),
+        success: () => this.loadCards({ force: true }),
       })
     } catch (err) {
       wx.hideLoading()

@@ -53,6 +53,13 @@ function logout() {
   wx.setStorageSync(MANUAL_LOGOUT_KEY, true)
   wx.removeStorageSync('token')
   wx.removeStorageSync('userInfo')
+  try {
+    const { invalidateCache } = require('./request')
+    invalidateCache('/user/')
+    invalidateCache('/reservation/')
+  } catch (e) {
+    // ignore
+  }
   const app = getAppSafe()
   if (app?.globalData) {
     app.globalData.user = null

@@ -5,6 +5,9 @@ const {
   DEV_LOCAL_HOST,
 } = require('../config')
 
+const IMAGE_CACHE_META_KEY = 'image_cache_meta_v1'
+const DISK_CACHE_TTL = 7 * 24 * 60 * 60 * 1000
+
 const localCache = {}
 
 function fileExt(url) {
@@ -21,6 +24,50 @@ function cachePath(url) {
     hash = ((hash << 5) - hash + url.charCodeAt(i)) | 0
   }
   return `${wx.env.USER_DATA_PATH}/img_${Math.abs(hash)}_${name}.${fileExt(url)}`
+}
+
+function markDiskCache(fullUrl, path) {
+  localCache[fullUrl] = path
+  try {
+    const meta = wx.getStorageSync(IMAGE_CACHE_META_KEY) || {}
+    meta[fullUrl] = { path, at: Date.now() }
+    wx.setStorageSync(IMAGE_CACHE_META_KEY, meta)
+  } catch (e) {
+    // ignore
+  }
+}
+
+function readDiskCache(fullUrl) {
+  if (localCache[fullUrl]) {
+    return localCache[fullUrl]
+  }
+
+  const target = cachePath(fullUrl)
+  const fs = wx.getFileSystemManager()
+
+  try {
+    const meta = wx.getStorageSync(IMAGE_CACHE_META_KEY) || {}
+    const entry = meta[fullUrl]
+    if (entry && entry.path === target && Date.now() - entry.at < DISK_CACHE_TTL) {
+      fs.accessSync(target)
+      localCache[fullUrl] = target
+      return target
+    }
+    if (entry && Date.now() - entry.at >= DISK_CACHE_TTL) {
+      delete meta[fullUrl]
+      wx.setStorageSync(IMAGE_CACHE_META_KEY, meta)
+    }
+  } catch (e) {
+    // ignore
+  }
+
+  try {
+    fs.accessSync(target)
+    markDiskCache(fullUrl, target)
+    return target
+  } catch (e) {
+    return null
+  }
 }
 
 function isLocalPath(url) {
@@ -40,20 +87,11 @@ function canUseRemoteDirectly(url) {
 }
 
 function downloadHttpsImage(fullUrl) {
-  if (localCache[fullUrl]) {
-    return Promise.resolve(localCache[fullUrl])
-  }
+  const cached = readDiskCache(fullUrl)
+  if (cached) return Promise.resolve(cached)
 
   const target = cachePath(fullUrl)
   const fs = wx.getFileSystemManager()
-
-  try {
-    fs.accessSync(target)
-    localCache[fullUrl] = target
-    return Promise.resolve(target)
-  } catch (e) {
-    // cache miss
-  }
 
   return new Promise((resolve, reject) => {
     wx.downloadFile({
@@ -67,11 +105,11 @@ function downloadHttpsImage(fullUrl) {
           srcPath: res.tempFilePath,
           destPath: target,
           success() {
-            localCache[fullUrl] = target
+            markDiskCache(fullUrl, target)
             resolve(target)
           },
           fail() {
-            localCache[fullUrl] = res.tempFilePath
+            markDiskCache(fullUrl, res.tempFilePath)
             resolve(res.tempFilePath)
           },
         })
@@ -82,20 +120,11 @@ function downloadHttpsImage(fullUrl) {
 }
 
 function downloadViaRequest(fullUrl) {
-  if (localCache[fullUrl]) {
-    return Promise.resolve(localCache[fullUrl])
-  }
+  const cached = readDiskCache(fullUrl)
+  if (cached) return Promise.resolve(cached)
 
   const target = cachePath(fullUrl)
   const fs = wx.getFileSystemManager()
-
-  try {
-    fs.accessSync(target)
-    localCache[fullUrl] = target
-    return Promise.resolve(target)
-  } catch (e) {
-    // cache miss
-  }
 
   return new Promise((resolve, reject) => {
     wx.request({
@@ -110,7 +139,7 @@ function downloadViaRequest(fullUrl) {
           filePath: target,
           data: res.data,
           success() {
-            localCache[fullUrl] = target
+            markDiskCache(fullUrl, target)
             resolve(target)
           },
           fail: reject,
@@ -122,9 +151,8 @@ function downloadViaRequest(fullUrl) {
 }
 
 function downloadHttpImage(fullUrl) {
-  if (localCache[fullUrl]) {
-    return Promise.resolve(localCache[fullUrl])
-  }
+  const cached = readDiskCache(fullUrl)
+  if (cached) return Promise.resolve(cached)
 
   return downloadViaRequest(fullUrl).catch((err) => {
     if (!useProdApi() && fullUrl.includes(`${DEV_LAN_HOST}:`)) {
@@ -153,14 +181,13 @@ function resolveImageForDisplay(url) {
   return downloadRemoteImage(fullUrl)
 }
 
-
 function getImageInfoPath(fullUrl) {
   return new Promise((resolve, reject) => {
     wx.getImageInfo({
       src: fullUrl,
       success(res) {
         if (res.path) {
-          localCache[fullUrl] = res.path
+          markDiskCache(fullUrl, res.path)
           resolve(res.path)
         } else {
           reject(new Error('getImageInfo empty path'))
@@ -197,7 +224,6 @@ async function resolveBannerImageUrl(fullUrl) {
 async function resolveBannerImages(banners) {
   const list = banners || []
   const out = []
-  // 轮播须落到本地路径；体验版严格校验 downloadFile，真机调试会跳过域名校验
   for (const item of list) {
     if (!item.image_url) {
       out.push(item)

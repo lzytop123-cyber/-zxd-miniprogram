@@ -1,3 +1,5 @@
 {
-  "navigationBarTitleText": "学习助手"
+  "navigationBarTitleText": "学习助手",
+  "enablePullDownRefresh": true,
+  "backgroundTextStyle": "dark"
 }

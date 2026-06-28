@@ -1,4 +1,5 @@
 const { getApiBase } = require('../config')
+const requestCache = require('./requestCache')
 
 function getErrorMessage(res) {
   const data = res.data || {}
@@ -11,7 +12,7 @@ function getErrorMessage(res) {
   return data.message || `请求失败(${res.statusCode})`
 }
 
-function request({ url, method = 'GET', data, silent = false }) {
+function rawRequest({ url, method = 'GET', data, silent = false }) {
   const payload = data === undefined ? undefined : data
   return new Promise((resolve, reject) => {
     wx.request({
@@ -34,7 +35,9 @@ function request({ url, method = 'GET', data, silent = false }) {
         if (res.data.code === 0) {
           resolve(res.data.data)
         } else {
-          wx.showToast({ title: res.data.message || '请求失败', icon: 'none' })
+          if (!silent) {
+            wx.showToast({ title: res.data.message || '请求失败', icon: 'none' })
+          }
           reject(res.data)
         }
       },
@@ -48,4 +51,25 @@ function request({ url, method = 'GET', data, silent = false }) {
   })
 }
 
-module.exports = { request }
+/**
+ * @param {object} options
+ * @param {number} [options.cacheTtl] 毫秒；0 不缓存
+ * @param {boolean} [options.force] 跳过缓存并强制请求
+ */
+function request(options) {
+  const { url, method = 'GET', data, silent = false, force = false } = options
+  const ttl = requestCache.resolveTtl(url, method, options)
+  const key = requestCache.buildKey(method, url, data)
+
+  if (!force && method.toUpperCase() === 'GET') {
+    return requestCache.runDeduped(key, ttl, () => rawRequest({ url, method, data, silent }))
+  }
+
+  return rawRequest({ url, method, data, silent })
+}
+
+function invalidateCache(match) {
+  requestCache.invalidate(match)
+}
+
+module.exports = { request, invalidateCache }

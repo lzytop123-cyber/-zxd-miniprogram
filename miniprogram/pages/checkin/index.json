@@ -1,4 +1,6 @@
 {
   "navigationBarTitleText": "入座",
+  "enablePullDownRefresh": true,
+  "backgroundTextStyle": "dark",
   "usingComponents": {}
 }

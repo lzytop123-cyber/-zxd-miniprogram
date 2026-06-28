@@ -19,19 +19,30 @@ Page({
   },
 
   onShow() {
-    this.bootstrap()
+    this.bootstrap({ silent: true })
   },
 
-  async bootstrap() {
+  onPullDownRefresh() {
+    this.bootstrap({ force: true }).finally(() => wx.stopPullDownRefresh())
+  },
+
+  async bootstrap(options = {}) {
+    const { force = false, silent = false } = options
     if (!auth.isLoggedIn()) {
       this.setData({ loginState: 'guest', user: null, avatarDisplay: '' })
       return
     }
 
-    this.setData({ loginState: 'loading' })
+    const hasUser = this.data.loginState === 'ready' && this.data.user
+    if (!hasUser || force) {
+      if (!silent || !hasUser) {
+        this.setData({ loginState: 'loading' })
+      }
+    }
+
     try {
       await auth.waitForLogin()
-      const user = await request({ url: '/user/profile', silent: true })
+      const user = await request({ url: '/user/profile', silent: true, force })
       auth.syncAppUser(user)
       if (user.needs_profile_setup) {
         auth.goLogin('/pages/profile/index')
@@ -44,7 +55,9 @@ Page({
         await this.applyUser(cached)
         return
       }
-      auth.goLogin('/pages/profile/index')
+      if (!hasUser) {
+        auth.goLogin('/pages/profile/index')
+      }
     }
   },
 

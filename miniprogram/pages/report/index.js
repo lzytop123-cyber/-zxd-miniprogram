@@ -22,24 +22,37 @@ Page({
   },
 
   onShow() {
-    this.load()
+    this.load({ silent: true })
     if (this.data.tab === 'assistant' && !this.data.introLoaded) {
       this.loadIntro()
     }
   },
 
-  load() {
-    request({ url: '/report/summary' }).then((summary) => {
-      this.setData({ summary })
-    })
-    this.loadLeaderboard()
+  onPullDownRefresh() {
+    const tasks = [this.load({ force: true })]
+    if (this.data.tab === 'assistant') {
+      this.setData({ introLoaded: false })
+      tasks.push(this.loadIntro({ force: true }))
+    }
+    Promise.all(tasks).finally(() => wx.stopPullDownRefresh())
   },
 
-  loadLeaderboard() {
+  load(options = {}) {
+    const { force = false } = options
+    return Promise.all([
+      request({ url: '/report/summary', silent: true, force }).then((summary) => {
+        this.setData({ summary })
+      }).catch(() => {}),
+      this.loadLeaderboard({ force }),
+    ])
+  },
+
+  loadLeaderboard(options = {}) {
+    const { force = false } = options
     const params = this.data.storeId ? `?store_id=${this.data.storeId}` : ''
-    request({ url: `/report/leaderboard${params}` }).then((leaderboard) => {
+    return request({ url: `/report/leaderboard${params}`, silent: true, force }).then((leaderboard) => {
       this.setData({ leaderboard })
-    })
+    }).catch(() => {})
   },
 
   setDays(e) {
@@ -53,10 +66,9 @@ Page({
       scopeLabel: idx === 0 ? '全平台' : '本店',
       storeId: idx === 0 ? null : 1,
     })
-    this.loadLeaderboard()
+    this.loadLeaderboard({ force: true })
   },
 
-  // ===== 分段切换 =====
   switchTab(e) {
     const tab = e.currentTarget.dataset.tab
     if (tab === this.data.tab) return
@@ -66,10 +78,10 @@ Page({
     }
   },
 
-  // ===== AI 助手 =====
-  loadIntro() {
+  loadIntro(options = {}) {
+    const { force = false } = options
     this.setData({ introLoaded: true })
-    request({ url: '/assistant/intro', silent: true })
+    return request({ url: '/assistant/intro', silent: true, force })
       .then((intro) => {
         this.setData({
           greeting: intro.greeting,
@@ -77,7 +89,9 @@ Page({
         })
       })
       .catch(() => {
-        this.setData({ greeting: 'Hi，我是知行岛学习助手小岛 🌱，有什么可以帮你的？' })
+        if (!this.data.greeting) {
+          this.setData({ greeting: 'Hi，我是知行岛学习助手小岛 🌱，有什么可以帮你的？' })
+        }
       })
   },
 
