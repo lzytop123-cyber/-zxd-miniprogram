@@ -3,10 +3,15 @@
 const DEFAULT_TTL = {
   '/user/cards': 60 * 1000,
   '/user/profile': 60 * 1000,
+  '/user/wallet': 60 * 1000,
+  '/user/coupons': 60 * 1000,
+  '/user/points/logs': 60 * 1000,
   '/store/list': 120 * 1000,
   '/home/banners': 180 * 1000,
   '/home/announcements': 120 * 1000,
   '/home/bootstrap': 120 * 1000,
+  '/reservation/list': 30 * 1000,
+  '/exchange/records': 60 * 1000,
   '/report/summary': 60 * 1000,
   '/report/leaderboard': 60 * 1000,
   '/assistant/intro': 300 * 1000,
@@ -28,6 +33,7 @@ function resolveTtl(url, method, options = {}) {
   const path = url.split('?')[0]
   if (DEFAULT_TTL[path] != null) return DEFAULT_TTL[path]
   if (path.startsWith('/card/packages')) return 120 * 1000
+  if (/^\/store\/\d+$/.test(path)) return 120 * 1000
   if (/\/store\/\d+\/pricing$/.test(path)) return 300 * 1000
   return 0
 }

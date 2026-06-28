@@ -87,14 +87,19 @@ Page({
   },
 
   onShow() {
-    this.loadPayOptions()
+    this.loadPayOptions({ silent: true })
   },
 
-  async loadPayOptions() {
+  onPullDownRefresh() {
+    this.loadPayOptions({ force: true }).finally(() => wx.stopPullDownRefresh())
+  },
+
+  async loadPayOptions(options = {}) {
+    const { force = false } = options
     try {
       const [cards, coupons] = await Promise.all([
-        request({ url: '/user/cards' }),
-        request({ url: '/user/coupons' }),
+        request({ url: '/user/cards', silent: true, force }),
+        request({ url: '/user/coupons', silent: true, force }),
       ])
       const storeId = Number(this.data.storeId)
       const billType = this.data.billType

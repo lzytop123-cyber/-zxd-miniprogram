@@ -1,3 +1,5 @@
 {
-  "navigationBarTitleText": "我的积分"
+  "navigationBarTitleText": "积分明细",
+  "enablePullDownRefresh": true,
+  "backgroundTextStyle": "dark"
 }

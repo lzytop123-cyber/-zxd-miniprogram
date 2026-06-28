@@ -43,11 +43,24 @@ Page({
   data: { orders: [] },
 
   onShow() {
-    request({ url: '/reservation/list' })
+    this.loadOrders({ silent: true })
+  },
+
+  onPullDownRefresh() {
+    this.loadOrders({ force: true }).finally(() => wx.stopPullDownRefresh())
+  },
+
+  loadOrders(options = {}) {
+    const { force = false } = options
+    return request({ url: '/reservation/list', silent: true, force })
       .then((orders) => {
         this.setData({ orders: (orders || []).map(enrichOrder) })
       })
-      .catch(() => this.setData({ orders: [] }))
+      .catch(() => {
+        if (!this.data.orders.length) {
+          this.setData({ orders: [] })
+        }
+      })
   },
 
   goOpen(e) {

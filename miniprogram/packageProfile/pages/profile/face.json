@@ -1,3 +1,5 @@
 {
-  "navigationBarTitleText": "人脸录入"
+  "navigationBarTitleText": "人脸录入",
+  "enablePullDownRefresh": true,
+  "backgroundTextStyle": "dark"
 }

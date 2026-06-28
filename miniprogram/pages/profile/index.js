@@ -1,6 +1,7 @@
 const auth = require('../../utils/auth')
 const { request } = require('../../utils/request')
 const { normalizeUser, pickAvatarDisplay } = require('../../utils/user')
+const routes = require('../../utils/routes')
 
 const GOAL_OPTIONS = [
   { value: 'kaoyan', label: '考研' },
@@ -16,6 +17,13 @@ Page({
     avatarUploading: false,
     saving: false,
     goalOptions: GOAL_OPTIONS,
+    menuUrls: {
+      wallet: routes.profileWallet,
+      orders: routes.profileOrders,
+      coupons: routes.profileCoupons,
+      points: routes.profilePoints,
+      invite: routes.profileInvite,
+    },
   },
 
   onShow() {

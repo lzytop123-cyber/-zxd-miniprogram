@@ -4,8 +4,19 @@ Page({
   data: { records: [] },
 
   onShow() {
-    request({ url: '/exchange/records' }).then((records) => {
-      this.setData({ records: records || [] })
-    })
+    this.loadRecords({ silent: true })
+  },
+
+  onPullDownRefresh() {
+    this.loadRecords({ force: true }).finally(() => wx.stopPullDownRefresh())
+  },
+
+  loadRecords(options = {}) {
+    const { force = false } = options
+    return request({ url: '/exchange/records', silent: true, force })
+      .then((records) => {
+        this.setData({ records: records || [] })
+      })
+      .catch(() => {})
   },
 })

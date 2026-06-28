@@ -1,3 +1,5 @@
 {
-  "navigationBarTitleText": "邀请有礼"
+  "navigationBarTitleText": "邀请有礼",
+  "enablePullDownRefresh": true,
+  "backgroundTextStyle": "dark"
 }

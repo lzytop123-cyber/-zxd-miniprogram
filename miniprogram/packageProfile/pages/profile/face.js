@@ -4,9 +4,20 @@ Page({
   data: { registered: false },
 
   onShow() {
-    request({ url: '/user/profile' }).then((user) => {
-      this.setData({ registered: user.face_registered })
-    })
+    this.loadFaceStatus({ silent: true })
+  },
+
+  onPullDownRefresh() {
+    this.loadFaceStatus({ force: true }).finally(() => wx.stopPullDownRefresh())
+  },
+
+  loadFaceStatus(options = {}) {
+    const { force = false } = options
+    return request({ url: '/user/profile', silent: true, force })
+      .then((user) => {
+        this.setData({ registered: user.face_registered })
+      })
+      .catch(() => {})
   },
 
   chooseFace() {

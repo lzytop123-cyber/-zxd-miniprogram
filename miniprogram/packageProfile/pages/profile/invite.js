@@ -7,9 +7,20 @@ Page({
   },
 
   onShow() {
-    request({ url: '/user/profile' }).then((user) => {
-      this.setData({ inviteCode: user.invite_code || '' })
-    })
+    this.loadInvite({ silent: true })
+  },
+
+  onPullDownRefresh() {
+    this.loadInvite({ force: true }).finally(() => wx.stopPullDownRefresh())
+  },
+
+  loadInvite(options = {}) {
+    const { force = false } = options
+    return request({ url: '/user/profile', silent: true, force })
+      .then((user) => {
+        this.setData({ inviteCode: user.invite_code || '' })
+      })
+      .catch(() => {})
   },
 
   onInput(e) {
@@ -33,7 +44,7 @@ Page({
       url: '/user/invite/apply',
       method: 'POST',
       data: { invite_code: this.data.inputCode },
-    }).then((res) => {
+    }).then(() => {
       wx.showToast({ title: '领取成功' })
       this.setData({ inputCode: '' })
     })
