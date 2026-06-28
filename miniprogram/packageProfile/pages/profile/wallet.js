@@ -1,5 +1,5 @@
-const { request } = require('../../utils/request')
-const { completeWechatPay } = require('../../utils/pay')
+const { request } = require('../../../utils/request')
+const { completeWechatPay } = require('../../../utils/pay')
 
 Page({
   data: { balance: 0, logs: [], amount: 100 },

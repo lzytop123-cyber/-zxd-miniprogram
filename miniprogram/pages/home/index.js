@@ -1,6 +1,7 @@
 const { request } = require('../../utils/request')
 const auth = require('../../utils/auth')
 const { normalizeUser } = require('../../utils/user')
+const routes = require('../../utils/routes')
 const TAB_PAGES = [
   '/pages/home/index',
   '/pages/packages/index',
@@ -314,7 +315,7 @@ Page({
 
   goStore(e) {
     const id = e.detail?.id ?? e.currentTarget.dataset.id
-    const bookingUrl = `/pages/booking/index?storeId=${id}`
+    const bookingUrl = `${routes.bookingIndex}?storeId=${id}`
     if (!auth.requireLogin(bookingUrl)) return
     wx.navigateTo({ url: bookingUrl })
   },
@@ -322,7 +323,7 @@ Page({
   goNearestStore() {
     const { stores } = this.data
     const storeId = stores && stores[0] ? stores[0].id : ''
-    const bookingUrl = storeId ? `/pages/booking/index?storeId=${storeId}` : '/pages/profile/login'
+    const bookingUrl = storeId ? `${routes.bookingIndex}?storeId=${storeId}` : routes.profileLogin
 
     if (!auth.isLoggedIn()) {
       auth.goLogin(storeId ? bookingUrl : '')
@@ -375,7 +376,7 @@ Page({
   },
 
   goExchange() {
-    wx.navigateTo({ url: '/pages/exchange/index?platform=meituan' })
+    wx.navigateTo({ url: `${routes.exchangeIndex}?platform=meituan` })
   },
 
   goPackages() {
@@ -387,23 +388,23 @@ Page({
   },
 
   goCoupons() {
-    wx.navigateTo({ url: '/pages/profile/coupons' })
+    wx.navigateTo({ url: routes.profileCoupons })
   },
 
   goWallet() {
-    wx.navigateTo({ url: '/pages/profile/wallet' })
+    wx.navigateTo({ url: routes.profileWallet })
   },
 
   goPoints() {
-    wx.navigateTo({ url: '/pages/profile/points' })
+    wx.navigateTo({ url: routes.profilePoints })
   },
 
   goOrders() {
-    wx.navigateTo({ url: '/pages/profile/orders' })
+    wx.navigateTo({ url: routes.profileOrders })
   },
 
   goInvite() {
-    wx.navigateTo({ url: '/pages/profile/invite' })
+    wx.navigateTo({ url: routes.profileInvite })
   },
 
   goCheckin() {

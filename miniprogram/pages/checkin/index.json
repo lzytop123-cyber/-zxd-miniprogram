@@ -2,5 +2,11 @@
   "navigationBarTitleText": "入座",
   "enablePullDownRefresh": true,
   "backgroundTextStyle": "dark",
+  "plugins": {
+    "ttlock-plugin": {
+      "version": "3.1.4",
+      "provider": "wx43d5971c94455481"
+    }
+  },
   "usingComponents": {}
 }

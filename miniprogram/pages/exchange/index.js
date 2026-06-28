@@ -1,9 +1,10 @@
 const { request } = require('../../utils/request')
+const routes = require('../../utils/routes')
 
 Page({
   data: {
     platform: 'meituan',
-    platformLabel: '美团',
+    platformLabel: '??',
     code: '',
     storeId: null,
     loading: false,
@@ -14,10 +15,10 @@ Page({
     const platform = options.platform || 'meituan'
     this.setData({
       platform,
-      platformLabel: platform === 'douyin' ? '抖音' : '美团',
+      platformLabel: platform === 'douyin' ? '??' : '??',
       storeId: options.storeId || null,
     })
-    wx.setNavigationBarTitle({ title: `${platform === 'douyin' ? '抖音' : '美团'}兑换` })
+    wx.setNavigationBarTitle({ title: `${platform === 'douyin' ? '??' : '??'}??` })
   },
 
   onInput(e) {
@@ -25,14 +26,14 @@ Page({
   },
 
   _applyScanResult(res) {
-    const { fillCodeFromScanResult } = require('../../utils/voucherScan')
+    const { fillCodeFromScanResult } = require('./utils/voucherScan')
     const parsed = fillCodeFromScanResult(res)
     if (!parsed.ok) {
       wx.showToast({ title: parsed.message, icon: 'none', duration: 2500 })
       return false
     }
     this.setData({ code: parsed.code })
-    wx.showToast({ title: '券码已填入', icon: 'success' })
+    wx.showToast({ title: '?????', icon: 'success' })
     return true
   },
 
@@ -41,28 +42,28 @@ Page({
     this.setData({ scanning: true })
     let loadingShown = false
     try {
-      const { pickAndScanVoucher } = require('../../utils/voucherScan')
+      const { pickAndScanVoucher } = require('./utils/voucherScan')
       const res = await pickAndScanVoucher({
         onAlbumStart: () => {
           loadingShown = true
-          wx.showLoading({ title: '识别券码…', mask: true })
+          wx.showLoading({ title: '?????', mask: true })
         },
       })
       this._applyScanResult(res)
     } catch (e) {
       const msg = e.errMsg || e.message || ''
       if (msg.includes('cancel') || msg.includes('fail cancel')) return
-      if (msg.includes('未识别') || msg.includes('条形码')) {
+      if (msg.includes('???') || msg.includes('???')) {
         wx.showModal({
-          title: '识别失败',
-          content: msg.includes('条形码')
+          title: '????',
+          content: msg.includes('???')
             ? msg
-            : '相册图片未识别到二维码。若券上是条形码，请选择「相机扫码」。',
+            : '??????????????????????????????',
           showCancel: false,
         })
         return
       }
-      wx.showToast({ title: '扫码失败', icon: 'none' })
+      wx.showToast({ title: '????', icon: 'none' })
     } finally {
       if (loadingShown) wx.hideLoading()
       this.setData({ scanning: false })
@@ -72,23 +73,23 @@ Page({
   async onAlbumScanTap() {
     if (this.data.loading || this.data.scanning) return
     this.setData({ scanning: true })
-    wx.showLoading({ title: '识别券码…', mask: true })
+    wx.showLoading({ title: '?????', mask: true })
     try {
-      const { pickFromAlbumAndDecode } = require('../../utils/voucherScan')
+      const { pickFromAlbumAndDecode } = require('./utils/voucherScan')
       const res = await pickFromAlbumAndDecode()
       this._applyScanResult(res)
     } catch (e) {
       const msg = e.errMsg || e.message || ''
       if (msg.includes('cancel') || msg.includes('fail cancel')) return
-      if (msg.includes('未识别') || msg.includes('条形码')) {
+      if (msg.includes('???') || msg.includes('???')) {
         wx.showModal({
-          title: '识别失败',
+          title: '????',
           content: msg,
           showCancel: false,
         })
         return
       }
-      wx.showToast({ title: '识别失败', icon: 'none' })
+      wx.showToast({ title: '????', icon: 'none' })
     } finally {
       wx.hideLoading()
       this.setData({ scanning: false })
@@ -102,12 +103,12 @@ Page({
   async submit(forcedCode) {
     const code = typeof forcedCode === 'string' ? forcedCode.trim() : (this.data.code || '').trim()
     if (!code || code.length < 6) {
-      wx.showToast({ title: '请输入有效券码', icon: 'none' })
+      wx.showToast({ title: '???????', icon: 'none' })
       return
     }
     const { platform, storeId } = this.data
     this.setData({ loading: true, code })
-    wx.showLoading({ title: '连接核销中…', mask: true })
+    wx.showLoading({ title: '??????', mask: true })
     try {
       const path = platform === 'douyin' ? '/exchange/douyin' : '/exchange/meituan'
       let reqUrl = `${path}/${encodeURIComponent(code)}`
@@ -115,18 +116,18 @@ Page({
       const result = await request({ url: reqUrl, method: 'POST', silent: true })
       wx.hideLoading()
       wx.showModal({
-        title: '兑换成功',
-        content: `已获得：${result.card_name || '期限卡'}`,
+        title: '????',
+        content: `????${result.card_name || '???'}`,
         showCancel: false,
         success: () => wx.switchTab({ url: '/pages/packages/index' }),
       })
     } catch (e) {
       wx.hideLoading()
-      const msg = e.detail || e.message || '兑换失败'
-      if (msg.includes('待配置') || msg.includes('dealId=')) {
+      const msg = e.detail || e.message || '????'
+      if (msg.includes('???') || msg.includes('dealId=')) {
         wx.showModal({
-          title: '暂无法兑换',
-          content: `${msg}\n\n您的券未被核销，管理员配置完成后请再试一次。`,
+          title: '?????',
+          content: `${msg}\n\n??????????????????????`,
           showCancel: false,
         })
       } else {
@@ -138,6 +139,6 @@ Page({
   },
 
   goRecords() {
-    wx.navigateTo({ url: '/pages/exchange/records' })
+    wx.navigateTo({ url: routes.exchangeRecords })
   },
 })

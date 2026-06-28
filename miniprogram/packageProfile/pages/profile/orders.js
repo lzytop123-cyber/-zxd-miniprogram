@@ -1,4 +1,4 @@
-const { request } = require('../../utils/request')
+const { request } = require('../../../utils/request')
 
 function parseDate(iso) {
   return new Date(String(iso).replace(' ', 'T'))

@@ -1,5 +1,6 @@
 const { request } = require('../../utils/request')
 const auth = require('../../utils/auth')
+const routes = require('../../utils/routes')
 const { getLayout } = require('../../utils/seat-layout')
 const { debounce } = require('../../utils/debounce')
 const { dailyPassDays } = require('../../utils/cardDisplay')
@@ -66,7 +67,7 @@ Page({
   },
 
   onLoad(options) {
-    const redirect = `/pages/booking/index?storeId=${options.storeId || ''}`
+    const redirect = `${routes.bookingIndex}?storeId=${options.storeId || ''}`
     if (!auth.isLoggedIn()) {
       auth.goLogin(redirect, { replace: true })
       return
@@ -492,7 +493,7 @@ Page({
   goOrder() {
     const { storeId, preview, billType, seatId } = this.data
     if (!auth.isLoggedIn()) {
-      const redirect = `/pages/booking/index?storeId=${storeId}`
+      const redirect = `${routes.bookingIndex}?storeId=${storeId}`
       auth.requireLogin(redirect)
       return
     }
@@ -510,7 +511,7 @@ Page({
       return
     }
     wx.navigateTo({
-      url: `/pages/booking/order?storeId=${storeId}&start=${encodeURIComponent(preview.start_time)}&end=${encodeURIComponent(preview.end_time)}&seatId=${preview.seat_id}&price=${preview.final_price}&seatCode=${preview.seat_code}&billType=${billType}`,
+      url: `${routes.bookingOrder}?storeId=${storeId}&start=${encodeURIComponent(preview.start_time)}&end=${encodeURIComponent(preview.end_time)}&seatId=${preview.seat_id}&price=${preview.final_price}&seatCode=${preview.seat_code}&billType=${billType}`,
     })
   },
 })

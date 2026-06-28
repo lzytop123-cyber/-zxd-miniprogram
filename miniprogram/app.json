@@ -2,24 +2,52 @@
   "pages": [
     "pages/home/index",
     "pages/packages/index",
-    "pages/store/detail",
-    "pages/store/seats",
-    "pages/booking/index",
-    "pages/booking/order",
     "pages/checkin/index",
     "pages/report/index",
-    "pages/profile/index",
-    "pages/profile/login",
-    "pages/profile/wallet",
-    "pages/profile/orders",
-    "pages/profile/cards",
-    "pages/profile/coupons",
-    "pages/profile/points",
-    "pages/profile/invite",
-    "pages/profile/face",
-    "pages/exchange/index",
-    "pages/exchange/records"
+    "pages/profile/index"
   ],
+  "subPackages": [
+    {
+      "root": "pages/booking",
+      "name": "booking",
+      "pages": [
+        "index",
+        "order"
+      ]
+    },
+    {
+      "root": "pages/store",
+      "name": "store",
+      "pages": [
+        "detail",
+        "seats"
+      ]
+    },
+    {
+      "root": "pages/exchange",
+      "name": "exchange",
+      "pages": [
+        "index",
+        "records"
+      ]
+    },
+    {
+      "root": "packageProfile",
+      "name": "profile",
+      "pages": [
+        "pages/profile/login",
+        "pages/profile/wallet",
+        "pages/profile/orders",
+        "pages/profile/cards",
+        "pages/profile/coupons",
+        "pages/profile/points",
+        "pages/profile/invite",
+        "pages/profile/face"
+      ]
+    }
+  ],
+  "lazyCodeLoading": "requiredComponents",
+  "preloadRule": {},
   "window": {
     "navigationBarBackgroundColor": "#52B788",
     "navigationBarTitleText": "知行岛自习室",
@@ -72,11 +100,5 @@
     }
   },
   "requiredPrivateInfos": ["getLocation"],
-  "plugins": {
-    "ttlock-plugin": {
-      "version": "3.1.4",
-      "provider": "wx43d5971c94455481"
-    }
-  },
   "sitemapLocation": "sitemap.json"
 }

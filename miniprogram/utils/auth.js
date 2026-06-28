@@ -1,10 +1,11 @@
 const { request } = require('./request')
 const { normalizeUser } = require('./user')
+const routes = require('./routes')
 
 const DEFAULT_NICKNAME = '知行岛学员'
 const DEFAULT_AVATAR = ''
 const MANUAL_LOGOUT_KEY = 'manualLogout'
-const LOGIN_PAGE = '/pages/profile/login'
+const LOGIN_PAGE = routes.profileLogin
 const TAB_PAGES = [
   '/pages/home/index',
   '/pages/checkin/index',

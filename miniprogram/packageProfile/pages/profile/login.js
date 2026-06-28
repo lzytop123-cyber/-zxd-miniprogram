@@ -1,6 +1,6 @@
-const auth = require('../../utils/auth')
-const { request } = require('../../utils/request')
-const { normalizeUser, pickAvatarDisplay } = require('../../utils/user')
+const auth = require('../../../utils/auth')
+const { request } = require('../../../utils/request')
+const { normalizeUser, pickAvatarDisplay } = require('../../../utils/user')
 
 const GOAL_OPTIONS = [
   { value: 'kaoyan', label: '考研' },

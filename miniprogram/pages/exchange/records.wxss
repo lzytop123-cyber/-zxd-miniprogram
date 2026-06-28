@@ -1,4 +1,7 @@
-@import '../profile/cards.wxss';
+.list-page {
+  min-height: 100vh;
+  padding-bottom: 32rpx;
+}
 
 .item-card {
   margin-bottom: 24rpx;

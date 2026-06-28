@@ -1,5 +1,6 @@
 const auth = require('../../utils/auth')
 const { request, invalidateCache } = require('../../utils/request')
+const routes = require('../../utils/routes')
 const { completeWechatPay } = require('../../utils/pay')
 const {
   PKG_CATEGORY_TABS,
@@ -174,7 +175,7 @@ Page({
   noop() {},
 
   goExchange() {
-    wx.navigateTo({ url: '/pages/exchange/index?platform=meituan' })
+    wx.navigateTo({ url: `${routes.exchangeIndex}?platform=meituan` })
   },
 
   goLogin() {
