@@ -21,6 +21,10 @@
         </swiper-item>
       </swiper>
 
+      <view wx:elif="{{bannersLoading}}" class="hero-swiper hero-swiper--single hero-fallback hero-fallback--loading" style="height: {{heroHeight}}rpx;">
+        <view class="hero-grid"></view>
+      </view>
+
       <view wx:else class="hero-swiper hero-swiper--single hero-fallback" style="height: {{heroHeight}}rpx;">
         <view class="hero-grid"></view>
         <view class="hero-fallback-text">知行岛自习室</view>

@@ -3,7 +3,6 @@ const {
   USE_PROD,
   DEV_LAN_HOST,
   DEV_LOCAL_HOST,
-  isWechatDevtools,
 } = require('../config')
 
 const localCache = {}
@@ -33,10 +32,10 @@ function isLocalPath(url) {
   )
 }
 
-/** 真机必须走 downloadFile/request，且域名需在公众平台配置；仅开发者工具可 HTTPS 直链 */
+/** 生产 HTTPS 在真机可直接用于 <image>（需配置 downloadFile 域名） */
 function canUseRemoteDirectly(url) {
   if (!url.startsWith('https://')) return false
-  return isWechatDevtools() && USE_PROD
+  return USE_PROD
 }
 
 function downloadHttpsImage(fullUrl) {
@@ -138,10 +137,18 @@ async function resolveBannerImages(banners) {
         return { ...item, image_url }
       } catch (err) {
         console.error('[media] banner image fail', item.image_url, err)
-        return item
+        return { ...item, image_url: resolveStaticUrl(item.image_url) }
       }
     })
   )
+}
+
+/** 同步解析 Banner URL，用于 API 返回后立即展示，避免占位图闪烁 */
+function prepareBannerItems(banners) {
+  return (banners || []).map((item) => ({
+    ...item,
+    image_url: item.image_url ? resolveStaticUrl(item.image_url) : '',
+  }))
 }
 
 async function resolveStoreList(stores) {
@@ -165,5 +172,6 @@ async function resolveStoreList(stores) {
 module.exports = {
   resolveImageForDisplay,
   resolveBannerImages,
+  prepareBannerItems,
   resolveStoreList,
 }

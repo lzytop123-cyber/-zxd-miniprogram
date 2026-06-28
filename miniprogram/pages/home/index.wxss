@@ -56,6 +56,15 @@
   letter-spacing: 4rpx;
 }
 
+.hero-fallback--loading {
+  animation: hero-pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes hero-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.85; }
+}
+
 .hero-swiper-item {
   height: 100%;
   overflow: hidden;
