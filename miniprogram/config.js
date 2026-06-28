@@ -55,12 +55,14 @@ function getStaticBase() {
 
 function resolveStaticUrl(url) {
   if (!url) return ''
+  // 已经是完整 HTTPS URL 就不拆了，直接返回
+  if (url.startsWith('https://')) return url
   const marker = '/static/'
   const idx = url.indexOf(marker)
   if (idx >= 0) {
     return getStaticBase() + url.slice(idx)
   }
-  if (useProdApi() && url.startsWith('http://')) {
+  if (url.startsWith('http://')) {
     return url.replace(/^http:\/\//i, 'https://')
   }
   return url
