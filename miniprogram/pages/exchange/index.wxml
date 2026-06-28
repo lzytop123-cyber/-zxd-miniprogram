@@ -4,7 +4,7 @@
       <view class="exchange-icon">🎟</view>
       <view class="exchange-title">{{platformLabel}}团购兑换</view>
     </view>
-    <view class="hint">右侧 📷 相机扫码填入券码，确认后点「立即兑换」。</view>
+    <view class="hint">点 📷 可相机扫码或选相册；条形码请用相机扫码。</view>
     <view class="hint sub">核销需连接美团服务器，约 3～8 秒，属正常情况</view>
 
     <view class="code-field">
@@ -23,7 +23,7 @@
     </view>
 
     <view class="album-link {{loading || scanning ? 'disabled' : ''}}" bindtap="onAlbumScanTap">
-      从相册识别券码（扫码页点右上角相册）
+      从相册选择券码图
     </view>
 
     <view class="btn-primary {{loading?'disabled':''}}" bindtap="onSubmitTap">立即兑换</view>

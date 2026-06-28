@@ -1,6 +1,15 @@
-/** 团购券扫码（轻量：走微信原生 scanCode，不用 jsQR） */
+/** 团购券扫码：相机走微信原生；相册直接选图 + 按需加载 jsQR 解码 */
 
 const CODE_KEYS = ['code', 'couponcode', 'receiptcode', 'voucher', 'c']
+
+let jsQRModule = null
+
+function getJsQR() {
+  if (!jsQRModule) {
+    jsQRModule = require('./jsqr')
+  }
+  return jsQRModule
+}
 
 function parseScannedVoucherCode(raw) {
   if (raw == null) return ''
@@ -55,14 +64,118 @@ function scanVoucherCode(options = {}) {
   })
 }
 
-/** 相机扫码（点输入框右侧图标） */
 function scanFromCamera() {
   return scanVoucherCode({ onlyFromCamera: true })
 }
 
-/** 扫码页可切换相册，微信原生识别（比 js 解码快，且支持条形码） */
-function scanWithAlbumSupport() {
-  return scanVoucherCode({ onlyFromCamera: false })
+function chooseAlbumImage() {
+  return new Promise((resolve, reject) => {
+    wx.chooseMedia({
+      count: 1,
+      mediaType: ['image'],
+      sourceType: ['album'],
+      sizeType: ['compressed'],
+      success(res) {
+        const file = res.tempFiles && res.tempFiles[0]
+        if (!file || !file.tempFilePath) {
+          reject(new Error('未选择图片'))
+          return
+        }
+        resolve(file.tempFilePath)
+      },
+      fail: reject,
+    })
+  })
+}
+
+function compressForDecode(filePath) {
+  return new Promise((resolve) => {
+    if (typeof wx.compressImage !== 'function') {
+      resolve(filePath)
+      return
+    }
+    wx.compressImage({
+      src: filePath,
+      quality: 68,
+      compressedWidth: 640,
+      success: (res) => resolve(res.tempFilePath || filePath),
+      fail: () => resolve(filePath),
+    })
+  })
+}
+
+function decodeQrFromImage(filePath) {
+  return new Promise((resolve, reject) => {
+    wx.getImageInfo({
+      src: filePath,
+      success(info) {
+        let dw = info.width
+        let dh = info.height
+        const maxSide = 480
+        if (Math.max(dw, dh) > maxSide) {
+          const scale = maxSide / Math.max(dw, dh)
+          dw = Math.floor(dw * scale)
+          dh = Math.floor(dh * scale)
+        }
+        try {
+          const jsQR = getJsQR()
+          const canvas = wx.createOffscreenCanvas({ type: '2d', width: dw, height: dh })
+          const ctx = canvas.getContext('2d')
+          const img = canvas.createImage()
+          img.onload = () => {
+            ctx.drawImage(img, 0, 0, dw, dh)
+            const imageData = ctx.getImageData(0, 0, dw, dh)
+            const result = jsQR(imageData.data, imageData.width, imageData.height, {
+              inversionAttempts: 'dontInvert',
+            })
+            if (result && result.data) {
+              resolve(result.data)
+              return
+            }
+            reject(new Error('未识别到二维码，条形码请用相机扫码'))
+          }
+          img.onerror = () => reject(new Error('图片加载失败'))
+          img.src = filePath
+        } catch (e) {
+          reject(e)
+        }
+      },
+      fail: reject,
+    })
+  })
+}
+
+/** 直接打开相册选图并识别（二维码） */
+async function pickFromAlbumAndDecode() {
+  const filePath = await chooseAlbumImage()
+  const compressed = await compressForDecode(filePath)
+  const text = await decodeQrFromImage(compressed)
+  return { result: text, scanType: 'QR_CODE' }
+}
+
+function pickScanSource() {
+  return new Promise((resolve, reject) => {
+    wx.showActionSheet({
+      itemList: ['相机扫码', '从相册选择'],
+      success(res) {
+        if (res.tapIndex === 0) resolve('camera')
+        else if (res.tapIndex === 1) resolve('album')
+        else reject(new Error('cancel'))
+      },
+      fail: reject,
+    })
+  })
+}
+
+async function pickAndScanVoucher(hooks = {}) {
+  const source = await pickScanSource()
+  if (source === 'album' && typeof hooks.onAlbumStart === 'function') {
+    hooks.onAlbumStart()
+  }
+  if (source === 'camera') {
+    return scanFromCamera()
+  }
+  return pickFromAlbumAndDecode()
 }
 
 function fillCodeFromScanResult(res) {
@@ -76,6 +189,7 @@ function fillCodeFromScanResult(res) {
 module.exports = {
   parseScannedVoucherCode,
   scanFromCamera,
-  scanWithAlbumSupport,
+  pickFromAlbumAndDecode,
+  pickAndScanVoucher,
   fillCodeFromScanResult,
 }

@@ -39,15 +39,32 @@ Page({
   async onScanTap() {
     if (this.data.loading || this.data.scanning) return
     this.setData({ scanning: true })
+    let loadingShown = false
     try {
-      const { scanFromCamera } = require('../../utils/voucherScan')
-      const res = await scanFromCamera()
+      const { pickAndScanVoucher } = require('../../utils/voucherScan')
+      const res = await pickAndScanVoucher({
+        onAlbumStart: () => {
+          loadingShown = true
+          wx.showLoading({ title: '识别券码…', mask: true })
+        },
+      })
       this._applyScanResult(res)
     } catch (e) {
       const msg = e.errMsg || e.message || ''
       if (msg.includes('cancel') || msg.includes('fail cancel')) return
+      if (msg.includes('未识别') || msg.includes('条形码')) {
+        wx.showModal({
+          title: '识别失败',
+          content: msg.includes('条形码')
+            ? msg
+            : '相册图片未识别到二维码。若券上是条形码，请选择「相机扫码」。',
+          showCancel: false,
+        })
+        return
+      }
       wx.showToast({ title: '扫码失败', icon: 'none' })
     } finally {
+      if (loadingShown) wx.hideLoading()
       this.setData({ scanning: false })
     }
   },
@@ -55,15 +72,25 @@ Page({
   async onAlbumScanTap() {
     if (this.data.loading || this.data.scanning) return
     this.setData({ scanning: true })
+    wx.showLoading({ title: '识别券码…', mask: true })
     try {
-      const { scanWithAlbumSupport } = require('../../utils/voucherScan')
-      const res = await scanWithAlbumSupport()
+      const { pickFromAlbumAndDecode } = require('../../utils/voucherScan')
+      const res = await pickFromAlbumAndDecode()
       this._applyScanResult(res)
     } catch (e) {
       const msg = e.errMsg || e.message || ''
       if (msg.includes('cancel') || msg.includes('fail cancel')) return
+      if (msg.includes('未识别') || msg.includes('条形码')) {
+        wx.showModal({
+          title: '识别失败',
+          content: msg,
+          showCancel: false,
+        })
+        return
+      }
       wx.showToast({ title: '识别失败', icon: 'none' })
     } finally {
+      wx.hideLoading()
       this.setData({ scanning: false })
     }
   },
