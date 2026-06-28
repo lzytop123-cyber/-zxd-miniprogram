@@ -113,6 +113,7 @@ import { onMounted, reactive, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import http from '../api/http'
+import { parsePageResult } from '../utils/pageData'
 
 const list = ref<any[]>([])
 const loading = ref(false)
@@ -168,8 +169,13 @@ async function load() {
     if (userId.value) params.user_id = userId.value
     if (status.value !== null && status.value !== undefined) params.status = status.value
     const res = await http.get('/admin/period-cards', { params })
-    list.value = res.data.items
-    total.value = res.data.total
+    const pageData = parsePageResult(res)
+    list.value = pageData.items
+    total.value = pageData.total
+  } catch (e: any) {
+    list.value = []
+    total.value = 0
+    ElMessage.error(e?.message || '加载失败，请到「系统状态」执行数据库结构检查')
   } finally {
     loading.value = false
   }

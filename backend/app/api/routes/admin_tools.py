@@ -284,6 +284,24 @@ def update_seat_admin(
     return ResponseModel(message="座位已更新")
 
 
+@router.delete("/seats/{seat_id}", response_model=ResponseModel)
+def delete_seat_admin(
+    seat_id: int,
+    admin: AdminUser = Depends(get_current_admin),
+    db: Session = Depends(get_db),
+):
+    seat = db.get(Seat, seat_id)
+    if not seat:
+        raise HTTPException(status_code=404, detail="座位不存在")
+    used = db.scalar(select(func.count()).where(Reservation.seat_id == seat_id)) or 0
+    if used:
+        raise HTTPException(status_code=400, detail="该座位有关联订单，请改为停用而非删除")
+    db.delete(seat)
+    log_admin_action(db, admin, "delete_seat", target_type="seat", target_id=seat_id)
+    db.commit()
+    return ResponseModel(message="座位已删除")
+
+
 @router.get("/stores/{store_id}/seats/layout", response_model=ResponseModel)
 def store_seats_layout(
     store_id: int,

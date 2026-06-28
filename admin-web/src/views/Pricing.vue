@@ -47,6 +47,7 @@
       <el-table-column label="操作" width="100" fixed="right">
         <template #default="{ row }">
           <el-button link type="primary" @click="openEdit(row)">编辑</el-button>
+          <el-button link type="danger" @click="removeRule(row)">删除</el-button>
         </template>
       </el-table-column>
     </el-table>
@@ -111,7 +112,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import http from '../api/http'
 
 const billTypes = [
@@ -260,6 +261,13 @@ async function submitCopy() {
   } finally {
     copying.value = false
   }
+}
+
+async function removeRule(row: any) {
+  await ElMessageBox.confirm(`确定删除「${billLabel(row.bill_type)} / ${row.seat_type}」价格规则吗？`, '删除确认', { type: 'warning' })
+  await http.delete(`/admin/pricing/${row.id}`)
+  ElMessage.success('已删除')
+  load()
 }
 
 onMounted(async () => {

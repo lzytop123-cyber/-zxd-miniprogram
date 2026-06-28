@@ -54,9 +54,11 @@
       <el-table-column prop="total_points" label="积分" width="80" />
       <el-table-column prop="invite_code" label="邀请码" width="100" />
       <el-table-column prop="created_at" label="注册时间" width="170" />
-      <el-table-column label="操作" width="90" fixed="right">
+      <el-table-column label="操作" width="200" fixed="right">
         <template #default="{ row }">
-          <el-button link type="primary" @click.stop="openDetail(row)">详情</el-button>
+          <el-button link type="primary" @click.stop="openDetail(row, 'balance')">编辑</el-button>
+          <el-button link type="success" @click.stop="openDetail(row, 'balance')">余额</el-button>
+          <el-button link @click.stop="openDetail(row, 'orders')">详情</el-button>
         </template>
       </el-table-column>
     </el-table>
@@ -182,6 +184,7 @@ import { onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import http from '../api/http'
+import { parsePageResult } from '../utils/pageData'
 
 const router = useRouter()
 
@@ -209,8 +212,12 @@ function goalTagType(goal: string) {
 }
 
 async function loadStats() {
-  const res = await http.get('/admin/users/study-goal-stats')
-  stats.value = res.data
+  try {
+    const res = await http.get('/admin/users/study-goal-stats')
+    stats.value = res.data
+  } catch {
+    stats.value = null
+  }
 }
 
 async function load() {
@@ -220,8 +227,13 @@ async function load() {
     if (keyword.value.trim()) params.keyword = keyword.value.trim()
     if (studyGoal.value) params.study_goal = studyGoal.value
     const res = await http.get('/admin/users', { params })
-    list.value = res.data.items
-    total.value = res.data.total
+    const pageData = parsePageResult(res)
+    list.value = pageData.items
+    total.value = pageData.total
+  } catch (e: any) {
+    list.value = []
+    total.value = 0
+    ElMessage.error(e?.message || '加载用户失败，请检查登录状态或到系统状态执行数据库迁移')
   } finally {
     loading.value = false
   }
@@ -237,12 +249,12 @@ function filterByGoal(key: string) {
   search()
 }
 
-async function openDetail(row: any) {
+async function openDetail(row: any, tab = 'balance') {
   const res = await http.get(`/admin/users/${row.id}`)
   detail.value = res.data
   editStudyGoal.value = res.data.study_goal || null
   adjustAmount.value = 0
-  detailTab.value = 'balance'
+  detailTab.value = tab
   overview.value = { orders: [], cards: [], exchanges: [], wallet_logs: [] }
   showDetail.value = true
   await loadOverview()

@@ -72,7 +72,7 @@
           </el-tag>
         </template>
       </el-table-column>
-      <el-table-column label="操作" width="180">
+      <el-table-column label="操作" width="220">
         <template #default="{ row }">
           <el-button link type="primary" @click="openEdit(row)">编辑</el-button>
           <el-button
@@ -82,6 +82,7 @@
           >
             {{ row.status === 1 ? '停用' : '启用' }}
           </el-button>
+          <el-button link type="danger" @click="removeSeat(row)">删除</el-button>
         </template>
       </el-table-column>
     </el-table>
@@ -239,6 +240,17 @@ async function toggle(row: any) {
   await http.patch(`/admin/seats/${row.id}/status`, null, { params: { status } })
   ElMessage.success(status === 1 ? '已启用' : '已停用')
   load()
+}
+
+async function removeSeat(row: any) {
+  await ElMessageBox.confirm(`确定删除座位 ${row.seat_code} 吗？有关联订单的座位无法删除。`, '删除确认', { type: 'warning' })
+  try {
+    await http.delete(`/admin/seats/${row.id}`)
+    ElMessage.success('已删除')
+    load()
+  } catch (e: any) {
+    ElMessage.error(e?.message || '删除失败')
+  }
 }
 
 onMounted(async () => {

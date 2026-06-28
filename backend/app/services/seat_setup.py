@@ -34,6 +34,18 @@ def expected_seat_codes() -> list[str]:
     return codes
 
 
+# 历史 seed 可能用 D1/D2/D3，与标准 D01–D03 视为等价
+_SEAT_CODE_ALIASES = {"D1": "D01", "D2": "D02", "D3": "D03"}
+
+
+def _normalized_seat_codes(codes: set[str]) -> set[str]:
+    out = {c.strip().upper() for c in codes if c}
+    for raw, canonical in _SEAT_CODE_ALIASES.items():
+        if raw in out or raw.upper() in out:
+            out.add(canonical)
+    return out
+
+
 def _seat_position(index: int, start_y: int) -> tuple[int, int]:
     col = (index - 1) % 4
     row = (index - 1) // 4
@@ -131,7 +143,7 @@ def store_seat_summary(db: Session, store_id: int) -> dict:
     seats = db.scalars(
         select(Seat).where(Seat.store_id == store_id, Seat.is_buffer == 0).order_by(Seat.seat_code)
     ).all()
-    codes = {s.seat_code for s in seats}
+    codes = _normalized_seat_codes({s.seat_code for s in seats})
     expected = expected_seat_codes()
     missing = [c for c in expected if c not in codes]
     enabled = sum(1 for s in seats if s.status == 1)

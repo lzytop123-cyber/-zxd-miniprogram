@@ -568,6 +568,22 @@ def create_coupon(
     return ResponseModel(message="已发放", data={"id": coupon.id})
 
 
+@router.delete("/coupons/{coupon_id}", response_model=ResponseModel)
+def delete_coupon(
+    coupon_id: int,
+    _: object = Depends(get_current_admin),
+    db: Session = Depends(get_db),
+):
+    coupon = db.get(Coupon, coupon_id)
+    if not coupon:
+        raise HTTPException(status_code=404, detail="优惠券不存在")
+    if coupon.status == 1:
+        raise HTTPException(status_code=400, detail="已使用的优惠券不可删除")
+    db.delete(coupon)
+    db.commit()
+    return ResponseModel(message="已删除")
+
+
 @router.get("/seats", response_model=ResponseModel)
 def list_seats(
     store_id: int = Query(1),
@@ -778,6 +794,20 @@ def update_pricing_rule(
     db.commit()
     db.refresh(rule)
     return ResponseModel(message="已更新", data=_pricing_to_dict(rule))
+
+
+@router.delete("/pricing/{rule_id}", response_model=ResponseModel)
+def delete_pricing_rule(
+    rule_id: int,
+    _: object = Depends(get_current_admin),
+    db: Session = Depends(get_db),
+):
+    rule = db.get(PricingRule, rule_id)
+    if not rule:
+        raise HTTPException(status_code=404, detail="价格规则不存在")
+    db.delete(rule)
+    db.commit()
+    return ResponseModel(message="已删除")
 
 
 class AdminBalanceAdjustRequest(BaseModel):

@@ -19,6 +19,12 @@
           {{ row.status === 0 ? '未使用' : '已使用' }}
         </template>
       </el-table-column>
+      <el-table-column label="操作" width="90" fixed="right">
+        <template #default="{ row }">
+          <el-button v-if="row.status === 0" link type="danger" @click="remove(row)">删除</el-button>
+          <span v-else class="muted">-</span>
+        </template>
+      </el-table-column>
     </el-table>
 
     <el-dialog v-model="showAdd" title="发放优惠券" width="480px">
@@ -45,7 +51,7 @@
 
 <script setup lang="ts">
 import { onMounted, reactive, ref } from 'vue'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import http from '../api/http'
 
 const list = ref<any[]>([])
@@ -77,9 +83,21 @@ async function submit() {
   load()
 }
 
+async function remove(row: any) {
+  await ElMessageBox.confirm(`确定删除优惠券「${row.coupon_name}」吗？`, '删除确认', { type: 'warning' })
+  try {
+    await http.delete(`/admin/coupons/${row.id}`)
+    ElMessage.success('已删除')
+    load()
+  } catch (e: any) {
+    ElMessage.error(e?.message || '删除失败')
+  }
+}
+
 onMounted(load)
 </script>
 
 <style scoped>
 .header-row { display: flex; justify-content: space-between; align-items: center; }
+.muted { color: #999; font-size: 12px; }
 </style>
