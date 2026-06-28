@@ -61,13 +61,162 @@ Page({
 
   refreshHome(options = {}) {
     const { silent = false, force = false } = options
-    return Promise.all([
-      this.loadBanners({ silent, force }),
-      this.loadAnnouncements({ force }),
-      this.loadStores({ silent, force }),
-      this.loadUser({ force }),
-      this.loadCardCount({ force }),
-    ])
+    return this.loadBootstrap({ silent, force }).catch(() =>
+      Promise.all([
+        this.loadBanners({ silent, force }),
+        this.loadAnnouncements({ force }),
+        this.loadStores({ silent, force }),
+        this.loadUser({ force }),
+        this.loadCardCount({ force }),
+      ])
+    )
+  },
+
+  _applyAnnouncementPopup(items) {
+    this.setData({ announcements: items })
+    if (!items.length) return
+    const popup = items.find((a) => a.popup_once) || items[0]
+    if (popup.popup_once) {
+      try {
+        const seen = wx.getStorageSync(ANNOUNCE_SEEN_KEY) || []
+        if (seen.includes(popup.id)) return
+      } catch (e) {
+        // ignore
+      }
+    }
+    this.setData({ popupAnnouncement: popup, showAnnouncementPopup: true })
+  },
+
+  async _applyBannersFromRaw(raw, carousel) {
+    const heroHeight = carousel.hero_height || 680
+    const nextSig = bannerSignature(raw)
+
+    if (!raw.length) {
+      this.setData({
+        banners: [],
+        showBanners: false,
+        bannersLoading: false,
+        bannerReady: false,
+        carousel,
+        heroHeight,
+      })
+      this._bannerSignature = nextSig
+      return
+    }
+
+    const { resolveBannerImages } = require('../../utils/media')
+    const resolved = await resolveBannerImages(raw)
+    const patch = {
+      banners: resolved,
+      showBanners: true,
+      bannersLoading: false,
+      bannerReady: true,
+      carousel,
+      heroHeight,
+    }
+    if (nextSig !== this._bannerSignature) {
+      patch.swiperKey = Date.now()
+      this._bannerSignature = nextSig
+    }
+    this.setData(patch)
+    try {
+      wx.setStorageSync(BANNER_CACHE_KEY, { items: raw, carousel })
+    } catch (e) {
+      // ignore
+    }
+  },
+
+  loadBootstrap(options = {}) {
+    const { force = false } = options
+    const { getUserLocation, isLocationDenied, formatDistance } = require('../../utils/location')
+    const { resolveStoreList } = require('../../utils/media')
+    const hasBanners = this.data.banners.length > 0
+    const hasStores = this.data.stores.length > 0
+
+    if (!hasBanners) {
+      this.setData({ bannerReady: false, bannersLoading: true })
+    }
+    if (!hasStores) {
+      this.setData({ storesLoading: true })
+    }
+
+    this._storeFetchToken = (this._storeFetchToken || 0) + 1
+    const token = this._storeFetchToken
+
+    const applyBootstrap = async (data, hint = '') => {
+      if (token !== this._storeFetchToken) return
+
+      this._applyAnnouncementPopup(data.announcements?.items || [])
+
+      const carousel = data.banners?.carousel || this.data.carousel
+      await this._applyBannersFromRaw(data.banners?.items || [], carousel)
+
+      if (token !== this._storeFetchToken) return
+      const list = await resolveStoreList(data.stores || [])
+      if (token !== this._storeFetchToken) return
+      const withDistance = list.map((s) => ({
+        ...s,
+        distanceLabel: formatDistance(s.distance),
+      }))
+      this.setData({
+        stores: withDistance,
+        storesLoading: false,
+        locationHint: hint || '',
+      })
+
+      if (data.user) {
+        auth.syncAppUser(data.user)
+        const normalized = await normalizeUser(data.user)
+        const avatar_url = normalized.avatar_url || ''
+        this.setData({
+          user: { ...normalized, avatar_url },
+          cardCount: data.card_count || 0,
+        })
+      } else {
+        this.setData({ user: null, cardCount: 0 })
+      }
+    }
+
+    const fetchBootstrap = (query = '') =>
+      request({ url: `/home/bootstrap${query}`, silent: true, force })
+
+    const fetchWithoutLocation = (hint) =>
+      fetchBootstrap('')
+        .then((data) => applyBootstrap(data, hint))
+        .catch(() => {
+          if (token !== this._storeFetchToken) return Promise.reject(new Error('bootstrap failed'))
+          if (!this.data.stores.length) {
+            this.setData({ stores: [], storesLoading: false, locationHint: hint || '加载门店失败' })
+          } else {
+            this.setData({ storesLoading: false })
+          }
+          if (!this.data.banners.length) {
+            this.setData({ bannersLoading: false, bannerReady: false })
+          } else {
+            this.setData({ bannersLoading: false })
+          }
+          return Promise.reject(new Error('bootstrap failed'))
+        })
+
+    const fetchWithLocation = () =>
+      getUserLocation()
+        .then(({ latitude, longitude }) =>
+          fetchBootstrap(`?latitude=${latitude}&longitude=${longitude}`)
+        )
+        .then((data) => applyBootstrap(data, ''))
+        .catch(async () => {
+          if (token !== this._storeFetchToken) return Promise.reject(new Error('bootstrap failed'))
+          const denied = await isLocationDenied()
+          return fetchWithoutLocation(denied ? '开启定位查看距离' : '定位失败，点击重试')
+        })
+
+    return isLocationDenied().then((denied) => {
+      if (token !== this._storeFetchToken) return
+      if (denied) {
+        return fetchWithoutLocation('开启定位查看距离')
+      }
+      return fetchWithLocation()
+    })
   },
 
   _hydrateBannerCache() {
@@ -97,21 +246,7 @@ Page({
   loadAnnouncements(options = {}) {
     const { force = false } = options
     return request({ url: '/home/announcements', silent: true, force })
-      .then((data) => {
-        const items = data.items || []
-        this.setData({ announcements: items })
-        if (!items.length) return
-        const popup = items.find((a) => a.popup_once) || items[0]
-        if (popup.popup_once) {
-          try {
-            const seen = wx.getStorageSync(ANNOUNCE_SEEN_KEY) || []
-            if (seen.includes(popup.id)) return
-          } catch (e) {
-            // ignore
-          }
-        }
-        this.setData({ popupAnnouncement: popup, showAnnouncementPopup: true })
-      })
+      .then((data) => this._applyAnnouncementPopup(data.items || []))
       .catch(() => {})
   },
 
@@ -156,44 +291,8 @@ Page({
 
     return request({ url: '/home/banners', silent: true, force })
       .then(async (data) => {
-        const raw = data.items || []
         const carousel = data.carousel || this.data.carousel
-        const heroHeight = carousel.hero_height || 680
-        const nextSig = bannerSignature(raw)
-
-        if (!raw.length) {
-          this.setData({
-            banners: [],
-            showBanners: false,
-            bannersLoading: false,
-            bannerReady: false,
-            carousel,
-            heroHeight,
-          })
-          this._bannerSignature = nextSig
-          return
-        }
-
-        const { resolveBannerImages } = require('../../utils/media')
-        const resolved = await resolveBannerImages(raw)
-        const patch = {
-          banners: resolved,
-          showBanners: true,
-          bannersLoading: false,
-          bannerReady: true,
-          carousel,
-          heroHeight,
-        }
-        if (nextSig !== this._bannerSignature) {
-          patch.swiperKey = Date.now()
-          this._bannerSignature = nextSig
-        }
-        this.setData(patch)
-        try {
-          wx.setStorageSync(BANNER_CACHE_KEY, { items: raw, carousel })
-        } catch (e) {
-          // ignore
-        }
+        await this._applyBannersFromRaw(data.items || [], carousel)
       })
       .catch(() => {
         if (!this.data.banners.length) {
@@ -305,11 +404,11 @@ Page({
     isLocationDenied().then((denied) => {
       if (denied) {
         openLocationSettings().then((ok) => {
-          if (ok) this.loadStores({ force: true })
+          if (ok) this.refreshHome({ force: true })
         })
         return
       }
-      this.loadStores({ force: true })
+      this.refreshHome({ force: true })
     })
   },
 
@@ -332,7 +431,7 @@ Page({
 
     if (!storeId) {
       wx.showToast({ title: '正在获取门店…', icon: 'none' })
-      this.loadStores({ force: true })
+      this.refreshHome({ force: true })
       return
     }
 

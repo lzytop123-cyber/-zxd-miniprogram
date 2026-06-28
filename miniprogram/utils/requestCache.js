@@ -6,6 +6,7 @@ const DEFAULT_TTL = {
   '/store/list': 120 * 1000,
   '/home/banners': 180 * 1000,
   '/home/announcements': 120 * 1000,
+  '/home/bootstrap': 120 * 1000,
   '/report/summary': 60 * 1000,
   '/report/leaderboard': 60 * 1000,
   '/assistant/intro': 300 * 1000,

@@ -25,6 +25,22 @@ def get_current_user(
     return user
 
 
+def get_optional_user(
+    credentials: HTTPAuthorizationCredentials | None = Depends(security),
+    db: Session = Depends(get_db),
+) -> User | None:
+    if not credentials:
+        return None
+    subject = decode_access_token(credentials.credentials)
+    if not subject or not subject.startswith("user:"):
+        return None
+    try:
+        user_id = int(subject.split(":")[1])
+    except ValueError:
+        return None
+    return db.get(User, user_id)
+
+
 def get_current_admin(
     credentials: HTTPAuthorizationCredentials | None = Depends(security),
     db: Session = Depends(get_db),

@@ -21,7 +21,7 @@
       bindscale="onScale"
     >
       <!-- 平面图（已去标题/留白）：1:1 铺满，保证 99% 还原 -->
-      <image class="plan-img" src="/assets/floor-plan-clean.png" mode="scaleToFill" />
+      <image class="plan-img" src="{{floorPlanSrc}}" mode="scaleToFill" />
 
       <!-- 可点选座位叠加层（随底图一起缩放，始终对齐） -->
       <view class="seats-layer">

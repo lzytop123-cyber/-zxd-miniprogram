@@ -1,6 +1,7 @@
 const { request } = require('../../utils/request')
 const auth = require('../../utils/auth')
 const routes = require('../../utils/routes')
+const { FLOOR_PLAN } = require('../../utils/assets')
 const { getLayout } = require('../../utils/seat-layout')
 const { debounce } = require('../../utils/debounce')
 const { dailyPassDays } = require('../../utils/cardDisplay')
@@ -82,7 +83,7 @@ Page({
     const today = todayStr()
     this._layout = getLayout()
     this._refreshPreviewDebounced = debounce(() => this._doRefreshPreview(), 450)
-    wx.getImageInfo({ src: '/assets/floor-plan-clean.png' })
+    wx.getImageInfo({ src: FLOOR_PLAN })
 
     this.setData({
       storeId: options.storeId,

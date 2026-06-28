@@ -1,4 +1,5 @@
 const { buildSeatMarkers } = require('../../utils/seat-layout')
+const { FLOOR_PLAN } = require('../../utils/assets')
 
 const SCALE_MIN = 1
 const SCALE_MAX = 4
@@ -13,6 +14,7 @@ Component({
     markers: [],
     scale: 1,
     scaleValue: 1,
+    floorPlanSrc: FLOOR_PLAN,
   },
   observers: {
     seats(seats) {

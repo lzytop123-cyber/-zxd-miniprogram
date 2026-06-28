@@ -1,13 +1,18 @@
-from datetime import datetime
+from datetime import date, datetime
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
+from app.api.deps import get_optional_user
+from app.api.routes.store import _store_list_item
+from app.api.routes.user import _to_profile
 from app.db.session import get_db
 from app.core.static_url import public_static_url
-from app.models import HomeBanner, HomeCarouselSetting, SystemAnnouncement
+from app.models import HomeBanner, HomeCarouselSetting, PeriodCard, Store, SystemAnnouncement, User
 from app.schemas.common import ResponseModel
+from app.services.business import calc_distance
+from app.services.card_service import is_period_card_active
 
 router = APIRouter(prefix="/home", tags=["首页"])
 
@@ -140,3 +145,48 @@ def _list_active_announcements(db: Session) -> list[dict]:
 @router.get("/announcements", response_model=ResponseModel)
 def get_home_announcements(db: Session = Depends(get_db)):
     return ResponseModel(data={"items": _list_active_announcements(db)})
+
+
+def _list_stores(db: Session, latitude: float | None, longitude: float | None) -> list:
+    stores = db.scalars(select(Store).where(Store.status == 1)).all()
+    items = []
+    for store in stores:
+        distance = None
+        if latitude is not None and longitude is not None and store.latitude and store.longitude:
+            distance = calc_distance(
+                latitude, longitude, float(store.latitude), float(store.longitude)
+            )
+        items.append(_store_list_item(store, distance=distance).model_dump())
+    if latitude is not None and longitude is not None:
+        items.sort(key=lambda x: x.get("distance") if x.get("distance") is not None else 99999)
+    return items
+
+
+def _active_card_count(db: Session, user: User) -> int:
+    today = date.today()
+    cards = db.scalars(
+        select(PeriodCard).where(PeriodCard.user_id == user.id, PeriodCard.status == 1)
+    ).all()
+    return sum(1 for c in cards if is_period_card_active(c, today))
+
+
+@router.get("/bootstrap", response_model=ResponseModel)
+def get_home_bootstrap(
+    latitude: float | None = Query(None),
+    longitude: float | None = Query(None),
+    db: Session = Depends(get_db),
+    user: User | None = Depends(get_optional_user),
+):
+    profile = _to_profile(db, user).model_dump() if user else None
+    return ResponseModel(
+        data={
+            "banners": {
+                "items": _list_active_banners(db),
+                "carousel": _get_carousel_settings(db),
+            },
+            "announcements": {"items": _list_active_announcements(db)},
+            "stores": _list_stores(db, latitude, longitude),
+            "user": profile,
+            "card_count": _active_card_count(db, user) if user else 0,
+        }
+    )
