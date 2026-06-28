@@ -7,10 +7,20 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user
 from app.db.session import get_db
-from app.models import CardSource, MeituanOrder, MeituanOrderStatus, User
+from app.models import (
+    CardSource,
+    MeituanDealMapping,
+    MeituanOrder,
+    MeituanOrderStatus,
+    User,
+)
 from app.schemas.common import ResponseModel
 from app.services.card_service import get_mapping_by_deal_id, issue_period_card
-from app.services.deal_mapping_service import record_pending_deal
+from app.services.deal_mapping_service import (
+    guess_reward_from_name,
+    mark_pending_resolved_by_deal_id,
+    record_pending_deal,
+)
 from app.services.yunlaoban import YunlaobanService
 
 router = APIRouter(prefix="/exchange", tags=["兑换"])
@@ -66,6 +76,19 @@ async def _exchange(
     mapping = get_mapping_by_deal_id(db, deal_id)
     if not mapping:
         ticket_name = prepared.get("ticketName") or prepared["ticketData"].get("dealTitle", "")
+        # 自动识别并创建映射，无需管理员手动配置
+        reward_type, reward_value = guess_reward_from_name(ticket_name)
+        mapping = MeituanDealMapping(
+            store_id=body.store_id,
+            deal_id=deal_id,
+            deal_name=ticket_name,
+            reward_type=reward_type,
+            reward_value=reward_value,
+            platform=platform,
+            is_active=1,
+        )
+        db.add(mapping)
+        # 同时记录到待配置列表，方便管理员后续查看/调整
         record_pending_deal(
             db,
             deal_id=deal_id,
@@ -74,11 +97,9 @@ async def _exchange(
             coupon_code=code,
             ticket_data=prepared.get("ticketData"),
         )
-        suffix = f"（{ticket_name}）" if ticket_name else ""
-        raise HTTPException(
-            status_code=400,
-            detail=f"未配置的团购商品 dealId={deal_id}{suffix}，已记录到后台「待配置团购」，请管理员添加映射后重试",
-        )
+        mark_pending_resolved_by_deal_id(db, deal_id)
+        db.commit()
+        db.refresh(mapping)
 
     try:
         consume_result = await YunlaobanService.consume(platform, code, prepared["ticketInfo"])
