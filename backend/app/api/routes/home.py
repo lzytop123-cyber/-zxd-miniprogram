@@ -5,7 +5,7 @@ from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
-from app.core.static_url import public_static_path
+from app.core.static_url import public_static_url
 from app.models import HomeBanner, HomeCarouselSetting, SystemAnnouncement
 from app.schemas.common import ResponseModel
 
@@ -48,7 +48,7 @@ def _banner_from_row(row: HomeBanner) -> dict:
         "date_range": _banner_field(row.date_range),
         "cta_text": _banner_field(row.cta_text),
         "layout_type": _banner_field(row.layout_type) or "text",
-        "image_url": public_static_path(row.image_url),
+        "image_url": public_static_url(row.image_url),
         "link_path": _banner_field(row.link_path),
     }
 
