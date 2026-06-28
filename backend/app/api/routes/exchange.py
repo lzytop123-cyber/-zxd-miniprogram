@@ -68,7 +68,7 @@ async def _exchange(
         raise HTTPException(status_code=400, detail="该券码已兑换")
 
     try:
-        prepared = await YunlaobanService.prepare(platform, code)
+        prepared, consume_result = await YunlaobanService.prepare_and_consume(platform, code)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
@@ -100,11 +100,6 @@ async def _exchange(
         mark_pending_resolved_by_deal_id(db, deal_id)
         db.commit()
         db.refresh(mapping)
-
-    try:
-        consume_result = await YunlaobanService.consume(platform, code, prepared["ticketInfo"])
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
 
     card = issue_period_card(
         db,

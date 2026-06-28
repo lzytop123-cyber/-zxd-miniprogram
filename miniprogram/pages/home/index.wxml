@@ -6,7 +6,7 @@
     <!-- 轮播：仅展示后台配置的活动 Banner -->
     <view class="hero-media">
       <swiper
-        wx:if="{{banners.length > 0}}"
+        wx:if="{{bannerReady && banners.length > 0}}"
         class="hero-swiper"
         style="height: {{heroHeight}}rpx;"
         indicator-dots="{{carousel.indicator_dots && banners.length > 1}}"
@@ -15,9 +15,66 @@
         autoplay="{{carousel.autoplay && banners.length > 1}}"
         interval="{{carousel.interval}}"
         circular="{{carousel.circular && banners.length > 1}}"
+        skip-hidden-item-layout="{{false}}"
       >
         <swiper-item wx:for="{{banners}}" wx:key="id" class="hero-swiper-item">
-          <template is="heroSlide" data="{{item: item, index: index, heroMode: carousel.hero_mode}}" />
+          <view class="hero-slide hero-slide--{{carousel.hero_mode || 'fullscreen'}}">
+            <image
+              wx:if="{{item.image_url && (item.layout_type === 'image' || item.layout_type === 'image_text')}}"
+              class="hero-slide-bg {{carousel.hero_mode === 'card' ? 'hero-slide-bg--card' : ''}}"
+              src="{{item.image_url}}"
+              mode="aspectFill"
+              lazy-load="{{false}}"
+              data-index="{{index}}"
+              binderror="onBannerImageError"
+            />
+            <view wx:else class="hero-slide-bg hero-slide-bg--text">
+              <view class="hero-grid"></view>
+            </view>
+
+            <view
+              wx:if="{{item.layout_type === 'image' && item.image_url}}"
+              class="hero-slide-tap"
+              bindtap="onCampaignTap"
+              data-index="{{index}}"
+            ></view>
+
+            <view
+              class="hero-slide-content {{carousel.hero_mode === 'card' ? 'hero-slide-content--card' : ''}}"
+              wx:if="{{item.layout_type === 'text' && (item.ribbon || item.title_line1 || item.title_line2 || item.date_label || item.date_range || item.cta_text)}}"
+            >
+              <view class="campaign-ribbon" wx:if="{{item.ribbon}}">{{item.ribbon}}</view>
+              <view class="campaign-title" wx:if="{{item.title_line1 || item.title_line2}}">
+                <text class="ct-line" wx:if="{{item.title_line1}}">{{item.title_line1}}</text>
+                <text class="ct-line ct-line--sm" wx:if="{{item.title_line2}}">{{item.title_line2}}</text>
+              </view>
+              <view class="campaign-foot" wx:if="{{item.date_label || item.date_range || item.cta_text}}">
+                <view class="campaign-date" wx:if="{{item.date_label || item.date_range}}">
+                  <text class="cd-label" wx:if="{{item.date_label}}">{{item.date_label}}</text>
+                  <text class="cd-range" wx:if="{{item.date_range}}">{{item.date_range}}</text>
+                </view>
+                <view class="campaign-cta" wx:if="{{item.cta_text}}" bindtap="onCampaignTap" data-index="{{index}}">{{item.cta_text}}</view>
+              </view>
+            </view>
+
+            <view
+              class="hero-slide-content hero-slide-content--overlay"
+              wx:elif="{{item.layout_type === 'image_text' && item.image_url && (item.ribbon || item.title_line1 || item.title_line2 || item.date_label || item.date_range || item.cta_text)}}"
+            >
+              <view class="campaign-ribbon" wx:if="{{item.ribbon}}">{{item.ribbon}}</view>
+              <view class="campaign-title" wx:if="{{item.title_line1 || item.title_line2}}">
+                <text class="ct-line" wx:if="{{item.title_line1}}">{{item.title_line1}}</text>
+                <text class="ct-line ct-line--sm" wx:if="{{item.title_line2}}">{{item.title_line2}}</text>
+              </view>
+              <view class="campaign-foot" wx:if="{{item.date_label || item.date_range || item.cta_text}}">
+                <view class="campaign-date" wx:if="{{item.date_label || item.date_range}}">
+                  <text class="cd-label" wx:if="{{item.date_label}}">{{item.date_label}}</text>
+                  <text class="cd-range" wx:if="{{item.date_range}}">{{item.date_range}}</text>
+                </view>
+                <view class="campaign-cta" wx:if="{{item.cta_text}}" bindtap="onCampaignTap" data-index="{{index}}">{{item.cta_text}}</view>
+              </view>
+            </view>
+          </view>
         </swiper-item>
       </swiper>
 
@@ -157,64 +214,3 @@
     </view>
   </view>
 </view>
-
-<template name="heroSlide">
-  <view class="hero-slide hero-slide--{{heroMode || 'fullscreen'}}">
-    <!-- 背景：图片铺满或默认绿 -->
-    <image
-      wx:if="{{item.image_url && (item.layout_type === 'image' || item.layout_type === 'image_text')}}"
-      class="hero-slide-bg {{heroMode === 'card' ? 'hero-slide-bg--card' : ''}}"
-      src="{{item.image_url}}"
-      mode="aspectFill"
-    />
-    <view wx:else class="hero-slide-bg hero-slide-bg--text">
-      <view class="hero-grid"></view>
-    </view>
-
-    <!-- 纯图片：整页可点 -->
-    <view
-      wx:if="{{item.layout_type === 'image' && item.image_url}}"
-      class="hero-slide-tap"
-      bindtap="onCampaignTap"
-      data-index="{{index}}"
-    ></view>
-
-    <!-- 文字内容（纯文字布局） -->
-    <view
-      class="hero-slide-content {{heroMode === 'card' ? 'hero-slide-content--card' : ''}}"
-      wx:if="{{item.layout_type === 'text' && (item.ribbon || item.title_line1 || item.title_line2 || item.date_label || item.date_range || item.cta_text)}}"
-    >
-      <view class="campaign-ribbon" wx:if="{{item.ribbon}}">{{item.ribbon}}</view>
-      <view class="campaign-title" wx:if="{{item.title_line1 || item.title_line2}}">
-        <text class="ct-line" wx:if="{{item.title_line1}}">{{item.title_line1}}</text>
-        <text class="ct-line ct-line--sm" wx:if="{{item.title_line2}}">{{item.title_line2}}</text>
-      </view>
-      <view class="campaign-foot" wx:if="{{item.date_label || item.date_range || item.cta_text}}">
-        <view class="campaign-date" wx:if="{{item.date_label || item.date_range}}">
-          <text class="cd-label" wx:if="{{item.date_label}}">{{item.date_label}}</text>
-          <text class="cd-range" wx:if="{{item.date_range}}">{{item.date_range}}</text>
-        </view>
-        <view class="campaign-cta" wx:if="{{item.cta_text}}" bindtap="onCampaignTap" data-index="{{index}}">{{item.cta_text}}</view>
-      </view>
-    </view>
-
-    <!-- 图文叠加 -->
-    <view
-      class="hero-slide-content hero-slide-content--overlay"
-      wx:elif="{{item.layout_type === 'image_text' && item.image_url && (item.ribbon || item.title_line1 || item.title_line2 || item.date_label || item.date_range || item.cta_text)}}"
-    >
-      <view class="campaign-ribbon" wx:if="{{item.ribbon}}">{{item.ribbon}}</view>
-      <view class="campaign-title" wx:if="{{item.title_line1 || item.title_line2}}">
-        <text class="ct-line" wx:if="{{item.title_line1}}">{{item.title_line1}}</text>
-        <text class="ct-line ct-line--sm" wx:if="{{item.title_line2}}">{{item.title_line2}}</text>
-      </view>
-      <view class="campaign-foot" wx:if="{{item.date_label || item.date_range || item.cta_text}}">
-        <view class="campaign-date" wx:if="{{item.date_label || item.date_range}}">
-          <text class="cd-label" wx:if="{{item.date_label}}">{{item.date_label}}</text>
-          <text class="cd-range" wx:if="{{item.date_range}}">{{item.date_range}}</text>
-        </view>
-        <view class="campaign-cta" wx:if="{{item.cta_text}}" bindtap="onCampaignTap" data-index="{{index}}">{{item.cta_text}}</view>
-      </view>
-    </view>
-  </view>
-</template>

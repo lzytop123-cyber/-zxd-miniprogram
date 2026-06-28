@@ -15,11 +15,12 @@ function fileExt(url) {
 }
 
 function cachePath(url) {
+  const name = url.split('/').pop()?.split('?')[0]?.replace(/[^\w.-]/g, '_') || 'img'
   let hash = 0
   for (let i = 0; i < url.length; i += 1) {
     hash = ((hash << 5) - hash + url.charCodeAt(i)) | 0
   }
-  return `${wx.env.USER_DATA_PATH}/img_${Math.abs(hash)}.${fileExt(url)}`
+  return `${wx.env.USER_DATA_PATH}/img_${Math.abs(hash)}_${name}.${fileExt(url)}`
 }
 
 function isLocalPath(url) {
@@ -42,6 +43,18 @@ function downloadHttpsImage(fullUrl) {
   if (localCache[fullUrl]) {
     return Promise.resolve(localCache[fullUrl])
   }
+
+  const target = cachePath(fullUrl)
+  const fs = wx.getFileSystemManager()
+
+  try {
+    fs.accessSync(target)
+    localCache[fullUrl] = target
+    return Promise.resolve(target)
+  } catch (e) {
+    // cache miss
+  }
+
   return new Promise((resolve, reject) => {
     wx.downloadFile({
       url: fullUrl,
@@ -50,15 +63,25 @@ function downloadHttpsImage(fullUrl) {
           reject(new Error(`download failed: ${res.statusCode}`))
           return
         }
-        localCache[fullUrl] = res.tempFilePath
-        resolve(res.tempFilePath)
+        fs.copyFile({
+          srcPath: res.tempFilePath,
+          destPath: target,
+          success() {
+            localCache[fullUrl] = target
+            resolve(target)
+          },
+          fail() {
+            localCache[fullUrl] = res.tempFilePath
+            resolve(res.tempFilePath)
+          },
+        })
       },
       fail: reject,
     })
   })
 }
 
-function downloadHttpImage(fullUrl) {
+function downloadViaRequest(fullUrl) {
   if (localCache[fullUrl]) {
     return Promise.resolve(localCache[fullUrl])
   }
@@ -74,35 +97,39 @@ function downloadHttpImage(fullUrl) {
     // cache miss
   }
 
-  const attempt = (url) =>
-    new Promise((resolve, reject) => {
-      wx.request({
-        url,
-        responseType: 'arraybuffer',
-        success(res) {
-          if (res.statusCode !== 200) {
-            reject(new Error(`download failed: ${res.statusCode}`))
-            return
-          }
-          fs.writeFile({
-            filePath: target,
-            data: res.data,
-            success() {
-              localCache[fullUrl] = target
-              localCache[url] = target
-              resolve(target)
-            },
-            fail: reject,
-          })
-        },
-        fail: reject,
-      })
+  return new Promise((resolve, reject) => {
+    wx.request({
+      url: fullUrl,
+      responseType: 'arraybuffer',
+      success(res) {
+        if (res.statusCode !== 200) {
+          reject(new Error(`request download failed: ${res.statusCode}`))
+          return
+        }
+        fs.writeFile({
+          filePath: target,
+          data: res.data,
+          success() {
+            localCache[fullUrl] = target
+            resolve(target)
+          },
+          fail: reject,
+        })
+      },
+      fail: reject,
     })
+  })
+}
 
-  return attempt(fullUrl).catch((err) => {
+function downloadHttpImage(fullUrl) {
+  if (localCache[fullUrl]) {
+    return Promise.resolve(localCache[fullUrl])
+  }
+
+  return downloadViaRequest(fullUrl).catch((err) => {
     if (!useProdApi() && fullUrl.includes(`${DEV_LAN_HOST}:`)) {
       const fallback = fullUrl.replace(DEV_LAN_HOST, DEV_LOCAL_HOST)
-      return attempt(fallback)
+      return downloadViaRequest(fallback)
     }
     return Promise.reject(err)
   })
@@ -127,20 +154,60 @@ function resolveImageForDisplay(url) {
 }
 
 
+function getImageInfoPath(fullUrl) {
+  return new Promise((resolve, reject) => {
+    wx.getImageInfo({
+      src: fullUrl,
+      success(res) {
+        if (res.path) {
+          localCache[fullUrl] = res.path
+          resolve(res.path)
+        } else {
+          reject(new Error('getImageInfo empty path'))
+        }
+      },
+      fail: reject,
+    })
+  })
+}
+
+async function resolveBannerImageUrl(fullUrl) {
+  if (!fullUrl || isLocalPath(fullUrl)) return fullUrl
+
+  try {
+    return await downloadRemoteImage(fullUrl)
+  } catch (err1) {
+    console.warn('[media] banner downloadFile fail, try request', fullUrl, err1)
+  }
+
+  try {
+    return await downloadViaRequest(fullUrl)
+  } catch (err2) {
+    console.warn('[media] banner request fail, try getImageInfo', fullUrl, err2)
+  }
+
+  try {
+    return await getImageInfoPath(fullUrl)
+  } catch (err3) {
+    console.error('[media] banner image fail', fullUrl, err3)
+    return fullUrl
+  }
+}
+
 async function resolveBannerImages(banners) {
   const list = banners || []
-  return Promise.all(
-    list.map(async (item) => {
-      if (!item.image_url) return item
-      try {
-        const image_url = await resolveImageForDisplay(item.image_url)
-        return { ...item, image_url }
-      } catch (err) {
-        console.error('[media] banner image fail', item.image_url, err)
-        return { ...item, image_url: resolveStaticUrl(item.image_url) }
-      }
-    })
-  )
+  const out = []
+  // 轮播须落到本地路径；体验版严格校验 downloadFile，真机调试会跳过域名校验
+  for (const item of list) {
+    if (!item.image_url) {
+      out.push(item)
+      continue
+    }
+    const remote = resolveStaticUrl(item.image_url)
+    const image_url = await resolveBannerImageUrl(remote)
+    out.push({ ...item, image_url, _remote_url: remote })
+  }
+  return out
 }
 
 /** 同步解析 Banner URL，用于 API 返回后立即展示，避免占位图闪烁 */
@@ -172,6 +239,7 @@ async function resolveStoreList(stores) {
 module.exports = {
   resolveImageForDisplay,
   resolveBannerImages,
+  resolveBannerImageUrl,
   prepareBannerItems,
   resolveStoreList,
 }

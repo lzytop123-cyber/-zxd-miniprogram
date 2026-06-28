@@ -4,10 +4,29 @@
       <view class="exchange-icon">🎟</view>
       <view class="exchange-title">{{platformLabel}}团购兑换</view>
     </view>
-    <view class="hint">请输入券码，核销后将发放对应期限卡到「我的期限卡」。</view>
-    <view class="hint sub">开发环境：券码末位 1~5 对应不同卡种（4小时/天卡/月卡/夜读月卡/10次卡）</view>
-    <input class="code-input" placeholder="请输入券码" value="{{code}}" bindinput="onInput" maxlength="32" />
-    <view class="btn-primary {{loading?'disabled':''}}" bindtap="submit">立即兑换</view>
+    <view class="hint">右侧 📷 相机扫码填入券码，确认后点「立即兑换」。</view>
+    <view class="hint sub">核销需连接美团服务器，约 3～8 秒，属正常情况</view>
+
+    <view class="code-field">
+      <input
+        class="code-input"
+        placeholder="请输入或扫码填入券码"
+        value="{{code}}"
+        bindinput="onInput"
+        maxlength="32"
+        confirm-type="done"
+        bindconfirm="onSubmitTap"
+      />
+      <view class="code-scan {{loading || scanning ? 'disabled' : ''}}" bindtap="onScanTap">
+        <text class="code-scan-icon">📷</text>
+      </view>
+    </view>
+
+    <view class="album-link {{loading || scanning ? 'disabled' : ''}}" bindtap="onAlbumScanTap">
+      从相册识别券码（扫码页点右上角相册）
+    </view>
+
+    <view class="btn-primary {{loading?'disabled':''}}" bindtap="onSubmitTap">立即兑换</view>
     <view class="link-records" bindtap="goRecords">查看兑换记录 ›</view>
   </view>
 </view>

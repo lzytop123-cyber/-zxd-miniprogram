@@ -28,20 +28,18 @@ class YunlaobanService:
         }
 
     @staticmethod
-    async def prepare(platform: int, code: str) -> dict:
-        if _use_mock():
-            if settings.app_env == "production" and (settings.coupon_provider or "").lower() == "meituan":
-                logger.warning("COUPON_PROVIDER=meituan but Yunlaoban credentials missing; using mock prepare")
-            return _mock_prepare(code, platform)
+    def _api_base() -> str:
+        return settings.yunlaoban_base_url.rstrip("/")
+
+    @staticmethod
+    async def _prepare_with_client(client: httpx.AsyncClient, platform: int, code: str) -> dict:
         shop_id = int(settings.yunlaoban_shop_id)
-        base = settings.yunlaoban_base_url.rstrip("/")
-        async with httpx.AsyncClient(timeout=settings.yunlaoban_timeout_sec) as client:
-            resp = await client.post(
-                f"{base}/api/isp/groupBuy/prepare",
-                headers=YunlaobanService._headers(),
-                json={"shopId": shop_id, "platform": platform, "code": code},
-            )
-            data = resp.json()
+        resp = await client.post(
+            f"{YunlaobanService._api_base()}/api/isp/groupBuy/prepare",
+            headers=YunlaobanService._headers(),
+            json={"shopId": shop_id, "platform": platform, "code": code},
+        )
+        data = resp.json()
         if data.get("code") != "SUCCESS":
             raise ValueError(data.get("message", "验券失败"))
         ticket = json.loads(data["result"])
@@ -53,27 +51,54 @@ class YunlaobanService:
         }
 
     @staticmethod
-    async def consume(platform: int, code: str, ticket_info: str) -> str:
-        if _use_mock():
-            return json.dumps({"mock": True, "code": code})
+    async def _consume_with_client(
+        client: httpx.AsyncClient, platform: int, code: str, ticket_info: str
+    ) -> str:
         shop_id = int(settings.yunlaoban_shop_id)
-        base = settings.yunlaoban_base_url.rstrip("/")
-        async with httpx.AsyncClient(timeout=settings.yunlaoban_timeout_sec) as client:
-            resp = await client.post(
-                f"{base}/api/isp/groupBuy/consumeWithResult",
-                headers=YunlaobanService._headers(),
-                json={
-                    "shopId": shop_id,
-                    "platform": platform,
-                    "code": code,
-                    "ticketInfo": ticket_info,
-                    "num": 1,
-                },
-            )
-            data = resp.json()
+        resp = await client.post(
+            f"{YunlaobanService._api_base()}/api/isp/groupBuy/consumeWithResult",
+            headers=YunlaobanService._headers(),
+            json={
+                "shopId": shop_id,
+                "platform": platform,
+                "code": code,
+                "ticketInfo": ticket_info,
+                "num": 1,
+            },
+        )
+        data = resp.json()
         if data.get("code") != "SUCCESS":
             raise ValueError(data.get("message", "核销失败"))
         return data.get("result") or "true"
+
+    @staticmethod
+    async def prepare(platform: int, code: str) -> dict:
+        if _use_mock():
+            if settings.app_env == "production" and (settings.coupon_provider or "").lower() == "meituan":
+                logger.warning("COUPON_PROVIDER=meituan but Yunlaoban credentials missing; using mock prepare")
+            return _mock_prepare(code, platform)
+        async with httpx.AsyncClient(timeout=settings.yunlaoban_timeout_sec) as client:
+            return await YunlaobanService._prepare_with_client(client, platform, code)
+
+    @staticmethod
+    async def consume(platform: int, code: str, ticket_info: str) -> str:
+        if _use_mock():
+            return json.dumps({"mock": True, "code": code})
+        async with httpx.AsyncClient(timeout=settings.yunlaoban_timeout_sec) as client:
+            return await YunlaobanService._consume_with_client(client, platform, code, ticket_info)
+
+    @staticmethod
+    async def prepare_and_consume(platform: int, code: str) -> tuple[dict, str]:
+        """复用同一 HTTP 连接，减少 prepare + consume 两次往返的握手开销。"""
+        if _use_mock():
+            prepared = _mock_prepare(code, platform)
+            return prepared, json.dumps({"mock": True, "code": code})
+        async with httpx.AsyncClient(timeout=settings.yunlaoban_timeout_sec) as client:
+            prepared = await YunlaobanService._prepare_with_client(client, platform, code)
+            consume_result = await YunlaobanService._consume_with_client(
+                client, platform, code, prepared["ticketInfo"]
+            )
+            return prepared, consume_result
 
 
 def _mock_prepare(code: str, platform: int) -> dict:

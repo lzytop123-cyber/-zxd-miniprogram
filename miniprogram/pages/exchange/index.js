@@ -7,6 +7,7 @@ Page({
     code: '',
     storeId: null,
     loading: false,
+    scanning: false,
   },
 
   onLoad(options) {
@@ -23,14 +24,63 @@ Page({
     this.setData({ code: e.detail.value.trim() })
   },
 
-  async submit() {
-    const { code, platform, storeId } = this.data
+  _applyScanResult(res) {
+    const { fillCodeFromScanResult } = require('../../utils/voucherScan')
+    const parsed = fillCodeFromScanResult(res)
+    if (!parsed.ok) {
+      wx.showToast({ title: parsed.message, icon: 'none', duration: 2500 })
+      return false
+    }
+    this.setData({ code: parsed.code })
+    wx.showToast({ title: '券码已填入', icon: 'success' })
+    return true
+  },
+
+  async onScanTap() {
+    if (this.data.loading || this.data.scanning) return
+    this.setData({ scanning: true })
+    try {
+      const { scanFromCamera } = require('../../utils/voucherScan')
+      const res = await scanFromCamera()
+      this._applyScanResult(res)
+    } catch (e) {
+      const msg = e.errMsg || e.message || ''
+      if (msg.includes('cancel') || msg.includes('fail cancel')) return
+      wx.showToast({ title: '扫码失败', icon: 'none' })
+    } finally {
+      this.setData({ scanning: false })
+    }
+  },
+
+  async onAlbumScanTap() {
+    if (this.data.loading || this.data.scanning) return
+    this.setData({ scanning: true })
+    try {
+      const { scanWithAlbumSupport } = require('../../utils/voucherScan')
+      const res = await scanWithAlbumSupport()
+      this._applyScanResult(res)
+    } catch (e) {
+      const msg = e.errMsg || e.message || ''
+      if (msg.includes('cancel') || msg.includes('fail cancel')) return
+      wx.showToast({ title: '识别失败', icon: 'none' })
+    } finally {
+      this.setData({ scanning: false })
+    }
+  },
+
+  onSubmitTap() {
+    this.submit()
+  },
+
+  async submit(forcedCode) {
+    const code = typeof forcedCode === 'string' ? forcedCode.trim() : (this.data.code || '').trim()
     if (!code || code.length < 6) {
       wx.showToast({ title: '请输入有效券码', icon: 'none' })
       return
     }
-    this.setData({ loading: true })
-    wx.showLoading({ title: '兑换中' })
+    const { platform, storeId } = this.data
+    this.setData({ loading: true, code })
+    wx.showLoading({ title: '连接核销中…', mask: true })
     try {
       const path = platform === 'douyin' ? '/exchange/douyin' : '/exchange/meituan'
       let reqUrl = `${path}/${encodeURIComponent(code)}`

@@ -1,4 +1,4 @@
-// API 环境：develop → 本机/局域网；trial、release → 生产服务器
+// API 环境：仅开发者工具模拟器 → 本机；真机调试 / 体验版 / 正式版 → 生产
 const PROD_API_BASE = 'https://api.islandspace.xyz/api'
 const PROD_STATIC_BASE = 'https://api.islandspace.xyz'
 
@@ -14,9 +14,13 @@ function getEnvVersion() {
   }
 }
 
-/** develop 使用本地 API；体验版与正式版使用生产 API */
+/**
+ * 生产 API：体验版 / 正式版 / 真机调试
+ * 仅开发者工具模拟器 + develop 走本地 API
+ */
 function useProdApi() {
-  return getEnvVersion() !== 'develop'
+  if (getEnvVersion() === 'develop' && isWechatDevtools()) return false
+  return true
 }
 
 /** 仅开发者工具 / develop 环境允许 mock 支付 */

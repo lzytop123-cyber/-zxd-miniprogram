@@ -9,7 +9,7 @@ const TAB_PAGES = [
   '/pages/profile/index',
 ]
 
-const BANNER_CACHE_KEY = 'home_banners_v1'
+const BANNER_CACHE_KEY = 'home_banners_v4'
 const ANNOUNCE_SEEN_KEY = 'announce_seen_v1'
 
 Page({
@@ -34,17 +34,16 @@ Page({
     announcements: [],
     popupAnnouncement: null,
     showAnnouncementPopup: false,
+    bannerReady: false,
+    swiperKey: 0,
   },
 
   onLoad() {
     try {
       const cached = wx.getStorageSync(BANNER_CACHE_KEY)
-      if (cached?.items?.length) {
-        const carousel = cached.carousel || this.data.carousel
+      if (cached?.carousel) {
+        const carousel = cached.carousel
         this.setData({
-          banners: cached.items,
-          showBanners: true,
-          bannersLoading: false,
           carousel,
           heroHeight: carousel.hero_height || 680,
         })
@@ -114,50 +113,40 @@ Page({
   },
 
   loadBanners() {
-    const { resolveBannerImages, prepareBannerItems } = require('../../utils/media')
+    const { resolveBannerImages } = require('../../utils/media')
+    this.setData({ bannerReady: false, bannersLoading: true })
     request({ url: '/home/banners', silent: true })
       .then(async (data) => {
         const raw = data.items || []
         const carousel = data.carousel || this.data.carousel
         const heroHeight = carousel.hero_height || 680
-        const prepared = prepareBannerItems(raw)
 
-        if (prepared.length) {
-          this.setData({
-            banners: prepared,
-            showBanners: true,
-            bannersLoading: false,
-            carousel,
-            heroHeight,
-          })
-          try {
-            wx.setStorageSync(BANNER_CACHE_KEY, { items: prepared, carousel })
-          } catch (e) {
-            // ignore
-          }
-        } else {
+        if (!raw.length) {
           this.setData({
             banners: [],
             showBanners: false,
             bannersLoading: false,
+            bannerReady: false,
             carousel,
             heroHeight,
           })
+          return
         }
 
         const resolved = await resolveBannerImages(raw)
-        if (resolved.length) {
-          this.setData({
-            banners: resolved,
-            showBanners: true,
-            carousel,
-            heroHeight,
-          })
-          try {
-            wx.setStorageSync(BANNER_CACHE_KEY, { items: resolved, carousel })
-          } catch (e) {
-            // ignore
-          }
+        this.setData({
+          banners: resolved,
+          showBanners: true,
+          bannersLoading: false,
+          bannerReady: true,
+          swiperKey: Date.now(),
+          carousel,
+          heroHeight,
+        })
+        try {
+          wx.setStorageSync(BANNER_CACHE_KEY, { items: raw, carousel })
+        } catch (e) {
+          // ignore
         }
       })
       .catch(() => {
@@ -291,6 +280,20 @@ Page({
     }
 
     wx.navigateTo({ url: bookingUrl })
+  },
+
+  onBannerImageError(e) {
+    const idx = Number(e.currentTarget.dataset.index)
+    const item = this.data.banners[idx]
+    if (!item || !item._remote_url || item._imageRetried) return
+    const { resolveBannerImageUrl } = require('../../utils/media')
+    resolveBannerImageUrl(item._remote_url).then((path) => {
+      if (!path || path === item.image_url) return
+      this.setData({
+        [`banners[${idx}].image_url`]: path,
+        [`banners[${idx}]._imageRetried`]: true,
+      })
+    })
   },
 
   onCampaignTap(e) {

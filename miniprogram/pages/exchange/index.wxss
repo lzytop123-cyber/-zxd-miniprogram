@@ -30,13 +30,53 @@
   color: #2D6A4F;
 }
 
-.code-input {
+.code-field {
+  display: flex;
+  align-items: stretch;
   border: 2rpx solid #D8F3DC;
   border-radius: 16rpx;
-  padding: 24rpx;
-  margin: 24rpx 0 32rpx;
+  margin: 28rpx 0 32rpx;
   background: #F4FAF6;
+  overflow: hidden;
+}
+
+.code-input {
+  flex: 1;
+  min-width: 0;
+  padding: 24rpx 12rpx 24rpx 24rpx;
   font-size: 30rpx;
+  background: transparent;
+}
+
+.code-scan {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 96rpx;
+  flex-shrink: 0;
+  border-left: 2rpx solid #D8F3DC;
+  background: rgba(255, 255, 255, 0.55);
+}
+
+.code-scan.disabled {
+  opacity: 0.45;
+}
+
+.code-scan-icon {
+  font-size: 40rpx;
+  line-height: 1;
+}
+
+.album-link {
+  margin: -16rpx 0 28rpx;
+  text-align: center;
+  font-size: 24rpx;
+  color: #52B788;
+  font-weight: 600;
+}
+
+.album-link.disabled {
+  opacity: 0.45;
 }
 
 .link-records {
