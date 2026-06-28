@@ -86,10 +86,21 @@ def auto_checkin_due_orders():
         db.close()
 
 
+def health_alert_job():
+    db = SessionLocal()
+    try:
+        from app.services.health_alert import maybe_send_health_alert
+
+        maybe_send_health_alert(db)
+    finally:
+        db.close()
+
+
 def start_scheduler():
     scheduler = BackgroundScheduler()
     scheduler.add_job(cancel_unpaid_orders, "interval", minutes=5)
     scheduler.add_job(expire_finished_orders, "interval", minutes=5)
     scheduler.add_job(auto_checkin_due_orders, "interval", minutes=1)
     scheduler.add_job(check_ble_battery, "interval", hours=1)
+    scheduler.add_job(health_alert_job, "interval", minutes=5)
     scheduler.start()

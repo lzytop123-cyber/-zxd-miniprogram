@@ -8,7 +8,10 @@
             <el-option v-for="s in stores" :key="s.id" :label="s.name" :value="s.id" />
           </el-select>
         </div>
-        <el-button type="primary" @click="openAdd">新增规则</el-button>
+        <div class="right-actions">
+          <el-button @click="openCopy">复制到其他门店</el-button>
+          <el-button type="primary" @click="openAdd">新增规则</el-button>
+        </div>
       </div>
     </template>
 
@@ -78,6 +81,31 @@
         <el-button type="primary" :loading="saving" @click="submit">保存</el-button>
       </template>
     </el-dialog>
+
+    <el-dialog v-model="copyVisible" title="复制定价到其他门店" width="420px">
+      <el-form label-width="100px">
+        <el-form-item label="源门店">
+          <el-input :model-value="stores.find(s => s.id === storeId)?.name || ''" disabled />
+        </el-form-item>
+        <el-form-item label="目标门店">
+          <el-select v-model="copyTargetId" style="width:100%">
+            <el-option
+              v-for="s in stores.filter(x => x.id !== storeId)"
+              :key="s.id"
+              :label="s.name"
+              :value="s.id"
+            />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="覆盖已有">
+          <el-switch v-model="copyOverwrite" />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="copyVisible = false">取消</el-button>
+        <el-button type="primary" :loading="copying" @click="submitCopy">确认复制</el-button>
+      </template>
+    </el-dialog>
   </el-card>
 </template>
 
@@ -106,6 +134,10 @@ const loading = ref(false)
 const saving = ref(false)
 const showDialog = ref(false)
 const editingId = ref<number | null>(null)
+const copyVisible = ref(false)
+const copyTargetId = ref<number | null>(null)
+const copyOverwrite = ref(false)
+const copying = ref(false)
 const form = reactive<any>({})
 
 const dialogTitle = computed(() => (editingId.value ? '编辑价格规则' : '新增价格规则'))
@@ -205,6 +237,31 @@ async function submit() {
   }
 }
 
+function openCopy() {
+  if (!storeId.value) return
+  copyTargetId.value = stores.value.find((s) => s.id !== storeId.value)?.id || null
+  copyOverwrite.value = false
+  copyVisible.value = true
+}
+
+async function submitCopy() {
+  if (!storeId.value || !copyTargetId.value) {
+    ElMessage.warning('请选择目标门店')
+    return
+  }
+  copying.value = true
+  try {
+    const res = await http.post(
+      `/admin/stores/${storeId.value}/pricing/copy-to/${copyTargetId.value}`,
+      { overwrite: copyOverwrite.value },
+    )
+    ElMessage.success(`复制完成：新增 ${res.data.added}，更新 ${res.data.updated}`)
+    copyVisible.value = false
+  } finally {
+    copying.value = false
+  }
+}
+
 onMounted(async () => {
   await loadStores()
   await load()
@@ -213,6 +270,6 @@ onMounted(async () => {
 
 <style scoped>
 .header-row { display: flex; justify-content: space-between; align-items: center; }
-.left { display: flex; align-items: center; }
+.left, .right-actions { display: flex; align-items: center; gap: 8px; }
 .field-hint { margin-top: 6px; font-size: 12px; color: #909399; }
 </style>

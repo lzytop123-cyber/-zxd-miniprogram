@@ -37,6 +37,28 @@ def add_points(
     return log
 
 
+def adjust_points(
+    db: Session,
+    user: User,
+    delta: int,
+    remark: str,
+) -> PointLog:
+    if delta == 0:
+        raise ValueError("调整积分不能为0")
+    new_total = (user.total_points or 0) + delta
+    if new_total < 0:
+        raise ValueError("积分不足，无法扣减")
+    user.total_points = new_total
+    log = PointLog(
+        user_id=user.id,
+        points=delta,
+        type="admin_adjust",
+        remark=remark,
+    )
+    db.add(log)
+    return log
+
+
 def apply_invite_code(db: Session, user: User, invite_code: str) -> dict:
     code = invite_code.strip().upper()
     if not code:

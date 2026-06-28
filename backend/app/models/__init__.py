@@ -221,6 +221,8 @@ class Reservation(Base):
     pay_status: Mapped[int] = mapped_column(Integer, default=0)
     status: Mapped[int] = mapped_column(Integer, default=0)
     check_in_time: Mapped[datetime | None] = mapped_column(DateTime)
+    refund_remark: Mapped[str | None] = mapped_column(String(200))
+    refunded_at: Mapped[datetime | None] = mapped_column(DateTime)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
 
@@ -407,6 +409,7 @@ class MeituanDealMapping(Base):
     reward_value: Mapped[int | None] = mapped_column(Integer)
     night_start: Mapped[time | None] = mapped_column(Time)
     night_end: Mapped[time | None] = mapped_column(Time)
+    platform: Mapped[int] = mapped_column(Integer, default=1)
     is_active: Mapped[int] = mapped_column(Integer, default=1)
 
 
@@ -469,3 +472,47 @@ class HomeCarouselSetting(Base):
     hero_height: Mapped[int] = mapped_column(Integer, default=680)
     hero_mode: Mapped[str] = mapped_column(String(20), default="fullscreen")
     updated_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), onupdate=func.now())
+
+
+class AdminOperationLog(Base):
+    __tablename__ = "admin_operation_logs"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    admin_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("admin_users.id"))
+    admin_username: Mapped[str | None] = mapped_column(String(50))
+    action: Mapped[str] = mapped_column(String(50), nullable=False)
+    target_type: Mapped[str | None] = mapped_column(String(30))
+    target_id: Mapped[str | None] = mapped_column(String(50))
+    detail: Mapped[str | None] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+
+class SystemAnnouncement(Base):
+    __tablename__ = "system_announcements"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    title: Mapped[str] = mapped_column(String(100), nullable=False)
+    content: Mapped[str] = mapped_column(Text, nullable=False)
+    link_path: Mapped[str | None] = mapped_column(String(200))
+    show_on_home: Mapped[int] = mapped_column(Integer, default=1)
+    popup_once: Mapped[int] = mapped_column(Integer, default=1)
+    priority: Mapped[int] = mapped_column(Integer, default=0)
+    is_active: Mapped[int] = mapped_column(Integer, default=1)
+    start_at: Mapped[datetime | None] = mapped_column(DateTime)
+    end_at: Mapped[datetime | None] = mapped_column(DateTime)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), onupdate=func.now())
+
+
+class StoreCalendarDay(Base):
+    __tablename__ = "store_calendar_days"
+    __table_args__ = (UniqueConstraint("store_id", "day", name="uq_store_calendar_day"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    store_id: Mapped[int] = mapped_column(Integer, ForeignKey("stores.id"), nullable=False)
+    day: Mapped[date] = mapped_column(Date, nullable=False)
+    is_closed: Mapped[int] = mapped_column(Integer, default=0)
+    open_time: Mapped[time | None] = mapped_column(Time)
+    close_time: Mapped[time | None] = mapped_column(Time)
+    remark: Mapped[str | None] = mapped_column(String(200))
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())

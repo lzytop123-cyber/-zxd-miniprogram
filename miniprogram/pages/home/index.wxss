@@ -691,3 +691,70 @@
 .store-list {
   padding: 8rpx 24rpx 32rpx;
 }
+
+.announce-bar {
+  margin: 20rpx 24rpx 0;
+  padding: 20rpx 24rpx;
+  background: #fff8e6;
+  border-radius: 16rpx;
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+  box-shadow: 0 8rpx 24rpx rgba(255, 208, 0, 0.12);
+}
+
+.announce-icon {
+  font-size: 28rpx;
+}
+
+.announce-text {
+  flex: 1;
+  font-size: 26rpx;
+  color: #8a6d00;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.announce-mask {
+  position: fixed;
+  inset: 0;
+  z-index: 999;
+  background: rgba(0, 0, 0, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 48rpx;
+}
+
+.announce-modal {
+  width: 100%;
+  max-width: 620rpx;
+  background: #fff;
+  border-radius: 24rpx;
+  padding: 40rpx 32rpx 32rpx;
+}
+
+.announce-title {
+  font-size: 34rpx;
+  font-weight: 700;
+  color: #1a1a1a;
+  margin-bottom: 20rpx;
+}
+
+.announce-content {
+  font-size: 28rpx;
+  line-height: 1.6;
+  color: #555;
+  white-space: pre-wrap;
+  max-height: 420rpx;
+  overflow-y: auto;
+}
+
+.announce-btn {
+  margin-top: 32rpx;
+  background: #FFD000;
+  color: #1a1a1a;
+  border-radius: 999rpx;
+  font-weight: 600;
+}

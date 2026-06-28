@@ -61,6 +61,8 @@ class Settings(BaseSettings):
 
     jwt_expire_days: int = 7
 
+    health_alert_webhook: str = ""
+
     # DeepSeek AI 学习助手（OpenAI 兼容接口）
     deepseek_api_key: str = ""
     deepseek_base_url: str = "https://api.deepseek.com"

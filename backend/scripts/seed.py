@@ -8,6 +8,9 @@ from sqlalchemy import select, text
 from app.core.config import settings
 from app.core.security import hash_password
 from app.db.session import Base, SessionLocal, engine
+from app.services.schema_migrate import run_schema_migrations
+from app.services.seat_setup import ensure_store_seats
+from app.data.deal_templates import DEAL_MAPPING_TEMPLATES
 from app.models import (
     AdminUser,
     BillType,
@@ -24,44 +27,9 @@ from app.models import (
     Zone,
 )
 
-# A/B/C 各 8 座 + D 区 3 座（平面图左墙 22–24），共 27 座
-SEAT_ZONE_SPECS = (
-    ("A区", "A", "standard", 0, 40),
-    ("B区", "B", "window", 1, 180),
-    ("C区", "C", "standard", 2, 320),
-)
-SEATS_PER_ZONE = 8
-# 平面图编号 22–24，左墙沉浸区
-EXTRA_SEAT_SPECS = (
-    ("D区", "D", "standard", 3, (
-        ("D01", 30, 400),
-        ("D02", 30, 470),
-        ("D03", 30, 540),
-    )),
-)
-
 
 # 云老板验券返回的 dealId → 期限卡权益（美团后台 ID 可能不同，以验券返回为准）
-REAL_DEAL_MAPPINGS = (
-    # 云老板实测返回的 dealId
-    ("1457226281", "团购测试四小时", RewardType.hours, 4, None, None),
-    # 美团开店宝团购列表 ID（验券若返回这些 ID 可直接匹配）
-    ("1538184020", "团购测试四小时", RewardType.hours, 4, None, None),
-    ("1380905696", "「全区域通用 固定座位」季卡", RewardType.quarter_pass, 90, None, None),
-    ("1372550283", "「全区域通用 任意30次」30次卡", RewardType.session, 30, None, None),
-    ("1378191332", "「全区域通用 可自选」四小时卡", RewardType.hours, 4, None, None),
-    ("1358350526", "「全区域通用」十次卡", RewardType.session, 10, None, None),
-    ("1345243007", "「可分次·十次通用库」50小时", RewardType.hours, 50, None, None),
-    ("1344290952", "「上班族」月卡", RewardType.month_pass, 30, None, None),
-    ("1344305321", "「新客专享·全区域通用」月卡", RewardType.month_pass, 30, None, None),
-    ("1344307152", "「全区域通用 固定座位」月卡", RewardType.month_pass, 30, None, None),
-    ("1344310042", "「全区域通用」周卡", RewardType.week_pass, 7, None, None),
-    ("1344305196", "「全区域通坐 可复购」日卡", RewardType.day_pass, 1, None, None),
-    ("1344196515", "「新客专享 全区域通坐」三天卡", RewardType.day_pass, 3, None, None),
-    ("1344167767", "「新客专享 全区域通坐」日卡", RewardType.day_pass, 1, None, None),
-    ("1392559935", "「新客专享·全区域通坐」日卡", RewardType.day_pass, 1, None, None),
-    ("1344166440", "「新客专享 全区域通坐」四小时", RewardType.hours, 4, None, None),
-)
+REAL_DEAL_MAPPINGS = DEAL_MAPPING_TEMPLATES
 
 
 def _ensure_real_deal_mappings(db, store: Store) -> int:
@@ -90,100 +58,6 @@ def _ensure_real_deal_mappings(db, store: Store) -> int:
         )
         added += 1
     return added
-
-
-def _seat_position(index: int, start_y: int) -> tuple[int, int]:
-    col = (index - 1) % 4
-    row = (index - 1) // 4
-    return 30 + col * 90, start_y + row * 70
-
-
-def _ensure_store_seats(db, store: Store) -> int:
-    """补全门店座位（已有则跳过，支持重复执行 seed）。"""
-    zones: dict[str, Zone] = {}
-    for name, prefix, zone_type, sort_order, _ in SEAT_ZONE_SPECS:
-        zone = db.scalar(select(Zone).where(Zone.store_id == store.id, Zone.name == name))
-        if not zone:
-            zone = Zone(store_id=store.id, name=name, type=zone_type, sort_order=sort_order)
-            db.add(zone)
-            db.flush()
-        zones[prefix] = zone
-
-    existing_codes = {
-        s.seat_code
-        for s in db.scalars(select(Seat).where(Seat.store_id == store.id, Seat.is_buffer == 0)).all()
-    }
-    added = []
-    for name, prefix, zone_type, _, start_y in SEAT_ZONE_SPECS:
-        for i in range(1, SEATS_PER_ZONE + 1):
-            code = f"{prefix}{i:02d}"
-            if code in existing_codes:
-                continue
-            pos_x, pos_y = _seat_position(i, start_y)
-            added.append(
-                Seat(
-                    store_id=store.id,
-                    zone_id=zones[prefix].id,
-                    seat_code=code,
-                    seat_type=zone_type,
-                    has_outlet=1,
-                    has_curtain=1 if prefix == "C" else 0,
-                    pos_x=pos_x,
-                    pos_y=pos_y,
-                )
-            )
-    if added:
-        db.add_all(added)
-
-    # 统一刷新已有座位的分布图坐标
-    for name, prefix, zone_type, _, start_y in SEAT_ZONE_SPECS:
-        for i in range(1, SEATS_PER_ZONE + 1):
-            code = f"{prefix}{i:02d}"
-            seat = db.scalar(
-                select(Seat).where(Seat.store_id == store.id, Seat.seat_code == code)
-            )
-            if not seat:
-                continue
-            pos_x, pos_y = _seat_position(i, start_y)
-            seat.pos_x = pos_x
-            seat.pos_y = pos_y
-            seat.zone_id = zones[prefix].id
-            seat.seat_type = zone_type
-
-    extra_new = 0
-    for zone_name, prefix, zone_type, sort_order, seats in EXTRA_SEAT_SPECS:
-        zone = db.scalar(select(Zone).where(Zone.store_id == store.id, Zone.name == zone_name))
-        if not zone:
-            zone = Zone(store_id=store.id, name=zone_name, type=zone_type, sort_order=sort_order)
-            db.add(zone)
-            db.flush()
-        for code, pos_x, pos_y in seats:
-            if code in existing_codes:
-                seat = db.scalar(
-                    select(Seat).where(Seat.store_id == store.id, Seat.seat_code == code)
-                )
-                if seat:
-                    seat.zone_id = zone.id
-                    seat.seat_type = zone_type
-                    seat.pos_x = pos_x
-                    seat.pos_y = pos_y
-                    seat.status = 1
-                continue
-            db.add(
-                Seat(
-                    store_id=store.id,
-                    zone_id=zone.id,
-                    seat_code=code,
-                    seat_type=zone_type,
-                    has_outlet=1,
-                    has_curtain=0,
-                    pos_x=pos_x,
-                    pos_y=pos_y,
-                )
-            )
-            extra_new += 1
-
-    return len(added) + extra_new
 
 
 def _ensure_quarterly_pricing(db, store: Store) -> bool:
@@ -264,9 +138,9 @@ def _ensure_weekly_pricing(db, store: Store) -> bool:
 
 def seed():
     Base.metadata.create_all(bind=engine)
-    _ensure_sqlite_columns()
     db = SessionLocal()
     try:
+        run_schema_migrations(db)
         if not db.scalar(select(Store).limit(1)):
             store = Store(
                 name="知行岛平阳路店",
@@ -289,7 +163,7 @@ def seed():
             db.add_all([zone_a, zone_b])
             db.flush()
 
-            _ensure_store_seats(db, store)
+            ensure_store_seats(db, store)
 
             pricing = [
                 PricingRule(
@@ -375,7 +249,7 @@ def seed():
 
         store = db.scalar(select(Store).limit(1))
         if store:
-            added = _ensure_store_seats(db, store)
+            added = ensure_store_seats(db, store)
             if added:
                 print(f"Added {added} seats.")
             mapped = _ensure_real_deal_mappings(db, store)
@@ -482,37 +356,6 @@ def _ensure_home_banner(db) -> None:
             sort_order=0,
         )
     )
-
-
-def _ensure_sqlite_columns():
-    if "sqlite" not in str(engine.url):
-        return
-    stmts = [
-        "ALTER TABLE users ADD COLUMN invite_code VARCHAR(20)",
-        "ALTER TABLE users ADD COLUMN invited_by INTEGER",
-        "ALTER TABLE users ADD COLUMN study_goal VARCHAR(20)",
-        "ALTER TABLE home_banners ADD COLUMN layout_type VARCHAR(20) DEFAULT 'text'",
-        "ALTER TABLE home_banners ADD COLUMN image_url VARCHAR(500)",
-        "ALTER TABLE home_banners ADD COLUMN link_path VARCHAR(200)",
-        "ALTER TABLE home_carousel_settings ADD COLUMN hero_height INTEGER DEFAULT 520",
-        "ALTER TABLE home_carousel_settings ADD COLUMN hero_mode VARCHAR(20) DEFAULT 'fullscreen'",
-        "ALTER TABLE period_cards ADD COLUMN total_hours NUMERIC(5, 1)",
-    ]
-    with engine.begin() as conn:
-        for stmt in stmts:
-            try:
-                conn.execute(text(stmt))
-            except Exception:
-                pass
-        try:
-            conn.execute(
-                text(
-                    "UPDATE period_cards SET total_hours = remaining_hours "
-                    "WHERE card_type = 'hourly' AND total_hours IS NULL"
-                )
-            )
-        except Exception:
-            pass
 
 
 if __name__ == "__main__":

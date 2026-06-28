@@ -70,45 +70,108 @@
       />
     </div>
 
-    <el-drawer v-model="showDetail" :title="`用户 #${detail?.id || ''}`" size="420px">
+    <el-drawer v-model="showDetail" :title="`用户 #${detail?.id || ''}`" size="640px">
       <template v-if="detail">
-        <el-descriptions :column="1" border>
+        <el-descriptions :column="2" border>
           <el-descriptions-item label="学号 ID">{{ detail.id }}</el-descriptions-item>
           <el-descriptions-item label="昵称">{{ detail.nickname || '-' }}</el-descriptions-item>
           <el-descriptions-item label="手机号">{{ detail.phone || '-' }}</el-descriptions-item>
-          <el-descriptions-item label="资料状态">
-            <el-tag v-if="detail.needs_profile_setup" type="warning" size="small">待完善</el-tag>
-            <el-tag v-else type="success" size="small">已完善</el-tag>
-          </el-descriptions-item>
-          <el-descriptions-item label="备考方向">
+          <el-descriptions-item label="余额">¥{{ detail.balance }}</el-descriptions-item>
+          <el-descriptions-item label="积分">{{ detail.total_points }}</el-descriptions-item>
+          <el-descriptions-item label="已付订单">{{ detail.paid_order_count }}</el-descriptions-item>
+          <el-descriptions-item label="有效期限卡">{{ detail.active_card_count }}</el-descriptions-item>
+          <el-descriptions-item label="邀请码">{{ detail.invite_code || '-' }}</el-descriptions-item>
+        </el-descriptions>
+
+        <el-tabs v-model="detailTab" class="detail-tabs">
+          <el-tab-pane label="余额调整" name="balance">
+            <div class="section-title">调整余额</div>
+            <el-form inline>
+              <el-form-item>
+                <el-input-number v-model="adjustAmount" :precision="2" :step="10" />
+              </el-form-item>
+              <el-form-item>
+                <el-input v-model="adjustRemark" placeholder="备注" style="width:160px" />
+              </el-form-item>
+              <el-form-item>
+                <el-button type="primary" @click="adjustBalance">确认调整</el-button>
+              </el-form-item>
+            </el-form>
+            <p class="hint">正数充值，负数扣减</p>
+
+            <div class="section-title">调整积分</div>
+            <el-form inline>
+              <el-form-item>
+                <el-input-number v-model="adjustPointsDelta" :step="10" />
+              </el-form-item>
+              <el-form-item>
+                <el-input v-model="adjustPointsRemark" placeholder="备注" style="width:160px" />
+              </el-form-item>
+              <el-form-item>
+                <el-button type="primary" @click="adjustPoints">确认调整</el-button>
+              </el-form-item>
+            </el-form>
+            <p class="hint">正数增加，负数扣减</p>
+
+            <div class="section-title">备考方向</div>
             <el-select v-model="editStudyGoal" placeholder="未填写" clearable style="width:160px">
               <el-option label="考研" value="kaoyan" />
               <el-option label="考公" value="kaogong" />
               <el-option label="其他" value="other" />
             </el-select>
             <el-button type="primary" link style="margin-left:8px" @click="saveStudyGoal">保存</el-button>
-          </el-descriptions-item>
-          <el-descriptions-item label="余额">¥{{ detail.balance }}</el-descriptions-item>
-          <el-descriptions-item label="积分">{{ detail.total_points }}</el-descriptions-item>
-          <el-descriptions-item label="已付订单">{{ detail.paid_order_count }}</el-descriptions-item>
-          <el-descriptions-item label="有效期限卡">{{ detail.active_card_count }}</el-descriptions-item>
-          <el-descriptions-item label="邀请码">{{ detail.invite_code || '-' }}</el-descriptions-item>
-          <el-descriptions-item label="注册时间">{{ detail.created_at || '-' }}</el-descriptions-item>
-        </el-descriptions>
+          </el-tab-pane>
 
-        <div class="section-title">调整余额</div>
-        <el-form inline>
-          <el-form-item>
-            <el-input-number v-model="adjustAmount" :precision="2" :step="10" />
-          </el-form-item>
-          <el-form-item>
-            <el-input v-model="adjustRemark" placeholder="备注" style="width:160px" />
-          </el-form-item>
-          <el-form-item>
-            <el-button type="primary" @click="adjustBalance">确认调整</el-button>
-          </el-form-item>
-        </el-form>
-        <p class="hint">正数充值，负数扣减（如 -10 表示扣 10 元）</p>
+          <el-tab-pane label="订单" name="orders">
+            <el-table :data="overview.orders || []" size="small" stripe max-height="360">
+              <el-table-column prop="order_no" label="订单号" width="150" />
+              <el-table-column prop="seat_code" label="座位" width="70" />
+              <el-table-column label="支付" width="80">
+                <template #default="{ row }">{{ ['待付','已付','退款'][row.pay_status] || row.pay_status }}</template>
+              </el-table-column>
+              <el-table-column prop="status_label" label="状态" width="90" />
+              <el-table-column prop="start_time" label="开始" min-width="140" />
+            </el-table>
+          </el-tab-pane>
+
+          <el-tab-pane label="期限卡" name="cards">
+            <div class="tab-actions">
+              <el-button type="success" size="small" @click="goIssueCard">手动发期限卡</el-button>
+            </div>
+            <el-table :data="overview.cards || []" size="small" stripe max-height="360">
+              <el-table-column prop="card_name" label="名称" min-width="120" />
+              <el-table-column prop="card_type" label="类型" width="90" />
+              <el-table-column label="余量" width="100">
+                <template #default="{ row }">
+                  <span v-if="row.remaining_hours != null">{{ row.remaining_hours }}h</span>
+                  <span v-else-if="row.remaining_sessions != null">{{ row.remaining_sessions }}次</span>
+                  <span v-else>-</span>
+                </template>
+              </el-table-column>
+              <el-table-column prop="status" label="状态" width="70">
+                <template #default="{ row }">{{ row.status === 1 ? '有效' : '失效' }}</template>
+              </el-table-column>
+            </el-table>
+          </el-tab-pane>
+
+          <el-tab-pane label="兑换记录" name="exchanges">
+            <el-table :data="overview.exchanges || []" size="small" stripe max-height="360">
+              <el-table-column prop="coupon_code" label="券码" width="120" />
+              <el-table-column prop="deal_name" label="团购" min-width="140" />
+              <el-table-column prop="status" label="状态" width="90" />
+              <el-table-column prop="created_at" label="时间" min-width="140" />
+            </el-table>
+          </el-tab-pane>
+
+          <el-tab-pane label="钱包流水" name="wallet">
+            <el-table :data="overview.wallet_logs || []" size="small" stripe max-height="360">
+              <el-table-column prop="type" label="类型" width="80" />
+              <el-table-column prop="amount" label="金额" width="80" />
+              <el-table-column prop="remark" label="备注" min-width="140" />
+              <el-table-column prop="created_at" label="时间" min-width="140" />
+            </el-table>
+          </el-tab-pane>
+        </el-tabs>
       </template>
     </el-drawer>
   </el-card>
@@ -116,8 +179,11 @@
 
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
+import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import http from '../api/http'
+
+const router = useRouter()
 
 const list = ref<any[]>([])
 const loading = ref(false)
@@ -131,6 +197,10 @@ const detail = ref<any>(null)
 const editStudyGoal = ref<string | null>(null)
 const adjustAmount = ref(0)
 const adjustRemark = ref('管理员调整余额')
+const adjustPointsDelta = ref(0)
+const adjustPointsRemark = ref('管理员调整积分')
+const detailTab = ref('balance')
+const overview = ref<any>({ orders: [], cards: [], exchanges: [], wallet_logs: [] })
 
 function goalTagType(goal: string) {
   if (goal === 'kaoyan') return 'success'
@@ -172,7 +242,24 @@ async function openDetail(row: any) {
   detail.value = res.data
   editStudyGoal.value = res.data.study_goal || null
   adjustAmount.value = 0
+  detailTab.value = 'balance'
+  overview.value = { orders: [], cards: [], exchanges: [], wallet_logs: [] }
   showDetail.value = true
+  await loadOverview()
+}
+
+async function loadOverview() {
+  if (!detail.value) return
+  const res = await http.get(`/admin/users/${detail.value.id}/overview`)
+  overview.value = res.data
+  if (res.data.profile) {
+    detail.value = { ...detail.value, ...res.data.profile }
+  }
+}
+
+function goIssueCard() {
+  if (!detail.value) return
+  router.push({ path: '/period-cards', query: { userId: String(detail.value.id) } })
 }
 
 async function saveStudyGoal() {
@@ -200,6 +287,20 @@ async function adjustBalance() {
   load()
 }
 
+async function adjustPoints() {
+  if (!detail.value || !adjustPointsDelta.value) {
+    ElMessage.warning('请输入调整积分')
+    return
+  }
+  const res = await http.post(`/admin/users/${detail.value.id}/adjust-points`, {
+    delta: adjustPointsDelta.value,
+    remark: adjustPointsRemark.value,
+  })
+  detail.value.total_points = res.data.total_points
+  ElMessage.success('积分已调整')
+  load()
+}
+
 onMounted(async () => {
   await loadStats()
   await load()
@@ -223,5 +324,7 @@ onMounted(async () => {
 .muted { color: #999; }
 .pager { margin-top: 16px; display: flex; justify-content: flex-end; }
 .section-title { margin: 20px 0 12px; font-weight: 700; }
+.detail-tabs { margin-top: 16px; }
+.tab-actions { margin-bottom: 12px; }
 .hint { font-size: 12px; color: #999; margin-top: 8px; }
 </style>

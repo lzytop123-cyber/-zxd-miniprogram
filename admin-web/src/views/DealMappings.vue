@@ -2,10 +2,21 @@
   <el-card>
     <template #header>
       <div class="header-row">
-        <span>美团团购映射</span>
-        <el-button type="primary" @click="openAdd()">新增映射</el-button>
+        <span>团购映射</span>
+        <div class="actions">
+          <el-select v-model="storeId" style="width: 160px; margin-right: 8px">
+            <el-option v-for="s in stores" :key="s.id" :label="s.name" :value="s.id" />
+          </el-select>
+          <el-button @click="importTemplates">一键导入模板</el-button>
+          <el-button type="primary" @click="openAdd()">新增映射</el-button>
+        </div>
       </div>
     </template>
+
+    <el-tabs v-model="platformTab" @tab-change="load">
+      <el-tab-pane label="美团" name="1" />
+      <el-tab-pane label="抖音" name="2" />
+    </el-tabs>
 
     <el-alert
       v-if="pendingList.length"
@@ -70,11 +81,14 @@
 
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import http from '../api/http'
 
 const list = ref<any[]>([])
 const pendingList = ref<any[]>([])
+const stores = ref<any[]>([])
+const storeId = ref(1)
+const platformTab = ref('1')
 const loading = ref(false)
 const showAdd = ref(false)
 const resolveId = ref<number | null>(null)
@@ -85,16 +99,20 @@ const form = reactive({
   reward_type: 'hours',
   reward_value: 4,
   store_id: 1,
+  platform: 1,
 })
 
 const dialogTitle = computed(() => (resolveId.value ? '配置待处理团购' : '新增团购映射'))
+const currentPlatform = computed(() => Number(platformTab.value))
 
 async function load() {
   loading.value = true
+  form.platform = currentPlatform.value
+  form.store_id = storeId.value
   try {
     const [mappings, pending] = await Promise.all([
-      http.get('/admin/deal-mappings'),
-      http.get('/admin/deal-mappings/pending'),
+      http.get('/admin/deal-mappings', { params: { platform: currentPlatform.value } }),
+      http.get('/admin/deal-mappings/pending', { params: { platform: currentPlatform.value } }),
     ])
     list.value = mappings.data
     pendingList.value = pending.data
@@ -103,12 +121,28 @@ async function load() {
   }
 }
 
+async function importTemplates() {
+  await ElMessageBox.confirm(
+    `将把标准模板导入到当前门店（${platformTab.value === '1' ? '美团' : '抖音'}），已存在的 Deal ID 将跳过。`,
+    '导入模板',
+    { type: 'info' },
+  )
+  const res = await http.post('/admin/deal-mappings/import-templates', {
+    store_id: storeId.value,
+    platform: currentPlatform.value,
+    overwrite: false,
+  })
+  ElMessage.success(`导入完成：新增 ${res.data.added}，跳过 ${res.data.skipped}`)
+  load()
+}
+
 function openAdd() {
   resolveId.value = null
   form.deal_id = ''
   form.deal_name = ''
   form.reward_type = 'hours'
   form.reward_value = 4
+  form.platform = currentPlatform.value
   showAdd.value = true
 }
 
@@ -118,20 +152,21 @@ function openResolve(row: any) {
   form.deal_name = row.deal_name || ''
   form.reward_type = row.suggested_reward_type || 'day_pass'
   form.reward_value = row.suggested_reward_value || 1
+  form.platform = currentPlatform.value
   showAdd.value = true
 }
 
 async function submit() {
   if (resolveId.value) {
     await http.post(`/admin/deal-mappings/pending/${resolveId.value}/resolve`, {
-      store_id: form.store_id,
+      store_id: storeId.value,
       deal_name: form.deal_name,
       reward_type: form.reward_type,
       reward_value: form.reward_value,
     })
     ElMessage.success('已配置，可让用户重新兑换')
   } else {
-    await http.post('/admin/deal-mappings', form)
+    await http.post('/admin/deal-mappings', { ...form, platform: currentPlatform.value })
     ElMessage.success('已添加')
   }
   showAdd.value = false
@@ -145,11 +180,17 @@ async function dismiss(row: any) {
   load()
 }
 
-onMounted(load)
+onMounted(async () => {
+  const res = await http.get('/admin/stores')
+  stores.value = res.data
+  if (stores.value.length) storeId.value = stores.value[0].id
+  load()
+})
 </script>
 
 <style scoped>
-.header-row { display: flex; justify-content: space-between; align-items: center; }
+.header-row { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; }
+.actions { display: flex; align-items: center; flex-wrap: wrap; gap: 4px; }
 .pending-alert { margin-bottom: 16px; }
 .pending-table { margin-bottom: 8px; }
 </style>

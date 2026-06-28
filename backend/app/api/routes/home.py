@@ -1,10 +1,12 @@
+from datetime import datetime
+
 from fastapi import APIRouter, Depends
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
 from app.core.static_url import public_static_path
-from app.models import HomeBanner, HomeCarouselSetting
+from app.models import HomeBanner, HomeCarouselSetting, SystemAnnouncement
 from app.schemas.common import ResponseModel
 
 router = APIRouter(prefix="/home", tags=["首页"])
@@ -109,3 +111,32 @@ def get_home_banner(db: Session = Depends(get_db)):
     if not items:
         return ResponseModel(data=EMPTY_BANNER)
     return ResponseModel(data=items[0])
+
+
+def _list_active_announcements(db: Session) -> list[dict]:
+    now = datetime.now()
+    rows = db.scalars(
+        select(SystemAnnouncement)
+        .where(
+            SystemAnnouncement.is_active == 1,
+            SystemAnnouncement.show_on_home == 1,
+            or_(SystemAnnouncement.start_at.is_(None), SystemAnnouncement.start_at <= now),
+            or_(SystemAnnouncement.end_at.is_(None), SystemAnnouncement.end_at >= now),
+        )
+        .order_by(SystemAnnouncement.priority.desc(), SystemAnnouncement.id.desc())
+    ).all()
+    return [
+        {
+            "id": row.id,
+            "title": row.title,
+            "content": row.content,
+            "link_path": (row.link_path or "").strip(),
+            "popup_once": bool(row.popup_once),
+        }
+        for row in rows
+    ]
+
+
+@router.get("/announcements", response_model=ResponseModel)
+def get_home_announcements(db: Session = Depends(get_db)):
+    return ResponseModel(data={"items": _list_active_announcements(db)})

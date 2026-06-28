@@ -36,6 +36,11 @@
     </view>
   </view>
 
+  <view wx:if="{{announcements.length}}" class="announce-bar" bindtap="onAnnouncementBarTap">
+    <text class="announce-icon">📢</text>
+    <text class="announce-text">{{announcements[0].title}}</text>
+  </view>
+
   <!-- 两大主入口 -->
   <view class="entries">
     <view class="entry entry-book" bindtap="goNearestStore">
@@ -142,6 +147,14 @@
         <view>暂无门店信息</view>
       </view>
     </block>
+  </view>
+
+  <view wx:if="{{showAnnouncementPopup && popupAnnouncement}}" class="announce-mask" catchtouchmove="true">
+    <view class="announce-modal">
+      <view class="announce-title">{{popupAnnouncement.title}}</view>
+      <view class="announce-content">{{popupAnnouncement.content}}</view>
+      <button class="announce-btn" bindtap="closeAnnouncement">知道了</button>
+    </view>
   </view>
 </view>
 

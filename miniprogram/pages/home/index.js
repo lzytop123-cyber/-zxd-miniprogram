@@ -10,6 +10,7 @@ const TAB_PAGES = [
 ]
 
 const BANNER_CACHE_KEY = 'home_banners_v1'
+const ANNOUNCE_SEEN_KEY = 'announce_seen_v1'
 
 Page({
   data: {
@@ -30,6 +31,9 @@ Page({
     cardCount: 0,
     storesLoading: true,
     locationHint: '',
+    announcements: [],
+    popupAnnouncement: null,
+    showAnnouncementPopup: false,
   },
 
   onLoad() {
@@ -52,9 +56,61 @@ Page({
 
   onShow() {
     this.loadBanners()
+    this.loadAnnouncements()
     this.loadStores()
     this.loadUser()
     this.loadCardCount()
+  },
+
+  loadAnnouncements() {
+    request({ url: '/home/announcements', silent: true })
+      .then((data) => {
+        const items = data.items || []
+        this.setData({ announcements: items })
+        if (!items.length) return
+        const popup = items.find((a) => a.popup_once) || items[0]
+        if (popup.popup_once) {
+          try {
+            const seen = wx.getStorageSync(ANNOUNCE_SEEN_KEY) || []
+            if (seen.includes(popup.id)) return
+          } catch (e) {
+            // ignore
+          }
+        }
+        this.setData({ popupAnnouncement: popup, showAnnouncementPopup: true })
+      })
+      .catch(() => {})
+  },
+
+  closeAnnouncement() {
+    const item = this.data.popupAnnouncement
+    if (item && item.popup_once) {
+      try {
+        const seen = wx.getStorageSync(ANNOUNCE_SEEN_KEY) || []
+        if (!seen.includes(item.id)) {
+          wx.setStorageSync(ANNOUNCE_SEEN_KEY, [...seen, item.id])
+        }
+      } catch (e) {
+        // ignore
+      }
+    }
+    this.setData({ showAnnouncementPopup: false })
+  },
+
+  onAnnouncementBarTap() {
+    const item = this.data.announcements[0]
+    if (!item) return
+    if (item.link_path) {
+      const url = item.link_path.startsWith('/') ? item.link_path : `/${item.link_path}`
+      const base = url.split('?')[0]
+      if (TAB_PAGES.includes(base)) {
+        wx.switchTab({ url: base })
+      } else {
+        wx.navigateTo({ url })
+      }
+      return
+    }
+    this.setData({ popupAnnouncement: item, showAnnouncementPopup: true })
   },
 
   loadBanners() {

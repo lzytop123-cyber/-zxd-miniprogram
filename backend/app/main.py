@@ -6,7 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy.orm import Session
 
-from app.api.routes import admin, assistant, ble, card, exchange, home, payment, report, reservation, store, user
+from app.api.routes import admin, admin_tools, assistant, ble, card, exchange, home, payment, report, reservation, store, user
 from app.db.session import get_db
 from app.services.health import run_health_checks
 from app.tasks.scheduler import start_scheduler
@@ -16,6 +16,14 @@ UPLOADS_DIR = Path(__file__).resolve().parent.parent / "uploads"
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    from app.db.session import SessionLocal
+    from app.services.schema_migrate import run_schema_migrations
+
+    db = SessionLocal()
+    try:
+        run_schema_migrations(db)
+    finally:
+        db.close()
     start_scheduler()
     yield
 
@@ -45,6 +53,7 @@ app.include_router(payment.router, prefix="/api")
 app.include_router(assistant.router, prefix="/api")
 app.include_router(home.router, prefix="/api")
 app.include_router(admin.router, prefix="/api")
+app.include_router(admin_tools.router, prefix="/api")
 
 UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
 app.mount("/static", StaticFiles(directory=str(UPLOADS_DIR)), name="static")

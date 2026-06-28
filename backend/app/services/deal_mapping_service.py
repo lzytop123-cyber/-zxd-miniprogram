@@ -107,6 +107,7 @@ def resolve_pending_deal(
         deal_name=deal_name or pending.deal_name,
         reward_type=reward_type,
         reward_value=reward_value,
+        platform=pending.platform or 1,
         is_active=1,
     )
     db.add(mapping)

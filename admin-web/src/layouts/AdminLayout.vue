@@ -8,7 +8,9 @@
         <el-sub-menu index="home">
           <template #title>首页 · 运营</template>
           <el-menu-item index="/banners">首页活动</el-menu-item>
+          <el-menu-item index="/announcements">消息公告</el-menu-item>
           <el-menu-item index="/stores">门店管理</el-menu-item>
+          <el-menu-item index="/store-calendar">营业日历</el-menu-item>
         </el-sub-menu>
 
         <el-sub-menu index="booking">
@@ -45,6 +47,7 @@
         <el-sub-menu index="system">
           <template #title>系统</template>
           <el-menu-item index="/system-status">系统状态</el-menu-item>
+          <el-menu-item index="/operation-logs">操作日志</el-menu-item>
           <el-menu-item index="/admins">管理员</el-menu-item>
         </el-sub-menu>
       </el-menu>

@@ -36,6 +36,7 @@
       </el-form-item>
       <el-form-item>
         <el-button type="primary" @click="search">查询</el-button>
+        <el-button @click="filterUnpaid">待付款</el-button>
         <el-button @click="reset">重置</el-button>
       </el-form-item>
     </el-form>
@@ -93,7 +94,7 @@
           <div class="sub">至 {{ formatTime(row.end_time) }}</div>
         </template>
       </el-table-column>
-      <el-table-column label="操作" width="140" fixed="right">
+      <el-table-column label="操作" width="220" fixed="right">
         <template #default="{ row }">
           <el-button
             v-if="canChangeSeat(row)"
@@ -102,11 +103,29 @@
             @click="openChangeSeat(row)"
           >换座</el-button>
           <el-button
-            v-if="row.status === 0 && row.pay_status === 1"
+            v-if="canRemoteUnlock(row)"
+            link
+            type="success"
+            @click="remoteUnlock(row)"
+          >远程开门</el-button>
+          <el-button
+            v-if="row.status === 1"
+            link
+            type="warning"
+            @click="forceCheckout(row)"
+          >强制离座</el-button>
+          <el-button
+            v-if="canCancel(row)"
             link
             type="danger"
             @click="cancelOrder(row)"
           >取消</el-button>
+          <el-button
+            v-if="row.pay_status === 1"
+            link
+            type="info"
+            @click="openRefund(row)"
+          >登记退款</el-button>
         </template>
       </el-table-column>
     </el-table>
@@ -143,6 +162,15 @@
         <el-button type="primary" :loading="changeSeatSubmitting" :disabled="!changeSeatTargetId" @click="submitChangeSeat">
           确认换座
         </el-button>
+      </template>
+    </el-dialog>
+
+    <el-dialog v-model="refundVisible" title="登记退款" width="420px">
+      <p v-if="refundRow" class="sub">订单 {{ refundRow.order_no }} · ¥{{ refundRow.final_price ?? 0 }}</p>
+      <el-input v-model="refundRemark" type="textarea" :rows="3" placeholder="退款原因/备注（人工登记，非微信自动退款）" />
+      <template #footer>
+        <el-button @click="refundVisible = false">取消</el-button>
+        <el-button type="primary" :loading="refundSubmitting" @click="submitRefund">确认登记</el-button>
       </template>
     </el-dialog>
 
@@ -249,10 +277,46 @@ function reset() {
   search()
 }
 
+function filterUnpaid() {
+  filters.pay_status = 0
+  filters.status = 0
+  search()
+}
+
+function canCancel(row: any) {
+  if (row.status === 3 || row.status === 2) return false
+  if (row.status === 1) return false
+  return row.status === 0
+}
+
+function canRemoteUnlock(row: any) {
+  if (row.pay_status !== 1) return false
+  if (row.status === 3 || row.status === 2) return false
+  if (!row.end_time) return true
+  return new Date(row.end_time).getTime() > Date.now()
+}
+
 async function cancelOrder(row: any) {
-  await ElMessageBox.confirm(`确定取消订单 ${row.order_no} 吗？已付款将尝试退款。`, '取消订单', { type: 'warning' })
+  const msg = row.pay_status === 0
+    ? `确定取消未支付订单 ${row.order_no} 吗？座位将立即释放。`
+    : `确定取消订单 ${row.order_no} 吗？已付款将尝试退款。`
+  await ElMessageBox.confirm(msg, '取消订单', { type: 'warning' })
   await http.post(`/admin/reservations/${row.id}/cancel`)
   ElMessage.success('已取消')
+  load()
+}
+
+async function remoteUnlock(row: any) {
+  await ElMessageBox.confirm(`确定为订单 ${row.order_no} 远程开门吗？`, '远程开门', { type: 'info' })
+  const res = await http.post(`/admin/reservations/${row.id}/remote-unlock`)
+  ElMessage.success(res.message || '开门成功')
+  load()
+}
+
+async function forceCheckout(row: any) {
+  await ElMessageBox.confirm(`确定强制结束订单 ${row.order_no} 吗？`, '强制离座', { type: 'warning' })
+  const res = await http.post(`/admin/reservations/${row.id}/force-checkout`)
+  ElMessage.success(res.message || '已离座')
   load()
 }
 
@@ -328,6 +392,35 @@ async function submitChangeSeat() {
     load()
   } finally {
     changeSeatSubmitting.value = false
+  }
+}
+
+const refundVisible = ref(false)
+const refundRow = ref<any>(null)
+const refundRemark = ref('')
+const refundSubmitting = ref(false)
+
+function openRefund(row: any) {
+  refundRow.value = row
+  refundRemark.value = ''
+  refundVisible.value = true
+}
+
+async function submitRefund() {
+  if (!refundRow.value || !refundRemark.value.trim()) {
+    ElMessage.warning('请填写退款备注')
+    return
+  }
+  refundSubmitting.value = true
+  try {
+    await http.post(`/admin/reservations/${refundRow.value.id}/mark-refund`, {
+      remark: refundRemark.value.trim(),
+    })
+    ElMessage.success('已登记退款')
+    refundVisible.value = false
+    load()
+  } finally {
+    refundSubmitting.value = false
   }
 }
 

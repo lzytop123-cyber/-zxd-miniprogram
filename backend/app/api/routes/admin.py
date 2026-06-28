@@ -18,6 +18,7 @@ from app.models import (
     AdminUser,
     BillType,
     CardPurchaseOrder,
+    CardType,
     Coupon,
     HomeBanner,
     HomeCarouselSetting,
@@ -41,9 +42,19 @@ from app.schemas.common import PageParams, PageResult, ResponseModel
 from app.schemas.reservation import ReservationItem
 from app.schemas.user import STUDY_GOAL_LABELS
 from app.services import assistant as assistant_service
+from app.services.admin_ops import (
+    admin_force_checkout,
+    admin_remote_unlock,
+    issue_admin_period_card,
+    period_card_admin_dict,
+    update_admin_period_card,
+    user_overview,
+)
 from app.services.booking import add_wallet_log, auto_checkin_reservation, change_reservation_seat, seat_options_for_change
 from app.services.card_service import BILL_TYPE_LABELS
 from app.services.deal_mapping_service import mark_pending_resolved_by_deal_id, resolve_pending_deal
+from app.services.schema_migrate import get_last_migration_result, run_schema_migrations
+from app.services.seat_setup import ensure_store_seats, store_seat_summary
 from app.services.wechat_pay import WechatPayService
 
 router = APIRouter(prefix="/admin", tags=["后台管理"])
@@ -234,6 +245,7 @@ class DealMappingCreateRequest(BaseModel):
     deal_name: str | None = None
     reward_type: RewardType
     reward_value: int | None = None
+    platform: int = 1
     is_active: int = 1
 
 
@@ -381,8 +393,15 @@ def _pricing_to_dict(rule: PricingRule) -> dict:
 
 
 @router.get("/deal-mappings", response_model=ResponseModel)
-def list_deal_mappings(_: object = Depends(get_current_admin), db: Session = Depends(get_db)):
-    rows = db.scalars(select(MeituanDealMapping).order_by(MeituanDealMapping.id.desc())).all()
+def list_deal_mappings(
+    platform: int | None = Query(None, ge=1, le=2),
+    _: object = Depends(get_current_admin),
+    db: Session = Depends(get_db),
+):
+    query = select(MeituanDealMapping).order_by(MeituanDealMapping.id.desc())
+    if platform is not None:
+        query = query.where(MeituanDealMapping.platform == platform)
+    rows = db.scalars(query).all()
     return ResponseModel(
         data=[
             {
@@ -392,6 +411,7 @@ def list_deal_mappings(_: object = Depends(get_current_admin), db: Session = Dep
                 "deal_name": r.deal_name,
                 "reward_type": r.reward_type.value,
                 "reward_value": r.reward_value,
+                "platform": getattr(r, "platform", 1) or 1,
                 "is_active": r.is_active,
             }
             for r in rows
@@ -411,6 +431,7 @@ def create_deal_mapping(
         deal_name=body.deal_name,
         reward_type=body.reward_type,
         reward_value=body.reward_value,
+        platform=body.platform,
         is_active=body.is_active,
     )
     db.add(row)
@@ -421,12 +442,15 @@ def create_deal_mapping(
 
 
 @router.get("/deal-mappings/pending", response_model=ResponseModel)
-def list_pending_deal_mappings(_: object = Depends(get_current_admin), db: Session = Depends(get_db)):
-    rows = db.scalars(
-        select(PendingDealMapping)
-        .where(PendingDealMapping.status == "pending")
-        .order_by(PendingDealMapping.updated_at.desc())
-    ).all()
+def list_pending_deal_mappings(
+    platform: int | None = Query(None, ge=1, le=2),
+    _: object = Depends(get_current_admin),
+    db: Session = Depends(get_db),
+):
+    query = select(PendingDealMapping).where(PendingDealMapping.status == "pending")
+    if platform is not None:
+        query = query.where(PendingDealMapping.platform == platform)
+    rows = db.scalars(query.order_by(PendingDealMapping.updated_at.desc())).all()
     return ResponseModel(
         data=[
             {
@@ -590,6 +614,36 @@ def update_seat_status(
     seat.status = status
     db.commit()
     return ResponseModel(message="已更新")
+
+
+@router.get("/stores/{store_id}/seats/summary", response_model=ResponseModel)
+def admin_store_seats_summary(
+    store_id: int,
+    _: object = Depends(get_current_admin),
+    db: Session = Depends(get_db),
+):
+    try:
+        return ResponseModel(data=store_seat_summary(db, store_id))
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+
+@router.post("/stores/{store_id}/ensure-seats", response_model=ResponseModel)
+def admin_ensure_store_seats(
+    store_id: int,
+    _: object = Depends(get_current_admin),
+    db: Session = Depends(get_db),
+):
+    store = db.get(Store, store_id)
+    if not store:
+        raise HTTPException(status_code=404, detail="门店不存在")
+    added = ensure_store_seats(db, store)
+    db.commit()
+    summary = store_seat_summary(db, store_id)
+    return ResponseModel(
+        message=f"已补全座位，本次新增 {added} 个",
+        data={**summary, "added": added},
+    )
 
 
 @router.get("/stores", response_model=ResponseModel)
@@ -786,7 +840,12 @@ def admin_cancel_reservation(
     if reservation.status == 2:
         raise HTTPException(status_code=400, detail="订单已完成，不可取消")
     if reservation.status == 1:
-        raise HTTPException(status_code=400, detail="使用中，请用户先离座")
+        raise HTTPException(status_code=400, detail="使用中，请先强制离座")
+
+    if reservation.pay_status == 0:
+        reservation.status = 3
+        db.commit()
+        return ResponseModel(message="未支付订单已取消，座位已释放")
 
     user = db.get(User, reservation.user_id)
     if reservation.pay_status == 1 and user:
@@ -862,6 +921,44 @@ def admin_change_reservation_seat(
     db.refresh(reservation)
     return ResponseModel(
         message=f"已换座：{old_seat.seat_code} → {new_seat.seat_code}",
+        data=_reservation_admin_item(db, reservation),
+    )
+
+
+@router.post("/reservations/{reservation_id}/remote-unlock", response_model=ResponseModel)
+async def admin_reservation_remote_unlock(
+    reservation_id: int,
+    _: object = Depends(get_current_admin),
+    db: Session = Depends(get_db),
+):
+    reservation = db.get(Reservation, reservation_id)
+    if not reservation:
+        raise HTTPException(status_code=404, detail="订单不存在")
+    try:
+        data = await admin_remote_unlock(db, reservation)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    db.commit()
+    return ResponseModel(message="远程开门成功", data=data)
+
+
+@router.post("/reservations/{reservation_id}/force-checkout", response_model=ResponseModel)
+def admin_reservation_force_checkout(
+    reservation_id: int,
+    _: object = Depends(get_current_admin),
+    db: Session = Depends(get_db),
+):
+    reservation = db.get(Reservation, reservation_id)
+    if not reservation:
+        raise HTTPException(status_code=404, detail="订单不存在")
+    try:
+        admin_force_checkout(db, reservation)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    db.commit()
+    db.refresh(reservation)
+    return ResponseModel(
+        message="已强制离座",
         data=_reservation_admin_item(db, reservation),
     )
 
@@ -947,6 +1044,27 @@ def get_user_admin(
     return ResponseModel(data=data)
 
 
+@router.get("/users/{user_id}/overview", response_model=ResponseModel)
+def get_user_overview_admin(
+    user_id: int,
+    _: object = Depends(get_current_admin),
+    db: Session = Depends(get_db),
+):
+    try:
+        data = user_overview(db, user_id)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e)) from e
+    user = db.get(User, user_id)
+    data["profile"] = _user_admin_item(user)
+    data["profile"]["paid_order_count"] = db.scalar(
+        select(func.count()).where(Reservation.user_id == user_id, Reservation.pay_status == 1)
+    ) or 0
+    data["profile"]["active_card_count"] = db.scalar(
+        select(func.count()).where(PeriodCard.user_id == user_id, PeriodCard.status == 1)
+    ) or 0
+    return ResponseModel(data=data)
+
+
 @router.post("/users/{user_id}/adjust-balance", response_model=ResponseModel)
 def adjust_user_balance(
     user_id: int,
@@ -1010,25 +1128,85 @@ def list_period_cards_admin(
     ).all()
     items = []
     for card in rows:
-        user = db.get(User, card.user_id)
-        items.append({
-            "id": card.id,
-            "user_id": card.user_id,
-            "user_nickname": user.nickname if user else None,
-            "user_phone": user.phone if user else None,
-            "card_name": card.card_name,
-            "card_type": card.card_type.value,
-            "remaining_hours": float(card.remaining_hours) if card.remaining_hours is not None else None,
-            "remaining_sessions": card.remaining_sessions,
-            "start_date": str(card.start_date) if card.start_date else None,
-            "end_date": str(card.end_date) if card.end_date else None,
-            "source": card.source.value,
-            "status": card.status,
-            "created_at": card.created_at.isoformat() if card.created_at else None,
-        })
+        items.append(period_card_admin_dict(db, card))
     return ResponseModel(
         data=PageResult(items=items, total=total or 0, page=page, page_size=page_size)
     )
+
+
+class AdminIssuePeriodCardRequest(BaseModel):
+    user_id: int
+    card_type: str
+    reward_value: int = 1
+    store_id: int | None = None
+    card_name: str | None = None
+    remark: str | None = None
+
+
+class AdminUpdatePeriodCardRequest(BaseModel):
+    status: int | None = None
+    end_date: date | None = None
+    extend_days: int | None = None
+    remaining_hours: float | None = None
+    total_hours: float | None = None
+    remaining_sessions: int | None = None
+    remark: str | None = None
+
+
+@router.post("/period-cards", response_model=ResponseModel)
+def issue_period_card_admin(
+    body: AdminIssuePeriodCardRequest,
+    _: object = Depends(get_current_admin),
+    db: Session = Depends(get_db),
+):
+    try:
+        card_type = CardType(body.card_type)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail="卡类型无效") from e
+    try:
+        card = issue_admin_period_card(
+            db,
+            user_id=body.user_id,
+            card_type=card_type,
+            reward_value=body.reward_value,
+            store_id=body.store_id,
+            card_name=body.card_name,
+            remark=body.remark,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    db.commit()
+    db.refresh(card)
+    return ResponseModel(message="期限卡已发放", data=period_card_admin_dict(db, card))
+
+
+@router.patch("/period-cards/{card_id}", response_model=ResponseModel)
+def update_period_card_admin(
+    card_id: int,
+    body: AdminUpdatePeriodCardRequest,
+    _: object = Depends(get_current_admin),
+    db: Session = Depends(get_db),
+):
+    card = db.get(PeriodCard, card_id)
+    if not card:
+        raise HTTPException(status_code=404, detail="期限卡不存在")
+    try:
+        update_admin_period_card(
+            db,
+            card,
+            status=body.status,
+            end_date=body.end_date,
+            extend_days=body.extend_days,
+            remaining_hours=Decimal(str(body.remaining_hours)) if body.remaining_hours is not None else None,
+            total_hours=Decimal(str(body.total_hours)) if body.total_hours is not None else None,
+            remaining_sessions=body.remaining_sessions,
+            remark=body.remark,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    db.commit()
+    db.refresh(card)
+    return ResponseModel(message="期限卡已更新", data=period_card_admin_dict(db, card))
 
 
 @router.get("/card-purchase-orders", response_model=ResponseModel)
@@ -1184,8 +1362,17 @@ def update_knowledge_admin(
     )
 
 
+@router.post("/system/migrate", response_model=ResponseModel)
+def admin_run_schema_migrate(
+    _: object = Depends(get_current_admin),
+    db: Session = Depends(get_db),
+):
+    result = run_schema_migrations(db)
+    return ResponseModel(message="数据库结构检查完成", data=result)
+
+
 @router.get("/system/status", response_model=ResponseModel)
-def system_status_admin(_: object = Depends(get_current_admin)):
+def system_status_admin(_: object = Depends(get_current_admin), db: Session = Depends(get_db)):
     from app.services.yunlaoban import _use_mock
 
     pay_cert = Path(settings.wx_pay_key_path)
@@ -1195,6 +1382,22 @@ def system_status_admin(_: object = Depends(get_current_admin)):
     )
     appid = (settings.wx_appid or "").strip()
     masked_appid = f"{appid[:6]}***" if len(appid) >= 6 else None
+    migration = get_last_migration_result()
+
+    unpaid_count = db.scalar(
+        select(func.count()).where(
+            Reservation.pay_status == 0,
+            Reservation.status != 3,
+        )
+    ) or 0
+    pending_deals = db.scalar(
+        select(func.count()).where(PendingDealMapping.status == "pending")
+    ) or 0
+    incomplete_stores: list[dict] = []
+    for store in db.scalars(select(Store).where(Store.status == 1)).all():
+        summary = store_seat_summary(db, store.id)
+        if not summary["is_complete"]:
+            incomplete_stores.append(summary)
 
     checks = [
         {
@@ -1233,6 +1436,14 @@ def system_status_admin(_: object = Depends(get_current_admin)):
             "ok": len(kb_content) > 100,
             "detail": f"{len(kb_content)} 字",
         },
+        {
+            "key": "database",
+            "name": "数据库结构",
+            "ok": migration.get("status") in ("ok", "unknown") and not migration.get("errors"),
+            "detail": f"回填小时卡 {migration.get('backfill_hours', 0)} 条"
+            if migration.get("backfill_hours")
+            else "结构已就绪",
+        },
     ]
 
     return ResponseModel(
@@ -1243,6 +1454,13 @@ def system_status_admin(_: object = Depends(get_current_admin)):
             "wx_appid": masked_appid,
             "checks": checks,
             "all_ok": all(c["ok"] for c in checks),
+            "migration": migration,
+            "ops_todos": {
+                "unpaid_orders": unpaid_count,
+                "pending_deal_mappings": pending_deals,
+                "incomplete_seat_stores": incomplete_stores,
+            },
+            "health_alert_webhook": bool((settings.health_alert_webhook or "").strip()),
         }
     )
 
