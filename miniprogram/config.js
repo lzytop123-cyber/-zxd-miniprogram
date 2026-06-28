@@ -4,7 +4,7 @@ const PROD_STATIC_BASE = 'https://api.islandspace.xyz'
 
 const DEV_LAN_HOST = '192.168.0.104'
 const DEV_LOCAL_HOST = '127.0.0.1'
-const DEV_API_PORT = 8002
+const DEV_API_PORT = 8000
 
 function getEnvVersion() {
   try {
