@@ -1,8 +1,8 @@
 <template name="seatUnit">
   <view class="seat-cell {{seat.status}} {{selectedId===seat.id?'is-selected':''}} {{seat.status==='empty'?'is-hidden':''}}">
     <text
-      wx:if="{{selectedId===seat.id && seat.map_label}}"
-      class="seat-cell-num seat-cell-num--on"
+      wx:if="{{seat.map_label && (!floorPlanLoaded || selectedId===seat.id)}}"
+      class="seat-cell-num {{selectedId===seat.id ? 'seat-cell-num--on' : 'seat-cell-num--dim'}}"
     >{{seat.map_label}}</text>
   </view>
 </template>
@@ -21,7 +21,13 @@
       bindscale="onScale"
     >
       <!-- 平面图（已去标题/留白）：1:1 铺满，保证 99% 还原 -->
-      <image class="plan-img" src="{{floorPlanSrc}}" mode="scaleToFill" />
+      <image
+        class="plan-img"
+        src="{{floorPlanSrc}}"
+        mode="scaleToFill"
+        bindload="onPlanImageLoad"
+        binderror="onPlanImageError"
+      />
 
       <!-- 可点选座位叠加层（随底图一起缩放，始终对齐） -->
       <view class="seats-layer">
@@ -36,7 +42,7 @@
           data-code="{{seat.seat_code}}"
           data-status="{{seat.status}}"
         >
-          <template is="seatUnit" data="{{seat: seat, selectedId: selectedId}}" />
+          <template is="seatUnit" data="{{seat: seat, selectedId: selectedId, floorPlanLoaded: floorPlanLoaded}}" />
         </view>
       </view>
     </movable-view>

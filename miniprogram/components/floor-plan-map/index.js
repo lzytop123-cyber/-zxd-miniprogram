@@ -15,6 +15,7 @@ Component({
     scale: 1,
     scaleValue: 1,
     floorPlanSrc: FLOOR_PLAN,
+    floorPlanLoaded: false,
   },
   observers: {
     seats(seats) {
@@ -50,6 +51,17 @@ Component({
 
     zoomReset() {
       this.applyScale(1)
+    },
+
+    onPlanImageLoad() {
+      this.setData({ floorPlanLoaded: true })
+    },
+
+    onPlanImageError() {
+      const { FLOOR_PLAN, FLOOR_PLAN_WEBP } = require('../../utils/assets')
+      if (this.data.floorPlanSrc !== FLOOR_PLAN) {
+        this.setData({ floorPlanSrc: FLOOR_PLAN, floorPlanLoaded: false })
+      }
     },
   },
 })

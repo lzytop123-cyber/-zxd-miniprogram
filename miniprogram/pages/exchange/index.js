@@ -4,7 +4,7 @@ const routes = require('../../utils/routes')
 Page({
   data: {
     platform: 'meituan',
-    platformLabel: '??',
+    platformLabel: '美团',
     code: '',
     storeId: null,
     loading: false,
@@ -13,12 +13,13 @@ Page({
 
   onLoad(options) {
     const platform = options.platform || 'meituan'
+    const platformLabel = platform === 'douyin' ? '抖音' : '美团'
     this.setData({
       platform,
-      platformLabel: platform === 'douyin' ? '??' : '??',
+      platformLabel,
       storeId: options.storeId || null,
     })
-    wx.setNavigationBarTitle({ title: `${platform === 'douyin' ? '??' : '??'}??` })
+    wx.setNavigationBarTitle({ title: `${platformLabel}团购兑换` })
   },
 
   onInput(e) {
@@ -33,7 +34,7 @@ Page({
       return false
     }
     this.setData({ code: parsed.code })
-    wx.showToast({ title: '?????', icon: 'success' })
+    wx.showToast({ title: '券码已填入', icon: 'success' })
     return true
   },
 
@@ -46,24 +47,24 @@ Page({
       const res = await pickAndScanVoucher({
         onAlbumStart: () => {
           loadingShown = true
-          wx.showLoading({ title: '?????', mask: true })
+          wx.showLoading({ title: '识别券码…', mask: true })
         },
       })
       this._applyScanResult(res)
     } catch (e) {
       const msg = e.errMsg || e.message || ''
       if (msg.includes('cancel') || msg.includes('fail cancel')) return
-      if (msg.includes('???') || msg.includes('???')) {
+      if (msg.includes('未识别') || msg.includes('条形码')) {
         wx.showModal({
-          title: '????',
-          content: msg.includes('???')
+          title: '识别失败',
+          content: msg.includes('条形码')
             ? msg
-            : '??????????????????????????????',
+            : '未识别到有效券码，请重试或使用相机扫码',
           showCancel: false,
         })
         return
       }
-      wx.showToast({ title: '????', icon: 'none' })
+      wx.showToast({ title: '扫码失败', icon: 'none' })
     } finally {
       if (loadingShown) wx.hideLoading()
       this.setData({ scanning: false })
@@ -73,7 +74,7 @@ Page({
   async onAlbumScanTap() {
     if (this.data.loading || this.data.scanning) return
     this.setData({ scanning: true })
-    wx.showLoading({ title: '?????', mask: true })
+    wx.showLoading({ title: '识别券码…', mask: true })
     try {
       const { pickFromAlbumAndDecode } = require('./utils/voucherScan')
       const res = await pickFromAlbumAndDecode()
@@ -81,15 +82,15 @@ Page({
     } catch (e) {
       const msg = e.errMsg || e.message || ''
       if (msg.includes('cancel') || msg.includes('fail cancel')) return
-      if (msg.includes('???') || msg.includes('???')) {
+      if (msg.includes('未识别') || msg.includes('条形码')) {
         wx.showModal({
-          title: '????',
+          title: '识别失败',
           content: msg,
           showCancel: false,
         })
         return
       }
-      wx.showToast({ title: '????', icon: 'none' })
+      wx.showToast({ title: '扫码失败', icon: 'none' })
     } finally {
       wx.hideLoading()
       this.setData({ scanning: false })
@@ -103,12 +104,12 @@ Page({
   async submit(forcedCode) {
     const code = typeof forcedCode === 'string' ? forcedCode.trim() : (this.data.code || '').trim()
     if (!code || code.length < 6) {
-      wx.showToast({ title: '???????', icon: 'none' })
+      wx.showToast({ title: '请输入有效券码', icon: 'none' })
       return
     }
     const { platform, storeId } = this.data
     this.setData({ loading: true, code })
-    wx.showLoading({ title: '??????', mask: true })
+    wx.showLoading({ title: '连接核销中…', mask: true })
     try {
       const path = platform === 'douyin' ? '/exchange/douyin' : '/exchange/meituan'
       let reqUrl = `${path}/${encodeURIComponent(code)}`
@@ -116,18 +117,18 @@ Page({
       const result = await request({ url: reqUrl, method: 'POST', silent: true })
       wx.hideLoading()
       wx.showModal({
-        title: '????',
-        content: `????${result.card_name || '???'}`,
+        title: '兑换成功',
+        content: `已获得：${result.card_name || '期限卡'}`,
         showCancel: false,
         success: () => wx.switchTab({ url: '/pages/packages/index' }),
       })
     } catch (e) {
       wx.hideLoading()
-      const msg = e.detail || e.message || '????'
-      if (msg.includes('???') || msg.includes('dealId=')) {
+      const msg = e.detail || e.message || '兑换失败'
+      if (msg.includes('dealId') || msg.includes('未配置')) {
         wx.showModal({
-          title: '?????',
-          content: `${msg}\n\n??????????????????????`,
+          title: '待配置团购',
+          content: `${msg}\n\n该券未被核销，请联系店长配置后再试`,
           showCancel: false,
         })
       } else {
