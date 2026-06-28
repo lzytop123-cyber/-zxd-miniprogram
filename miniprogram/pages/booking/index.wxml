@@ -48,9 +48,9 @@
 
     <!-- 天卡 -->
     <block wx:if="{{billType==='daily'}}">
-      <block wx:if="{{multiDayDailyCard}}">
+      <block wx:if="{{dailyUseMode==='multi_pass' && multiDayDailyCard}}">
         <view class="field"><text class="field-key">连续使用</text><text class="field-val">{{startDate}} 至 {{endDate}}</text></view>
-        <view class="hint">须一次约满连续 {{multiDayDailyCard.daily_pass_days}} 天，不可拆分</view>
+        <view class="hint">三天卡须一次约满连续 {{multiDayDailyCard.daily_pass_days}} 天，不可拆分</view>
       </block>
       <block wx:else>
         <picker mode="date" value="{{startDate}}" start="{{today}}" bindchange="onStartDateChange">
@@ -59,8 +59,12 @@
         <picker mode="date" value="{{endDate}}" start="{{startDate}}" bindchange="onEndDateChange">
           <view class="field"><text class="field-key">结束日期</text><text class="field-val">{{endDate}} ›</text></view>
         </picker>
-        <view class="hint">日卡按自然日计费，默认当日有效</view>
+        <view class="hint">日卡默认单日；结束日期可与开始相同</view>
       </block>
+      <view class="quick-btns" wx:if="{{hasMultiDayDailyCard}}">
+        <view class="chip {{dailyUseMode==='single'?'active':''}}" bindtap="setDailyMode" data-mode="single">单日预约</view>
+        <view class="chip {{dailyUseMode==='multi_pass'?'active':''}}" bindtap="setDailyMode" data-mode="multi_pass">三天卡连续</view>
+      </view>
     </block>
 
     <!-- 次卡 -->

@@ -116,11 +116,14 @@ Page({
         if (c.card_type === 'daily') {
           if (billType !== 'daily') return false
           const span = dailyPassDays(c)
+          const start = this.data.startTime.slice(0, 10)
+          const end = this.data.endTime.slice(0, 10)
           if (span > 1) {
-            const start = this.data.startTime.slice(0, 10)
-            const end = this.data.endTime.slice(0, 10)
             return start === c.start_date && end === c.end_date
           }
+          if (start !== end) return false
+          if (c.start_date && start < c.start_date) return false
+          if (c.end_date && end > c.end_date) return false
           return true
         }
         if (c.card_type === 'weekly') return billType === 'weekly'

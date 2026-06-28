@@ -60,6 +60,8 @@ Page({
     seatsLoading: false,
     previewLoading: false,
     userCards: [],
+    hasMultiDayDailyCard: false,
+    dailyUseMode: 'single',
     multiDayDailyCard: null,
   },
 
@@ -116,7 +118,11 @@ Page({
   loadUserCards() {
     request({ url: '/user/cards', silent: true })
       .then((cards) => {
-        this.setData({ userCards: cards || [] }, () => this._applyMultiDayDailyDefaults())
+        const list = cards || []
+        this.setData({
+          userCards: list,
+          hasMultiDayDailyCard: !!this._findMultiDayDailyCard(list),
+        })
       })
       .catch(() => {})
   },
@@ -125,18 +131,24 @@ Page({
     return (cards || []).find((c) => c.card_type === 'daily' && dailyPassDays(c) > 1)
   },
 
-  _applyMultiDayDailyDefaults() {
-    const card = this._findMultiDayDailyCard(this.data.userCards)
-    if (!card || this.data.billType !== 'daily') {
-      if (this.data.multiDayDailyCard) {
-        this.setData({ multiDayDailyCard: null })
-      }
+  setDailyMode(e) {
+    const mode = e.currentTarget.dataset.mode
+    if (mode === 'multi_pass') {
+      const card = this._findMultiDayDailyCard(this.data.userCards)
+      if (!card) return
+      this.setData({
+        dailyUseMode: 'multi_pass',
+        multiDayDailyCard: card,
+        startDate: card.start_date,
+        endDate: card.end_date,
+      }, () => this.refreshPreview())
       return
     }
+    const { startDate } = this.data
     this.setData({
-      multiDayDailyCard: card,
-      startDate: card.start_date,
-      endDate: card.end_date,
+      dailyUseMode: 'single',
+      multiDayDailyCard: null,
+      endDate: startDate,
     }, () => this.refreshPreview())
   },
 
@@ -156,16 +168,11 @@ Page({
     } else if (billType === 'session') {
       Object.assign(patch, { endDate: startDate })
     } else if (billType === 'daily') {
-      const multi = this._findMultiDayDailyCard(this.data.userCards)
-      if (multi) {
-        Object.assign(patch, {
-          endDate: multi.end_date,
-          startDate: multi.start_date,
-          multiDayDailyCard: multi,
-        })
-      } else {
-        Object.assign(patch, { endDate: startDate, multiDayDailyCard: null })
-      }
+      Object.assign(patch, {
+        endDate: startDate,
+        dailyUseMode: 'single',
+        multiDayDailyCard: null,
+      })
     } else if (billType === 'weekly') {
       Object.assign(patch, { endDate: addDays(startDate, defaults.endOffset) })
     } else if (billType === 'monthly') {
@@ -187,7 +194,7 @@ Page({
     const startDate = e.detail.value
     const patch = { startDate }
     if (this.data.billType === 'daily') {
-      if (this.data.multiDayDailyCard) {
+      if (this.data.dailyUseMode === 'multi_pass' && this.data.multiDayDailyCard) {
         patch.startDate = this.data.multiDayDailyCard.start_date
         patch.endDate = this.data.multiDayDailyCard.end_date
       } else {
@@ -210,7 +217,7 @@ Page({
   },
 
   onEndDateChange(e) {
-    if (this.data.billType === 'daily' && this.data.multiDayDailyCard) return
+    if (this.data.billType === 'daily' && this.data.dailyUseMode === 'multi_pass') return
     this.setData({ endDate: e.detail.value }, () => this.refreshPreview())
   },
 
@@ -278,7 +285,7 @@ Page({
       start = new Date(`${startDate}T00:00:00`)
       end = new Date(`${endDate}T23:59:59`)
       if (end < start) throw new Error('结束日期不能早于开始日期')
-      const multi = this.data.multiDayDailyCard
+      const multi = this.data.dailyUseMode === 'multi_pass' ? this.data.multiDayDailyCard : null
       if (multi) {
         const span = dailyPassDays(multi)
         const days = Math.floor((end - start) / 86400000) + 1
