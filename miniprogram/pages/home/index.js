@@ -12,6 +12,12 @@ const TAB_PAGES = [
 const BANNER_CACHE_KEY = 'home_banners_v4'
 const ANNOUNCE_SEEN_KEY = 'announce_seen_v1'
 
+function bannerSignature(items) {
+  return (items || [])
+    .map((b) => `${b.id || ''}:${b.image_url || ''}:${b.updated_at || ''}`)
+    .join('|')
+}
+
 Page({
   data: {
     stores: [],
@@ -39,30 +45,56 @@ Page({
   },
 
   onLoad() {
+    this._hydrateBannerCache()
+  },
+
+  onShow() {
+    this.refreshHome({ silent: true })
+  },
+
+  onPullDownRefresh() {
+    this.refreshHome({ force: true }).finally(() => {
+      wx.stopPullDownRefresh()
+    })
+  },
+
+  refreshHome(options = {}) {
+    const { silent = false, force = false } = options
+    return Promise.all([
+      this.loadBanners({ silent, force }),
+      this.loadAnnouncements(),
+      this.loadStores({ silent, force }),
+      this.loadUser(),
+      this.loadCardCount(),
+    ])
+  },
+
+  _hydrateBannerCache() {
     try {
       const cached = wx.getStorageSync(BANNER_CACHE_KEY)
-      if (cached?.carousel) {
-        const carousel = cached.carousel
-        this.setData({
-          carousel,
-          heroHeight: carousel.hero_height || 680,
-        })
-      }
+      if (!cached) return
+
+      const carousel = cached.carousel || this.data.carousel
+      const heroHeight = carousel.hero_height || 680
+      this.setData({ carousel, heroHeight })
+
+      if (!cached.items?.length) return
+
+      const { prepareBannerItems } = require('../../utils/media')
+      this.setData({
+        banners: prepareBannerItems(cached.items),
+        showBanners: true,
+        bannerReady: true,
+        bannersLoading: false,
+      })
+      this._bannerSignature = bannerSignature(cached.items)
     } catch (e) {
       // ignore
     }
   },
 
-  onShow() {
-    this.loadBanners()
-    this.loadAnnouncements()
-    this.loadStores()
-    this.loadUser()
-    this.loadCardCount()
-  },
-
   loadAnnouncements() {
-    request({ url: '/home/announcements', silent: true })
+    return request({ url: '/home/announcements', silent: true })
       .then((data) => {
         const items = data.items || []
         this.setData({ announcements: items })
@@ -112,14 +144,19 @@ Page({
     this.setData({ popupAnnouncement: item, showAnnouncementPopup: true })
   },
 
-  loadBanners() {
-    const { resolveBannerImages } = require('../../utils/media')
-    this.setData({ bannerReady: false, bannersLoading: true })
-    request({ url: '/home/banners', silent: true })
+  loadBanners(options = {}) {
+    const hasBanners = this.data.banners.length > 0
+
+    if (!hasBanners) {
+      this.setData({ bannerReady: false, bannersLoading: true })
+    }
+
+    return request({ url: '/home/banners', silent: true })
       .then(async (data) => {
         const raw = data.items || []
         const carousel = data.carousel || this.data.carousel
         const heroHeight = carousel.hero_height || 680
+        const nextSig = bannerSignature(raw)
 
         if (!raw.length) {
           this.setData({
@@ -130,19 +167,25 @@ Page({
             carousel,
             heroHeight,
           })
+          this._bannerSignature = nextSig
           return
         }
 
+        const { resolveBannerImages } = require('../../utils/media')
         const resolved = await resolveBannerImages(raw)
-        this.setData({
+        const patch = {
           banners: resolved,
           showBanners: true,
           bannersLoading: false,
           bannerReady: true,
-          swiperKey: Date.now(),
           carousel,
           heroHeight,
-        })
+        }
+        if (nextSig !== this._bannerSignature) {
+          patch.swiperKey = Date.now()
+          this._bannerSignature = nextSig
+        }
+        this.setData(patch)
         try {
           wx.setStorageSync(BANNER_CACHE_KEY, { items: raw, carousel })
         } catch (e) {
@@ -151,18 +194,19 @@ Page({
       })
       .catch(() => {
         if (!this.data.banners.length) {
-          this.setData({ banners: [], showBanners: false, heroHeight: 520 })
+          this.setData({ banners: [], showBanners: false, heroHeight: 520, bannersLoading: false })
+        } else {
+          this.setData({ bannersLoading: false })
         }
-        this.setData({ bannersLoading: false })
       })
   },
 
   loadUser() {
     if (!auth.isLoggedIn()) {
       this.setData({ user: null, cardCount: 0 })
-      return
+      return Promise.resolve()
     }
-    request({ url: '/user/profile', silent: true })
+    return request({ url: '/user/profile', silent: true })
       .then(async (user) => {
         auth.syncAppUser(user)
         const normalized = await normalizeUser(user)
@@ -177,20 +221,24 @@ Page({
   loadCardCount() {
     if (!auth.isLoggedIn()) {
       this.setData({ cardCount: 0 })
-      return
+      return Promise.resolve()
     }
-    request({ url: '/user/cards', silent: true })
+    return request({ url: '/user/cards', silent: true })
       .then((cards) => this.setData({ cardCount: (cards || []).length }))
       .catch(() => this.setData({ cardCount: 0 }))
   },
 
-  loadStores() {
+  loadStores(options = {}) {
+    const hasStores = this.data.stores.length > 0
     const { resolveStoreList } = require('../../utils/media')
     const { getUserLocation, isLocationDenied, formatDistance } = require('../../utils/location')
 
     this._storeFetchToken = (this._storeFetchToken || 0) + 1
     const token = this._storeFetchToken
-    this.setData({ storesLoading: true })
+
+    if (!hasStores) {
+      this.setData({ storesLoading: true })
+    }
 
     const finishList = async (stores, hint) => {
       if (token !== this._storeFetchToken) return
@@ -208,16 +256,20 @@ Page({
     }
 
     const fetchWithoutLocation = (hint) => {
-      request({ url: '/store/list', silent: true })
+      return request({ url: '/store/list', silent: true })
         .then((stores) => finishList(stores, hint))
         .catch(() => {
           if (token !== this._storeFetchToken) return
-          this.setData({ stores: [], storesLoading: false, locationHint: hint || '加载门店失败' })
+          if (!this.data.stores.length) {
+            this.setData({ stores: [], storesLoading: false, locationHint: hint || '加载门店失败' })
+          } else {
+            this.setData({ storesLoading: false })
+          }
         })
     }
 
     const fetchWithLocation = () => {
-      getUserLocation()
+      return getUserLocation()
         .then(({ latitude, longitude }) =>
           request({
             url: `/store/list?latitude=${latitude}&longitude=${longitude}`,
@@ -228,18 +280,16 @@ Page({
         .catch(async () => {
           if (token !== this._storeFetchToken) return
           const denied = await isLocationDenied()
-          fetchWithoutLocation(denied ? '开启定位查看距离' : '定位失败，点击重试')
+          return fetchWithoutLocation(denied ? '开启定位查看距离' : '定位失败，点击重试')
         })
     }
 
-    isLocationDenied().then((denied) => {
+    return isLocationDenied().then((denied) => {
       if (token !== this._storeFetchToken) return
       if (denied) {
-        fetchWithoutLocation('开启定位查看距离')
-      } else {
-        // 未拒绝（含首次未询问）：直接 getLocation，会弹出授权框
-        fetchWithLocation()
+        return fetchWithoutLocation('开启定位查看距离')
       }
+      return fetchWithLocation()
     })
   },
 
@@ -248,11 +298,11 @@ Page({
     isLocationDenied().then((denied) => {
       if (denied) {
         openLocationSettings().then((ok) => {
-          if (ok) this.loadStores()
+          if (ok) this.loadStores({ force: true })
         })
         return
       }
-      this.loadStores()
+      this.loadStores({ force: true })
     })
   },
 
@@ -275,7 +325,7 @@ Page({
 
     if (!storeId) {
       wx.showToast({ title: '正在获取门店…', icon: 'none' })
-      this.loadStores()
+      this.loadStores({ force: true })
       return
     }
 

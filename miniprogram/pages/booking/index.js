@@ -8,7 +8,6 @@ const {
   todayStr,
   addDays,
   combineDateTime,
-  roundUp15min,
   nowTimeStr,
   pad,
 } = require('../../utils/datetime')
@@ -59,6 +58,7 @@ Page({
     pricingMap: {},
     seatsLoading: false,
     previewLoading: false,
+    showSeatMap: false,
     userCards: [],
     hasMultiDayDailyCard: false,
     dailyUseMode: 'single',
@@ -81,6 +81,8 @@ Page({
     const today = todayStr()
     this._layout = getLayout()
     this._refreshPreviewDebounced = debounce(() => this._doRefreshPreview(), 450)
+    wx.getImageInfo({ src: '/assets/floor-plan-clean.png' })
+
     this.setData({
       storeId: options.storeId,
       startDate: today,
@@ -88,35 +90,65 @@ Page({
       startClock: nowTimeStr(),
       endClock: this._addHoursToClock(nowTimeStr(), 2),
       planSeatCount: this._layout.planSeatCount,
+      showSeatMap: true,
+    }, () => {
+      this.refreshPreview({ immediate: true })
     })
-    request({ url: `/store/${options.storeId}` }).then((s) => {
+
+    request({ url: `/store/${options.storeId}`, silent: true }).then((s) => {
       this.setData({ storeName: s.name })
     })
-    request({ url: `/store/${options.storeId}/pricing` }).then((rules) => {
-      const pricingMap = {}
-      rules.forEach((r) => {
-        pricingMap[r.bill_type] = r
-      })
-      const night = pricingMap.night
-      if (night && night.night_start) {
-        const start = String(night.night_start).slice(0, 5)
-        const end = night.night_end ? String(night.night_end).slice(0, 5) : '24:00'
-        this.setData({
-          pricingMap,
-          startClock: start,
-          endClock: end === '00:00' ? '23:59' : end,
-          nightHint: `${start} - ${end === '00:00' ? '次日 00:00' : end}`,
-        })
-      } else {
-        this.setData({ pricingMap })
-      }
-      this.refreshPreview()
-    }).catch(() => this.refreshPreview())
+
+    this._fetchPricing(options.storeId).then(() => {
+      this.refreshPreview({ immediate: true })
+    })
     this.loadUserCards()
   },
 
+  onPullDownRefresh() {
+    const { storeId } = this.data
+    if (!storeId) {
+      wx.stopPullDownRefresh()
+      return
+    }
+    this._seatRange = null
+    Promise.all([
+      this.loadUserCards(),
+      this._fetchPricing(storeId),
+    ])
+      .then(() => this._doRefreshPreview({ force: true }))
+      .finally(() => wx.stopPullDownRefresh())
+  },
+
+  _fetchPricing(storeId) {
+    return request({ url: `/store/${storeId}/pricing`, silent: true })
+      .then((rules) => {
+        this.setData(this._buildPricingPatch(rules))
+      })
+      .catch(() => {})
+  },
+
+  _buildPricingPatch(rules) {
+    const pricingMap = {}
+    ;(rules || []).forEach((r) => {
+      pricingMap[r.bill_type] = r
+    })
+    const night = pricingMap.night
+    if (night && night.night_start) {
+      const start = String(night.night_start).slice(0, 5)
+      const end = night.night_end ? String(night.night_end).slice(0, 5) : '24:00'
+      return {
+        pricingMap,
+        startClock: start,
+        endClock: end === '00:00' ? '23:59' : end,
+        nightHint: `${start} - ${end === '00:00' ? '次日 00:00' : end}`,
+      }
+    }
+    return { pricingMap }
+  },
+
   loadUserCards() {
-    request({ url: '/user/cards', silent: true })
+    return request({ url: '/user/cards', silent: true })
       .then((cards) => {
         const list = cards || []
         this.setData({
@@ -129,6 +161,10 @@ Page({
 
   _findMultiDayDailyCard(cards) {
     return (cards || []).find((c) => c.card_type === 'daily' && dailyPassDays(c) > 1)
+  },
+
+  _hasSeatAvailability() {
+    return (this.data.seats || []).some((s) => s.id)
   },
 
   setDailyMode(e) {
@@ -328,13 +364,17 @@ Page({
     return `${fmt(start)}  →  ${fmt(end)}`
   },
 
-  refreshPreview() {
+  refreshPreview(options = {}) {
+    if (options.immediate || options.force) {
+      return this._doRefreshPreview(options)
+    }
     this._refreshPreviewDebounced()
+    return Promise.resolve()
   },
 
-  _doRefreshPreview() {
+  _doRefreshPreview(options = {}) {
     const { storeId, billType, seatId } = this.data
-    if (!storeId) return
+    if (!storeId) return Promise.resolve()
     let start
     let end
     try {
@@ -342,8 +382,15 @@ Page({
       start = times.start
       end = times.end
     } catch (err) {
-      this.setData({ preview: null, timeSummary: '', startTime: '', endTime: '', previewLoading: false })
-      return
+      this.setData({
+        preview: null,
+        timeSummary: '',
+        startTime: '',
+        endTime: '',
+        previewLoading: false,
+        showSeatMap: false,
+      })
+      return Promise.resolve()
     }
 
     this.setData({
@@ -351,10 +398,10 @@ Page({
       endTime: end,
       timeSummary: this._formatSummary(start, end),
       previewLoading: true,
+      showSeatMap: true,
     })
 
-    this.loadSeats(start, end)
-
+    const seatPromise = this.loadSeats(start, end, options)
     const body = {
       store_id: Number(storeId),
       bill_type: billType,
@@ -363,7 +410,7 @@ Page({
     }
     if (seatId) body.seat_id = seatId
 
-    request({ url: '/reservation/preview', method: 'POST', data: body })
+    const previewPromise = request({ url: '/reservation/preview', method: 'POST', data: body, silent: true })
       .then((preview) => {
         const patch = { preview, previewLoading: false }
         if (this.data.seatId && preview.seat_id === this.data.seatId) {
@@ -372,16 +419,27 @@ Page({
         this.setData(patch)
       })
       .catch(() => this.setData({ preview: null, previewLoading: false }))
+
+    return Promise.all([seatPromise, previewPromise])
   },
 
-  loadSeats(start, end) {
+  loadSeats(start, end, options = {}) {
+    const { force = false } = options
     const { storeId } = this.data
-    if (!storeId) return
+    if (!storeId) return Promise.resolve()
+
     const range = `${start}~${end}`
-    if (range === this._seatRange && this.data.seats.length) return
+    if (!force && range === this._seatRange && this._hasSeatAvailability()) {
+      return Promise.resolve()
+    }
     this._seatRange = range
-    this.setData({ seatsLoading: true })
-    request({
+
+    const showLoadingOverlay = force || !this._hasSeatAvailability()
+    if (showLoadingOverlay) {
+      this.setData({ seatsLoading: true })
+    }
+
+    return request({
       url: `/store/${storeId}/availability?start_time=${encodeURIComponent(start)}&end_time=${encodeURIComponent(end)}`,
       silent: true,
     })
@@ -408,6 +466,10 @@ Page({
 
   selectSeat(e) {
     const { id, code, status } = e.detail
+    if (this.data.seatsLoading) {
+      wx.showToast({ title: '座位状态更新中', icon: 'none' })
+      return
+    }
     if (!id || status === 'empty') {
       wx.showToast({ title: '该座位暂未开放', icon: 'none' })
       return
@@ -444,7 +506,7 @@ Page({
     }
     if (preview.seat_id !== seatId) {
       wx.showToast({ title: '座位信息同步中，请稍候', icon: 'none' })
-      this.refreshPreview()
+      this.refreshPreview({ immediate: true })
       return
     }
     wx.navigateTo({

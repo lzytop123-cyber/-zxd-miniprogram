@@ -149,7 +149,7 @@
       </view>
     </view>
 
-    <view class="seat-map-tip">点击平面图编号选座 · 双指缩放 / 右下角可放大</view>
+    <view class="seat-map-tip">点击平面图编号选座 · 双指缩放 · 下拉刷新座位状态</view>
 
     <view class="seat-legend">
       <view class="seat-legend-item"><view class="seat-dot available"></view><text>可选</text></view>
@@ -162,14 +162,15 @@
       </view>
     </view>
 
-    <view class="seat-map-frame" wx:if="{{startTime && endTime}}">
-      <view class="skeleton-seat-map skeleton-shimmer" wx:if="{{seatsLoading}}"></view>
+    <view class="seat-map-frame" wx:if="{{showSeatMap}}">
       <floor-plan-map
-        wx:else
         seats="{{seats}}"
         selectedId="{{selectedId}}"
         bind:select="selectSeat"
       />
+      <view class="seat-map-loading" wx:if="{{seatsLoading}}">
+        <text class="seat-map-loading-text">{{seats.length ? '更新座位状态…' : '加载座位状态…'}}</text>
+      </view>
     </view>
     <view class="seat-map-empty" wx:else>请先选择有效的使用时间</view>
   </view>
