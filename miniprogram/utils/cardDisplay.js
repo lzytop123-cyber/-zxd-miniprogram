@@ -52,6 +52,8 @@ function dailyDetailLines(card) {
   }
   return CARD_DETAIL_LINES.daily
 }
+
+const TYPE_LABELS = {
   daily: '天卡',
   weekly: '周卡',
   monthly: '月卡',
