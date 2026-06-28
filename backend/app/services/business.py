@@ -235,12 +235,12 @@ def calc_distance(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
 
 
 def _seat_conflict_query(seat_id: int, start: datetime, end: datetime):
-    """仅将未过期、仍有效的预约视为占用。"""
+    """仅已支付且未取消/结束的预约视为占用（未支付不占座，避免支付失败锁死座位）。"""
     now = datetime.now()
     return select(Reservation).where(
         Reservation.seat_id == seat_id,
         Reservation.status.in_([0, 1]),
-        Reservation.pay_status.in_([0, 1]),
+        Reservation.pay_status == 1,
         Reservation.end_time > now,
         Reservation.start_time < end,
         Reservation.end_time > start,
@@ -268,7 +268,7 @@ def get_seat_status(db: Session, seat_id: int, at: datetime | None = None) -> st
     upcoming = db.scalar(
         select(Reservation).where(
             Reservation.seat_id == seat_id,
-            Reservation.pay_status.in_([0, 1]),
+            Reservation.pay_status == 1,
             Reservation.status == 0,
             Reservation.end_time > at,
             Reservation.start_time > at,

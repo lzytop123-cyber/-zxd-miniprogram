@@ -267,7 +267,14 @@ Page({
       setTimeout(() => wx.switchTab({ url: '/pages/checkin/index' }), 1200)
     } catch (e) {
       wx.hideLoading()
-      wx.showToast({ title: e.message || '下单失败', icon: 'none' })
+      if (this.data.reservationId) {
+        request({
+          url: `/reservation/${this.data.reservationId}/cancel`,
+          method: 'POST',
+          silent: true,
+        }).catch(() => {})
+      }
+      wx.showToast({ title: e.detail || e.message || '下单失败', icon: 'none' })
     }
   },
 })

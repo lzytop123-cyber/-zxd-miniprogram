@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_admin, get_current_user
 from app.core.config import settings
-from app.core.static_url import public_static_url
+from app.core.static_url import public_static_path, public_static_url
 from app.core.security import create_access_token, hash_password, verify_password
 from app.db.session import get_db
 from app.models import (
@@ -49,6 +49,7 @@ from app.services.wechat_pay import WechatPayService
 router = APIRouter(prefix="/admin", tags=["后台管理"])
 
 BANNER_DIR = Path(__file__).resolve().parents[3] / "uploads" / "banners"
+STORE_COVER_DIR = Path(__file__).resolve().parents[3] / "uploads" / "stores"
 BANNER_IMAGE_TYPES = {
     "image/jpeg": "jpg",
     "image/png": "png",
@@ -263,6 +264,8 @@ class AdminStoreItem(BaseModel):
     wifi_name: str | None = None
     wifi_password: str | None = None
     floor_plan: str | None = None
+    cover_images: list[str] = []
+    meituan_shop_id: str | None = None
     status: int
 
     model_config = {"from_attributes": True}
@@ -278,6 +281,8 @@ class AdminStoreUpdateRequest(BaseModel):
     wifi_name: str | None = None
     wifi_password: str | None = None
     floor_plan: str | None = None
+    cover_images: list[str] | None = None
+    meituan_shop_id: str | None = None
     status: int | None = None
 
 
@@ -322,6 +327,23 @@ def _parse_time(value: str | None) -> time | None:
     return time(int(parts[0]), int(parts[1]), int(parts[2]) if len(parts) > 2 else 0)
 
 
+def _cover_images_admin(store: Store) -> list[str]:
+    if not store.cover_images:
+        return []
+    return [public_static_url(u) for u in store.cover_images if u]
+
+
+def _cover_images_to_store(urls: list[str] | None) -> list | None:
+    if urls is None:
+        return None
+    out: list[str] = []
+    for url in urls:
+        path = public_static_path(url)
+        if path:
+            out.append(path)
+    return out
+
+
 def _store_to_admin_item(store: Store) -> dict:
     return {
         "id": store.id,
@@ -334,6 +356,8 @@ def _store_to_admin_item(store: Store) -> dict:
         "wifi_name": store.wifi_name,
         "wifi_password": store.wifi_password,
         "floor_plan": store.floor_plan,
+        "cover_images": _cover_images_admin(store),
+        "meituan_shop_id": store.meituan_shop_id,
         "status": store.status,
     }
 
@@ -604,6 +628,8 @@ def update_store_admin(
                 data[field] = _parse_time(data[field])
             except ValueError as e:
                 raise HTTPException(status_code=400, detail=str(e))
+    if "cover_images" in data:
+        data["cover_images"] = _cover_images_to_store(data["cover_images"])
 
     for key, value in data.items():
         if key in ("latitude", "longitude") and value is not None:
@@ -1351,6 +1377,8 @@ class AdminStoreCreateRequest(BaseModel):
     close_time: str | None = None
     wifi_name: str | None = None
     wifi_password: str | None = None
+    cover_images: list[str] | None = None
+    meituan_shop_id: str | None = None
 
 
 class AdminBannerCreateRequest(BaseModel):
@@ -1426,12 +1454,41 @@ def create_store_admin(
         close_time=close_time,
         wifi_name=body.wifi_name,
         wifi_password=body.wifi_password,
+        cover_images=_cover_images_to_store(body.cover_images or []),
+        meituan_shop_id=body.meituan_shop_id,
         status=1,
     )
     db.add(store)
     db.commit()
     db.refresh(store)
     return ResponseModel(message="门店已创建", data=_store_to_admin_item(store))
+
+
+@router.post("/stores/upload-cover", response_model=ResponseModel)
+async def upload_store_cover_admin(
+    file: UploadFile = File(...),
+    _: object = Depends(get_current_admin),
+):
+    """上传门店封面图，保存后写入 cover_images 列表。"""
+    content_type = (file.content_type or "").lower()
+    if content_type not in BANNER_IMAGE_TYPES:
+        raise HTTPException(status_code=400, detail="仅支持 jpg / png / webp / gif")
+
+    content = await file.read()
+    if len(content) > 2_000_000:
+        raise HTTPException(status_code=400, detail="图片不能超过 2MB")
+
+    ext = BANNER_IMAGE_TYPES[content_type]
+    STORE_COVER_DIR.mkdir(parents=True, exist_ok=True)
+    filename = f"{uuid.uuid4().hex}.{ext}"
+    (STORE_COVER_DIR / filename).write_bytes(content)
+
+    return ResponseModel(
+        data={
+            "url": public_static_url(f"/static/stores/{filename}"),
+            "path": f"/static/stores/{filename}",
+        }
+    )
 
 
 class AdminCarouselSettingRequest(BaseModel):

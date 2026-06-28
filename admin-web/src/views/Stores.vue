@@ -10,8 +10,18 @@
       </div>
     </template>
 
+    <p class="page-hint">
+      可配置封面图、地址、营业时间、WiFi 等。封面展示在小程序首页门店卡片与门店详情页轮播。
+    </p>
+
     <el-table :data="list" v-loading="loading" stripe>
       <el-table-column prop="id" label="ID" width="60" />
+      <el-table-column label="封面" width="88">
+        <template #default="{ row }">
+          <el-image v-if="row.cover_images?.length" :src="row.cover_images[0]" fit="cover" class="thumb" />
+          <span v-else class="muted">未设置</span>
+        </template>
+      </el-table-column>
       <el-table-column prop="name" label="门店名称" min-width="140" />
       <el-table-column prop="address" label="地址" min-width="200" show-overflow-tooltip />
       <el-table-column label="营业时间" width="140">
@@ -34,35 +44,27 @@
       </el-table-column>
     </el-table>
 
-    <el-dialog v-model="showCreate" title="新增门店" width="560px">
-      <el-form :model="createForm" label-width="100px">
-        <el-form-item label="门店名称"><el-input v-model="createForm.name" /></el-form-item>
-        <el-form-item label="地址"><el-input v-model="createForm.address" type="textarea" :rows="2" /></el-form-item>
-        <el-form-item label="纬度"><el-input-number v-model="createForm.latitude" :precision="6" style="width:100%" /></el-form-item>
-        <el-form-item label="经度"><el-input-number v-model="createForm.longitude" :precision="6" style="width:100%" /></el-form-item>
-        <el-form-item label="开门时间"><el-input v-model="createForm.open_time" placeholder="08:00" /></el-form-item>
-        <el-form-item label="关门时间"><el-input v-model="createForm.close_time" placeholder="23:00" /></el-form-item>
-      </el-form>
+    <el-dialog v-model="showCreate" title="新增门店" width="620px">
+      <StoreFormFields
+        :form="createForm"
+        :uploading="uploading"
+        @upload="(opt, f) => uploadCover(opt, f)"
+        @remove="removeCover"
+      />
       <template #footer>
         <el-button @click="showCreate = false">取消</el-button>
         <el-button type="primary" :loading="saving" @click="createStore">创建</el-button>
       </template>
     </el-dialog>
 
-    <el-dialog v-model="showEdit" :title="`编辑门店 · ${form.name}`" width="560px">
-      <el-form :model="form" label-width="100px">
-        <el-form-item label="门店名称"><el-input v-model="form.name" /></el-form-item>
-        <el-form-item label="地址"><el-input v-model="form.address" type="textarea" :rows="2" /></el-form-item>
-        <el-form-item label="纬度"><el-input-number v-model="form.latitude" :precision="6" :step="0.000001" style="width:100%" /></el-form-item>
-        <el-form-item label="经度"><el-input-number v-model="form.longitude" :precision="6" :step="0.000001" style="width:100%" /></el-form-item>
-        <el-form-item label="开门时间"><el-input v-model="form.open_time" placeholder="08:00" /></el-form-item>
-        <el-form-item label="关门时间"><el-input v-model="form.close_time" placeholder="23:00" /></el-form-item>
-        <el-form-item label="WiFi 名称"><el-input v-model="form.wifi_name" /></el-form-item>
-        <el-form-item label="WiFi 密码"><el-input v-model="form.wifi_password" /></el-form-item>
-        <el-form-item label="状态">
-          <el-switch v-model="form.status" :active-value="1" :inactive-value="0" active-text="营业" inactive-text="停用" />
-        </el-form-item>
-      </el-form>
+    <el-dialog v-model="showEdit" :title="`编辑门店 · ${form.name}`" width="620px">
+      <StoreFormFields
+        :form="form"
+        :uploading="uploading"
+        show-status
+        @upload="(opt, f) => uploadCover(opt, f)"
+        @remove="removeCover"
+      />
       <template #footer>
         <el-button @click="showEdit = false">取消</el-button>
         <el-button type="primary" :loading="saving" @click="save">保存</el-button>
@@ -74,22 +76,70 @@
 <script setup lang="ts">
 import { onMounted, reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
+import type { UploadRequestOptions } from 'element-plus'
 import http from '../api/http'
+import StoreFormFields from '../components/StoreFormFields.vue'
 
 const list = ref<any[]>([])
 const loading = ref(false)
 const saving = ref(false)
+const uploading = ref(false)
 const showEdit = ref(false)
 const showCreate = ref(false)
 const form = reactive<any>({})
-const createForm = reactive<any>({
-  name: '',
-  address: '',
-  latitude: null,
-  longitude: null,
-  open_time: '08:00',
-  close_time: '23:00',
-})
+const createForm = reactive<any>(emptyForm())
+
+function emptyForm() {
+  return {
+    name: '',
+    address: '',
+    latitude: null,
+    longitude: null,
+    open_time: '08:00',
+    close_time: '23:00',
+    wifi_name: '',
+    wifi_password: '',
+    meituan_shop_id: '',
+    cover_images: [] as string[],
+    status: 1,
+  }
+}
+
+async function uploadCover(options: UploadRequestOptions, target: any) {
+  uploading.value = true
+  try {
+    const fd = new FormData()
+    fd.append('file', options.file as File)
+    const res = await http.post('/admin/stores/upload-cover', fd, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    })
+    if (!target.cover_images) target.cover_images = []
+    target.cover_images.push(res.data.url)
+    ElMessage.success('图片已上传')
+  } finally {
+    uploading.value = false
+  }
+}
+
+function removeCover(target: any, index: number) {
+  target.cover_images.splice(index, 1)
+}
+
+function buildPayload(data: any) {
+  return {
+    name: data.name,
+    address: data.address,
+    latitude: data.latitude,
+    longitude: data.longitude,
+    open_time: data.open_time,
+    close_time: data.close_time,
+    wifi_name: data.wifi_name,
+    wifi_password: data.wifi_password,
+    meituan_shop_id: data.meituan_shop_id || null,
+    cover_images: data.cover_images || [],
+    ...(data.status !== undefined ? { status: data.status } : {}),
+  }
+}
 
 async function load() {
   loading.value = true
@@ -102,14 +152,7 @@ async function load() {
 }
 
 function openCreate() {
-  Object.assign(createForm, {
-    name: '',
-    address: '',
-    latitude: null,
-    longitude: null,
-    open_time: '08:00',
-    close_time: '23:00',
-  })
+  Object.assign(createForm, emptyForm())
   showCreate.value = true
 }
 
@@ -120,7 +163,7 @@ async function createStore() {
   }
   saving.value = true
   try {
-    await http.post('/admin/stores', createForm)
+    await http.post('/admin/stores', buildPayload(createForm))
     ElMessage.success('门店已创建')
     showCreate.value = false
     load()
@@ -130,24 +173,18 @@ async function createStore() {
 }
 
 function openEdit(row: any) {
-  Object.assign(form, { ...row })
+  Object.assign(form, {
+    ...row,
+    cover_images: [...(row.cover_images || [])],
+    meituan_shop_id: row.meituan_shop_id || '',
+  })
   showEdit.value = true
 }
 
 async function save() {
   saving.value = true
   try {
-    await http.put(`/admin/stores/${form.id}`, {
-      name: form.name,
-      address: form.address,
-      latitude: form.latitude,
-      longitude: form.longitude,
-      open_time: form.open_time,
-      close_time: form.close_time,
-      wifi_name: form.wifi_name,
-      wifi_password: form.wifi_password,
-      status: form.status,
-    })
+    await http.put(`/admin/stores/${form.id}`, buildPayload(form))
     ElMessage.success('已保存')
     showEdit.value = false
     load()
@@ -162,4 +199,7 @@ onMounted(load)
 <style scoped>
 .header-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
 .actions { display: flex; align-items: center; gap: 12px; }
+.page-hint { margin: 0 0 16px; color: #666; font-size: 13px; line-height: 1.6; }
+.thumb { width: 56px; height: 40px; border-radius: 6px; }
+.muted { color: #999; font-size: 12px; }
 </style>

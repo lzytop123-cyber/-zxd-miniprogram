@@ -34,6 +34,7 @@ from app.services.booking import (
     reservation_status_display,
     reservation_unlock_allowed,
     resolve_booking_window,
+    seat_conflict_excluding,
     validate_seat_for_booking,
 )
 from app.services.card_service import consume_period_card, validate_period_card_for_reservation
@@ -173,6 +174,18 @@ def _sync_user_active_reservations(
     return rows
 
 
+def _assert_seat_available_for_pay(db: Session, reservation: Reservation) -> None:
+    conflict = seat_conflict_excluding(
+        db,
+        reservation.seat_id,
+        reservation.start_time,
+        reservation.end_time,
+        reservation.id,
+    )
+    if conflict:
+        raise HTTPException(status_code=409, detail="该座位已被他人预约，请重新选座")
+
+
 @router.post("/preview", response_model=ResponseModel[ReservationPreviewResponse])
 def preview(
     body: ReservationPreviewRequest,
@@ -247,6 +260,8 @@ async def pay(
         raise HTTPException(status_code=404, detail="订单不存在")
     if reservation.pay_status == 1:
         raise HTTPException(status_code=400, detail="订单已支付")
+
+    _assert_seat_available_for_pay(db, reservation)
 
     if body.pay_type == PayType.period_card:
         if not body.period_card_id:
@@ -439,6 +454,9 @@ def cancel(
     if reservation.status not in (0,):
         raise HTTPException(status_code=400, detail="当前状态不可取消")
     reservation.status = 3
+    if reservation.pay_status == 0:
+        db.commit()
+        return ResponseModel(message="已取消")
     if reservation.pay_status == 1 and reservation.pay_type == PayType.wechat:
         WechatPayService.refund(
             reservation.order_no,
