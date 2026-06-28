@@ -28,6 +28,59 @@
   min-height: calc(100vh - 48rpx - env(safe-area-inset-bottom));
 }
 
+.order-switch {
+  margin-bottom: 20rpx;
+  padding: 20rpx 24rpx;
+}
+
+.order-switch-label {
+  font-size: 24rpx;
+  color: #8C9BA5;
+  margin-bottom: 16rpx;
+}
+
+.order-switch-scroll {
+  width: 100%;
+}
+
+.order-switch-inner {
+  display: inline-flex;
+  gap: 16rpx;
+  padding-bottom: 4rpx;
+}
+
+.order-chip {
+  flex-shrink: 0;
+  min-width: 160rpx;
+  padding: 16rpx 24rpx;
+  border-radius: 16rpx;
+  background: #F4FAF6;
+  border: 2rpx solid transparent;
+  text-align: center;
+}
+
+.order-chip.active {
+  background: #D8F3DC;
+  border-color: #52B788;
+}
+
+.order-chip-seat {
+  font-size: 32rpx;
+  font-weight: 700;
+  color: #2D6A4F;
+  line-height: 1.2;
+}
+
+.order-chip-meta {
+  font-size: 22rpx;
+  color: #8C9BA5;
+  margin-top: 6rpx;
+  max-width: 200rpx;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .info-card {
   width: 100%;
   box-sizing: border-box;

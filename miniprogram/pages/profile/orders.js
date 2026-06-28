@@ -51,6 +51,10 @@ Page({
   },
 
   goOpen(e) {
+    const id = Number(e.currentTarget.dataset.id)
+    if (id) {
+      wx.setStorageSync('checkin_selected_id', id)
+    }
     wx.switchTab({ url: '/pages/checkin/index' })
   },
 })

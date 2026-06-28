@@ -133,6 +133,46 @@ def _to_item(db: Session, r: Reservation) -> ReservationItem:
     )
 
 
+def _sync_user_active_reservations(
+    db: Session,
+    user: User,
+    now: datetime | None = None,
+) -> list[Reservation]:
+    """完结已过期订单，返回用户全部进行中预约（按开始时间排序）。"""
+    now = now or datetime.now()
+    stale = db.scalars(
+        select(Reservation).where(
+            Reservation.user_id == user.id,
+            Reservation.pay_status == 1,
+            Reservation.status.in_([0, 1]),
+            Reservation.end_time <= now,
+        )
+    ).all()
+    changed = False
+    for row in stale:
+        if finalize_expired_reservation(db, row, now):
+            changed = True
+
+    rows = db.scalars(
+        select(Reservation)
+        .where(
+            Reservation.user_id == user.id,
+            Reservation.pay_status == 1,
+            Reservation.status.in_([0, 1]),
+            Reservation.end_time > now,
+        )
+        .order_by(Reservation.start_time)
+    ).all()
+    for row in rows:
+        if auto_checkin_reservation(db, row, when=now):
+            changed = True
+    if changed:
+        db.commit()
+        for row in rows:
+            db.refresh(row)
+    return rows
+
+
 @router.post("/preview", response_model=ResponseModel[ReservationPreviewResponse])
 def preview(
     body: ReservationPreviewRequest,
@@ -320,41 +360,26 @@ def list_reservations(user: User = Depends(get_current_user), db: Session = Depe
     return ResponseModel(data=[_to_item(db, r) for r in rows])
 
 
+@router.get("/active/list", response_model=ResponseModel[list[ReservationItem]])
+def list_active_reservations(
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    now = datetime.now()
+    rows = _sync_user_active_reservations(db, user, now)
+    return ResponseModel(data=[_to_item(db, row) for row in rows])
+
+
 @router.get("/active", response_model=ResponseModel[ReservationItem | None])
 def active_reservation(user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     now = datetime.now()
-    stale = db.scalars(
-        select(Reservation).where(
-            Reservation.user_id == user.id,
-            Reservation.pay_status == 1,
-            Reservation.status.in_([0, 1]),
-            Reservation.end_time <= now,
-        )
-    ).all()
-    changed = False
-    for row in stale:
-        if finalize_expired_reservation(db, row, now):
-            changed = True
-    row = db.scalar(
-        select(Reservation)
-        .where(
-            Reservation.user_id == user.id,
-            Reservation.pay_status == 1,
-            Reservation.status.in_([0, 1]),
-            Reservation.end_time > now,
-        )
-        .order_by(Reservation.start_time)
-    )
-    if row and auto_checkin_reservation(db, row):
-        changed = True
-    if changed:
-        db.commit()
-        if row:
-            db.refresh(row)
-    item = _to_item(db, row) if row else None
-    if item and not reservation_unlock_allowed(row, now):
+    rows = _sync_user_active_reservations(db, user, now)
+    if not rows:
         return ResponseModel(data=None)
-    return ResponseModel(data=item)
+    row = rows[0]
+    if not reservation_unlock_allowed(row, now):
+        return ResponseModel(data=None)
+    return ResponseModel(data=_to_item(db, row))
 
 
 @router.get("/{reservation_id}", response_model=ResponseModel[ReservationItem])

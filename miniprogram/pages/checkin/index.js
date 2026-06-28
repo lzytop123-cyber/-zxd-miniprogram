@@ -1,6 +1,8 @@
 const { request } = require('../../utils/request')
 const auth = require('../../utils/auth')
 
+const CHECKIN_SELECT_KEY = 'checkin_selected_id'
+
 let plugin = null
 
 function detectPlugin() {
@@ -44,6 +46,8 @@ function computeCanOpen(startTime, endTime, now = new Date()) {
 
 Page({
   data: {
+    activeList: [],
+    selectedId: null,
     reservation: null,
     endDisplay: '',
     statusLabel: '',
@@ -62,32 +66,77 @@ Page({
   onShow() {
     const pluginState = detectPlugin()
     const runtimeAppId = getRuntimeAppId()
+    const preferred = wx.getStorageSync(CHECKIN_SELECT_KEY)
+    if (preferred) {
+      wx.removeStorageSync(CHECKIN_SELECT_KEY)
+      this._preferredId = Number(preferred)
+    }
     this.setData({ ...pluginState, runtimeAppId })
     this.loadActive()
   },
 
   loadActive() {
-    request({ url: '/reservation/active' })
-      .then((reservation) => {
-        if (!reservation) {
+    request({ url: '/reservation/active/list' })
+      .then((list) => {
+        const items = list || []
+        if (!items.length) {
           this._expiredReloadFor = null
-          this.setData({ reservation: null, canOpen: false })
+          if (this._timer) clearInterval(this._timer)
+          this.setData({
+            activeList: [],
+            selectedId: null,
+            reservation: null,
+            canOpen: false,
+          })
           return
         }
-        const canOpen = computeCanOpen(reservation.start_time, reservation.end_time)
-        this.setData({
-          reservation,
-          endDisplay: formatDate(reservation.end_time),
-          statusLabel: reservation.status_label || '',
-          statusHint: reservation.status_hint || '',
-          canOpen,
-        })
-        this.loadBleKey(canOpen ? reservation.id : null)
-        this.startCountdown(reservation)
+
+        let selectedId = this.data.selectedId
+        const preferredId = this._preferredId
+        if (preferredId && items.some((item) => item.id === preferredId)) {
+          selectedId = preferredId
+          this._preferredId = null
+        } else if (!selectedId || !items.some((item) => item.id === selectedId)) {
+          selectedId = items[0].id
+        }
+
+        this.setData({ activeList: items, selectedId })
+        const reservation = items.find((item) => item.id === selectedId) || items[0]
+        this.applyReservation(reservation)
       })
       .catch(() => {
-        this.setData({ reservation: null, canOpen: false })
+        this.setData({
+          activeList: [],
+          selectedId: null,
+          reservation: null,
+          canOpen: false,
+        })
       })
+  },
+
+  selectReservation(e) {
+    const id = Number(e.currentTarget.dataset.id)
+    if (!id || id === this.data.selectedId) return
+    const reservation = this.data.activeList.find((item) => item.id === id)
+    if (!reservation) return
+    this.setData({ selectedId: id })
+    this.applyReservation(reservation)
+  },
+
+  applyReservation(reservation) {
+    if (!reservation) return
+    if (this._timer) clearInterval(this._timer)
+    this._expiredReloadFor = null
+    const canOpen = computeCanOpen(reservation.start_time, reservation.end_time)
+    this.setData({
+      reservation,
+      endDisplay: formatDate(reservation.end_time),
+      statusLabel: reservation.status_label || '',
+      statusHint: reservation.status_hint || '',
+      canOpen,
+    })
+    this.loadBleKey(canOpen ? reservation.id : null)
+    this.startCountdown(reservation)
   },
 
   loadBleKey(reservationId) {

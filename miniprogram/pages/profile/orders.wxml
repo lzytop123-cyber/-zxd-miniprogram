@@ -8,7 +8,7 @@
     <view class="order-time">{{item.timeRange}}</view>
     <view class="order-hint" wx:if="{{item.statusHint}}">{{item.statusHint}}</view>
     <view class="order-action" wx:if="{{item.canOpen}}">
-      <view class="action-btn" catchtap="goOpen">去开门</view>
+      <view class="action-btn" catchtap="goOpen" data-id="{{item.id}}">去开门</view>
     </view>
   </view>
 

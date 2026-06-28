@@ -46,6 +46,26 @@
     </view>
   </view>
 
+
+  <!-- 快捷功能 -->
+  <view class="quick card">
+    <view class="q" bindtap="goPackages">
+      <view class="q-icon q-pkg">🎫</view>
+      <text class="q-text">套餐</text>
+    </view>
+    <view class="q" bindtap="goCheckin">
+      <view class="q-icon q-self">🪪</view>
+      <text class="q-text">开门</text>
+    </view>
+    <view class="q" bindtap="goOrders">
+      <view class="q-icon q-order">📋</view>
+      <text class="q-text">订座记录</text>
+    </view>
+    <view class="q" bindtap="goReport">
+      <view class="q-icon q-report">📊</view>
+      <text class="q-text">学习助手</text>
+    </view>
+  </view>
   <!-- 会员信息卡 -->
   <view class="member" bindtap="goProfile">
     <view class="member-top">
@@ -70,25 +90,6 @@
     </view>
   </view>
 
-  <!-- 快捷功能 -->
-  <view class="quick card">
-    <view class="q" bindtap="goPackages">
-      <view class="q-icon q-pkg">🎫</view>
-      <text class="q-text">套餐</text>
-    </view>
-    <view class="q" bindtap="goCheckin">
-      <view class="q-icon q-self">🪪</view>
-      <text class="q-text">开门</text>
-    </view>
-    <view class="q" bindtap="goOrders">
-      <view class="q-icon q-order">📋</view>
-      <text class="q-text">订座记录</text>
-    </view>
-    <view class="q" bindtap="goReport">
-      <view class="q-icon q-report">📊</view>
-      <text class="q-text">学习助手</text>
-    </view>
-  </view>
 
   <!-- 邀请 Banner -->
   <!-- <view class="promo" bindtap="goInvite">

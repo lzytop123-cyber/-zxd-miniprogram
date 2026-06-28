@@ -7,6 +7,24 @@
   </view>
 
   <view wx:else class="active-panel">
+    <view class="order-switch card" wx:if="{{activeList.length > 1}}">
+      <view class="order-switch-label">切换订单（{{activeList.length}} 个进行中）</view>
+      <scroll-view class="order-switch-scroll" scroll-x enhanced show-scrollbar="{{false}}">
+        <view class="order-switch-inner">
+          <view
+            class="order-chip {{selectedId === item.id ? 'active' : ''}}"
+            wx:for="{{activeList}}"
+            wx:key="id"
+            data-id="{{item.id}}"
+            bindtap="selectReservation"
+          >
+            <view class="order-chip-seat">{{item.seat_code}}</view>
+            <view class="order-chip-meta">{{item.store_name}}</view>
+          </view>
+        </view>
+      </scroll-view>
+    </view>
+
     <view class="info-card card">
       <view class="store-name">{{reservation.store_name}}</view>
       <view class="seat-ring">
