@@ -5,6 +5,32 @@
     </el-form-item>
     <el-form-item label="地址">
       <el-input v-model="form.address" type="textarea" :rows="2" />
+      <div class="field-hint">与高德地图「知行岛·自习室」认证地址保持一致</div>
+    </el-form-item>
+
+    <el-form-item label="地图坐标">
+      <div class="coord-row">
+        <el-input
+          v-model="coordPaste"
+          placeholder="粘贴高德拾取器坐标，如 112.517856,37.820712"
+          clearable
+          @keyup.enter="applyCoordPaste"
+        />
+        <el-button type="primary" plain @click="applyCoordPaste">填入</el-button>
+      </div>
+      <div class="field-hint">
+        打开
+        <a href="https://lbs.amap.com/tools/picker" target="_blank" rel="noopener">高德坐标拾取器</a>
+        ，搜索门店或点 <strong>B604 门口</strong>，复制「经度,纬度」粘贴上方。
+        <strong>只改地址不会更新距离和导航，必须填坐标。</strong>
+      </div>
+    </el-form-item>
+
+    <el-form-item label="纬度">
+      <el-input-number v-model="form.latitude" :precision="6" :step="0.000001" style="width:100%" />
+    </el-form-item>
+    <el-form-item label="经度">
+      <el-input-number v-model="form.longitude" :precision="6" :step="0.000001" style="width:100%" />
     </el-form-item>
 
     <el-form-item label="封面图">
@@ -28,12 +54,6 @@
       </div>
     </el-form-item>
 
-    <el-form-item label="纬度">
-      <el-input-number v-model="form.latitude" :precision="6" :step="0.000001" style="width:100%" />
-    </el-form-item>
-    <el-form-item label="经度">
-      <el-input-number v-model="form.longitude" :precision="6" :step="0.000001" style="width:100%" />
-    </el-form-item>
     <el-form-item label="开门时间">
       <el-input v-model="form.open_time" placeholder="08:00" />
     </el-form-item>
@@ -56,7 +76,10 @@
 </template>
 
 <script setup lang="ts">
-defineProps<{
+import { ref } from 'vue'
+import { ElMessage } from 'element-plus'
+
+const props = defineProps<{
   form: Record<string, any>
   uploading?: boolean
   showStatus?: boolean
@@ -66,6 +89,30 @@ defineEmits<{
   upload: [options: any, form: Record<string, any>]
   remove: [form: Record<string, any>, index: number]
 }>()
+
+const coordPaste = ref('')
+
+function applyCoordPaste() {
+  const text = coordPaste.value.trim()
+  if (!text) {
+    ElMessage.warning('请先粘贴坐标')
+    return
+  }
+  const parts = text.split(/[,，\s]+/).map((s) => s.trim()).filter(Boolean)
+  if (parts.length < 2) {
+    ElMessage.warning('格式应为：经度,纬度（例如 112.517856,37.820712）')
+    return
+  }
+  const lng = Number(parts[0])
+  const lat = Number(parts[1])
+  if (Number.isNaN(lng) || Number.isNaN(lat) || Math.abs(lat) > 90 || Math.abs(lng) > 180) {
+    ElMessage.warning('坐标数值无效，请检查是否经度在前、纬度在后')
+    return
+  }
+  props.form.longitude = lng
+  props.form.latitude = lat
+  ElMessage.success('坐标已填入，请保存门店')
+}
 </script>
 
 <style scoped>
@@ -73,5 +120,8 @@ defineEmits<{
 .cover-list { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 12px; }
 .cover-item { display: flex; flex-direction: column; align-items: center; gap: 4px; }
 .cover-preview { width: 120px; height: 72px; border-radius: 8px; border: 1px solid #eee; }
-.field-hint { font-size: 12px; color: #999; margin-top: 8px; line-height: 1.5; }
+.coord-row { display: flex; gap: 8px; width: 100%; }
+.coord-row .el-input { flex: 1; }
+.field-hint { font-size: 12px; color: #999; margin-top: 8px; line-height: 1.6; }
+.field-hint a { color: #409eff; }
 </style>

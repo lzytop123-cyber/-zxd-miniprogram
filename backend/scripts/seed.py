@@ -143,10 +143,10 @@ def seed():
         run_schema_migrations(db)
         if not db.scalar(select(Store).limit(1)):
             store = Store(
-                name="知行岛平阳路店",
-                address="太原市平阳路睿鼎国际中心A座25层",
-                latitude=Decimal("37.8706"),
-                longitude=Decimal("112.5489"),
+                name="知行岛·自习室",
+                address="太原市万柏林区融创长风壹号3号公寓2单元B604室",
+                latitude=Decimal("37.820712"),
+                longitude=Decimal("112.517856"),
                 open_time=time(0, 0),
                 close_time=time(0, 0),
                 cover_images=["https://via.placeholder.com/800x400?text=ZXD"],

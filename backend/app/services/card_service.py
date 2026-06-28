@@ -123,6 +123,34 @@ def _session_days(start_time: datetime, end_time: datetime) -> int:
     return (end_time.date() - start_time.date()).days + 1
 
 
+def daily_pass_days(card: PeriodCard) -> int:
+    """天卡覆盖的连续自然日数（如三天卡为 3，日卡为 1）。"""
+    if card.card_type != CardType.daily:
+        return 0
+    if card.start_date and card.end_date:
+        return (card.end_date - card.start_date).days + 1
+    return 1
+
+
+def _validate_daily_pass_reservation(
+    card: PeriodCard,
+    start_time: datetime,
+    end_time: datetime,
+) -> None:
+    span = daily_pass_days(card)
+    res_start = start_time.date()
+    res_end = end_time.date()
+    if span > 1:
+        if res_start != card.start_date or res_end != card.end_date:
+            raise ValueError(
+                f"该卡须连续使用 {span} 天（{card.start_date} 至 {card.end_date}），请按完整时段预约"
+            )
+        return
+    if _session_days(start_time, end_time) != 1:
+        raise ValueError("日卡须预约单日")
+    _validate_reservation_within_card_period(card, start_time, end_time)
+
+
 def _reservation_hours(start_time: datetime, end_time: datetime) -> Decimal:
     return Decimal(str((end_time - start_time).total_seconds() / 3600)).quantize(Decimal("0.1"))
 
@@ -191,6 +219,12 @@ def validate_period_card_for_reservation(
         _validate_reservation_within_card_period(card, start_time, end_time)
         return
 
+    if card.card_type == CardType.daily:
+        if reservation_bill_type != BillType.daily:
+            raise ValueError("天卡请使用「天卡」预约方式")
+        _validate_daily_pass_reservation(card, start_time, end_time)
+        return
+
     type_map = {
         CardType.daily: BillType.daily,
         CardType.monthly: BillType.monthly,
@@ -200,7 +234,7 @@ def validate_period_card_for_reservation(
     expected = type_map.get(card.card_type)
     if expected and reservation_bill_type != expected:
         raise ValueError("期限卡类型与预约方式不匹配")
-    if card.card_type in (CardType.daily, CardType.monthly, CardType.weekly, CardType.quarterly):
+    if card.card_type in (CardType.monthly, CardType.weekly, CardType.quarterly):
         _validate_reservation_within_card_period(card, start_time, end_time)
 
 

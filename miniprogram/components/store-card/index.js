@@ -5,10 +5,15 @@ Component({
   },
   data: {
     coverFailed: false,
+    canNavigate: false,
   },
   observers: {
-    store() {
-      this.setData({ coverFailed: false })
+    store(store) {
+      const { hasStoreCoords } = require('../../utils/location')
+      this.setData({
+        coverFailed: false,
+        canNavigate: hasStoreCoords(store),
+      })
     },
   },
   methods: {
@@ -17,6 +22,10 @@ Component({
     },
     onCoverError() {
       this.setData({ coverFailed: true })
+    },
+    onNavigate() {
+      const { openStoreNavigation } = require('../../utils/location')
+      openStoreNavigation(this.properties.store).catch(() => {})
     },
   },
 })

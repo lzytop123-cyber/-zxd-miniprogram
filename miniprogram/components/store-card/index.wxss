@@ -109,11 +109,24 @@
   gap: 16rpx;
 }
 
-.addr {
+.addr-block {
   flex: 1;
+  min-width: 0;
+}
+
+.addr {
+  display: block;
   font-size: 24rpx;
   color: #8C9BA5;
   line-height: 1.5;
+}
+
+.nav-link {
+  display: inline-block;
+  margin-top: 8rpx;
+  font-size: 22rpx;
+  color: #52B788;
+  font-weight: 600;
 }
 
 .dist {

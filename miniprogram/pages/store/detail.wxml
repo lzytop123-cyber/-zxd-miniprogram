@@ -12,7 +12,10 @@
 
   <view class="info-card card">
     <view class="store-name">{{store.name}}</view>
-    <view class="store-addr">{{store.address}}</view>
+    <view class="store-addr-row" bindtap="openNavigation">
+      <view class="store-addr">{{store.address}}</view>
+      <view class="nav-btn" wx:if="{{canNavigate}}">地图导航 ›</view>
+    </view>
     <view class="tag-row">
       <text class="tag" wx:if="{{store.status === 1}}">营业中</text>
       <text class="tag gray" wx:else>已打烊</text>

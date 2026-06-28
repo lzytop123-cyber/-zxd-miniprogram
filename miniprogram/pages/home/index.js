@@ -197,57 +197,73 @@ Page({
 
   loadStores() {
     const { resolveStoreList } = require('../../utils/media')
+    const { getUserLocation, isLocationDenied, formatDistance } = require('../../utils/location')
+
+    this._storeFetchToken = (this._storeFetchToken || 0) + 1
+    const token = this._storeFetchToken
     this.setData({ storesLoading: true })
 
-    const applyStores = async (stores) => {
-      const list = await resolveStoreList(stores)
-      this.setData({ stores: list || [], storesLoading: false })
+    const finishList = async (stores, hint) => {
+      if (token !== this._storeFetchToken) return
+      const list = await resolveStoreList(stores || [])
+      if (token !== this._storeFetchToken) return
+      const withDistance = list.map((s) => ({
+        ...s,
+        distanceLabel: formatDistance(s.distance),
+      }))
+      this.setData({
+        stores: withDistance,
+        storesLoading: false,
+        locationHint: hint || '',
+      })
     }
 
-    const fetchList = (query = '') =>
-      request({ url: `/store/list${query}`, silent: true })
-        .then(applyStores)
+    const fetchWithoutLocation = (hint) => {
+      request({ url: '/store/list', silent: true })
+        .then((stores) => finishList(stores, hint))
         .catch(() => {
-          this.setData({ stores: [], storesLoading: false })
+          if (token !== this._storeFetchToken) return
+          this.setData({ stores: [], storesLoading: false, locationHint: hint || '加载门店失败' })
         })
+    }
 
-    fetchList()
-
-    wx.getSetting({
-      success: (res) => {
-        const authSetting = res.authSetting['scope.userLocation']
-        if (authSetting === true) {
-          this.setData({ locationHint: '' })
-          wx.getLocation({
-            type: 'gcj02',
-            success: ({ latitude, longitude }) => {
-              fetchList(`?latitude=${latitude}&longitude=${longitude}`)
-            },
-            fail: () => {
-              this.setData({ locationHint: '定位失败，暂无法显示距离' })
-            },
+    const fetchWithLocation = () => {
+      getUserLocation()
+        .then(({ latitude, longitude }) =>
+          request({
+            url: `/store/list?latitude=${latitude}&longitude=${longitude}`,
+            silent: true,
           })
-          return
-        }
-        if (authSetting === false) {
-          this.setData({ locationHint: '开启定位查看距离' })
-          return
-        }
-        this.setData({ locationHint: '开启定位查看距离' })
-      },
-      fail: () => {
-        this.setData({ locationHint: '开启定位查看距离' })
-      },
+        )
+        .then((stores) => finishList(stores, ''))
+        .catch(async () => {
+          if (token !== this._storeFetchToken) return
+          const denied = await isLocationDenied()
+          fetchWithoutLocation(denied ? '开启定位查看距离' : '定位失败，点击重试')
+        })
+    }
+
+    isLocationDenied().then((denied) => {
+      if (token !== this._storeFetchToken) return
+      if (denied) {
+        fetchWithoutLocation('开启定位查看距离')
+      } else {
+        // 未拒绝（含首次未询问）：直接 getLocation，会弹出授权框
+        fetchWithLocation()
+      }
     })
   },
 
   openLocationSetting() {
-    wx.openSetting({
-      success: (res) => {
-        if (res.authSetting['scope.userLocation']) {
-          this.loadStores()
-        }
-      },
+    const { isLocationDenied, openLocationSettings } = require('../../utils/location')
+    isLocationDenied().then((denied) => {
+      if (denied) {
+        openLocationSettings().then((ok) => {
+          if (ok) this.loadStores()
+        })
+        return
+      }
+      this.loadStores()
     })
   },
 

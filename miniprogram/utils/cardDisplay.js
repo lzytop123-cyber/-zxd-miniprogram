@@ -25,7 +25,33 @@ function hourlyDetailLines(card) {
   ]
 }
 
-const TYPE_LABELS = {
+function dailyPassDays(card) {
+  if (card.daily_pass_days != null) return Number(card.daily_pass_days)
+  if (!card.start_date || !card.end_date) return 1
+  const s = new Date(`${card.start_date}T00:00:00`)
+  const e = new Date(`${card.end_date}T00:00:00`)
+  return Math.floor((e - s) / 86400000) + 1
+}
+
+function dailyRuleText(card) {
+  const span = dailyPassDays(card)
+  if (span > 1) {
+    return `连续 ${span} 天不限时，须一次约满 ${card.start_date} 至 ${card.end_date}`
+  }
+  return RULE_LINES.daily
+}
+
+function dailyDetailLines(card) {
+  const span = dailyPassDays(card)
+  if (span > 1) {
+    return [
+      '兑换即开卡，连续自然日有效',
+      `须一次预约连续 ${span} 天（不可拆分）`,
+      '完成预约后该卡核销',
+    ]
+  }
+  return CARD_DETAIL_LINES.daily
+}
   daily: '天卡',
   weekly: '周卡',
   monthly: '月卡',
@@ -120,10 +146,13 @@ function isCardUsable(card) {
 }
 
 function formatCard(card) {
-  const ruleText = card.card_type === 'hourly' ? hourlyRuleText(card) : (RULE_LINES[card.card_type] || '')
+  const ruleText = card.card_type === 'hourly'
+    ? hourlyRuleText(card)
+    : (card.card_type === 'daily' ? dailyRuleText(card) : (RULE_LINES[card.card_type] || ''))
+  const span = card.card_type === 'daily' ? dailyPassDays(card) : 0
   return {
     ...card,
-    typeLabel: TYPE_LABELS[card.card_type] || '期限卡',
+    typeLabel: span > 1 ? `${span}天卡` : (TYPE_LABELS[card.card_type] || '期限卡'),
     validityText: formatValidity(card),
     remainText: formatRemain(card),
     ruleText,
@@ -134,7 +163,7 @@ function formatCard(card) {
 function buildCardDetail(card) {
   const lines = card.card_type === 'hourly'
     ? [...hourlyDetailLines(card)]
-    : [...(CARD_DETAIL_LINES[card.card_type] || [])]
+    : (card.card_type === 'daily' ? [...dailyDetailLines(card)] : [...(CARD_DETAIL_LINES[card.card_type] || [])])
   if (card.validityText) lines.unshift(card.validityText)
   if (card.remainText) lines.unshift(card.remainText)
   if (card.daily_start) lines.push(`可用时段：${card.daily_start} 起`)
@@ -206,6 +235,7 @@ module.exports = {
   formatCard,
   isCardUsable,
   hourlyAllowsPartialUse,
+  dailyPassDays,
   enrichPackage,
   filterPackages,
   buildCardDetail,

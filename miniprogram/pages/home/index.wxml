@@ -122,7 +122,7 @@
   <view class="location-hint" wx:if="{{locationHint && !storesLoading}}" bindtap="openLocationSetting">
     <text class="location-hint-icon">📍</text>
     <text>{{locationHint}}</text>
-    <text class="location-hint-action">去设置 ›</text>
+    <text class="location-hint-action">{{locationHint === '开启定位查看距离' ? '去设置 ›' : '重试 ›'}}</text>
   </view>
   <view class="store-list">
     <block wx:if="{{storesLoading}}">

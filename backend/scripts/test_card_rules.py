@@ -84,10 +84,45 @@ def test_hourly_50h_partial_use():
     assert card.status == 1
 
 
+def test_daily_pass_three_day_continuous():
+    from datetime import date, time, timedelta
+
+    today = date.today()
+    card = PeriodCard(
+        user_id=1,
+        card_name="三天卡",
+        card_type=CardType.daily,
+        status=1,
+        start_date=today,
+        end_date=today + timedelta(days=2),
+    )
+    start = datetime.combine(today, time.min)
+    end = datetime.combine(today + timedelta(days=2), time(23, 59, 59))
+    validate_period_card_for_reservation(None, card, BillType.daily, start, end, 1)
+    consume_period_card(None, card, BillType.daily, start, end, 1)
+    assert card.status == 0
+
+    card2 = PeriodCard(
+        user_id=1,
+        card_name="三天卡",
+        card_type=CardType.daily,
+        status=1,
+        start_date=today,
+        end_date=today + timedelta(days=2),
+    )
+    bad_end = datetime.combine(today, time(23, 59, 59))
+    try:
+        validate_period_card_for_reservation(None, card2, BillType.daily, start, bad_end, 1)
+        raise AssertionError("三天卡不应允许只约1天")
+    except ValueError as e:
+        assert "连续使用" in str(e)
+
+
 if __name__ == "__main__":
     test_session_multi_day_deduct()
     test_weekly_one_shot()
     test_quarterly_bill_type()
     test_hourly_single_use_must_match_remaining()
     test_hourly_50h_partial_use()
+    test_daily_pass_three_day_continuous()
     print("All card rule tests passed.")

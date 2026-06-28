@@ -2,16 +2,26 @@ const { request } = require('../../utils/request')
 const auth = require('../../utils/auth')
 
 Page({
-  data: { store: null, storeId: null },
+  data: { store: null, storeId: null, canNavigate: false },
 
   onLoad(options) {
     const { resolveStoreList } = require('../../utils/media')
+    const { hasStoreCoords } = require('../../utils/location')
     this.setData({ storeId: options.id })
     request({ url: `/store/${options.id}` })
       .then(async (store) => {
         const list = await resolveStoreList([store])
-        this.setData({ store: list[0] || store })
+        const item = list[0] || store
+        this.setData({
+          store: item,
+          canNavigate: hasStoreCoords(item),
+        })
       })
+  },
+
+  openNavigation() {
+    const { openStoreNavigation } = require('../../utils/location')
+    openStoreNavigation(this.data.store).catch(() => {})
   },
 
   goBooking() {
