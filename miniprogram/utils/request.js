@@ -40,7 +40,7 @@ function request({ url, method = 'GET', data, silent = false }) {
       },
       fail(err) {
         if (!silent) {
-          wx.showToast({ title: '网络错误，请确认后端已启动', icon: 'none' })
+          wx.showToast({ title: '网络异常，请稍后重试', icon: 'none' })
         }
         reject(err)
       },

@@ -125,3 +125,10 @@
   background: #F4FAF6;
   border-radius: 8rpx;
 }
+
+.dist-hint {
+  color: #8C9BA5;
+  font-weight: 500;
+  background: transparent;
+  padding: 0;
+}

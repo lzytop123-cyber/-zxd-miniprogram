@@ -1,11 +1,14 @@
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from sqlalchemy.orm import Session
 
 from app.api.routes import admin, assistant, ble, card, exchange, home, payment, report, reservation, store, user
+from app.db.session import get_db
+from app.services.health import run_health_checks
 from app.tasks.scheduler import start_scheduler
 
 UPLOADS_DIR = Path(__file__).resolve().parent.parent / "uploads"
@@ -48,5 +51,10 @@ app.mount("/static", StaticFiles(directory=str(UPLOADS_DIR)), name="static")
 
 
 @app.get("/health")
-def health():
+def health(db: Session = Depends(get_db)):
+    return run_health_checks(db)
+
+
+@app.get("/health/live")
+def health_live():
     return {"status": "ok"}

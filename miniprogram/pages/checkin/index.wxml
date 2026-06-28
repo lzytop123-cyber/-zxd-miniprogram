@@ -1,5 +1,14 @@
 <view class="page-checkin page-safe-bottom">
-  <view wx:if="{{!reservation}}" class="empty card empty-card">
+  <view wx:if="{{pageLoading}}" class="skeleton-checkin-wrap">
+    <view class="card skeleton-checkin-card">
+      <view class="skeleton-line skeleton-line--lg skeleton-shimmer" style="margin: 0 auto 24rpx;"></view>
+      <view class="skeleton-checkin-ring skeleton-shimmer"></view>
+      <view class="skeleton-line skeleton-shimmer"></view>
+      <view class="skeleton-line skeleton-line--sm skeleton-shimmer" style="margin: 0 auto;"></view>
+    </view>
+  </view>
+
+  <view wx:elif="{{!reservation}}" class="empty card empty-card">
     <view class="empty-icon">📚</view>
     <view class="empty-text">暂无进行中的订单</view>
     <view class="empty-hint">预约成功后到店开门即可，无需手动签到</view>
@@ -41,6 +50,7 @@
       <view class="tip ended" wx:if="{{countdown === '已结束'}}">订单已结束，无法开门</view>
       <view class="tip" wx:elif="{{!canOpen}}">提前 15 分钟可开门</view>
       <view class="tip ok" wx:elif="{{canOpen}}">已可开门，请站在门口操作</view>
+      <view class="tip warn" wx:if="{{lastOpenError}}">{{lastOpenError}}</view>
 
       <view
         class="open-hero {{canOpen && pluginReady && !opening ? '' : 'disabled'}}"
@@ -52,6 +62,12 @@
         <view class="open-hero-sub" wx:elif="{{canOpen && pluginReady}}">开启手机蓝牙并靠近门锁</view>
         <view class="open-hero-sub" wx:elif="{{!canOpen}}">到时间后按钮自动可用</view>
       </view>
+
+      <view
+        class="open-remote btn-outline"
+        wx:if="{{gatewayUnlock && canOpen && !opening}}"
+        bindtap="openDoorRemote"
+      >远程开门</view>
 
       <view class="open-steps" wx:if="{{canOpen && pluginReady}}">
         <text>① 打开蓝牙</text>

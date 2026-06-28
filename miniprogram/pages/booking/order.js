@@ -1,6 +1,7 @@
 const { request } = require('../../utils/request')
 const { getLayout } = require('../../utils/seat-layout')
 const { hourlyAllowsPartialUse } = require('../../utils/cardDisplay')
+const { completeWechatPay } = require('../../utils/pay')
 
 const BILL_LABELS = { hourly: '按小时', daily: '天卡', weekly: '周卡', session: '次卡', monthly: '月卡', quarterly: '季卡', night: '夜读' }
 
@@ -257,23 +258,12 @@ Page({
       })
 
       if (this.data.payType === 'wechat') {
-        const wp = payRes.wechat_pay
-        if (wp && wp.package && wp.package.includes('mock_prepay')) {
-          const mockUrl = `/reservation/${created.id}/mock-pay${this.data.selectedCouponId ? '?coupon_id=' + this.data.selectedCouponId : ''}`
-          await request({ url: mockUrl, method: 'POST' })
-        } else if (wp) {
-          await new Promise((resolve, reject) => {
-            wx.requestPayment({
-              timeStamp: wp.timeStamp,
-              nonceStr: wp.nonceStr,
-              package: wp.package,
-              signType: wp.signType || 'RSA',
-              paySign: wp.paySign,
-              success: resolve,
-              fail: (err) => reject(new Error(err.errMsg || '支付取消')),
-            })
+        await completeWechatPay(payRes.wechat_pay, () =>
+          request({
+            url: `/reservation/${created.id}/mock-pay${this.data.selectedCouponId ? '?coupon_id=' + this.data.selectedCouponId : ''}`,
+            method: 'POST',
           })
-        }
+        )
       }
 
       wx.hideLoading()

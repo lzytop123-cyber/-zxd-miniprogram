@@ -1,6 +1,6 @@
 const {
   resolveStaticUrl,
-  USE_PROD,
+  useProdApi,
   DEV_LAN_HOST,
   DEV_LOCAL_HOST,
 } = require('../config')
@@ -35,7 +35,7 @@ function isLocalPath(url) {
 /** 生产 HTTPS 在真机可直接用于 <image>（需配置 downloadFile 域名） */
 function canUseRemoteDirectly(url) {
   if (!url.startsWith('https://')) return false
-  return USE_PROD
+  return useProdApi()
 }
 
 function downloadHttpsImage(fullUrl) {
@@ -100,7 +100,7 @@ function downloadHttpImage(fullUrl) {
     })
 
   return attempt(fullUrl).catch((err) => {
-    if (!USE_PROD && fullUrl.includes(`${DEV_LAN_HOST}:`)) {
+    if (!useProdApi() && fullUrl.includes(`${DEV_LAN_HOST}:`)) {
       const fallback = fullUrl.replace(DEV_LAN_HOST, DEV_LOCAL_HOST)
       return attempt(fallback)
     }

@@ -1,5 +1,6 @@
 const auth = require('../../utils/auth')
 const { request } = require('../../utils/request')
+const { completeWechatPay } = require('../../utils/pay')
 const {
   PKG_CATEGORY_TABS,
   formatCard,
@@ -179,21 +180,9 @@ Page({
       })
 
       const wp = res.wechat_pay
-      if (wp && wp.package && String(wp.package).includes('mock_prepay')) {
-        await request({ url: `/card/purchase/${res.order_no}/mock`, method: 'POST' })
-      } else if (wp) {
-        await new Promise((resolve, reject) => {
-          wx.requestPayment({
-            timeStamp: wp.timeStamp,
-            nonceStr: wp.nonceStr,
-            package: wp.package,
-            signType: wp.signType || 'RSA',
-            paySign: wp.paySign,
-            success: resolve,
-            fail: (err) => reject(new Error(err.errMsg || '支付取消')),
-          })
-        })
-      }
+      await completeWechatPay(wp, () =>
+        request({ url: `/card/purchase/${res.order_no}/mock`, method: 'POST' })
+      )
 
       wx.hideLoading()
       wx.showModal({

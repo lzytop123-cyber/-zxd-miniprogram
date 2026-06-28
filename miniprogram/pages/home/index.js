@@ -28,6 +28,8 @@ Page({
     },
     heroHeight: 680,
     cardCount: 0,
+    storesLoading: true,
+    locationHint: '',
   },
 
   onLoad() {
@@ -139,29 +141,56 @@ Page({
 
   loadStores() {
     const { resolveStoreList } = require('../../utils/media')
+    this.setData({ storesLoading: true })
+
     const applyStores = async (stores) => {
       const list = await resolveStoreList(stores)
-      this.setData({ stores: list || [] })
+      this.setData({ stores: list || [], storesLoading: false })
     }
 
     const fetchList = (query = '') =>
       request({ url: `/store/list${query}`, silent: true })
         .then(applyStores)
-        .catch(() => applyStores([]))
+        .catch(() => {
+          this.setData({ stores: [], storesLoading: false })
+        })
 
-    // 默认不带定位，避免一进首页就弹出位置授权
     fetchList()
 
-    // 仅当用户此前已授权时，静默刷新距离排序（不再弹窗）
     wx.getSetting({
       success: (res) => {
-        if (!res.authSetting['scope.userLocation']) return
-        wx.getLocation({
-          type: 'gcj02',
-          success: ({ latitude, longitude }) => {
-            fetchList(`?latitude=${latitude}&longitude=${longitude}`)
-          },
-        })
+        const authSetting = res.authSetting['scope.userLocation']
+        if (authSetting === true) {
+          this.setData({ locationHint: '' })
+          wx.getLocation({
+            type: 'gcj02',
+            success: ({ latitude, longitude }) => {
+              fetchList(`?latitude=${latitude}&longitude=${longitude}`)
+            },
+            fail: () => {
+              this.setData({ locationHint: '定位失败，暂无法显示距离' })
+            },
+          })
+          return
+        }
+        if (authSetting === false) {
+          this.setData({ locationHint: '开启定位查看距离' })
+          return
+        }
+        this.setData({ locationHint: '开启定位查看距离' })
+      },
+      fail: () => {
+        this.setData({ locationHint: '开启定位查看距离' })
+      },
+    })
+  },
+
+  openLocationSetting() {
+    wx.openSetting({
+      success: (res) => {
+        if (res.authSetting['scope.userLocation']) {
+          this.loadStores()
+        }
       },
     })
   },

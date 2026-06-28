@@ -23,6 +23,10 @@
 
       <view wx:elif="{{bannersLoading}}" class="hero-swiper hero-swiper--single hero-fallback hero-fallback--loading" style="height: {{heroHeight}}rpx;">
         <view class="hero-grid"></view>
+        <view class="hero-skeleton-lines">
+          <view class="hero-skeleton-line skeleton-shimmer"></view>
+          <view class="hero-skeleton-line hero-skeleton-line--short skeleton-shimmer"></view>
+        </view>
       </view>
 
       <view wx:else class="hero-swiper hero-swiper--single hero-fallback" style="height: {{heroHeight}}rpx;">
@@ -108,19 +112,36 @@
   <!-- 附近门店 -->
   <view class="section-row">
     <view class="section-title">附近门店</view>
-    <text class="section-more" wx:if="{{stores.length}}">共 {{stores.length}} 家</text>
+    <text class="section-more" wx:if="{{stores.length && !storesLoading}}">共 {{stores.length}} 家</text>
+  </view>
+  <view class="location-hint" wx:if="{{locationHint && !storesLoading}}" bindtap="openLocationSetting">
+    <text class="location-hint-icon">📍</text>
+    <text>{{locationHint}}</text>
+    <text class="location-hint-action">去设置 ›</text>
   </view>
   <view class="store-list">
-    <store-card
-      wx:for="{{stores}}"
-      wx:key="id"
-      store="{{item}}"
-      bind:select="goStore"
-    />
-    <view class="empty" wx:if="{{!stores.length}}">
-      <view class="empty-icon">🌿</view>
-      <view>正在为你寻找附近的自习室…</view>
-    </view>
+    <block wx:if="{{storesLoading}}">
+      <view class="skeleton-store-card" wx:for="{{[1,2]}}" wx:key="*this">
+        <view class="skeleton-store-cover skeleton-shimmer"></view>
+        <view class="skeleton-store-body">
+          <view class="skeleton-line skeleton-line--lg skeleton-shimmer"></view>
+          <view class="skeleton-line skeleton-line--sm skeleton-shimmer"></view>
+        </view>
+      </view>
+    </block>
+    <block wx:else>
+      <store-card
+        wx:for="{{stores}}"
+        wx:key="id"
+        store="{{item}}"
+        showLocationHint="{{!!locationHint}}"
+        bind:select="goStore"
+      />
+      <view class="empty" wx:if="{{!stores.length}}">
+        <view class="empty-icon">🌿</view>
+        <view>暂无门店信息</view>
+      </view>
+    </block>
   </view>
 </view>
 

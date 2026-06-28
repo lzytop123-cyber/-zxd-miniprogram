@@ -153,7 +153,9 @@
     </view>
 
     <view class="seat-map-frame" wx:if="{{startTime && endTime}}">
+      <view class="skeleton-seat-map skeleton-shimmer" wx:if="{{seatsLoading}}"></view>
       <floor-plan-map
+        wx:else
         seats="{{seats}}"
         selectedId="{{selectedId}}"
         bind:select="selectSeat"

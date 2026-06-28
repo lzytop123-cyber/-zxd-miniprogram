@@ -1,6 +1,7 @@
 const { request } = require('../../utils/request')
 const auth = require('../../utils/auth')
 const { getLayout } = require('../../utils/seat-layout')
+const { debounce } = require('../../utils/debounce')
 const {
   formatLocalDateTime,
   todayStr,
@@ -55,6 +56,8 @@ Page({
     timeSummary: '',
     nightHint: '18:00 - 次日 00:00',
     pricingMap: {},
+    seatsLoading: false,
+    previewLoading: false,
   },
 
   onLoad(options) {
@@ -72,6 +75,7 @@ Page({
 
     const today = todayStr()
     this._layout = getLayout()
+    this._refreshPreviewDebounced = debounce(() => this._doRefreshPreview(), 450)
     this.setData({
       storeId: options.storeId,
       startDate: today,
@@ -264,6 +268,10 @@ Page({
   },
 
   refreshPreview() {
+    this._refreshPreviewDebounced()
+  },
+
+  _doRefreshPreview() {
     const { storeId, billType, seatId } = this.data
     if (!storeId) return
     let start
@@ -273,7 +281,7 @@ Page({
       start = times.start
       end = times.end
     } catch (err) {
-      this.setData({ preview: null, timeSummary: '', startTime: '', endTime: '' })
+      this.setData({ preview: null, timeSummary: '', startTime: '', endTime: '', previewLoading: false })
       return
     }
 
@@ -281,6 +289,7 @@ Page({
       startTime: start,
       endTime: end,
       timeSummary: this._formatSummary(start, end),
+      previewLoading: true,
     })
 
     this.loadSeats(start, end)
@@ -295,21 +304,22 @@ Page({
 
     request({ url: '/reservation/preview', method: 'POST', data: body })
       .then((preview) => {
-        const patch = { preview }
+        const patch = { preview, previewLoading: false }
         if (this.data.seatId && preview.seat_id === this.data.seatId) {
           patch.seatCode = preview.seat_code
         }
         this.setData(patch)
       })
-      .catch(() => this.setData({ preview: null }))
+      .catch(() => this.setData({ preview: null, previewLoading: false }))
   },
 
   loadSeats(start, end) {
     const { storeId } = this.data
     if (!storeId) return
     const range = `${start}~${end}`
-    if (range === this._seatRange) return
+    if (range === this._seatRange && this.data.seats.length) return
     this._seatRange = range
+    this.setData({ seatsLoading: true })
     request({
       url: `/store/${storeId}/availability?start_time=${encodeURIComponent(start)}&end_time=${encodeURIComponent(end)}`,
       silent: true,
@@ -317,7 +327,7 @@ Page({
       .then((seats) => {
         const applied = this._layout.applySeats(seats)
         const availableSeatCount = applied.filter((s) => s.status === 'available').length
-        const patch = { seats: applied, availableSeatCount }
+        const patch = { seats: applied, availableSeatCount, seatsLoading: false }
         if (this.data.seatId) {
           const current = applied.find((s) => s.id === this.data.seatId)
           if (!current || current.status !== 'available') {
@@ -332,7 +342,7 @@ Page({
         }
         this.setData(patch)
       })
-      .catch(() => {})
+      .catch(() => this.setData({ seatsLoading: false }))
   },
 
   selectSeat(e) {

@@ -1,5 +1,10 @@
 const { request } = require('../../utils/request')
 const auth = require('../../utils/auth')
+const {
+  computeCanOpen,
+  mapBleOpenFailure,
+  showOpenFailureModal,
+} = require('../../utils/bleUnlock')
 
 const CHECKIN_SELECT_KEY = 'checkin_selected_id'
 
@@ -32,20 +37,13 @@ function formatDate(iso) {
   return `${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`
 }
 
-const OPEN_EARLY_MS = 15 * 60000
-
 function parseTime(iso) {
   return new Date(String(iso).replace(' ', 'T'))
 }
 
-function computeCanOpen(startTime, endTime, now = new Date()) {
-  const start = parseTime(startTime)
-  const end = parseTime(endTime)
-  return now >= new Date(start.getTime() - OPEN_EARLY_MS) && now <= end
-}
-
 Page({
   data: {
+    pageLoading: true,
     activeList: [],
     selectedId: null,
     reservation: null,
@@ -61,6 +59,7 @@ Page({
     pluginHint: '',
     runtimeAppId: '',
     opening: false,
+    lastOpenError: '',
   },
 
   onShow() {
@@ -76,6 +75,7 @@ Page({
   },
 
   loadActive() {
+    this.setData({ pageLoading: true })
     request({ url: '/reservation/active/list' })
       .then((list) => {
         const items = list || []
@@ -87,6 +87,7 @@ Page({
             selectedId: null,
             reservation: null,
             canOpen: false,
+            pageLoading: false,
           })
           return
         }
@@ -100,7 +101,7 @@ Page({
           selectedId = items[0].id
         }
 
-        this.setData({ activeList: items, selectedId })
+        this.setData({ activeList: items, selectedId, pageLoading: false })
         const reservation = items.find((item) => item.id === selectedId) || items[0]
         this.applyReservation(reservation)
       })
@@ -110,6 +111,7 @@ Page({
           selectedId: null,
           reservation: null,
           canOpen: false,
+          pageLoading: false,
         })
       })
   },
@@ -134,6 +136,7 @@ Page({
       statusLabel: reservation.status_label || '',
       statusHint: reservation.status_hint || '',
       canOpen,
+      lastOpenError: '',
     })
     this.loadBleKey(canOpen ? reservation.id : null)
     this.startCountdown(reservation)
@@ -198,12 +201,22 @@ Page({
       method: 'POST',
       data: { reservation_id: reservation.id, result: 'success' },
     }).finally(() => this.loadActive())
-    this.setData({ opening: false })
+    this.setData({ opening: false, lastOpenError: '' })
   },
 
-  afterOpenFail(reservation, errorMsg, errorCode) {
+  afterOpenFail(reservation, errorMsg, errorCode, mode = 'ble') {
     wx.hideLoading()
-    wx.showToast({ title: errorMsg || '开门失败', icon: 'none' })
+    const failure = mapBleOpenFailure({
+      errorCode,
+      errorMsg,
+      canOpen: this.data.canOpen,
+      reservation,
+      mode,
+    })
+    this.setData({
+      opening: false,
+      lastOpenError: failure.content,
+    })
     request({
       url: `/ble/checkin/${reservation.id}`,
       method: 'POST',
@@ -211,10 +224,20 @@ Page({
         reservation_id: reservation.id,
         result: 'fail',
         error_code: errorCode ? String(errorCode) : '',
-        error_msg: errorMsg || '',
+        error_msg: errorMsg || failure.content,
       },
     })
-    this.setData({ opening: false })
+    showOpenFailureModal(failure, {
+      onRetry: () => {
+        if (mode === 'remote') this.openDoorRemote()
+        else this.openDoorBle()
+      },
+      onRemote: () => this.openDoorRemote(),
+      onRefresh: () => {
+        this.loadBleKey(reservation.id)
+        setTimeout(() => this.openDoorBle(), 500)
+      },
+    })
   },
 
   async openDoorBle() {
@@ -224,7 +247,7 @@ Page({
       const hint = this.data.pluginHint || '通通锁插件未加载'
       wx.showModal({
         title: '蓝牙开门不可用',
-        content: `${hint}。请确认已在 wx4d3a834429fc6538 后台添加插件并重新上传体验版；当前运行 AppID：${appId || '未知'}。可先使用「远程开门」。`,
+        content: `${hint}。请确认已在 wx4d3a834429fc6538 后台添加插件并重新上传体验版；当前运行 AppID：${appId || '未知'}。${this.data.gatewayUnlock ? '可尝试远程开门。' : ''}`,
         showCancel: false,
       })
       return
@@ -235,9 +258,15 @@ Page({
     try {
       await wx.openBluetoothAdapter()
     } catch (e) {
-      wx.showModal({
-        title: '请开启蓝牙',
-        content: '蓝牙开门需要开启手机蓝牙，或在通通锁 APP 中确认已打开远程开锁后使用「远程开门」。',
+      const failure = mapBleOpenFailure({
+        errorMsg: '蓝牙未开启',
+        canOpen: true,
+        reservation,
+        mode: 'ble',
+      })
+      showOpenFailureModal(failure, {
+        onRetry: () => this.openDoorBle(),
+        onRemote: () => this.openDoorRemote(),
       })
       return
     }
@@ -248,19 +277,31 @@ Page({
 
     if (!plugin || typeof plugin.controlLock !== 'function') {
       wx.hideLoading()
+      this.setData({ opening: false })
       wx.showModal({
         title: '蓝牙开门不可用',
         content: '通通锁插件未正确加载，请重新上传体验版，或使用「远程开门」。',
         showCancel: false,
       })
-      this.setData({ opening: false })
       return
     }
 
     if (!lockData) {
       wx.hideLoading()
-      wx.showToast({ title: '钥匙未生成，请稍后重试', icon: 'none' })
+      const failure = mapBleOpenFailure({
+        errorMsg: '钥匙未生成',
+        canOpen: true,
+        reservation,
+        mode: 'ble',
+      })
       this.setData({ opening: false })
+      showOpenFailureModal(failure, {
+        onRefresh: () => {
+          this.loadBleKey(reservation.id)
+          setTimeout(() => this.openDoorBle(), 500)
+        },
+        onRemote: () => this.openDoorRemote(),
+      })
       return
     }
 
@@ -273,15 +314,19 @@ Page({
       if (result && result.errorCode === 0) {
         this.afterOpenSuccess(reservation)
       } else {
-        const msg = (result && result.errorMsg) || '蓝牙开门失败，可试远程开门'
-        this.afterOpenFail(reservation, msg, result && result.errorCode)
+        this.afterOpenFail(
+          reservation,
+          (result && result.errorMsg) || '蓝牙开门失败',
+          result && result.errorCode,
+          'ble'
+        )
       }
     } catch (err) {
-      wx.hideLoading()
       this.afterOpenFail(
         reservation,
         err?.errorMsg || err?.message || '蓝牙插件调用失败',
-        err?.errorCode || ''
+        err?.errorCode || '',
+        'ble'
       )
     }
   },
@@ -297,7 +342,7 @@ Page({
       .then(() => this.afterOpenSuccess(reservation))
       .catch((err) => {
         const msg = err.detail || err.message || '远程开门失败'
-        this.afterOpenFail(reservation, msg, '')
+        this.afterOpenFail(reservation, msg, '', 'remote')
       })
   },
 

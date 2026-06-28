@@ -1,6 +1,7 @@
 Component({
   properties: {
     store: { type: Object, value: {} },
+    showLocationHint: { type: Boolean, value: false },
   },
   data: {
     coverFailed: false,

@@ -60,6 +60,43 @@
   animation: hero-pulse 1.2s ease-in-out infinite;
 }
 
+.hero-skeleton-lines {
+  position: relative;
+  z-index: 1;
+  width: 60%;
+  padding: 0 32rpx;
+}
+
+.hero-skeleton-line {
+  height: 36rpx;
+  border-radius: 12rpx;
+  margin-bottom: 20rpx;
+  background: rgba(255, 255, 255, 0.25);
+}
+
+.hero-skeleton-line--short {
+  width: 50%;
+  height: 28rpx;
+}
+
+.location-hint {
+  display: flex;
+  align-items: center;
+  gap: 8rpx;
+  margin: 0 32rpx 16rpx;
+  padding: 16rpx 20rpx;
+  background: rgba(82, 183, 136, 0.1);
+  border-radius: 16rpx;
+  font-size: 24rpx;
+  color: var(--color-primary-dark);
+}
+
+.location-hint-action {
+  margin-left: auto;
+  color: var(--color-primary);
+  font-weight: 600;
+}
+
 @keyframes hero-pulse {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.85; }

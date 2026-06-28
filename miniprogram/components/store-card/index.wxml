@@ -27,6 +27,7 @@
     <view class="addr-row">
       <text class="addr">{{store.address}}</text>
       <text class="dist" wx:if="{{store.distance != null}}">{{store.distance}} km</text>
+      <text class="dist dist-hint" wx:elif="{{showLocationHint}}">开启定位查看距离</text>
     </view>
   </view>
 </view>
