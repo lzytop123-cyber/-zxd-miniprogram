@@ -100,5 +100,11 @@
     }
   },
   "requiredPrivateInfos": ["getLocation"],
+  "plugins": {
+    "ttlock-plugin": {
+      "version": "3.1.4",
+      "provider": "wx43d5971c94455481"
+    }
+  },
   "sitemapLocation": "sitemap.json"
 }
