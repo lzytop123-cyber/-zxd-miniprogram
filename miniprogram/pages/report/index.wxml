@@ -44,6 +44,16 @@
         <view class="chip {{days===30?'active':''}}" bindtap="setDays" data-d="30">近30日</view>
       </view>
 
+      <view class="daily-chart" wx:if="{{daily.length}}">
+        <view class="daily-bar" wx:for="{{daily}}" wx:key="label">
+          <view class="daily-bar-track">
+            <view class="daily-bar-fill" style="height: {{item.height}}%"></view>
+          </view>
+          <text class="daily-bar-label">{{item.label}}</text>
+        </view>
+      </view>
+      <view class="daily-empty" wx:else>近{{days}}日暂无学习记录</view>
+
       <view class="section-title inner">排行榜</view>
       <view class="rank-list">
         <view class="rank-item {{item.is_self?'self':''}}" wx:for="{{leaderboard}}" wx:key="rank">

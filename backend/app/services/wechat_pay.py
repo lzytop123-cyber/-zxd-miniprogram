@@ -96,7 +96,7 @@ class WechatPayService:
     @staticmethod
     def verify_notify(headers: dict, body: bytes) -> dict | None:
         if _is_mock_mode():
-            return {"out_trade_no": "", "trade_state": "SUCCESS"}
+            return {"out_trade_no": "", "trade_state": "SUCCESS", "amount_total": None}
 
         wxpay = _get_client()
         result = wxpay.callback(headers, body)
@@ -108,10 +108,17 @@ class WechatPayService:
         if trade_state != "SUCCESS" and result.get("event_type") != "TRANSACTION.SUCCESS":
             return None
 
+        amount = resource.get("amount") or {}
+        # payer_total=实付（含优惠后），total=订单金额；优先校验实付
+        amount_total = amount.get("payer_total")
+        if amount_total is None:
+            amount_total = amount.get("total")
+
         return {
             "out_trade_no": resource.get("out_trade_no"),
             "trade_state": trade_state or "SUCCESS",
             "attach": resource.get("attach"),
+            "amount_total": amount_total,
         }
 
     @staticmethod

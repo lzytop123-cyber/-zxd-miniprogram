@@ -126,7 +126,10 @@ def purchase_card(
     if body.pay_type == PayType.balance:
         if user.balance < amount:
             raise HTTPException(status_code=400, detail="余额不足")
-        add_wallet_log(db, user, "consume", amount, f"购买{label}", order_no)
+        try:
+            add_wallet_log(db, user, "consume", amount, f"购买{label}", order_no)
+        except ValueError:
+            raise HTTPException(status_code=400, detail="余额不足")
         card = fulfill_card_purchase(db, order)
         db.commit()
         return ResponseModel(

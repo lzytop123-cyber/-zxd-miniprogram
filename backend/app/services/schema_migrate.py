@@ -24,6 +24,14 @@ MIGRATION_STATEMENTS = [
     "ALTER TABLE meituan_deal_mapping ADD COLUMN platform INTEGER DEFAULT 1",
     "ALTER TABLE reservations ADD COLUMN refund_remark VARCHAR(200)",
     "ALTER TABLE reservations ADD COLUMN refunded_at DATETIME",
+    "ALTER TABLE reservations ADD COLUMN period_card_id INTEGER",
+]
+
+# 性能索引（存量库补建；已存在时忽略）
+INDEX_STATEMENTS = [
+    "CREATE INDEX ix_reservations_seat_time ON reservations (seat_id, start_time, end_time)",
+    "CREATE INDEX ix_reservations_user ON reservations (user_id)",
+    "CREATE INDEX ix_wallet_logs_user_created ON wallet_logs (user_id, created_at)",
 ]
 
 _last_result: dict | None = None
@@ -71,14 +79,30 @@ def run_schema_migrations(db: Session) -> dict:
 
     created_tables: list[str] = []
     try:
-        from app.models import AdminOperationLog, StoreCalendarDay, SystemAnnouncement
+        from app.models import AdminOperationLog, RechargeOrder, StoreCalendarDay, SystemAnnouncement
 
-        for model in (AdminOperationLog, SystemAnnouncement, StoreCalendarDay):
+        for model in (AdminOperationLog, SystemAnnouncement, StoreCalendarDay, RechargeOrder):
             model.__table__.create(bind=engine, checkfirst=True)
             if inspector.has_table(model.__tablename__):
                 created_tables.append(model.__tablename__)
     except Exception as exc:
         errors.append(f"create tables: {exc.__class__.__name__}")
+
+    # 团购券码唯一索引（防并发重复兑换）。已存在重复数据时会失败，记录后跳过。
+    index_stmts = [
+        "CREATE UNIQUE INDEX uq_meituan_orders_coupon_code ON meituan_orders (coupon_code)",
+        *INDEX_STATEMENTS,
+    ]
+    for stmt in index_stmts:
+        idx_name = stmt.split("INDEX")[1].strip().split()[0]
+        try:
+            with engine.begin() as conn:
+                conn.execute(text(stmt))
+            applied.append(idx_name)
+        except Exception as exc:
+            msg = str(exc).lower()
+            if not ("duplicate" in msg or "already exists" in msg or "exists" in msg):
+                errors.append(f"{idx_name}: {exc.__class__.__name__}")
 
     _last_result = {
         "status": "ok" if not errors else "partial",

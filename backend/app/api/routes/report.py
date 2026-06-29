@@ -8,10 +8,10 @@ from sqlalchemy.orm import Session
 from app.api.deps import get_current_user
 from app.core.prod import block_mock_in_production
 from app.db.session import get_db
-from app.models import PeriodCard, Reservation, Seat, StudyStat, User, WalletLog
+from app.models import PeriodCard, RechargeOrder, Reservation, Seat, StudyStat, User, WalletLog
 from app.schemas.common import ResponseModel
 from app.schemas.report import DailyStatItem, LeaderboardItem, ReportSummary, RechargeRequest, WalletInfo
-from app.services.booking import add_wallet_log
+from app.services.booking import add_wallet_log, fulfill_recharge_order
 from app.services.card_service import daily_pass_days, is_period_card_active
 from app.services.wechat_pay import WechatPayService
 
@@ -106,9 +106,15 @@ def leaderboard(
     query = query.order_by(func.sum(StudyStat.total_minutes).desc()).limit(limit)
     rows = db.execute(query).all()
 
+    user_ids = [row.user_id for row in rows]
+    users = {
+        u.id: u
+        for u in (db.scalars(select(User).where(User.id.in_(user_ids))).all() if user_ids else [])
+    }
+
     items: list[LeaderboardItem] = []
     for i, row in enumerate(rows, 1):
-        u = db.get(User, row.user_id)
+        u = users.get(row.user_id)
         items.append(
             LeaderboardItem(
                 rank=i,
@@ -155,6 +161,9 @@ def recharge(
     db: Session = Depends(get_db),
 ):
     order_no = f"RCH{datetime.now().strftime('%Y%m%d%H%M%S')}{user.id}"
+    order = RechargeOrder(order_no=order_no, user_id=user.id, amount=body.amount, pay_status=0)
+    db.add(order)
+    db.commit()
     pay_params = WechatPayService.create_jsapi_order(
         order_no, body.amount, user.openid, f"知行岛余额充值-{body.amount}元"
     )
@@ -166,13 +175,25 @@ def recharge(
 @router.post("/user/recharge/{order_no}/mock", response_model=ResponseModel[WalletInfo])
 def mock_recharge(
     order_no: str,
-    amount: Decimal = Query(...),
+    amount: Decimal = Query(None),
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """开发环境模拟充值成功"""
+    """开发环境模拟充值成功（走与微信回调一致的幂等履约逻辑）"""
     block_mock_in_production()
-    add_wallet_log(db, user, "recharge", amount, "余额充值", order_no)
+    order = db.scalar(
+        select(RechargeOrder).where(
+            RechargeOrder.order_no == order_no, RechargeOrder.user_id == user.id
+        )
+    )
+    if order is None:
+        # 兼容历史无订单的调用：按传入金额补建订单
+        order = RechargeOrder(
+            order_no=order_no, user_id=user.id, amount=amount or Decimal("0"), pay_status=0
+        )
+        db.add(order)
+        db.flush()
+    fulfill_recharge_order(db, order)
     db.commit()
     db.refresh(user)
     return get_wallet(user, db)

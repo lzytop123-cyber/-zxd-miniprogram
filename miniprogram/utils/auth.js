@@ -8,6 +8,7 @@ const MANUAL_LOGOUT_KEY = 'manualLogout'
 const LOGIN_PAGE = routes.profileLogin
 const TAB_PAGES = [
   '/pages/home/index',
+  '/pages/packages/index',
   '/pages/checkin/index',
   '/pages/report/index',
   '/pages/profile/index',

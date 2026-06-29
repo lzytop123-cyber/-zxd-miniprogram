@@ -1,5 +1,12 @@
+import logging
+
 from pydantic import AliasChoices, Field, computed_field
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+logger = logging.getLogger(__name__)
+
+_WEAK_SECRETS = {"", "change-me", "secret", "changeme"}
+_WEAK_PASSWORDS = {"", "admin123", "admin", "123456", "password"}
 
 
 class Settings(BaseSettings):
@@ -10,6 +17,9 @@ class Settings(BaseSettings):
     base_url: str = "http://localhost:8000"
     # 小程序/商户审核中：生产环境仍允许 dev 登录与 mock 支付（未配置 WX 凭证时）
     pre_wechat_launch: bool = False
+
+    # 允许的跨域来源：逗号分隔；为 "*" 时开发环境放开（生产应配置白名单）
+    cors_origins: str = "*"
 
     database_url: str = "sqlite:///./zxd_study.db"
     redis_url: str = "redis://localhost:6379/0"
@@ -87,6 +97,36 @@ class Settings(BaseSettings):
     @property
     def yunlaoban_timeout_sec(self) -> float:
         return self.yunlaoban_timeout_ms / 1000.0
+
+    @property
+    def is_production(self) -> bool:
+        return self.app_env.lower() == "production"
+
+    @property
+    def cors_origin_list(self) -> list[str]:
+        raw = (self.cors_origins or "").strip()
+        if not raw or raw == "*":
+            return ["*"]
+        return [o.strip() for o in raw.split(",") if o.strip()]
+
+    def validate_for_production(self) -> None:
+        """生产环境强制安全基线，弱默认值直接拒绝启动。"""
+        if not self.is_production:
+            return
+        errors: list[str] = []
+        if (self.secret_key or "").strip().lower() in _WEAK_SECRETS or len(self.secret_key) < 16:
+            errors.append("SECRET_KEY 过弱，请设置 ≥16 位的随机强密钥")
+        if (self.admin_password or "").strip().lower() in _WEAK_PASSWORDS:
+            errors.append("ADMIN_PASSWORD 为弱默认值，请设置强密码")
+        if self.cors_origin_list == ["*"]:
+            errors.append('CORS_ORIGINS 不能为 "*"（携带凭证时浏览器也会拒绝），请配置域名白名单')
+        if errors:
+            raise RuntimeError("生产环境配置校验失败：\n- " + "\n- ".join(errors))
+        if self.pre_wechat_launch and not self.wx_pay_configured:
+            logger.warning(
+                "PRE_WECHAT_LAUNCH=true 且未配置微信支付：生产环境仍允许 dev 登录与 mock 支付，"
+                "审核通过后请置为 false。"
+            )
 
 
 settings = Settings()

@@ -128,6 +128,58 @@
   margin-bottom: 24rpx;
 }
 
+/* ============ 每日学习时长趋势 ============ */
+.daily-chart {
+  display: flex;
+  align-items: flex-end;
+  gap: 8rpx;
+  height: 200rpx;
+  padding: 12rpx 4rpx 0;
+  margin-bottom: 28rpx;
+  overflow-x: auto;
+}
+
+.daily-bar {
+  flex: 1 0 auto;
+  min-width: 36rpx;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  height: 100%;
+}
+
+.daily-bar-track {
+  width: 22rpx;
+  height: 150rpx;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+}
+
+.daily-bar-fill {
+  width: 100%;
+  border-radius: 8rpx 8rpx 4rpx 4rpx;
+  background: linear-gradient(180deg, #52B788, #2D6A4F);
+  transition: height 0.3s ease;
+  min-height: 4rpx;
+}
+
+.daily-bar-label {
+  margin-top: 8rpx;
+  font-size: 18rpx;
+  color: #9CACA2;
+  white-space: nowrap;
+}
+
+.daily-empty {
+  padding: 36rpx 0;
+  text-align: center;
+  font-size: 24rpx;
+  color: #9CACA2;
+  margin-bottom: 12rpx;
+}
+
 .section-title.inner {
   padding: 0;
   margin-bottom: 16rpx;

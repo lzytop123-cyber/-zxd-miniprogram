@@ -12,18 +12,86 @@ function getErrorMessage(res) {
   return data.message || `请求失败(${res.statusCode})`
 }
 
-function rawRequest({ url, method = 'GET', data, silent = false }) {
+let _redirectingToLogin = false
+
+function currentPagePath() {
+  try {
+    const pages = getCurrentPages()
+    if (!pages.length) return ''
+    const cur = pages[pages.length - 1]
+    const opts = cur.options || {}
+    const qs = Object.keys(opts)
+      .map((k) => `${k}=${opts[k]}`)
+      .join('&')
+    return '/' + cur.route + (qs ? `?${qs}` : '')
+  } catch (e) {
+    return ''
+  }
+}
+
+/** 登录态失效（401）：清理本地登录信息并引导重新登录。 */
+function handleUnauthorized() {
+  try {
+    wx.removeStorageSync('token')
+    wx.removeStorageSync('userInfo')
+  } catch (e) {
+    // ignore
+  }
+  try {
+    requestCache.invalidate() // 清空全部缓存，避免读到旧用户数据
+  } catch (e) {
+    // ignore
+  }
+  try {
+    const app = getApp({ allowDefault: true })
+    if (app && app.globalData) {
+      app.globalData.user = null
+      app.globalData.loginReady = false
+      app.globalData.loginPromise = null
+    }
+  } catch (e) {
+    // ignore
+  }
+
+  if (_redirectingToLogin) return
+  _redirectingToLogin = true
+  setTimeout(() => {
+    _redirectingToLogin = false
+  }, 3000)
+  try {
+    const routes = require('./routes')
+    const redirect = currentPagePath()
+    if (redirect && redirect.indexOf(routes.profileLogin) === 0) return
+    const query = redirect ? `?redirect=${encodeURIComponent(redirect)}` : ''
+    wx.navigateTo({ url: routes.profileLogin + query })
+  } catch (e) {
+    // ignore
+  }
+}
+
+const REQUEST_TIMEOUT = 15000
+
+function rawRequest({ url, method = 'GET', data, silent = false, retries }) {
   const payload = data === undefined ? undefined : data
+  // GET 幂等，弱网下默认重试 1 次
+  const maxRetries = retries != null ? retries : method.toUpperCase() === 'GET' ? 1 : 0
   return new Promise((resolve, reject) => {
     wx.request({
       url: getApiBase() + url,
       method,
+      timeout: REQUEST_TIMEOUT,
       ...(payload !== undefined ? { data: payload } : {}),
       header: {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${wx.getStorageSync('token') || ''}`,
       },
       success(res) {
+        if (res.statusCode === 401) {
+          handleUnauthorized()
+          const msg = getErrorMessage(res)
+          reject({ ...(res.data || {}), detail: msg, statusCode: 401 })
+          return
+        }
         if (res.statusCode >= 400) {
           const msg = getErrorMessage(res)
           if (!silent) {
@@ -42,6 +110,10 @@ function rawRequest({ url, method = 'GET', data, silent = false }) {
         }
       },
       fail(err) {
+        if (maxRetries > 0) {
+          resolve(rawRequest({ url, method, data, silent, retries: maxRetries - 1 }))
+          return
+        }
         if (!silent) {
           wx.showToast({ title: '网络异常，请稍后重试', icon: 'none' })
         }

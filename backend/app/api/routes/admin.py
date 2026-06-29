@@ -1111,7 +1111,10 @@ def adjust_user_balance(
     if amount < 0 and user.balance + amount < 0:
         raise HTTPException(status_code=400, detail="余额不足，无法扣减")
     log_type = "recharge" if amount > 0 else "consume"
-    add_wallet_log(db, user, log_type, abs(amount), body.remark)
+    try:
+        add_wallet_log(db, user, log_type, abs(amount), body.remark)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="余额不足，无法扣减")
     db.commit()
     db.refresh(user)
     return ResponseModel(message="余额已调整", data=_user_admin_item(user))

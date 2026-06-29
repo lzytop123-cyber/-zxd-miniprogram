@@ -3,6 +3,7 @@ from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException, Path, Query
 from pydantic import BaseModel, Field
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user
@@ -67,10 +68,34 @@ async def _exchange(
     if existing and existing.status == MeituanOrderStatus.verified:
         raise HTTPException(status_code=400, detail="该券码已兑换")
 
+    # 先占位：借助 coupon_code 唯一索引原子抢占券码，避免并发重复核销导致资损
+    order = MeituanOrder(
+        user_id=user.id,
+        coupon_code=code,
+        store_id=body.store_id,
+        status=MeituanOrderStatus.pending,
+    )
+    db.add(order)
+    try:
+        db.flush()
+    except IntegrityError:
+        db.rollback()
+        dup = db.scalar(select(MeituanOrder).where(MeituanOrder.coupon_code == code))
+        if dup and dup.status == MeituanOrderStatus.verified:
+            raise HTTPException(status_code=400, detail="该券码已兑换")
+        raise HTTPException(status_code=409, detail="该券码正在兑换中，请稍后重试")
+
+    # 占位成功后再核销；核销失败则释放占位以便用户重试
     try:
         prepared, consume_result = await YunlaobanService.prepare_and_consume(platform, code)
     except ValueError as e:
+        db.delete(order)
+        db.commit()
         raise HTTPException(status_code=400, detail=str(e))
+    except Exception:
+        db.delete(order)
+        db.commit()
+        raise
 
     deal_id = str(prepared["ticketData"].get("dealId", ""))
     mapping = get_mapping_by_deal_id(db, deal_id)
@@ -110,18 +135,13 @@ async def _exchange(
         store_id=body.store_id,
     )
 
-    order = MeituanOrder(
-        meituan_deal_id=deal_id,
-        user_id=user.id,
-        coupon_code=code,
-        deal_name=prepared.get("ticketName") or mapping.deal_name,
-        deal_type=mapping.reward_type.value,
-        store_id=body.store_id or mapping.store_id,
-        status=MeituanOrderStatus.verified,
-        verified_at=datetime.now(),
-        meituan_raw={"result": consume_result, "ticketData": prepared["ticketData"]},
-    )
-    db.add(order)
+    order.meituan_deal_id = deal_id
+    order.deal_name = prepared.get("ticketName") or mapping.deal_name
+    order.deal_type = mapping.reward_type.value
+    order.store_id = body.store_id or mapping.store_id
+    order.status = MeituanOrderStatus.verified
+    order.verified_at = datetime.now()
+    order.meituan_raw = {"result": consume_result, "ticketData": prepared["ticketData"]}
     db.commit()
     db.refresh(card)
 

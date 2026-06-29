@@ -7,6 +7,7 @@ from sqlalchemy import (
     DateTime,
     Enum,
     ForeignKey,
+    Index,
     Integer,
     JSON,
     Numeric,
@@ -203,6 +204,10 @@ class PricingRule(Base):
 
 class Reservation(Base):
     __tablename__ = "reservations"
+    __table_args__ = (
+        Index("ix_reservations_seat_time", "seat_id", "start_time", "end_time"),
+        Index("ix_reservations_user", "user_id"),
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     order_no: Mapped[str] = mapped_column(String(32), unique=True, nullable=False)
@@ -221,6 +226,7 @@ class Reservation(Base):
     pay_status: Mapped[int] = mapped_column(Integer, default=0)
     status: Mapped[int] = mapped_column(Integer, default=0)
     check_in_time: Mapped[datetime | None] = mapped_column(DateTime)
+    period_card_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("period_cards.id"))
     refund_remark: Mapped[str | None] = mapped_column(String(200))
     refunded_at: Mapped[datetime | None] = mapped_column(DateTime)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
@@ -267,6 +273,21 @@ class CardPurchaseOrder(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
 
+class RechargeOrder(Base):
+    """余额充值订单（微信支付回调据此入账）"""
+
+    __tablename__ = "recharge_orders"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    order_no: Mapped[str] = mapped_column(String(32), unique=True, nullable=False)
+    user_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"), nullable=False)
+    amount: Mapped[Decimal] = mapped_column(Numeric(10, 2), nullable=False)
+    pay_type: Mapped[PayType] = mapped_column(Enum(PayType), default=PayType.wechat)
+    pay_status: Mapped[int] = mapped_column(Integer, default=0)
+    paid_at: Mapped[datetime | None] = mapped_column(DateTime)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+
 class Coupon(Base):
     __tablename__ = "coupons"
 
@@ -282,6 +303,7 @@ class Coupon(Base):
 
 class WalletLog(Base):
     __tablename__ = "wallet_logs"
+    __table_args__ = (Index("ix_wallet_logs_user_created", "user_id", "created_at"),)
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     user_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"), nullable=False)
@@ -378,6 +400,9 @@ class DoorLog(Base):
 
 class MeituanOrder(Base):
     __tablename__ = "meituan_orders"
+    __table_args__ = (
+        Index("uq_meituan_orders_coupon_code", "coupon_code", unique=True),
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     meituan_deal_id: Mapped[str | None] = mapped_column(String(100))

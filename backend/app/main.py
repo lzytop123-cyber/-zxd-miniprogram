@@ -7,6 +7,7 @@ from fastapi.staticfiles import StaticFiles
 from sqlalchemy.orm import Session
 
 from app.api.routes import admin, admin_tools, assistant, ble, card, exchange, home, payment, report, reservation, store, user
+from app.core.config import settings
 from app.db.session import get_db
 from app.services.health import run_health_checks
 from app.tasks.scheduler import start_scheduler
@@ -16,8 +17,11 @@ UPLOADS_DIR = Path(__file__).resolve().parent.parent / "uploads"
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    from app.core.config import settings
     from app.db.session import SessionLocal
     from app.services.schema_migrate import run_schema_migrations
+
+    settings.validate_for_production()
 
     db = SessionLocal()
     try:
@@ -34,10 +38,12 @@ app = FastAPI(
     version="1.0.2",
     lifespan=lifespan,
 )
+_cors_origins = settings.cors_origin_list
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
+    allow_origins=_cors_origins,
+    # 通配来源时浏览器禁止携带凭证；本系统用 Bearer Token 鉴权，无需 cookie 凭证
+    allow_credentials=_cors_origins != ["*"],
     allow_methods=["*"],
     allow_headers=["*"],
 )

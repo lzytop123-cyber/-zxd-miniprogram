@@ -7,6 +7,7 @@ Page({
     // 学习报告
     summary: null,
     leaderboard: [],
+    daily: [],
     days: 7,
     scopeLabel: '全平台',
     storeId: null,
@@ -44,6 +45,7 @@ Page({
         this.setData({ summary })
       }).catch(() => {}),
       this.loadLeaderboard({ force }),
+      this.loadDaily({ force }),
     ])
   },
 
@@ -55,18 +57,56 @@ Page({
     }).catch(() => {})
   },
 
+  loadDaily(options = {}) {
+    const { force = false } = options
+    return request({ url: `/report/daily?days=${this.data.days}`, silent: true, force })
+      .then((rows) => {
+        const list = rows || []
+        const max = list.reduce((m, r) => Math.max(m, r.total_minutes || 0), 0)
+        const daily = list.map((r) => {
+          const md = String(r.stat_date || '').slice(5).replace('-', '/')
+          return {
+            label: md,
+            minutes: r.total_minutes || 0,
+            height: max > 0 ? Math.max(4, Math.round((r.total_minutes / max) * 100)) : 0,
+          }
+        })
+        this.setData({ daily })
+      })
+      .catch(() => {})
+  },
+
   setDays(e) {
-    this.setData({ days: Number(e.currentTarget.dataset.d) })
-    request({ url: `/report/daily?days=${this.data.days}` })
+    const days = Number(e.currentTarget.dataset.d)
+    if (days === this.data.days) return
+    this.setData({ days })
+    this.loadDaily({ force: true })
   },
 
   onScopeChange(e) {
     const idx = Number(e.detail.value)
-    this.setData({
-      scopeLabel: idx === 0 ? '全平台' : '本店',
-      storeId: idx === 0 ? null : 1,
+    if (idx === 0) {
+      this.setData({ scopeLabel: '全平台', storeId: null })
+      this.loadLeaderboard({ force: true })
+      return
+    }
+    this.setData({ scopeLabel: '本店' })
+    this.resolveStoreId().then((storeId) => {
+      this.setData({ storeId: storeId || null })
+      this.loadLeaderboard({ force: true })
     })
-    this.loadLeaderboard({ force: true })
+  },
+
+  /** 解析「本店」对应的门店 id（取门店列表首个，结果缓存）。 */
+  resolveStoreId() {
+    if (this._storeId) return Promise.resolve(this._storeId)
+    return request({ url: '/store/list', silent: true })
+      .then((list) => {
+        const first = Array.isArray(list) && list.length ? list[0] : null
+        this._storeId = first ? first.id : null
+        return this._storeId
+      })
+      .catch(() => null)
   },
 
   switchTab(e) {

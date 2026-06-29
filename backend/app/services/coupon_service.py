@@ -1,6 +1,7 @@
 from datetime import date
 from decimal import Decimal
 
+from sqlalchemy import update
 from sqlalchemy.orm import Session
 
 from app.models import Coupon, Reservation
@@ -31,5 +32,12 @@ def apply_coupon(
     return discount, final_price
 
 
-def mark_coupon_used(db: Session, coupon: Coupon, reservation: Reservation) -> None:
-    coupon.status = 1
+def mark_coupon_used(db: Session, coupon: Coupon, reservation: Reservation) -> bool:
+    """原子核销优惠券：仅当券仍为未使用(status=0)时置为已用，防并发重复使用。"""
+    result = db.execute(
+        update(Coupon).where(Coupon.id == coupon.id, Coupon.status == 0).values(status=1)
+    )
+    if result.rowcount == 1:
+        db.refresh(coupon)
+        return True
+    return False

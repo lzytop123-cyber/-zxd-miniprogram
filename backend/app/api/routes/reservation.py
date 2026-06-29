@@ -37,11 +37,22 @@ from app.services.booking import (
     seat_conflict_excluding,
     validate_seat_for_booking,
 )
-from app.services.card_service import consume_period_card, validate_period_card_for_reservation
+from app.services.card_service import (
+    consume_period_card,
+    refund_period_card_consume,
+    validate_period_card_for_reservation,
+)
 from app.services.coupon_service import apply_coupon, mark_coupon_used
 from app.services.wechat_pay import WechatPayService
 
 router = APIRouter(prefix="/reservation", tags=["预约"])
+
+SEAT_LOCK_EXPIRE = 10
+
+
+def _seat_lock(seat_id: int) -> RedisLock:
+    """同一座位的预约/支付串行化锁（覆盖整个座位，避免跨时段超卖）。"""
+    return RedisLock(f"seat_lock:{seat_id}", expire=SEAT_LOCK_EXPIRE)
 
 
 def _prepare_booking(db: Session, body, require_seat: bool = False):
@@ -219,10 +230,13 @@ def create(
     start, end, duration, seat, price = _prepare_booking(db, body, require_seat=bool(body.seat_id))
     discount, final_price, coupon = _resolve_coupon_price(db, user.id, body.coupon_id, price)
 
-    lock_key = f"seat_lock:{seat.id}:{start.strftime('%Y%m%d%H')}"
-    with RedisLock(lock_key) as lock:
+    with _seat_lock(seat.id) as lock:
         if not lock.acquired:
             raise HTTPException(status_code=409, detail="座位正在被预约，请重试")
+
+        # 锁内二次校验，避免与已支付订单时段冲突（防超卖）
+        if seat_conflict_excluding(db, seat.id, start, end):
+            raise HTTPException(status_code=409, detail="该座位时段已被预约，请重新选座")
 
         reservation = Reservation(
             order_no=generate_order_no(),
@@ -280,18 +294,23 @@ async def pay(
             )
         except ValueError as e:
             raise HTTPException(status_code=400, detail=str(e))
-        consume_period_card(
-            db,
-            card,
-            reservation.bill_type,
-            reservation.start_time,
-            reservation.end_time,
-            reservation.store_id,
-        )
-        reservation.pay_type = PayType.period_card
-        reservation.pay_status = 1
-        reservation.final_price = Decimal("0.00")
-        db.commit()
+        with _seat_lock(reservation.seat_id) as lock:
+            if not lock.acquired:
+                raise HTTPException(status_code=409, detail="座位正在被占用，请重试")
+            _assert_seat_available_for_pay(db, reservation)
+            consume_period_card(
+                db,
+                card,
+                reservation.bill_type,
+                reservation.start_time,
+                reservation.end_time,
+                reservation.store_id,
+            )
+            reservation.pay_type = PayType.period_card
+            reservation.pay_status = 1
+            reservation.period_card_id = card.id
+            reservation.final_price = Decimal("0.00")
+            db.commit()
         await finalize_reservation_after_pay(db, reservation)
         return ResponseModel(
             data=ReservationPayResponse(order_no=body.order_no, pay_type=PayType.period_card)
@@ -300,14 +319,21 @@ async def pay(
     if body.pay_type == PayType.balance:
         if user.balance < (reservation.final_price or Decimal("0")):
             raise HTTPException(status_code=400, detail="余额不足")
-        add_wallet_log(
-            db, user, "consume", reservation.final_price or Decimal("0"),
-            f"预约消费-{reservation.order_no}", reservation.order_no,
-        )
-        reservation.pay_type = PayType.balance
-        reservation.pay_status = 1
-        _mark_pay_coupon(db, user.id, body.coupon_id, reservation)
-        db.commit()
+        with _seat_lock(reservation.seat_id) as lock:
+            if not lock.acquired:
+                raise HTTPException(status_code=409, detail="座位正在被占用，请重试")
+            _assert_seat_available_for_pay(db, reservation)
+            try:
+                add_wallet_log(
+                    db, user, "consume", reservation.final_price or Decimal("0"),
+                    f"预约消费-{reservation.order_no}", reservation.order_no,
+                )
+            except ValueError:
+                raise HTTPException(status_code=400, detail="余额不足")
+            reservation.pay_type = PayType.balance
+            reservation.pay_status = 1
+            _mark_pay_coupon(db, user.id, body.coupon_id, reservation)
+            db.commit()
         await finalize_reservation_after_pay(db, reservation)
         return ResponseModel(
             data=ReservationPayResponse(order_no=body.order_no, pay_type=PayType.balance)
@@ -457,13 +483,29 @@ def cancel(
     if reservation.pay_status == 0:
         db.commit()
         return ResponseModel(message="已取消")
-    if reservation.pay_status == 1 and reservation.pay_type == PayType.wechat:
-        WechatPayService.refund(
-            reservation.order_no,
-            reservation.final_price or Decimal("0"),
-            reservation.final_price or Decimal("0"),
-            "用户取消预约",
-        )
-        reservation.pay_status = 2
+
+    if reservation.pay_status == 1:
+        amount = reservation.final_price or Decimal("0")
+        if reservation.pay_type == PayType.wechat:
+            if amount > 0:
+                WechatPayService.refund(reservation.order_no, amount, amount, "用户取消预约")
+            reservation.pay_status = 2
+        elif reservation.pay_type == PayType.balance:
+            if amount > 0:
+                add_wallet_log(
+                    db, user, "refund", amount,
+                    f"取消退款-{reservation.order_no}", reservation.order_no,
+                )
+            reservation.pay_status = 2
+        elif reservation.pay_type == PayType.period_card:
+            if reservation.period_card_id:
+                card = db.get(PeriodCard, reservation.period_card_id)
+                if card:
+                    refund_period_card_consume(
+                        card, reservation.bill_type, reservation.start_time, reservation.end_time
+                    )
+            reservation.pay_status = 2
+        reservation.refunded_at = datetime.now()
+        reservation.refund_remark = "用户取消预约"
     db.commit()
     return ResponseModel(message="已取消")

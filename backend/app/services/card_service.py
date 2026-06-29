@@ -277,6 +277,30 @@ def consume_period_card(
         card.status = 0
 
 
+def refund_period_card_consume(
+    card: PeriodCard,
+    reservation_bill_type: BillType,
+    start_time: datetime,
+    end_time: datetime,
+) -> None:
+    """取消预约时回滚期限卡消耗（与 consume_period_card 对应）。"""
+    if card.card_type == CardType.hourly:
+        if hourly_allows_partial_use(card):
+            hours = _reservation_hours(start_time, end_time)
+            card.remaining_hours = ((card.remaining_hours or Decimal(0)) + hours).quantize(Decimal("0.1"))
+        else:
+            # 一次性小时卡：恢复全部时长
+            card.remaining_hours = card.total_hours or card.remaining_hours
+        card.status = 1
+    elif card.card_type == CardType.session:
+        days = _session_days(start_time, end_time)
+        card.remaining_sessions = (card.remaining_sessions or 0) + days
+        card.status = 1
+    else:
+        # 天/周/月/季/夜读月卡：单次预约即核销，取消后恢复可用
+        card.status = 1
+
+
 def get_mapping_by_deal_id(db: Session, deal_id: str) -> MeituanDealMapping | None:
     return db.scalar(
         select(MeituanDealMapping).where(

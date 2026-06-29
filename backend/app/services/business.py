@@ -289,10 +289,26 @@ def find_available_seat(
     if seat_type:
         query = query.where(Seat.seat_type == seat_type)
     seats = db.scalars(query).all()
+    if not seats:
+        return None
 
+    # 一次性查出该时段被占用的座位集合，避免逐座位查询（N+1）
+    now = datetime.now()
+    seat_ids = [s.id for s in seats]
+    busy = set(
+        db.scalars(
+            select(Reservation.seat_id).where(
+                Reservation.seat_id.in_(seat_ids),
+                Reservation.status.in_([0, 1]),
+                Reservation.pay_status == 1,
+                Reservation.end_time > now,
+                Reservation.start_time < end,
+                Reservation.end_time > start,
+            )
+        ).all()
+    )
     for seat in seats:
-        conflict = db.scalar(_seat_conflict_query(seat.id, start, end))
-        if not conflict:
+        if seat.id not in busy:
             return seat
     return None
 

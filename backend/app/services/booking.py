@@ -1,12 +1,15 @@
+import logging
 from datetime import date, datetime, time, timedelta
 from decimal import Decimal
 
-from sqlalchemy import func, select
+from sqlalchemy import func, select, update
 from sqlalchemy.orm import Session
 
 from app.models import BillType, PeriodCard, PricingRule, Reservation, Seat, StudyStat, User, WalletLog
 from app.services.points import add_points
 from app.services.business import _seat_conflict_query, update_study_title
+
+logger = logging.getLogger(__name__)
 
 
 def resolve_booking_window(
@@ -277,6 +280,26 @@ def record_study_on_checkout(db: Session, reservation: Reservation, user: User) 
         )
 
 
+def adjust_user_balance(
+    db: Session, user: User, delta: Decimal, *, require_sufficient: bool = False
+) -> bool:
+    """原子调整用户余额（数据库行级更新，避免并发丢失更新/超扣）。
+
+    require_sufficient 且为扣减时，余额不足则不扣减并返回 False。
+    """
+    if delta == 0:
+        return True
+    stmt = update(User).where(User.id == user.id)
+    if require_sufficient and delta < 0:
+        stmt = stmt.where(User.balance >= -delta)
+    stmt = stmt.values(balance=User.balance + delta)
+    result = db.execute(stmt)
+    if result.rowcount != 1:
+        return False
+    db.refresh(user)
+    return True
+
+
 def add_wallet_log(
     db: Session,
     user: User,
@@ -285,12 +308,17 @@ def add_wallet_log(
     remark: str,
     ref_order: str | None = None,
 ) -> WalletLog:
-    if log_type == "recharge":
-        user.balance += amount
-    elif log_type == "consume":
-        user.balance -= amount
-    elif log_type == "refund":
-        user.balance += amount
+    amount = Decimal(str(amount or 0))
+    if log_type == "consume":
+        delta = -amount
+    elif log_type in ("recharge", "refund"):
+        delta = amount
+    else:
+        delta = Decimal("0")
+    if delta != 0:
+        ok = adjust_user_balance(db, user, delta, require_sufficient=(log_type == "consume"))
+        if not ok:
+            raise ValueError("余额不足")
     log = WalletLog(
         user_id=user.id,
         type=log_type,
@@ -301,6 +329,19 @@ def add_wallet_log(
     )
     db.add(log)
     return log
+
+
+def fulfill_recharge_order(db: Session, order) -> bool:
+    """履约充值订单：余额入账并记流水。幂等——已支付订单不会重复入账。"""
+    if order is None or order.pay_status == 1:
+        return False
+    user = db.get(User, order.user_id)
+    if not user:
+        return False
+    order.pay_status = 1
+    order.paid_at = datetime.now()
+    add_wallet_log(db, user, "recharge", order.amount, "余额充值", order.order_no)
+    return True
 
 
 EARLY_CHECKIN_MINUTES = 15
