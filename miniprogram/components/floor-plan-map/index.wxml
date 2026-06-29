@@ -50,13 +50,19 @@
         <view class="wall wall--cb2"></view>
         <view class="wall wall--cb3"></view>
 
-        <!-- 门弧 -->
-        <view class="door door--down door--a"></view>
-        <view class="door door--down door--b"></view>
-        <view class="door door--down door--d"></view>
-        <view class="door door--down door--wc"></view>
-        <view class="door door--up-r door--entry-l"></view>
-        <view class="door door--up-l door--entry-r"></view>
+        <!-- 窗户 -->
+        <view class="win win--h win--a"></view>
+        <view class="win win--h win--b"></view>
+        <view class="win win--h win--c"></view>
+        <view class="win win--h win--bl"></view>
+
+        <!-- 门（门扇 + 开启弧线） -->
+        <view class="door door--down door--a"><view class="door-leaf"></view></view>
+        <view class="door door--down door--b"><view class="door-leaf"></view></view>
+        <view class="door door--down door--d"><view class="door-leaf"></view></view>
+        <view class="door door--down door--wc"><view class="door-leaf"></view></view>
+        <view class="door door--up-r door--entry-l"><view class="door-leaf"></view></view>
+        <view class="door door--up-l door--entry-r"><view class="door-leaf"></view></view>
 
         <!-- 分区文字 -->
         <text class="lbl lbl--zone lbl--za">沉浸区</text>

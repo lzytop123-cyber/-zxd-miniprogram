@@ -253,71 +253,145 @@
   height: 6rpx;
 }
 
-/* ============ 门弧 ============ */
+/* ============ 门（门扇 + 开启弧线） ============ */
 .door {
   position: absolute;
   box-sizing: border-box;
-  border: 3rpx solid var(--wall-soft);
+  border: 0 solid var(--wall-soft);
 }
 
+.door-leaf {
+  position: absolute;
+  width: 3rpx;
+  height: 100%;
+  background: var(--wall);
+  border-radius: 2rpx;
+}
+
+/* 合页在左上，门扇向下，弧线收向右上 */
 .door--down {
-  border-top-color: transparent;
-  border-right-color: transparent;
-  border-bottom-left-radius: 100%;
+  border-bottom: 2rpx solid var(--wall-soft);
+  border-right: 2rpx solid var(--wall-soft);
+  border-bottom-right-radius: 100%;
 }
 
+.door--down .door-leaf {
+  left: 0;
+  top: 0;
+}
+
+/* 合页在左下，门扇向上，弧线收向右下 */
+.door--up-r {
+  border-top: 2rpx solid var(--wall-soft);
+  border-right: 2rpx solid var(--wall-soft);
+  border-top-right-radius: 100%;
+}
+
+.door--up-r .door-leaf {
+  left: 0;
+  bottom: 0;
+}
+
+/* 合页在右下，门扇向上，弧线收向左下 */
 .door--up-l {
-  border-bottom-color: transparent;
-  border-right-color: transparent;
+  border-top: 2rpx solid var(--wall-soft);
+  border-left: 2rpx solid var(--wall-soft);
   border-top-left-radius: 100%;
 }
 
-.door--up-r {
-  border-bottom-color: transparent;
-  border-left-color: transparent;
-  border-top-right-radius: 100%;
+.door--up-l .door-leaf {
+  right: 0;
+  bottom: 0;
 }
 
 .door--a {
   left: 24.52%;
   top: 46.33%;
-  width: 8.77%;
-  height: 8.49%;
+  width: 5.5%;
+  height: 7.07%;
 }
 
 .door--b {
   left: 47.53%;
   top: 46.33%;
-  width: 8.77%;
-  height: 8.49%;
+  width: 5.5%;
+  height: 7.07%;
 }
 
 .door--d {
   left: 21.22%;
   top: 53.4%;
-  width: 8.77%;
-  height: 8.49%;
+  width: 5.5%;
+  height: 7.07%;
 }
 
 .door--wc {
   left: 40.96%;
   top: 53.4%;
-  width: 8.77%;
-  height: 8.49%;
+  width: 5.5%;
+  height: 7.07%;
 }
 
 .door--entry-l {
   left: 61.79%;
   bottom: 6.286%;
   width: 6.03%;
-  height: 7%;
+  height: 7.75%;
 }
 
 .door--entry-r {
   left: 67.81%;
   bottom: 6.286%;
   width: 6.03%;
-  height: 7%;
+  height: 7.75%;
+}
+
+/* ============ 窗户 ============ */
+.win {
+  position: absolute;
+  box-sizing: border-box;
+  background: #ffffff;
+}
+
+.win--h {
+  height: 11rpx;
+  border-top: 3rpx solid var(--wall);
+  border-bottom: 3rpx solid var(--wall);
+}
+
+.win--h::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 50%;
+  height: 2rpx;
+  transform: translateY(-50%);
+  background: var(--wall-soft);
+}
+
+.win--a {
+  left: 14.54%;
+  width: 9%;
+  top: calc(6.286% - 2.5rpx);
+}
+
+.win--b {
+  left: 42.21%;
+  width: 9%;
+  top: calc(6.286% - 2.5rpx);
+}
+
+.win--c {
+  left: 73.18%;
+  width: 9%;
+  top: calc(6.286% - 2.5rpx);
+}
+
+.win--bl {
+  left: 9.5%;
+  width: 9%;
+  bottom: calc(6.286% - 2.5rpx);
 }
 
 /* ============ 文字标签 ============ */
