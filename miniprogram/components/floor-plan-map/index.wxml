@@ -25,28 +25,38 @@
         <!-- 休息区（虚线围合） -->
         <view class="rest"></view>
 
+        <!-- 1、2 号座位间 -->
+        <view class="niche"></view>
+
         <!-- 外墙 -->
         <view class="wall wall--top"></view>
         <view class="wall wall--left"></view>
         <view class="wall wall--right"></view>
         <view class="wall wall--bottom-l"></view>
         <view class="wall wall--bottom-r"></view>
-        <view class="wall wall--jamb-l"></view>
-        <view class="wall wall--jamb-r"></view>
+        <view class="wall wall--notch-jamb"></view>
 
-        <!-- 隔墙 / 分区线 -->
-        <view class="wall wall--v1"></view>
-        <view class="wall wall--v2"></view>
-        <view class="wall wall--corr1"></view>
-        <view class="wall wall--corr2"></view>
-        <view class="wall wall--corr3"></view>
+        <!-- 竖向隔墙（走廊处断开） -->
+        <view class="wall wall--v1-top"></view>
+        <view class="wall wall--v1-bot"></view>
+        <view class="wall wall--v2-top"></view>
+        <view class="wall wall--v2-bot"></view>
+
+        <!-- 走廊上下横墙（留门洞） -->
+        <view class="wall wall--ct1"></view>
+        <view class="wall wall--ct2"></view>
+        <view class="wall wall--ct3"></view>
+        <view class="wall wall--cb1"></view>
+        <view class="wall wall--cb2"></view>
+        <view class="wall wall--cb3"></view>
 
         <!-- 门弧 -->
-        <view class="door door--a"></view>
-        <view class="door door--b"></view>
-        <view class="door door--wc"></view>
-        <view class="door door--entry-l"></view>
-        <view class="door door--entry-r"></view>
+        <view class="door door--down door--a"></view>
+        <view class="door door--down door--b"></view>
+        <view class="door door--down door--d"></view>
+        <view class="door door--down door--wc"></view>
+        <view class="door door--up-r door--entry-l"></view>
+        <view class="door door--up-l door--entry-r"></view>
 
         <!-- 分区文字 -->
         <text class="lbl lbl--zone lbl--za">沉浸区</text>
