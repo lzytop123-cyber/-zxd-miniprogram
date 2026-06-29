@@ -268,18 +268,6 @@
   border-radius: 2rpx;
 }
 
-/* 合页在左上，门扇向下，弧线收向右上 */
-.door--down {
-  border-bottom: 2rpx solid var(--wall-soft);
-  border-right: 2rpx solid var(--wall-soft);
-  border-bottom-right-radius: 100%;
-}
-
-.door--down .door-leaf {
-  left: 0;
-  top: 0;
-}
-
 /* 合页在左下，门扇向上，弧线收向右下 */
 .door--up-r {
   border-top: 2rpx solid var(--wall-soft);
@@ -302,34 +290,6 @@
 .door--up-l .door-leaf {
   right: 0;
   bottom: 0;
-}
-
-.door--a {
-  left: 24.52%;
-  top: 46.33%;
-  width: 5.5%;
-  height: 7.07%;
-}
-
-.door--b {
-  left: 47.53%;
-  top: 46.33%;
-  width: 5.5%;
-  height: 7.07%;
-}
-
-.door--d {
-  left: 21.22%;
-  top: 53.4%;
-  width: 5.5%;
-  height: 7.07%;
-}
-
-.door--wc {
-  left: 40.96%;
-  top: 53.4%;
-  width: 5.5%;
-  height: 7.07%;
 }
 
 .door--entry-l {

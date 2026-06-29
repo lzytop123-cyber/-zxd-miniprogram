@@ -56,11 +56,7 @@
         <view class="win win--h win--c"></view>
         <view class="win win--h win--bl"></view>
 
-        <!-- 门（门扇 + 开启弧线） -->
-        <view class="door door--down door--a"><view class="door-leaf"></view></view>
-        <view class="door door--down door--b"><view class="door-leaf"></view></view>
-        <view class="door door--down door--d"><view class="door-leaf"></view></view>
-        <view class="door door--down door--wc"><view class="door-leaf"></view></view>
+        <!-- 入口双开门（走廊两侧仅留门洞，不画门扇/弧线） -->
         <view class="door door--up-r door--entry-l"><view class="door-leaf"></view></view>
         <view class="door door--up-l door--entry-r"><view class="door-leaf"></view></view>
 
