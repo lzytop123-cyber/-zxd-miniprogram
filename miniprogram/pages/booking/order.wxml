@@ -44,6 +44,6 @@
       <text class="pay-label">实付</text>
       <text class="pay-amount">¥{{price}}</text>
     </view>
-    <view class="btn-primary submit-btn" bindtap="submitOrder">确认支付</view>
+    <view class="btn-primary submit-btn {{submitting?'disabled':''}}" bindtap="submitOrder">{{submitting?'提交中…':'确认支付'}}</view>
   </view>
 </view>

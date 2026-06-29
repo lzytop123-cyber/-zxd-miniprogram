@@ -238,6 +238,26 @@ def create(
         if seat_conflict_excluding(db, seat.id, start, end):
             raise HTTPException(status_code=409, detail="该座位时段已被预约，请重新选座")
 
+        # 幂等：同一用户对同座位同时段已有未支付单则直接复用，避免重复下单堆积
+        existing = db.scalar(
+            select(Reservation).where(
+                Reservation.user_id == user.id,
+                Reservation.seat_id == seat.id,
+                Reservation.bill_type == body.bill_type,
+                Reservation.start_time == start,
+                Reservation.end_time == end,
+                Reservation.status == 0,
+                Reservation.pay_status == 0,
+            )
+        )
+        if existing:
+            existing.original_price = price
+            existing.discount_price = discount
+            existing.final_price = final_price
+            db.commit()
+            db.refresh(existing)
+            return ResponseModel(data=_to_item(db, existing))
+
         reservation = Reservation(
             order_no=generate_order_no(),
             user_id=user.id,

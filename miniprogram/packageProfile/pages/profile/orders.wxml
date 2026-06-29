@@ -10,6 +10,10 @@
     <view class="order-action" wx:if="{{item.canOpen}}">
       <view class="action-btn" catchtap="goOpen" data-id="{{item.id}}">去开门</view>
     </view>
+    <view class="order-action" wx:if="{{item.canPay}}">
+      <view class="action-btn ghost" catchtap="cancelOrder" data-id="{{item.id}}">取消</view>
+      <view class="action-btn" catchtap="goPay" data-id="{{item.id}}">去支付</view>
+    </view>
   </view>
 
   <view class="orders-tip card" wx:if="{{orders.length}}">

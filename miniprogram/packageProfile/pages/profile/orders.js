@@ -1,4 +1,5 @@
 const { request } = require('../../../utils/request')
+const routes = require('../../../utils/routes')
 
 function parseDate(iso) {
   return new Date(String(iso).replace(' ', 'T'))
@@ -29,6 +30,8 @@ function enrichOrder(item) {
             : 'booked'
   const canOpen =
     item.pay_status === 1 && [0, 1].includes(item.status) && parseDate(item.end_time) > new Date()
+  // 待支付且未取消：可去支付 / 取消
+  const canPay = item.pay_status !== 1 && item.status === 0 && parseDate(item.end_time) > new Date()
   return {
     ...item,
     timeRange: formatRange(item.start_time, item.end_time),
@@ -36,6 +39,7 @@ function enrichOrder(item) {
     statusHint: item.status_hint || '',
     statusTone: tone,
     canOpen,
+    canPay,
   }
 }
 
@@ -69,5 +73,36 @@ Page({
       wx.setStorageSync('checkin_selected_id', id)
     }
     wx.switchTab({ url: '/pages/checkin/index' })
+  },
+
+  goPay(e) {
+    const id = Number(e.currentTarget.dataset.id)
+    const o = this.data.orders.find((x) => x.id === id)
+    if (!o) return
+    const url =
+      `${routes.bookingOrder}?storeId=${o.store_id}` +
+      `&start=${encodeURIComponent(o.start_time)}&end=${encodeURIComponent(o.end_time)}` +
+      `&seatId=${o.seat_id}&price=${o.final_price}` +
+      `&seatCode=${encodeURIComponent(o.seat_code || '')}&billType=${o.bill_type}`
+    wx.navigateTo({ url })
+  },
+
+  cancelOrder(e) {
+    const id = Number(e.currentTarget.dataset.id)
+    if (!id) return
+    wx.showModal({
+      title: '取消预约',
+      content: '确定取消该待支付订单吗？',
+      confirmColor: '#52B788',
+      success: (res) => {
+        if (!res.confirm) return
+        request({ url: `/reservation/${id}/cancel`, method: 'POST' })
+          .then(() => {
+            wx.showToast({ title: '已取消', icon: 'success' })
+            this.loadOrders({ force: true })
+          })
+          .catch(() => {})
+      },
+    })
   },
 })

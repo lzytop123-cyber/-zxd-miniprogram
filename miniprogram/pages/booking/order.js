@@ -59,6 +59,7 @@ Page({
     usableCoupons: [],
     selectedCouponId: null,
     sessionDays: 0,
+    submitting: false,
   },
 
   onLoad(options) {
@@ -235,6 +236,9 @@ Page({
   },
 
   async submitOrder() {
+    if (this._submitting) return
+    this._submitting = true
+    this.setData({ submitting: true })
     wx.showLoading({ title: '提交中' })
     try {
       const body = {
@@ -294,8 +298,12 @@ Page({
           method: 'POST',
           silent: true,
         }).catch(() => {})
+        this.setData({ reservationId: null, orderNo: '' })
       }
       wx.showToast({ title: e.detail || e.message || '下单失败', icon: 'none' })
+    } finally {
+      this._submitting = false
+      this.setData({ submitting: false })
     }
   },
 })

@@ -121,3 +121,8 @@
   margin: 0;
   width: 100%;
 }
+
+.submit-btn.disabled {
+  opacity: 0.6;
+  pointer-events: none;
+}
