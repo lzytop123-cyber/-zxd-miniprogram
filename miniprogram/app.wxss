@@ -279,7 +279,7 @@ page {
 .seat-map-frame {
   position: relative;
   width: 100%;
-  padding-bottom: 76.75%;
+  padding-bottom: 77.78%;
   height: 0;
   border-radius: 24rpx;
   overflow: hidden;

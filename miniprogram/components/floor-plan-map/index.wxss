@@ -3,6 +3,14 @@
   inset: 0;
   overflow: hidden;
   background: linear-gradient(180deg, #f6fbf7 0%, #eef7f1 100%);
+  --wall: rgba(74, 92, 82, 0.92);
+  --wall-soft: rgba(74, 92, 82, 0.62);
+  --desk: rgba(116, 136, 124, 0.55);
+  --tint-imm: rgba(82, 183, 136, 0.05);
+  --tint-std: rgba(82, 183, 136, 0.09);
+  --tint-svc: rgba(110, 132, 120, 0.05);
+  --dash: rgba(96, 140, 112, 0.5);
+  --label: rgba(58, 80, 66, 0.62);
 }
 
 .plan-area {
@@ -19,260 +27,319 @@
   position: relative;
 }
 
-.floor-plate {
+/* 0~900 (x) / 0~700 (y) 逻辑画布映射到此盒子 */
+.floor {
   position: absolute;
-  inset: 3.0% 3.0%;
-  border-radius: 30rpx;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(247, 251, 248, 0.98));
-  box-shadow:
-    0 16rpx 42rpx rgba(61, 101, 78, 0.09),
-    inset 0 1rpx 0 rgba(255, 255, 255, 0.95);
+  inset: 0;
+  border-radius: 24rpx;
+  background: linear-gradient(180deg, #fbfdfc 0%, #f3f9f5 100%);
+  box-shadow: inset 0 1rpx 0 rgba(255, 255, 255, 0.9);
   overflow: hidden;
 }
 
-.floor-border {
+/* ============ 区域底色 ============ */
+.room {
   position: absolute;
-  inset: 2.0%;
-  border: 2rpx solid rgba(110, 125, 117, 0.16);
-  border-radius: 24rpx;
-  pointer-events: none;
+  border-radius: 12rpx;
 }
 
+.room--a {
+  left: 5.333%;
+  top: 6.286%;
+  width: 26.667%;
+  height: 42.286%;
+  background: var(--tint-imm);
+}
+
+.room--b {
+  left: 32%;
+  top: 6.286%;
+  width: 26.667%;
+  height: 42.286%;
+  background: var(--tint-imm);
+}
+
+.room--c {
+  left: 58.667%;
+  top: 6.286%;
+  width: 36%;
+  height: 59.429%;
+  background: var(--tint-std);
+}
+
+.room--d {
+  left: 5.333%;
+  top: 55.429%;
+  width: 16.889%;
+  height: 33.857%;
+  background: var(--tint-imm);
+}
+
+/* ============ 服务区（实线围合） ============ */
+.svc {
+  position: absolute;
+  box-sizing: border-box;
+  border: 5rpx solid var(--wall-soft);
+  background: var(--tint-svc);
+  border-radius: 6rpx;
+}
+
+.svc--wc {
+  left: 40%;
+  top: 58.286%;
+  width: 22.222%;
+  height: 28.143%;
+}
+
+.svc--strip {
+  left: 33.333%;
+  top: 86.429%;
+  width: 31.111%;
+  height: 7.286%;
+}
+
+.strip-split {
+  position: absolute;
+  left: 48.889%;
+  top: 86.429%;
+  height: 7.286%;
+  border-left: 3rpx dashed var(--dash);
+}
+
+/* ============ 休息区（虚线围合） ============ */
+.rest {
+  position: absolute;
+  box-sizing: border-box;
+  left: 22.222%;
+  top: 67.143%;
+  width: 17.778%;
+  height: 19.286%;
+  border: 3rpx dashed var(--dash);
+  border-radius: 8rpx;
+}
+
+/* ============ 墙体 ============ */
 .wall {
   position: absolute;
-  background: #6d766f;
-  border-radius: 999rpx;
-  opacity: 0.92;
-  pointer-events: none;
+  background: var(--wall);
+  border-radius: 4rpx;
 }
 
 .wall--top {
-  left: 5.4%;
-  right: 5.4%;
-  top: 5.5%;
-  height: 6rpx;
+  left: 5.333%;
+  right: 5.333%;
+  top: 6.286%;
+  height: 7rpx;
 }
 
 .wall--left {
-  left: 5.6%;
-  top: 5.5%;
-  bottom: 5.5%;
-  width: 6rpx;
+  left: 5.333%;
+  top: 6.286%;
+  bottom: 6.286%;
+  width: 7rpx;
 }
 
 .wall--right {
-  right: 5.6%;
-  top: 5.5%;
-  bottom: 5.5%;
+  right: 5.333%;
+  top: 6.286%;
+  bottom: 6.286%;
+  width: 7rpx;
+}
+
+.wall--bottom-l {
+  left: 5.333%;
+  width: 61.333%;
+  bottom: 6.286%;
+  height: 7rpx;
+}
+
+.wall--bottom-r {
+  left: 78.444%;
+  right: 5.333%;
+  bottom: 6.286%;
+  height: 7rpx;
+}
+
+.wall--jamb-l {
+  left: 66.667%;
+  top: 87.143%;
+  height: 6.571%;
+  width: 7rpx;
+}
+
+.wall--jamb-r {
+  left: 78.444%;
+  top: 87.143%;
+  height: 6.571%;
+  width: 7rpx;
+}
+
+.wall--v1 {
+  left: 32%;
+  top: 6.286%;
+  height: 42.286%;
   width: 6rpx;
 }
 
-.wall--bottom {
-  left: 5.4%;
-  right: 5.4%;
-  bottom: 5.5%;
-  height: 6rpx;
-}
-
-.zone {
-  position: absolute;
-  border-radius: 18rpx;
-  background: rgba(75, 150, 107, 0.035);
-  border: 1rpx solid rgba(75, 150, 107, 0.08);
-}
-
-.zone-label {
-  position: absolute;
-  color: rgba(57, 78, 65, 0.56);
-  font-size: 13rpx;
-  letter-spacing: 1rpx;
-}
-
-.zone--immersive {
-  width: 18.5%;
-  height: 33%;
-}
-
-.zone--left-top {
-  left: 6.9%;
-  top: 8.3%;
-}
-
-.zone--left-bottom {
-  left: 6.9%;
-  top: 56.1%;
-  height: 18.5%;
-}
-
-.zone--work {
-  left: 34.0%;
-  top: 8.7%;
-  width: 17.4%;
-  height: 30.8%;
-}
-
-.zone--standard {
-  right: 7.0%;
-  top: 8.7%;
-  width: 25.4%;
-  height: 56.4%;
-}
-
-.zone--service {
-  background: rgba(75, 150, 107, 0.03);
-  border-style: dashed;
-}
-
-.zone--middle-bottom {
-  left: 40.4%;
-  bottom: 19.8%;
-  width: 21.0%;
-  height: 10%;
-}
-
-.zone--bottom-left {
-  left: 22.0%;
-  bottom: 27.0%;
-  width: 15.6%;
-  height: 10%;
-}
-
-.zone--bottom-right {
-  left: 67.4%;
-  bottom: 20.0%;
-  width: 15.6%;
-  height: 10%;
-}
-
-.zone--rest-center {
-  left: 38.2%;
-  bottom: 17.1%;
-  width: 23.2%;
-  height: 9.2%;
-}
-
-.zone-label--left-top {
-  left: 15.3%;
-  top: 24.8%;
-}
-
-.zone-label--left-bottom {
-  left: 15.3%;
-  top: 68.0%;
-}
-
-.zone-label--center-top {
-  left: 40.9%;
-  top: 22.0%;
-}
-
-.zone-label--right {
-  right: 16.1%;
-  top: 34.4%;
-}
-
-.zone-label--service {
-  left: 46.2%;
-  bottom: 15.6%;
-}
-
-.divider {
-  position: absolute;
-  background: #6d766f;
-  border-radius: 999rpx;
-  opacity: 0.88;
-  pointer-events: none;
-}
-
-.divider--vertical-left {
-  left: 30.5%;
-  top: 8.0%;
+.wall--v2 {
+  left: 58.667%;
+  top: 6.286%;
+  height: 59.429%;
   width: 6rpx;
-  height: 33.8%;
 }
 
-.divider--vertical-middle {
-  left: 59.0%;
-  top: 8.0%;
-  width: 6rpx;
-  height: 56.4%;
-}
-
-.divider--horizontal-upper {
-  left: 14.9%;
-  top: 40.6%;
-  width: 43.2%;
+.wall--corr1 {
+  left: 5.333%;
+  width: 12.444%;
+  top: 48.571%;
   height: 6rpx;
 }
 
-.divider--horizontal-middle {
-  left: 34.1%;
-  bottom: 29.0%;
-  width: 28.8%;
+.wall--corr2 {
+  left: 26.222%;
+  width: 18.667%;
+  top: 48.571%;
   height: 6rpx;
 }
 
-.divider--entry-notched {
-  left: 50.4%;
-  bottom: 7.3%;
-  width: 5.8%;
-  height: 7.4%;
-  border-left: 6rpx solid #6d766f;
-  border-bottom: 6rpx solid #6d766f;
-  border-radius: 0 0 0 18rpx;
-  background: transparent;
+.wall--corr3 {
+  left: 53.333%;
+  width: 5.333%;
+  top: 48.571%;
+  height: 6rpx;
 }
 
-.arch {
+/* ============ 门弧 ============ */
+.door {
   position: absolute;
-  border: 2rpx solid #6d766f;
+  box-sizing: border-box;
+  border: 3rpx solid var(--wall-soft);
   border-top-color: transparent;
-  border-radius: 0 0 40rpx 40rpx;
-  background: transparent;
-  opacity: 0.92;
+  border-right-color: transparent;
+  border-bottom-left-radius: 100%;
+}
+
+.door--a {
+  left: 17.778%;
+  top: 48.571%;
+  width: 8.444%;
+  height: 9.143%;
+}
+
+.door--b {
+  left: 44.889%;
+  top: 48.571%;
+  width: 8.444%;
+  height: 9.143%;
+}
+
+.door--wc {
+  left: 42.222%;
+  top: 50.857%;
+  width: 6.5%;
+  height: 7.4%;
+  border-top-color: var(--wall-soft);
+  border-right-color: var(--wall-soft);
+  border-bottom-color: transparent;
+  border-left-color: transparent;
+  border-bottom-left-radius: 0;
+  border-top-left-radius: 100%;
+}
+
+.door--entry-l {
+  left: 66.667%;
+  bottom: 6.286%;
+  width: 5.889%;
+  height: 7%;
+  border-top-color: var(--wall-soft);
+  border-right-color: transparent;
+  border-bottom-color: transparent;
+  border-left-color: var(--wall-soft);
+  border-bottom-left-radius: 0;
+  border-top-left-radius: 100%;
+}
+
+.door--entry-r {
+  left: 72.556%;
+  bottom: 6.286%;
+  width: 5.889%;
+  height: 7%;
+  border-top-color: var(--wall-soft);
+  border-left-color: transparent;
+  border-bottom-color: transparent;
+  border-right-color: var(--wall-soft);
+  border-bottom-left-radius: 0;
+  border-top-right-radius: 100%;
+}
+
+/* ============ 文字标签 ============ */
+.lbl {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  white-space: nowrap;
+  color: var(--label);
+  letter-spacing: 1rpx;
   pointer-events: none;
 }
 
-.arch--left {
-  left: 12.2%;
-  top: 39.4%;
-  width: 5.8%;
-  height: 5.8%;
-  border-right-color: transparent;
+.lbl--zone {
+  font-size: 15rpx;
+  font-weight: 600;
 }
 
-.arch--middle {
-  left: 43.1%;
-  top: 39.4%;
-  width: 5.8%;
-  height: 5.8%;
-  border-right-color: transparent;
+.lbl--svc {
+  font-size: 13rpx;
 }
 
-.arch--entry {
-  left: 58.4%;
-  bottom: 5.5%;
-  width: 4.8%;
-  height: 6.6%;
-  border-right-color: transparent;
+.lbl--za {
+  left: 18.667%;
+  top: 29.286%;
 }
 
-.small-label {
-  position: absolute;
-  font-size: 12rpx;
-  color: rgba(76, 92, 84, 0.72);
+.lbl--zb {
+  left: 45.556%;
+  top: 29.286%;
 }
 
-.small-label--entry {
-  left: 54.2%;
-  bottom: 3.6%;
+.lbl--zc {
+  left: 76.667%;
+  top: 47.143%;
 }
 
-.small-label--service {
-  left: 49.4%;
-  bottom: 7.8%;
+.lbl--zd {
+  left: 16.667%;
+  top: 72.143%;
 }
 
+.lbl--wc {
+  left: 51.111%;
+  top: 71.429%;
+}
+
+.lbl--rest {
+  left: 31.111%;
+  top: 77.143%;
+}
+
+.lbl--tea {
+  left: 41.111%;
+  top: 90%;
+}
+
+.lbl--dine {
+  left: 56.111%;
+  top: 90%;
+}
+
+.lbl--entry {
+  left: 72.556%;
+  top: 90.286%;
+  font-size: 14rpx;
+  font-weight: 600;
+  color: rgba(58, 80, 66, 0.78);
+}
+
+/* ============ 座位层 ============ */
 .seats-layer {
   position: absolute;
   inset: 0;
@@ -282,67 +349,92 @@
 .seat-anchor {
   position: absolute;
   transform: translate(-50%, -50%);
-  width: 5.6%;
-  height: 6.1%;
   display: flex;
   align-items: center;
   justify-content: center;
 }
 
+.seat-unit {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 3rpx;
+}
+
+.orient-v .seat-unit {
+  flex-direction: column;
+}
+
+.orient-h .seat-unit {
+  flex-direction: row;
+}
+
+.desk-bar {
+  flex-shrink: 0;
+  border-radius: 3rpx;
+  background: var(--desk);
+}
+
+.orient-v .desk-bar {
+  width: 30rpx;
+  height: 5rpx;
+}
+
+.orient-h .desk-bar {
+  width: 5rpx;
+  height: 28rpx;
+}
+
 .seat-chip {
-  width: 92%;
-  height: 80%;
-  border-radius: 12rpx;
+  width: 38rpx;
+  height: 28rpx;
+  border-radius: 8rpx;
   box-sizing: border-box;
   display: flex;
   align-items: center;
   justify-content: center;
-  border: 2rpx solid rgba(111, 125, 115, 0.18);
-  background: rgba(255, 255, 255, 0.9);
-  box-shadow: 0 4rpx 10rpx rgba(70, 86, 76, 0.07);
+  border: 2rpx solid rgba(111, 125, 115, 0.2);
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 3rpx 8rpx rgba(70, 86, 76, 0.08);
   transition: transform 0.12s ease, box-shadow 0.12s ease, border-color 0.12s ease;
 }
 
 .seat-chip.available {
-  border-color: rgba(78, 146, 104, 0.16);
+  border-color: rgba(78, 146, 104, 0.28);
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(237, 246, 239, 0.96));
 }
 
 .seat-anchor:active .seat-chip.available {
-  transform: scale(1.05);
-  border-color: rgba(64, 137, 93, 0.46);
-  box-shadow: 0 0 0 4rpx rgba(85, 157, 113, 0.1), 0 8rpx 16rpx rgba(70, 86, 76, 0.08);
+  transform: scale(1.08);
+  border-color: rgba(64, 137, 93, 0.5);
+  box-shadow: 0 0 0 4rpx rgba(85, 157, 113, 0.12), 0 6rpx 14rpx rgba(70, 86, 76, 0.1);
 }
 
 .seat-chip.reserved {
   background: rgba(237, 224, 192, 0.92);
-  border-color: rgba(181, 148, 75, 0.44);
+  border-color: rgba(181, 148, 75, 0.46);
 }
 
 .seat-chip.occupied {
   background: rgba(201, 208, 203, 0.92);
-  border-color: rgba(121, 133, 126, 0.44);
-}
-
-.seat-chip.empty {
-  display: none;
+  border-color: rgba(121, 133, 126, 0.46);
 }
 
 .seat-chip.is-selected {
   background: linear-gradient(180deg, rgba(255, 255, 255, 1), rgba(226, 242, 232, 1));
-  border: 3rpx solid #4b956b;
-  box-shadow: 0 0 0 5rpx rgba(84, 179, 129, 0.16);
-  transform: scale(1.08);
+  border: 3rpx solid #2d6a4f;
+  box-shadow: 0 0 0 5rpx rgba(84, 179, 129, 0.18);
+  transform: scale(1.12);
 }
 
 .seat-chip-label {
-  font-size: 12rpx;
+  font-size: 14rpx;
   font-weight: 700;
-  color: #315241;
+  color: #2d6a4f;
   line-height: 1;
   pointer-events: none;
 }
 
 .seat-chip-label--active {
-  color: #214232;
+  color: #1b4332;
 }

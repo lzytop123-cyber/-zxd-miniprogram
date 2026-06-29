@@ -10,56 +10,74 @@
       inertia
       bindscale="onScale"
     >
-      <view class="floor-plate">
-        <view class="floor-border"></view>
+      <view class="floor">
+        <!-- 区域底色 -->
+        <view class="room room--a"></view>
+        <view class="room room--b"></view>
+        <view class="room room--c"></view>
+        <view class="room room--d"></view>
 
+        <!-- 服务区（实线围合） -->
+        <view class="svc svc--wc"></view>
+        <view class="svc svc--strip"></view>
+        <view class="strip-split"></view>
+
+        <!-- 休息区（虚线围合） -->
+        <view class="rest"></view>
+
+        <!-- 外墙 -->
         <view class="wall wall--top"></view>
         <view class="wall wall--left"></view>
         <view class="wall wall--right"></view>
-        <view class="wall wall--bottom"></view>
+        <view class="wall wall--bottom-l"></view>
+        <view class="wall wall--bottom-r"></view>
+        <view class="wall wall--jamb-l"></view>
+        <view class="wall wall--jamb-r"></view>
 
-        <view class="zone zone--immersive zone--left-top"></view>
-        <view class="zone zone--immersive zone--left-bottom"></view>
-        <view class="zone zone--work zone--center-top"></view>
-        <view class="zone zone--standard zone--right"></view>
-        <view class="zone zone--service zone--middle-bottom"></view>
-        <view class="zone zone--service zone--bottom-left"></view>
-        <view class="zone zone--service zone--bottom-right"></view>
-        <view class="zone zone--service zone--rest-center"></view>
+        <!-- 隔墙 / 分区线 -->
+        <view class="wall wall--v1"></view>
+        <view class="wall wall--v2"></view>
+        <view class="wall wall--corr1"></view>
+        <view class="wall wall--corr2"></view>
+        <view class="wall wall--corr3"></view>
 
-        <text class="zone-label zone-label--left-top">沉浸区</text>
-        <text class="zone-label zone-label--left-bottom">沉浸区</text>
-        <text class="zone-label zone-label--center-top">工位区</text>
-        <text class="zone-label zone-label--right">标准区</text>
-        <text class="zone-label zone-label--service">休息 / 茶水</text>
+        <!-- 门弧 -->
+        <view class="door door--a"></view>
+        <view class="door door--b"></view>
+        <view class="door door--wc"></view>
+        <view class="door door--entry-l"></view>
+        <view class="door door--entry-r"></view>
 
-        <view class="divider divider--vertical-left"></view>
-        <view class="divider divider--vertical-middle"></view>
-        <view class="divider divider--horizontal-upper"></view>
-        <view class="divider divider--horizontal-middle"></view>
-        <view class="divider divider--entry-notched"></view>
+        <!-- 分区文字 -->
+        <text class="lbl lbl--zone lbl--za">沉浸区</text>
+        <text class="lbl lbl--zone lbl--zb">沉浸区</text>
+        <text class="lbl lbl--zone lbl--zc">标准区</text>
+        <text class="lbl lbl--zone lbl--zd">沉浸区</text>
+        <text class="lbl lbl--svc lbl--wc">卫生间</text>
+        <text class="lbl lbl--svc lbl--rest">休息区</text>
+        <text class="lbl lbl--svc lbl--tea">茶水间</text>
+        <text class="lbl lbl--svc lbl--dine">餐厅</text>
+        <text class="lbl lbl--entry">入口</text>
 
-        <view class="arch arch--left"></view>
-        <view class="arch arch--middle"></view>
-        <view class="arch arch--entry"></view>
-
-        <text class="small-label small-label--entry">入口</text>
-        <text class="small-label small-label--service">茶水间</text>
-
+        <!-- 座位层（可点击，交互逻辑保持不变） -->
         <view class="seats-layer">
           <view
             wx:for="{{markers}}"
             wx:for-item="seat"
             wx:key="map_slot"
-            class="seat-anchor"
+            class="seat-anchor orient-{{seat.orient}}"
             style="left: {{seat.left}}%; top: {{seat.top}}%;"
             catchtap="onTap"
             data-id="{{seat.id}}"
             data-code="{{seat.seat_code}}"
             data-status="{{seat.status}}"
           >
-            <view class="seat-chip {{seat.status}} {{selectedId===seat.id?'is-selected':''}} {{seat.status==='empty'?'is-hidden':''}}">
-              <text wx:if="{{seat.map_label && seat.status !== 'empty'}}" class="seat-chip-label {{selectedId===seat.id ? 'seat-chip-label--active' : ''}}">{{seat.map_label}}</text>
+            <view wx:if="{{seat.status !== 'empty'}}" class="seat-unit">
+              <view class="desk-bar"></view>
+              <view class="seat-chip {{seat.status}} {{selectedId===seat.id?'is-selected':''}}">
+                <text wx:if="{{seat.map_label}}" class="seat-chip-label {{selectedId===seat.id ? 'seat-chip-label--active' : ''}}">{{seat.map_label}}</text>
+              </view>
+              <view class="desk-bar"></view>
             </view>
           </view>
         </view>
