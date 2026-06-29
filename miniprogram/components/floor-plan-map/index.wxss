@@ -21,7 +21,7 @@
 
 .floor-plate {
   position: absolute;
-  inset: 3.4% 3.4%;
+  inset: 3.0% 3.0%;
   border-radius: 30rpx;
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(247, 251, 248, 0.98));
   box-shadow:
@@ -32,7 +32,7 @@
 
 .floor-border {
   position: absolute;
-  inset: 2.2%;
+  inset: 2.0%;
   border: 2rpx solid rgba(110, 125, 117, 0.16);
   border-radius: 24rpx;
   pointer-events: none;
@@ -105,17 +105,17 @@
 }
 
 .zone--work {
-  left: 34.2%;
-  top: 8.8%;
-  width: 17.0%;
-  height: 30.6%;
+  left: 34.0%;
+  top: 8.7%;
+  width: 17.4%;
+  height: 30.8%;
 }
 
 .zone--standard {
-  right: 7.1%;
-  top: 8.8%;
-  width: 25.0%;
-  height: 56.2%;
+  right: 7.0%;
+  top: 8.7%;
+  width: 25.4%;
+  height: 56.4%;
 }
 
 .zone--service {
@@ -125,14 +125,14 @@
 
 .zone--middle-bottom {
   left: 40.4%;
-  bottom: 20.3%;
+  bottom: 19.8%;
   width: 21.0%;
   height: 10%;
 }
 
 .zone--bottom-left {
   left: 22.0%;
-  bottom: 27.5%;
+  bottom: 27.0%;
   width: 15.6%;
   height: 10%;
 }
@@ -145,10 +145,10 @@
 }
 
 .zone--rest-center {
-  left: 38.4%;
-  bottom: 17.5%;
-  width: 23.0%;
-  height: 8.8%;
+  left: 38.2%;
+  bottom: 17.1%;
+  width: 23.2%;
+  height: 9.2%;
 }
 
 .zone-label--left-top {
@@ -192,7 +192,7 @@
 }
 
 .divider--vertical-middle {
-  left: 59.2%;
+  left: 59.0%;
   top: 8.0%;
   width: 6rpx;
   height: 56.4%;
@@ -213,7 +213,7 @@
 }
 
 .divider--entry-notched {
-  left: 50.7%;
+  left: 50.4%;
   bottom: 7.3%;
   width: 5.8%;
   height: 7.4%;
@@ -234,23 +234,23 @@
 }
 
 .arch--left {
-  left: 12.5%;
-  top: 39.5%;
+  left: 12.2%;
+  top: 39.4%;
   width: 5.8%;
   height: 5.8%;
   border-right-color: transparent;
 }
 
 .arch--middle {
-  left: 43.4%;
-  top: 39.5%;
+  left: 43.1%;
+  top: 39.4%;
   width: 5.8%;
   height: 5.8%;
   border-right-color: transparent;
 }
 
 .arch--entry {
-  left: 58.6%;
+  left: 58.4%;
   bottom: 5.5%;
   width: 4.8%;
   height: 6.6%;
