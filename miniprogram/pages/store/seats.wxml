@@ -1,12 +1,10 @@
 <view class="page-seats page-safe-bottom">
-  <view class="card seat-card">
+  <view class="card seat-card seat-card--premium">
     <view class="seat-head">
       <view class="seat-head-bar"></view>
       <text class="seat-head-title">选择座位</text>
     </view>
-    <view class="seat-map-tip">点击编号选座 · 双指捏合放大 / 拖动查看</view>
-
-    <view class="seat-map-tip">点击平面图编号选座 · 双指缩放 / 右下角可放大</view>
+    <view class="seat-map-tip">点击平面图编号选座 · 双指缩放 · 下拉刷新座位状态</view>
 
     <view class="seat-legend">
       <view class="seat-legend-item"><view class="seat-dot available"></view><text>可选</text></view>
@@ -19,7 +17,7 @@
       </view>
     </view>
 
-    <view class="seat-map-frame">
+    <view class="seat-map-frame seat-map-frame--premium">
       <floor-plan-map
         seats="{{seats}}"
         selectedId="{{selectedId}}"

@@ -1,15 +1,8 @@
 /**
- * 知行岛座位平面图 — 座位中心坐标来自原图（1024×990）连通域检测，误差 ≤2px
- * 底图已裁掉标题与四周留白（floor-plan-clean.png），仅保留平面图主体
- * 裁切区域 = 原图 (91,221)–(934,868)，尺寸 843×647
- * MAIN_POS 仍用原图像素坐标，经 pct() 换算到裁切图，叠加层 1:1 铺满即对齐
+ * 预约页座位布局数据
+ * 目标：优先还原参考图的结构比例与空间关系，样式细节后续再继续打磨。
  */
 
-// 裁切区域（相对原图）
-const CROP_LEFT = 91
-const CROP_TOP = 221
-const MAP_WIDTH = 843
-const MAP_HEIGHT = 647
 const PLAN_SEAT_COUNT = 27
 
 const CODE_TO_SLOT = {
@@ -19,62 +12,55 @@ const CODE_TO_SLOT = {
   A09: 22, B09: 23, C09: 24,
 }
 
-/** 原图像素 → 裁切图百分比 */
-function pct(x, y) {
+function pos(left, top) {
   return {
-    left: +(((x - CROP_LEFT) / MAP_WIDTH) * 100).toFixed(3),
-    top: +(((y - CROP_TOP) / MAP_HEIGHT) * 100).toFixed(3),
+    left: +left.toFixed(3),
+    top: +top.toFixed(3),
   }
 }
 
-/**
- * 座位编号框中心像素（原图 1024×990 坐标系）
- */
 const MAIN_POS = {
-  /* 左上沉浸区：左墙 21→24，靠中墙 20/19 */
-  21: pct(149, 296),
-  22: pct(149, 358),
-  23: pct(149, 416),
-  24: pct(149, 475),
-  20: pct(319, 295),
-  19: pct(319, 357),
+  21: pos(6.2, 15.2),
+  22: pos(6.2, 24.5),
+  23: pos(6.2, 33.8),
+  24: pos(6.2, 43.1),
+  20: pos(19.6, 15.0),
+  19: pos(19.6, 24.2),
 
-  /* 中上沉浸区：左墙 16/17/18，靠右 15/14 */
-  16: pct(395, 294),
-  17: pct(395, 355),
-  18: pct(395, 413),
-  15: pct(567, 293),
-  14: pct(567, 355),
+  16: pos(35.8, 15.0),
+  17: pos(35.8, 24.2),
+  18: pos(35.8, 33.6),
+  15: pos(50.4, 15.0),
+  14: pos(50.4, 24.2),
 
-  /* 左下沉浸区：27→25 */
-  27: pct(148, 569),
-  26: pct(148, 631),
-  25: pct(148, 689),
+  27: pos(6.2, 57.2),
+  26: pos(6.2, 66.6),
+  25: pos(6.2, 76.0),
 
-  /* 标准区：内列 9-11 / 12-13，右墙 8→3，入口 1-2 */
-  9: pct(644, 290),
-  10: pct(644, 352),
-  11: pct(644, 410),
-  12: pct(639, 595),
-  13: pct(639, 656),
-  8: pct(866, 292),
-  7: pct(866, 353),
-  6: pct(866, 411),
-  5: pct(867, 471),
-  4: pct(867, 533),
-  3: pct(867, 591),
-  1: pct(801, 735),
-  2: pct(863, 735),
+  12: pos(63.3, 63.5),
+  13: pos(63.3, 74.6),
+
+  9: pos(66.1, 15.1),
+  10: pos(66.1, 24.4),
+  11: pos(66.1, 33.7),
+  8: pos(92.1, 15.1),
+  7: pos(92.1, 24.4),
+  6: pos(92.1, 33.7),
+  5: pos(92.1, 43.2),
+  4: pos(92.1, 52.8),
+  3: pos(92.1, 62.4),
+
+  1: pos(84.0, 82.4),
+  2: pos(92.0, 82.4),
 }
 
 const ALL_SLOTS = Object.keys(MAIN_POS).map(Number)
 
-/** 与平面图分区一致：1–13 标准区，14–27 三个沉浸区块均为沉浸区 */
 const SLOT_ZONE = {
   1: '标准区', 2: '标准区', 3: '标准区', 4: '标准区', 5: '标准区',
   6: '标准区', 7: '标准区', 8: '标准区', 9: '标准区', 10: '标准区',
   11: '标准区', 12: '标准区', 13: '标准区',
-  14: '沉浸区', 15: '沉浸区', 16: '沉浸区', 17: '沉浸区', 18: '沉浸区',
+  14: '工位区', 15: '工位区', 16: '工位区', 17: '工位区', 18: '工位区',
   19: '沉浸区', 20: '沉浸区', 21: '沉浸区', 22: '沉浸区', 23: '沉浸区', 24: '沉浸区',
   25: '沉浸区', 26: '沉浸区', 27: '沉浸区',
 }
@@ -115,15 +101,15 @@ function placeholderSeat(slot) {
 
 function buildSeatMarkers(seats) {
   const bySlot = {}
-  ;(seats || []).forEach((s) => {
-    const item = enrichSeat(s)
+  ;(seats || []).forEach((seat) => {
+    const item = enrichSeat(seat)
     if (item.map_slot) bySlot[item.map_slot] = item
   })
 
   return ALL_SLOTS.map((slot) => {
     const seat = bySlot[slot] || placeholderSeat(slot)
-    const pos = MAIN_POS[slot]
-    return { ...seat, ...pos }
+    const posItem = MAIN_POS[slot]
+    return { ...seat, ...posItem }
   })
 }
 
@@ -144,8 +130,6 @@ function seatDisplay(seat) {
 
 function getLayout() {
   return {
-    mapWidth: MAP_WIDTH,
-    mapHeight: MAP_HEIGHT,
     planSeatCount: PLAN_SEAT_COUNT,
     applySeats(seats) {
       return (seats || []).map(enrichSeat)
@@ -156,13 +140,20 @@ function getLayout() {
   }
 }
 
-module.exports = {
+export {
   getLayout,
   buildSeatMarkers,
   zoneNameBySlot,
   seatDisplay,
   enrichSeat,
-  MAP_WIDTH,
-  MAP_HEIGHT,
+  PLAN_SEAT_COUNT,
+}
+
+export default {
+  getLayout,
+  buildSeatMarkers,
+  zoneNameBySlot,
+  seatDisplay,
+  enrichSeat,
   PLAN_SEAT_COUNT,
 }

@@ -1,5 +1,4 @@
-const { buildSeatMarkers } = require('../../utils/seat-layout')
-const { FLOOR_PLAN } = require('../../utils/assets')
+import { buildSeatMarkers } from '../../utils/seat-layout'
 
 const SCALE_MIN = 1
 const SCALE_MAX = 4
@@ -14,8 +13,6 @@ Component({
     markers: [],
     scale: 1,
     scaleValue: 1,
-    floorPlanSrc: FLOOR_PLAN,
-    floorPlanLoaded: false,
   },
   observers: {
     seats(seats) {
@@ -36,7 +33,6 @@ Component({
     applyScale(next) {
       const scale = Math.min(SCALE_MAX, Math.max(SCALE_MIN, next))
       this.data.scale = scale
-      // 手势缩放后 scale-value 不会同步，叠加极小抖动确保按钮每次都触发更新
       this._jitter = this._jitter ? 0 : 0.0002
       this.setData({ scaleValue: scale + this._jitter })
     },
@@ -51,17 +47,6 @@ Component({
 
     zoomReset() {
       this.applyScale(1)
-    },
-
-    onPlanImageLoad() {
-      this.setData({ floorPlanLoaded: true })
-    },
-
-    onPlanImageError() {
-      const { FLOOR_PLAN, FLOOR_PLAN_WEBP } = require('../../utils/assets')
-      if (this.data.floorPlanSrc !== FLOOR_PLAN) {
-        this.setData({ floorPlanSrc: FLOOR_PLAN, floorPlanLoaded: false })
-      }
     },
   },
 })
