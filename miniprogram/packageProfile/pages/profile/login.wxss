@@ -114,14 +114,11 @@
 }
 
 .avatar-placeholder--add {
+  box-sizing: border-box;
   border-style: dashed;
   background: #F4FAF6;
-}
-
-.avatar-add-icon {
   font-size: 64rpx;
   font-weight: 300;
-  line-height: 1;
   color: #52B788;
 }
 

@@ -23,9 +23,7 @@
         src="{{avatarDisplay}}"
         mode="aspectFill"
       />
-      <view wx:else class="avatar avatar-placeholder avatar-placeholder--add">
-        <text class="avatar-add-icon">+</text>
-      </view>
+      <view wx:else class="avatar avatar-placeholder avatar-placeholder--add">+</view>
       <view class="avatar-tip">{{avatarUploading ? '同步中...' : '点击使用微信头像'}}</view>
     </button>
 
