@@ -8,6 +8,12 @@ const GOAL_OPTIONS = [
   { value: 'other', label: '其他' },
 ]
 
+function isLocalAvatarPath(path) {
+  if (!path) return false
+  const s = String(path)
+  return s.startsWith('wxfile://') || /^https?:\/\/tmp\//.test(s)
+}
+
 Page({
   data: {
     step: 'loading',
@@ -107,6 +113,11 @@ Page({
     this.setData({ draftNickname: e.detail.value })
   },
 
+  onNicknameBlur(e) {
+    const value = String(e.detail.value || '').trim()
+    if (value) this.setData({ draftNickname: value })
+  },
+
   onGoalSelect(e) {
     const value = e.currentTarget.dataset.value
     const next = this.data.draftStudyGoal === value ? '' : value
@@ -118,7 +129,8 @@ Page({
     if (saving || avatarUploading) return
 
     const nickname = draftNickname.trim()
-    const hasAvatar = !!(avatarDisplay || user?.avatar_url)
+    const avatarTempPath = isLocalAvatarPath(avatarDisplay) ? avatarDisplay : undefined
+    const hasAvatar = !!(avatarTempPath || user?.avatar_url)
     if (!hasAvatar) {
       wx.showToast({ title: '请点击头像使用微信头像', icon: 'none' })
       return
@@ -134,11 +146,17 @@ Page({
       const profile = await auth.saveProfile({
         nickname,
         studyGoal: draftStudyGoal,
+        avatarTempPath,
       })
+      auth.syncAppUser(profile)
+      if (profile?.needs_profile_setup) {
+        wx.hideLoading()
+        wx.showToast({ title: '请先完成头像设置', icon: 'none' })
+        return
+      }
       wx.hideLoading()
       wx.showToast({ title: '登录成功', icon: 'success' })
-      auth.syncAppUser(profile)
-      auth.finishLoginRedirect(this.data.redirect)
+      setTimeout(() => auth.finishLoginRedirect(this.data.redirect), 1500)
     } catch (err) {
       wx.hideLoading()
       wx.showToast({ title: err.detail || err.message || '保存失败', icon: 'none' })

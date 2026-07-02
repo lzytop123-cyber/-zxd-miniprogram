@@ -16,40 +16,60 @@
   </view>
 
   <view wx:else class="active-panel">
-    <view class="order-switch card" wx:if="{{activeList.length > 1}}">
-      <view class="order-switch-label">切换订单（{{activeList.length}} 个进行中）</view>
-      <scroll-view class="order-switch-scroll" scroll-x enhanced show-scrollbar="{{false}}">
-        <view class="order-switch-inner">
-          <view
-            class="order-chip {{selectedId === item.id ? 'active' : ''}}"
-            wx:for="{{activeList}}"
-            wx:key="id"
-            data-id="{{item.id}}"
-            bindtap="selectReservation"
-          >
-            <view class="order-chip-seat">{{item.seat_code}}</view>
-            <view class="order-chip-meta">{{item.store_name}}</view>
-          </view>
+    <view class="hero card">
+      <view class="hero-header">
+        <view class="hero-header-main">
+          <view class="hero-title">{{reservation.store_name}}</view>
+          <view class="hero-subtitle">正在使用中 · 到店后可直接开门</view>
         </view>
-      </scroll-view>
-    </view>
+        <view class="hero-badge" wx:if="{{statusLabel}}">{{statusLabel}}</view>
+      </view>
 
-    <view class="info-card card">
-      <view class="store-name">{{reservation.store_name}}</view>
       <view class="seat-ring">
         <view class="seat-no">{{reservation.seat_code}}</view>
         <view class="seat-label">您的座位</view>
       </view>
-      <view class="time">结束 {{endDisplay}}</view>
-      <view class="status-pill" wx:if="{{statusLabel}}">{{statusLabel}}</view>
-      <view class="status-hint" wx:if="{{statusHint}}">{{statusHint}}</view>
-      <view class="countdown" wx:if="{{countdown}}">{{countdown}}</view>
+
+      <view class="hero-grid">
+        <view class="hero-meta-item">
+          <view class="hero-meta-label">结束时间</view>
+          <view class="hero-meta-value">{{endDisplay}}</view>
+        </view>
+        <view class="hero-meta-item hero-meta-item--accent">
+          <view class="hero-meta-label">剩余时长</view>
+          <view class="hero-meta-value hero-meta-value--accent">{{countdown}}</view>
+        </view>
+      </view>
+
+      <view class="hero-footer" wx:if="{{statusHint}}">{{statusHint}}</view>
     </view>
 
-    <view class="open-section">
-      <view class="tip ended" wx:if="{{countdown === '已结束'}}">订单已结束，无法开门</view>
-      <view class="tip" wx:elif="{{!canOpen}}">提前 15 分钟可开门</view>
-      <view class="tip ok" wx:elif="{{canOpen}}">已可开门，请站在门口操作</view>
+    <view class="order-switch card" wx:if="{{activeList.length > 1}}">
+      <view class="order-switch-head">
+        <view class="order-switch-label">切换订单</view>
+        <view class="order-switch-count">{{activeList.length}} 个进行中</view>
+      </view>
+      <view class="order-switch-list">
+        <view
+          class="order-chip {{selectedId === item.id ? 'active' : ''}}"
+          wx:for="{{activeList}}"
+          wx:key="id"
+          data-id="{{item.id}}"
+          bindtap="selectReservation"
+        >
+          <view class="order-chip-seat">{{item.seat_code}}</view>
+          <view class="order-chip-meta">{{item.store_name}}</view>
+        </view>
+      </view>
+    </view>
+
+    <view class="open-section card">
+      <view class="open-status-wrap">
+        <view class="tip ended" wx:if="{{countdown === '已结束'}}">订单已结束，无法开门</view>
+        <view class="tip" wx:elif="{{!canOpen}}">提前 15 分钟可开门</view>
+        <view class="tip ok" wx:elif="{{canOpen}}">已可开门，请站在门口操作</view>
+      </view>
+
       <view class="tip warn" wx:if="{{lastOpenError}}">{{lastOpenError}}</view>
 
       <view
@@ -63,23 +83,9 @@
         <view class="open-hero-sub" wx:elif="{{!canOpen}}">到时间后按钮自动可用</view>
       </view>
 
-      <view
-        class="open-remote btn-outline"
-        wx:if="{{gatewayUnlock && canOpen && !opening}}"
-        bindtap="openDoorRemote"
-      >远程开门</view>
-
-      <view class="open-steps" wx:if="{{canOpen && pluginReady}}">
-        <text>① 打开蓝牙</text>
-        <text class="dot">·</text>
-        <text>② 靠近门锁</text>
-        <text class="dot">·</text>
-        <text>③ 点击上方按钮</text>
+      <view class="action-row">
+        <view class="btn-outline" bindtap="checkout" wx:if="{{reservation.status === 1}}">提前离座</view>
       </view>
-    </view>
-
-    <view class="footer-actions">
-      <view class="btn-outline" bindtap="checkout" wx:if="{{reservation.status === 1}}">提前离座</view>
     </view>
   </view>
 </view>

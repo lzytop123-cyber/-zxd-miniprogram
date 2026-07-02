@@ -1,5 +1,6 @@
 const { request } = require('../../../utils/request')
 const routes = require('../../../utils/routes')
+const { seatDisplay } = require('../../../utils/seat-layout')
 
 function parseDate(iso) {
   return new Date(String(iso).replace(' ', 'T'))
@@ -15,6 +16,12 @@ function formatRange(start, end) {
     return `${fmtDate(s)} ${fmtTime(s)} - ${fmtTime(e)}`
   }
   return `${fmtDate(s)} ${fmtTime(s)} ~ ${fmtDate(e)} ${fmtTime(e)}`
+}
+
+function formatSeat(item) {
+  const display = seatDisplay({ seat_code: item.seat_code || '' })
+  if (!display.mapLabel) return item.seat_code || '-'
+  return display.zoneName ? `${display.mapLabel}号 · ${display.zoneName}` : `${display.mapLabel}号`
 }
 
 function enrichOrder(item) {
@@ -35,6 +42,7 @@ function enrichOrder(item) {
   return {
     ...item,
     timeRange: formatRange(item.start_time, item.end_time),
+    seatDisplay: formatSeat(item),
     statusLabel: item.status_label || '未知',
     statusHint: item.status_hint || '',
     statusTone: tone,

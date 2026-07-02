@@ -1,6 +1,14 @@
-const { request } = require('./request')
+const { request, invalidateCache } = require('./request')
 const { normalizeUser } = require('./user')
 const routes = require('./routes')
+
+function invalidateUserProfileCache() {
+  try {
+    invalidateCache('/user/profile')
+  } catch (e) {
+    // ignore
+  }
+}
 
 const DEFAULT_NICKNAME = '知行岛学员'
 const DEFAULT_AVATAR = ''
@@ -94,6 +102,7 @@ function login(options = {}) {
           .then((res) => {
             wx.removeStorageSync(MANUAL_LOGOUT_KEY)
             wx.setStorageSync('token', res.token)
+            invalidateUserProfileCache()
             syncAppUser(res.user)
             resolve(res)
           })
@@ -143,19 +152,23 @@ async function uploadAvatar(tempPath) {
   if (lower.includes('.png')) mime = 'png'
   else if (lower.includes('.webp')) mime = 'webp'
   const data = await readAvatarBase64(tempPath)
-  return request({
+  const user = await request({
     url: '/user/avatar',
     method: 'POST',
     data: { avatar_image: `data:image/${mime};base64,${data}` },
   })
+  invalidateUserProfileCache()
+  return user
 }
 
 async function updateProfile(fields) {
-  return request({
+  const user = await request({
     url: '/user/profile',
     method: 'PUT',
     data: fields,
   })
+  invalidateUserProfileCache()
+  return user
 }
 
 async function updateNickname(nickname) {
@@ -182,7 +195,15 @@ async function saveProfile({ nickname, avatarTempPath, studyGoal }) {
 function goLogin(redirect, options = {}) {
   const query = redirect ? `?redirect=${encodeURIComponent(redirect)}` : ''
   const url = `${LOGIN_PAGE}${query}`
-  if (options.replace) {
+  let onTabPage = false
+  try {
+    const pages = getCurrentPages()
+    const cur = pages[pages.length - 1]
+    onTabPage = TAB_PAGES.includes(`/${cur.route}`)
+  } catch (e) {
+    // ignore
+  }
+  if (options.replace && !onTabPage) {
     wx.redirectTo({ url })
   } else {
     wx.navigateTo({ url })

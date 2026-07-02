@@ -23,7 +23,9 @@
         src="{{avatarDisplay}}"
         mode="aspectFill"
       />
-      <view wx:else class="avatar avatar-placeholder">岛</view>
+      <view wx:else class="avatar avatar-placeholder avatar-placeholder--add">
+        <text class="avatar-add-icon">+</text>
+      </view>
       <view class="avatar-tip">{{avatarUploading ? '同步中...' : '点击使用微信头像'}}</view>
     </button>
 
@@ -35,6 +37,7 @@
         placeholder="点击输入或选用微信昵称"
         value="{{draftNickname}}"
         bindinput="onNicknameInput"
+        bindblur="onNicknameBlur"
       />
     </view>
 

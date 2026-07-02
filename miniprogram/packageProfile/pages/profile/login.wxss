@@ -113,6 +113,18 @@
   color: #2D6A4F;
 }
 
+.avatar-placeholder--add {
+  border-style: dashed;
+  background: #F4FAF6;
+}
+
+.avatar-add-icon {
+  font-size: 64rpx;
+  font-weight: 300;
+  line-height: 1;
+  color: #52B788;
+}
+
 .avatar-tip {
   margin-top: 12rpx;
   font-size: 24rpx;

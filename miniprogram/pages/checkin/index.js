@@ -41,6 +41,18 @@ function parseTime(iso) {
   return new Date(String(iso).replace(' ', 'T'))
 }
 
+function formatCountdown(diff) {
+  const totalMinutes = Math.max(0, Math.floor(diff / 60000))
+  const days = Math.floor(totalMinutes / (24 * 60))
+  const hours = Math.floor((totalMinutes % (24 * 60)) / 60)
+  const minutes = totalMinutes % 60
+  const parts = []
+  if (days > 0) parts.push(`${days}天`)
+  if (days > 0 || hours > 0) parts.push(`${hours}小时`)
+  parts.push(`${minutes}分`)
+  return `剩余 ${parts.join('')}`
+}
+
 Page({
   data: {
     pageLoading: true,
@@ -189,11 +201,8 @@ Page({
         }
         return
       }
-      const h = Math.floor(diff / 3600000)
-      const m = Math.floor((diff % 3600000) / 60000)
-      const s = Math.floor((diff % 60000) / 1000)
       this.setData({
-        countdown: `剩余 ${h}时${m}分${s}秒`,
+        countdown: formatCountdown(diff),
         canOpen,
       })
     }
@@ -242,11 +251,7 @@ Page({
       },
     })
     showOpenFailureModal(failure, {
-      onRetry: () => {
-        if (mode === 'remote') this.openDoorRemote()
-        else this.openDoorBle()
-      },
-      onRemote: () => this.openDoorRemote(),
+      onRetry: () => this.openDoorBle(),
       onRefresh: () => {
         this.loadBleKey(reservation.id)
         setTimeout(() => this.openDoorBle(), 500)
@@ -261,7 +266,7 @@ Page({
       const hint = this.data.pluginHint || '通通锁插件未加载'
       wx.showModal({
         title: '蓝牙开门不可用',
-        content: `${hint}。请确认已在 wx4d3a834429fc6538 后台添加插件并重新上传体验版；当前运行 AppID：${appId || '未知'}。${this.data.gatewayUnlock ? '可尝试远程开门。' : ''}`,
+        content: `${hint}。请确认已在 wx4d3a834429fc6538 后台添加插件并重新上传体验版；当前运行 AppID：${appId || '未知'}。`,
         showCancel: false,
       })
       return
@@ -280,7 +285,6 @@ Page({
       })
       showOpenFailureModal(failure, {
         onRetry: () => this.openDoorBle(),
-        onRemote: () => this.openDoorRemote(),
       })
       return
     }
@@ -294,7 +298,7 @@ Page({
       this.setData({ opening: false })
       wx.showModal({
         title: '蓝牙开门不可用',
-        content: '通通锁插件未正确加载，请重新上传体验版，或使用「远程开门」。',
+        content: '通通锁插件未正确加载，请重新上传体验版。',
         showCancel: false,
       })
       return
@@ -314,7 +318,6 @@ Page({
           this.loadBleKey(reservation.id)
           setTimeout(() => this.openDoorBle(), 500)
         },
-        onRemote: () => this.openDoorRemote(),
       })
       return
     }
@@ -345,20 +348,6 @@ Page({
     }
   },
 
-  openDoorRemote() {
-    if (!this.data.canOpen || this.data.opening) return
-    const { reservation } = this.data
-    if (!reservation) return
-
-    this.setData({ opening: true })
-    wx.showLoading({ title: '远程开门中...' })
-    request({ url: `/ble/unlock/${reservation.id}`, method: 'POST' })
-      .then(() => this.afterOpenSuccess(reservation))
-      .catch((err) => {
-        const msg = err.detail || err.message || '远程开门失败'
-        this.afterOpenFail(reservation, msg, '', 'remote')
-      })
-  },
 
   checkout() {
     const { reservation } = this.data

@@ -4,7 +4,7 @@
       <view class="order-store">{{item.store_name}}</view>
       <view class="order-status status-{{item.statusTone}}">{{item.statusLabel}}</view>
     </view>
-    <view class="order-seat">座位 {{item.seat_code}} · ¥{{item.final_price}}</view>
+    <view class="order-seat">座位 {{item.seatDisplay}} · ¥{{item.final_price}}</view>
     <view class="order-time">{{item.timeRange}}</view>
     <view class="order-hint" wx:if="{{item.statusHint}}">{{item.statusHint}}</view>
     <view class="order-action" wx:if="{{item.canOpen}}">

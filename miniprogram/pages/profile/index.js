@@ -53,7 +53,12 @@ Page({
       const user = await request({ url: '/user/profile', silent: true, force })
       auth.syncAppUser(user)
       if (user.needs_profile_setup) {
-        auth.goLogin('/pages/profile/index')
+        const synced = auth.getAppSafe()?.globalData?.user
+        if (synced && !synced.needs_profile_setup) {
+          await this.applyUser(synced)
+          return
+        }
+        auth.goLogin('/pages/profile/index', { replace: true })
         return
       }
       await this.applyUser(user)
