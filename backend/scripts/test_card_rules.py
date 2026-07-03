@@ -204,6 +204,25 @@ def test_office_night_booking_at_midnight_not_blocked():
     validate_period_card_for_reservation(None, card, BillType.night, start, end, 1)
 
 
+def test_night_reservation_does_not_block_saturday_morning():
+    from app.models import Reservation
+    from app.services.business import reservation_blocks_interval
+
+    night = Reservation(
+        user_id=1,
+        store_id=1,
+        seat_id=21,
+        bill_type=BillType.night,
+        pay_status=1,
+        status=0,
+        start_time=datetime(2026, 7, 3, 0, 0, 0),
+        end_time=datetime(2026, 8, 1, 23, 59, 59),
+    )
+    morning = datetime(2026, 7, 4, 9, 0, 0)
+    noon = datetime(2026, 7, 4, 11, 0, 0)
+    assert not reservation_blocks_interval(night, morning, noon)
+
+
 def test_night_reservation_does_not_block_morning():
     from app.models import Reservation
     from app.services.business import reservation_blocks_interval
@@ -313,6 +332,7 @@ if __name__ == "__main__":
     test_legacy_monthly_office_card_auto_upgraded()
     test_office_night_booking_at_midnight_not_blocked()
     test_night_reservation_does_not_block_morning()
+    test_night_reservation_does_not_block_saturday_morning()
     test_night_reservation_blocks_evening()
     test_reservation_open_window_night_weekday()
     test_reservation_open_window_night_weekend()

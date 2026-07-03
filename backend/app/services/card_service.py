@@ -18,7 +18,7 @@ OFFICE_NIGHT_WEEKDAY_START = datetime.strptime("18:00", "%H:%M").time()
 OFFICE_NIGHT_WEEKDAY_END = datetime.strptime("23:30", "%H:%M").time()
 OFFICE_NIGHT_WEEKEND_START = datetime.strptime("07:30", "%H:%M").time()
 OFFICE_NIGHT_WEEKEND_END = datetime.strptime("23:30", "%H:%M").time()
-OFFICE_NIGHT_USAGE_RULE = "可提前预约固定座位 · 每日可用：工作日 18:00-23:30 · 周末 7:30-23:30（开门时生效）"
+OFFICE_NIGHT_USAGE_RULE = "可提前预约固定座位 · 晚间 18:00-23:30 固定入座 · 白天座位可与他人分时共用"
 OFFICE_NIGHT_MAX_DAYS = 30
 OFFICE_NIGHT_BILL_TYPES = frozenset({BillType.night, BillType.night_monthly})
 
@@ -63,9 +63,16 @@ def ensure_office_night_card_type(db: Session | None, card: PeriodCard) -> None:
 
 
 def night_window_for_date(day: date) -> tuple[time, time, str]:
+    """夜读每日可开门/入座时段。"""
     if day.weekday() < 5:
         return OFFICE_NIGHT_WEEKDAY_START, OFFICE_NIGHT_WEEKDAY_END, "工作日"
     return OFFICE_NIGHT_WEEKEND_START, OFFICE_NIGHT_WEEKEND_END, "周末"
+
+
+def night_seat_block_window_for_date(day: date) -> tuple[time, time, str]:
+    """夜读固定座位在平面图/冲突检测中的占用时段（仅晚间锁座，白天可预约）。"""
+    _, _, label = night_window_for_date(day)
+    return OFFICE_NIGHT_WEEKDAY_START, OFFICE_NIGHT_WEEKDAY_END, label
 
 
 REWARD_TO_CARD: dict[RewardType, CardType] = {

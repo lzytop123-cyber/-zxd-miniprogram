@@ -82,10 +82,12 @@ function displayLabel(seatCode, slot) {
 
 function enrichSeat(seat) {
   const slot = slotFromCode(seat.seat_code)
+  const status = seat.status === 'occupied' ? 'reserved' : (seat.status || 'available')
   return {
     ...seat,
     map_slot: slot,
     map_label: displayLabel(seat.seat_code, slot),
+    status,
   }
 }
 
