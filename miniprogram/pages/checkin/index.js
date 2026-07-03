@@ -201,7 +201,7 @@ Page({
       const canOpen = computeCanOpen(reservation, now)
       const openWindowHint = getOpenWindowHint(reservation, now)
       if (diff <= 0) {
-        this.setData({ countdown: '已结束', canOpen: false, openWindowHint: '订单已结束，无法开门' })
+        this.setData({ countdown: '已结束', canOpen: false, openWindowHint: '订单已结束' })
         if (this._expiredReloadFor !== reservation.id) {
           this._expiredReloadFor = reservation.id
           this.loadActive()

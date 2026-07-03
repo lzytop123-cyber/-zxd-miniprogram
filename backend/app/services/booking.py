@@ -398,7 +398,7 @@ def reservation_unlock_message(reservation: Reservation, now: datetime | None = 
     if now.date() < reservation.start_time.date():
         return f"{reservation.start_time.strftime('%m月%d日')} 起可开门"
     if now.date() > reservation.end_time.date():
-        return "订单已结束，无法开门"
+        return "订单已结束"
 
     window = reservation_open_window(reservation, now)
     if window and window[0] <= now <= window[1]:
@@ -406,15 +406,9 @@ def reservation_unlock_message(reservation: Reservation, now: datetime | None = 
 
     today = now.date()
     if reservation.bill_type == BillType.night:
-        win_start, win_end, label = night_window_for_date(today)
-        return (
-            f"{label}夜读时段 {win_start.strftime('%H:%M')}-{win_end.strftime('%H:%M')} 可开门"
-            f"（可提前 {EARLY_CHECKIN_MINUTES} 分钟）"
-        )
-    return (
-        f"营业时间 {STORE_OPEN_START.strftime('%H:%M')}-{STORE_OPEN_END.strftime('%H:%M')} 可开门"
-        f"（可提前 {EARLY_CHECKIN_MINUTES} 分钟）"
-    )
+        win_start, win_end, _label = night_window_for_date(today)
+        return f"{win_start.strftime('%H:%M')}-{win_end.strftime('%H:%M')} 可开门"
+    return f"{STORE_OPEN_START.strftime('%H:%M')}-{STORE_OPEN_END.strftime('%H:%M')} 可开门"
 
 
 def reservation_unlock_allowed(
