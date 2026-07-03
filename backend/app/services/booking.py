@@ -11,7 +11,9 @@ from app.services.store_hours import (
     STORE_HOURS_LABEL,
     STORE_OPEN_END,
     STORE_OPEN_START,
+    night_date_range_bounds,
     night_window_for_date,
+    store_range_bounds,
     validate_store_time_range,
 )
 
@@ -32,66 +34,56 @@ def resolve_booking_window(
         return start_time, end_time
 
     if bill_type == BillType.daily:
-        day_start = start_time.replace(hour=0, minute=0, second=0, microsecond=0)
-        if end_time and end_time > day_start:
-            return day_start, end_time.replace(hour=23, minute=59, second=59)
-        return day_start, day_start + timedelta(days=1)
+        if not end_time:
+            return store_range_bounds(start_time, start_time)
+        if start_time.date() == end_time.date():
+            validate_store_time_range(start_time, end_time)
+            return start_time, end_time
+        return store_range_bounds(start_time, end_time)
 
     if bill_type == BillType.monthly:
-        day_start = start_time.replace(hour=0, minute=0, second=0, microsecond=0)
         if end_time:
-            day_end = end_time.replace(hour=23, minute=59, second=59, microsecond=0)
-            if day_end <= day_start:
+            start, end = store_range_bounds(start_time, end_time)
+            if end <= start:
                 raise ValueError("结束日期须晚于开始日期")
-            return day_start, day_end
+            return start, end
         days = rule.valid_days if rule and rule.valid_days else 30
-        return day_start, (day_start + timedelta(days=days)).replace(
-            hour=23, minute=59, second=59
-        )
+        end_day = start_time.date() + timedelta(days=days - 1)
+        return store_range_bounds(start_time, datetime.combine(end_day, STORE_OPEN_END))
 
     if bill_type == BillType.weekly:
-        day_start = start_time.replace(hour=0, minute=0, second=0, microsecond=0)
         if end_time:
-            day_end = end_time.replace(hour=23, minute=59, second=59, microsecond=0)
-            if day_end <= day_start:
+            start, end = store_range_bounds(start_time, end_time)
+            if end <= start:
                 raise ValueError("结束日期须晚于开始日期")
-            return day_start, day_end
+            return start, end
         days = rule.valid_days if rule and rule.valid_days else 7
-        return day_start, (day_start + timedelta(days=days - 1)).replace(
-            hour=23, minute=59, second=59
-        )
+        end_day = start_time.date() + timedelta(days=days - 1)
+        return store_range_bounds(start_time, datetime.combine(end_day, STORE_OPEN_END))
 
     if bill_type == BillType.quarterly:
-        day_start = start_time.replace(hour=0, minute=0, second=0, microsecond=0)
         if end_time:
-            day_end = end_time.replace(hour=23, minute=59, second=59, microsecond=0)
-            if day_end <= day_start:
+            start, end = store_range_bounds(start_time, end_time)
+            if end <= start:
                 raise ValueError("结束日期须晚于开始日期")
-            return day_start, day_end
+            return start, end
         days = rule.valid_days if rule and rule.valid_days else 90
-        return day_start, (day_start + timedelta(days=days - 1)).replace(
-            hour=23, minute=59, second=59
-        )
+        end_day = start_time.date() + timedelta(days=days - 1)
+        return store_range_bounds(start_time, datetime.combine(end_day, STORE_OPEN_END))
 
     if bill_type == BillType.session:
-        day_start = start_time.replace(hour=0, minute=0, second=0, microsecond=0)
         if end_time:
-            day_end = end_time.replace(hour=23, minute=59, second=59, microsecond=0)
-            if day_end < day_start:
-                raise ValueError("结束日期不能早于开始日期")
-            days = (day_end.date() - day_start.date()).days + 1
+            days = (end_time.date() - start_time.date()).days + 1
             if days > 30:
                 raise ValueError("次卡单次最多连续预约30天")
-            return day_start, day_end
-        return day_start, day_start.replace(hour=23, minute=59, second=59)
+            return store_range_bounds(start_time, end_time)
+        return store_range_bounds(start_time, start_time)
 
     if bill_type == BillType.night:
+        if end_time:
+            return night_date_range_bounds(start_time, end_time)
         night_start = rule.night_start if rule and rule.night_start else time(18, 0)
         night_end = rule.night_end if rule and rule.night_end else time(0, 0)
-        if end_time:
-            if end_time <= start_time:
-                raise ValueError("结束时间须晚于开始时间")
-            return start_time, end_time
         base = start_time.replace(
             hour=night_start.hour, minute=night_start.minute, second=0, microsecond=0
         )

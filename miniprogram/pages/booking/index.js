@@ -18,6 +18,10 @@ const {
   clampHourlyClocks,
   STORE_OPEN,
   compareClock,
+  storeRangeDateTimes,
+  nightRangeDateTimes,
+  clockRangeDateTimes,
+  defaultDailyClocks,
 } = require('../../utils/storeHours')
 const {
   formatLocalDateTime,
@@ -261,10 +265,13 @@ Page({
     } else if (billType === 'session') {
       Object.assign(patch, { endDate: startDate })
     } else if (billType === 'daily') {
+      const clocks = defaultDailyClocks(startDate, todayStr(), nowTimeStr())
       Object.assign(patch, {
         endDate: startDate,
         dailyUseMode: 'single',
         multiDayDailyCard: null,
+        startClock: clocks.startClock,
+        endClock: clocks.endClock,
       })
     } else if (billType === 'weekly') {
       Object.assign(patch, { endDate: addDays(startDate, defaults.endOffset) })
@@ -304,6 +311,14 @@ Page({
       const startClock = defaultHourlyStartClock(startDate, todayStr(), nowTimeStr())
       patch.startClock = startClock
       patch.endClock = this._addHoursToClock(startClock, this.data.hours)
+    } else if (
+      this.data.billType === 'daily'
+      && this.data.dailyUseMode === 'single'
+      && patch.endDate === startDate
+    ) {
+      const clocks = defaultDailyClocks(startDate, todayStr(), nowTimeStr())
+      patch.startClock = clocks.startClock
+      patch.endClock = clocks.endClock
     }
     this.setData(patch, () => this.refreshPreview())
   },
@@ -325,6 +340,14 @@ Page({
     this.setData({ endDate }, () => this.refreshPreview())
   },
 
+  _isDailySingleDay() {
+    return (
+      this.data.billType === 'daily'
+      && this.data.dailyUseMode === 'single'
+      && this.data.startDate === this.data.endDate
+    )
+  },
+
   onStartClockChange(e) {
     let startClock = e.detail.value
     const patch = { startClock }
@@ -337,13 +360,22 @@ Page({
         wx.showToast({ title: err, icon: 'none' })
         return
       }
+    } else if (this._isDailySingleDay()) {
+      const clamped = clampHourlyClocks(this.data.startDate, startClock, this.data.endClock)
+      patch.startClock = clamped.startClock
+      patch.endClock = clamped.endClock
+      const err = validateStoreTimeRange(this.data.startDate, patch.startClock, patch.endClock)
+      if (err) {
+        wx.showToast({ title: err, icon: 'none' })
+        return
+      }
     }
     this.setData(patch, () => this.refreshPreview())
   },
 
   onEndClockChange(e) {
     let endClock = e.detail.value
-    if (this.data.billType === 'hourly') {
+    if (this.data.billType === 'hourly' || this._isDailySingleDay()) {
       const clamped = clampHourlyClocks(this.data.startDate, this.data.startClock, endClock)
       endClock = clamped.endClock
       const err = validateStoreTimeRange(this.data.startDate, this.data.startClock, endClock)
@@ -353,6 +385,23 @@ Page({
       }
     }
     this.setData({ endClock }, () => this.refreshPreview())
+  },
+
+  setDailyFullDay() {
+    this.setData({
+      startClock: STORE_OPEN.start,
+      endClock: STORE_OPEN.end,
+    }, () => this.refreshPreview())
+  },
+
+  setDailyPreset(e) {
+    const { start, end } = e.currentTarget.dataset
+    const err = validateStoreTimeRange(this.data.startDate, start, end)
+    if (err) {
+      wx.showToast({ title: err, icon: 'none' })
+      return
+    }
+    this.setData({ startClock: start, endClock: end }, () => this.refreshPreview())
   },
 
   setHours(e) {
@@ -405,42 +454,38 @@ Page({
       const diffH = (end - start) / 3600000
       if (diffH < 2) throw new Error('按小时预约最少2小时')
       if (diffH > 24) throw new Error('按小时预约最长24小时')
-    } else if (billType === 'session') {
-      start = new Date(`${startDate}T00:00:00`)
-      end = new Date(`${endDate}T23:59:59`)
-      if (end < start) throw new Error('结束日期不能早于开始日期')
+    } else if (billType === 'night') {
+      ;({ start, end } = nightRangeDateTimes(startDate, endDate))
+      if (end <= start) throw new Error('结束日期须晚于开始日期')
       const days = Math.floor((end - start) / 86400000) + 1
-      if (days > 30) throw new Error('次卡单次最多连续预约30天')
+      if (days > 30) throw new Error('夜读月卡单次最多预约30天')
     } else if (billType === 'daily') {
-      start = new Date(`${startDate}T00:00:00`)
-      end = new Date(`${endDate}T23:59:59`)
-      if (end < start) throw new Error('结束日期不能早于开始日期')
       const multi = this.data.dailyUseMode === 'multi_pass' ? this.data.multiDayDailyCard : null
       if (multi) {
+        ;({ start, end } = storeRangeDateTimes(startDate, endDate))
         const span = dailyPassDays(multi)
         const days = Math.floor((end - start) / 86400000) + 1
         if (startDate !== multi.start_date || endDate !== multi.end_date || days !== span) {
           throw new Error(`该卡须连续预约 ${multi.start_date} 至 ${multi.end_date}`)
         }
+      } else if (startDate === endDate) {
+        ;({ start, end } = clockRangeDateTimes(startDate, startClock, endDate, endClock))
+        const err = validateStoreTimeRange(startDate, startClock, endClock)
+        if (err) throw new Error(err)
+        if (end <= start) throw new Error('结束时间须晚于开始时间')
+      } else {
+        ;({ start, end } = storeRangeDateTimes(startDate, endDate))
       }
-    } else if (billType === 'weekly') {
-      start = new Date(`${startDate}T00:00:00`)
-      end = new Date(`${endDate}T23:59:59`)
-      if (end <= start) throw new Error('结束日期须晚于开始日期')
-    } else if (billType === 'monthly') {
-      start = new Date(`${startDate}T00:00:00`)
-      end = new Date(`${endDate}T23:59:59`)
-      if (end <= start) throw new Error('结束日期须晚于开始日期')
-    } else if (billType === 'quarterly') {
-      start = new Date(`${startDate}T00:00:00`)
-      end = new Date(`${endDate}T23:59:59`)
-      if (end <= start) throw new Error('结束日期须晚于开始日期')
-    } else if (billType === 'night') {
-      start = new Date(`${startDate}T00:00:00`)
-      end = new Date(`${endDate}T23:59:59`)
-      if (end <= start) throw new Error('结束日期须晚于开始日期')
-      const days = Math.floor((end - start) / 86400000) + 1
-      if (days > 30) throw new Error('夜读月卡单次最多预约30天')
+      if (end < start) throw new Error('结束日期不能早于开始日期')
+    } else {
+      ;({ start, end } = storeRangeDateTimes(startDate, endDate))
+      if (end < start) throw new Error('结束日期不能早于开始日期')
+      if (billType === 'session') {
+        const days = Math.floor((end - start) / 86400000) + 1
+        if (days > 30) throw new Error('次卡单次最多连续预约30天')
+      } else if (['weekly', 'monthly', 'quarterly'].includes(billType) && end <= start) {
+        throw new Error('结束日期须晚于开始日期')
+      }
     }
 
     return {

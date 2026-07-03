@@ -59,7 +59,20 @@
         <picker mode="date" value="{{endDate}}" start="{{startDate}}" bindchange="onEndDateChange">
           <view class="field"><text class="field-key">结束日期</text><text class="field-val">{{endDate}} ›</text></view>
         </picker>
-        <view class="hint">日卡默认单日；结束日期可与开始相同</view>
+        <block wx:if="{{startDate === endDate}}">
+          <picker mode="time" value="{{startClock}}" bindchange="onStartClockChange">
+            <view class="field"><text class="field-key">开始时间</text><text class="field-val">{{startClock}} ›</text></view>
+          </picker>
+          <picker mode="time" value="{{endClock}}" bindchange="onEndClockChange">
+            <view class="field"><text class="field-key">结束时间</text><text class="field-val">{{endClock}} ›</text></view>
+          </picker>
+          <view class="quick-btns">
+            <view class="chip" bindtap="setDailyFullDay">全天</view>
+            <view class="chip" bindtap="setDailyPreset" data-start="08:00" data-end="18:00">8-18点</view>
+            <view class="chip" bindtap="setDailyPreset" data-start="09:00" data-end="21:00">9-21点</view>
+          </view>
+        </block>
+        <view class="hint">单日可自选时段；跨多日按营业时段全天 · {{storeHoursHint}}</view>
       </block>
       <view class="quick-btns" wx:if="{{hasMultiDayDailyCard}}">
         <view class="chip {{dailyUseMode==='single'?'active':''}}" bindtap="setDailyMode" data-mode="single">单日预约</view>
@@ -80,7 +93,7 @@
         <view class="chip" bindtap="setSessionDays" data-d="3">3天</view>
         <view class="chip" bindtap="setSessionDays" data-d="7">7天</view>
       </view>
-      <view class="hint">每自然日扣 1 次，连选 3 天扣 3 次；10次卡最多连选10天</view>
+      <view class="hint">每自然日扣 1 次 · {{storeHoursHint}}</view>
     </block>
 
     <!-- 周卡 -->
@@ -91,7 +104,7 @@
       <picker mode="date" value="{{endDate}}" start="{{startDate}}" bindchange="onEndDateChange">
         <view class="field"><text class="field-key">结束日期</text><text class="field-val">{{endDate}} ›</text></view>
       </picker>
-      <view class="hint">周卡默认7天，完成一次预约即核销整张卡</view>
+      <view class="hint">周卡默认7天 · {{storeHoursHint}}</view>
     </block>
 
     <!-- 月卡 -->
@@ -102,7 +115,7 @@
       <picker mode="date" value="{{endDate}}" start="{{startDate}}" bindchange="onEndDateChange">
         <view class="field"><text class="field-key">结束日期</text><text class="field-val">{{endDate}} ›</text></view>
       </picker>
-      <view class="hint">月卡默认30天，完成一次预约即核销</view>
+      <view class="hint">月卡默认30天 · {{storeHoursHint}}</view>
     </block>
 
     <!-- 季卡 -->
@@ -113,7 +126,7 @@
       <picker mode="date" value="{{endDate}}" start="{{startDate}}" bindchange="onEndDateChange">
         <view class="field"><text class="field-key">结束日期</text><text class="field-val">{{endDate}} ›</text></view>
       </picker>
-      <view class="hint">季卡默认90天，完成一次预约即核销</view>
+      <view class="hint">季卡默认90天 · {{storeHoursHint}}</view>
     </block>
 
     <!-- 夜读 -->
