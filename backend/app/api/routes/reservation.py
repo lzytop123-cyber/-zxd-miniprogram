@@ -62,7 +62,10 @@ def _prepare_booking(db: Session, body, require_seat: bool = False):
         _, rule = calc_price(db, body.store_id, body.bill_type, Decimal("1"))
     except ValueError:
         pass
-    start, end = resolve_booking_window(body.bill_type, body.start_time, body.end_time, rule)
+    try:
+        start, end = resolve_booking_window(body.bill_type, body.start_time, body.end_time, rule)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
     if body.bill_type == BillType.session:
         duration = Decimal(str((end.date() - start.date()).days + 1))
     else:

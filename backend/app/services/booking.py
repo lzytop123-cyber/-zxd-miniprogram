@@ -6,6 +6,8 @@ from sqlalchemy import func, select, update
 from sqlalchemy.orm import Session
 
 from app.models import BillType, PeriodCard, PricingRule, Reservation, Seat, StudyStat, User, WalletLog
+from app.services.business import find_seat_conflict
+from app.services.seat_setup import seat_code_to_slot
 from app.services.points import add_points
 from app.services.store_hours import (
     STORE_HOURS_LABEL,
