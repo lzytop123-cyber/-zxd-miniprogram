@@ -634,7 +634,7 @@ Page({
       selectedId: Number(id),
       selectedLabel: display.mapLabel,
       selectedZone: display.zoneName,
-    }, () => this.refreshPreview())
+    }, () => this.refreshPreview({ immediate: true }))
   },
 
   goOrder() {
@@ -648,17 +648,26 @@ Page({
       wx.showToast({ title: '请先点击平面图选座', icon: 'none' })
       return
     }
-    if (!preview) {
-      wx.showToast({ title: '请检查时间并等待价格计算', icon: 'none' })
+    if (this.data.previewLoading) {
+      wx.showToast({ title: '价格计算中…', icon: 'none' })
       return
     }
-    if (preview.seat_id !== seatId) {
-      wx.showToast({ title: '座位信息同步中，请稍候', icon: 'none' })
-      this.refreshPreview({ immediate: true })
+    if (preview && preview.seat_id === seatId) {
+      wx.navigateTo({
+        url: `${routes.bookingOrder}?storeId=${storeId}&start=${encodeURIComponent(preview.start_time)}&end=${encodeURIComponent(preview.end_time)}&seatId=${preview.seat_id}&price=${preview.final_price}&seatCode=${preview.seat_code}&billType=${billType}`,
+      })
       return
     }
-    wx.navigateTo({
-      url: `${routes.bookingOrder}?storeId=${storeId}&start=${encodeURIComponent(preview.start_time)}&end=${encodeURIComponent(preview.end_time)}&seatId=${preview.seat_id}&price=${preview.final_price}&seatCode=${preview.seat_code}&billType=${billType}`,
+    // 选座后预览尚未带上该座位，自动刷新一次再跳转
+    this.refreshPreview({ immediate: true }).then(() => {
+      const { preview: latest, seatId: sid } = this.data
+      if (latest && latest.seat_id === sid) {
+        wx.navigateTo({
+          url: `${routes.bookingOrder}?storeId=${storeId}&start=${encodeURIComponent(latest.start_time)}&end=${encodeURIComponent(latest.end_time)}&seatId=${latest.seat_id}&price=${latest.final_price}&seatCode=${latest.seat_code}&billType=${billType}`,
+        })
+      } else {
+        wx.showToast({ title: '价格计算失败，请重试', icon: 'none' })
+      }
     })
   },
 })

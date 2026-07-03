@@ -189,6 +189,6 @@
 
   <!-- 底部 CTA -->
   <view class="bk-bottom">
-    <view class="bk-cta full {{seatId ? '' : 'bk-cta--disabled'}}" bindtap="goOrder">立即预定</view>
+    <view class="bk-cta full {{seatId && preview && !previewLoading && preview.seat_id === seatId ? '' : 'bk-cta--disabled'}}" bindtap="goOrder">{{previewLoading ? '计算中…' : '立即预定'}}</view>
   </view>
 </view>
