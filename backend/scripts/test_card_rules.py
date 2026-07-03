@@ -289,6 +289,23 @@ def test_reservation_open_window_night_weekday():
     assert not reservation_unlock_allowed(res, datetime(2026, 7, 6, 23, 31, 0))
 
 
+def test_reservation_open_window_night_monthly_weekday():
+    from app.models import Reservation
+    from app.services.booking import reservation_unlock_allowed
+
+    res = Reservation(
+        user_id=1,
+        seat_id=1,
+        bill_type=BillType.night_monthly,
+        pay_status=1,
+        status=0,
+        start_time=datetime(2026, 7, 6, 0, 0, 0),
+        end_time=datetime(2026, 8, 4, 23, 59, 59),
+    )
+    assert not reservation_unlock_allowed(res, datetime(2026, 7, 6, 10, 0, 0))
+    assert reservation_unlock_allowed(res, datetime(2026, 7, 6, 18, 0, 0))
+
+
 def test_reservation_open_window_night_weekend():
     from app.models import Reservation
     from app.services.booking import reservation_unlock_allowed

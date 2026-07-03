@@ -36,6 +36,8 @@ class Settings(BaseSettings):
     ttlock_client_secret: str = ""
     ttlock_username: str = ""
     ttlock_password: str = ""
+    # 需 WiFi 网关；纯蓝牙锁保持 false
+    ttlock_remote_unlock_enabled: bool = False
 
     yunlaoban_client_id: str = Field(
         default="",

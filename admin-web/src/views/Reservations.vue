@@ -103,12 +103,6 @@
             @click="openChangeSeat(row)"
           >换座</el-button>
           <el-button
-            v-if="canRemoteUnlock(row)"
-            link
-            type="success"
-            @click="remoteUnlock(row)"
-          >远程开门</el-button>
-          <el-button
             v-if="row.status === 1"
             link
             type="warning"
@@ -289,13 +283,6 @@ function canCancel(row: any) {
   return row.status === 0
 }
 
-function canRemoteUnlock(row: any) {
-  if (row.pay_status !== 1) return false
-  if (row.status === 3 || row.status === 2) return false
-  if (!row.end_time) return true
-  return new Date(row.end_time).getTime() > Date.now()
-}
-
 async function cancelOrder(row: any) {
   const msg = row.pay_status === 0
     ? `确定取消未支付订单 ${row.order_no} 吗？座位将立即释放。`
@@ -303,13 +290,6 @@ async function cancelOrder(row: any) {
   await ElMessageBox.confirm(msg, '取消订单', { type: 'warning' })
   await http.post(`/admin/reservations/${row.id}/cancel`)
   ElMessage.success('已取消')
-  load()
-}
-
-async function remoteUnlock(row: any) {
-  await ElMessageBox.confirm(`确定为订单 ${row.order_no} 远程开门吗？`, '远程开门', { type: 'info' })
-  const res = await http.post(`/admin/reservations/${row.id}/remote-unlock`)
-  ElMessage.success(res.message || '开门成功')
   load()
 }
 

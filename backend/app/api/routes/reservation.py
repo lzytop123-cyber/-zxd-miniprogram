@@ -33,6 +33,7 @@ from app.services.booking import (
     record_study_on_checkout,
     reservation_status_display,
     reservation_unlock_allowed,
+    reservation_unlock_message,
     resolve_booking_window,
     seat_conflict_excluding,
     validate_seat_for_booking,
@@ -469,8 +470,13 @@ def checkin(
         raise HTTPException(status_code=404, detail="订单不存在")
     if reservation.pay_status != 1:
         raise HTTPException(status_code=400, detail="订单未支付")
-    reservation.status = 1
-    reservation.check_in_time = datetime.now()
+    if reservation.status != 0:
+        raise HTTPException(status_code=400, detail="当前状态不可入座")
+    if not reservation_unlock_allowed(reservation):
+        detail = reservation_unlock_message(reservation) or "当前无法入座"
+        raise HTTPException(status_code=400, detail=detail)
+    if not auto_checkin_reservation(db, reservation):
+        raise HTTPException(status_code=400, detail="当前无法入座")
     db.commit()
     return ResponseModel(message="入座成功")
 
@@ -484,6 +490,10 @@ def checkout(
     reservation = db.get(Reservation, reservation_id)
     if not reservation or reservation.user_id != user.id:
         raise HTTPException(status_code=404, detail="订单不存在")
+    if reservation.pay_status != 1:
+        raise HTTPException(status_code=400, detail="订单未支付")
+    if reservation.status != 1:
+        raise HTTPException(status_code=400, detail="请先开门入座")
     reservation.status = 2
     reservation.actual_end_time = datetime.now()
     record_study_on_checkout(db, reservation, user)

@@ -21,9 +21,6 @@
       </view>
     </view>
 
-    <view class="album-link {{loading || scanning ? 'disabled' : ''}}" bindtap="onAlbumScanTap">
-      从相册识别
-    </view>
 
     <view class="btn-primary {{loading?'disabled':''}}" bindtap="onSubmitTap">立即兑换</view>
     <view class="link-records" bindtap="goRecords">查看兑换记录 ›</view>

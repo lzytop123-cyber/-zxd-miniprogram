@@ -68,7 +68,6 @@ Page({
     openWindowHint: '',
     lockData: '',
     lockName: '',
-    gatewayUnlock: false,
     pluginReady: false,
     pluginHint: '',
     runtimeAppId: '',
@@ -175,7 +174,7 @@ Page({
 
   loadBleKey(reservationId) {
     if (!reservationId) {
-      this.setData({ lockData: '', gatewayUnlock: false })
+      this.setData({ lockData: '' })
       return
     }
     request({ url: `/ble/key/${reservationId}` })
@@ -184,11 +183,10 @@ Page({
         this.setData({
           lockData: res.lockData,
           lockName: res.lockName || '门店大门',
-          gatewayUnlock: !!res.gatewayUnlock,
         })
       })
       .catch(() => {
-        this.setData({ lockData: '', gatewayUnlock: false })
+        this.setData({ lockData: '' })
       })
   },
 

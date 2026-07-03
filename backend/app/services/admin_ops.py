@@ -143,6 +143,8 @@ def update_admin_period_card(
 
 
 async def admin_remote_unlock(db: Session, reservation: Reservation) -> dict:
+    if not settings.ttlock_remote_unlock_enabled:
+        raise ValueError("门店门锁不支持远程开门")
     if reservation.pay_status != 1:
         raise ValueError("订单未支付")
     if not reservation_unlock_allowed(reservation):

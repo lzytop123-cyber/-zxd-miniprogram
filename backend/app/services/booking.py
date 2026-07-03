@@ -360,7 +360,7 @@ def reservation_open_window(
     if today < res_start.date() or today > res_end.date():
         return None
 
-    if reservation.bill_type == BillType.night:
+    if reservation.bill_type in (BillType.night, BillType.night_monthly):
         win_start, win_end, _ = night_window_for_date(today)
     else:
         win_start, win_end = STORE_OPEN_START, STORE_OPEN_END
@@ -405,7 +405,7 @@ def reservation_unlock_message(reservation: Reservation, now: datetime | None = 
         return ""
 
     today = now.date()
-    if reservation.bill_type == BillType.night:
+    if reservation.bill_type in (BillType.night, BillType.night_monthly):
         win_start, win_end, _label = night_window_for_date(today)
         return f"{win_start.strftime('%H:%M')}-{win_end.strftime('%H:%M')} 可开门"
     return f"{STORE_OPEN_START.strftime('%H:%M')}-{STORE_OPEN_END.strftime('%H:%M')} 可开门"

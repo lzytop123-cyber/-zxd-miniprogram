@@ -1,5 +1,6 @@
 const { nightWindowForDate, STORE_OPEN } = require('./storeHours')
 
+const NIGHT_BILL_TYPES = new Set(['night', 'night_monthly'])
 const OPEN_EARLY_MS = 15 * 60000
 
 function parseTime(iso) {
@@ -27,7 +28,7 @@ function reservationOpenWindow(reservation, now = new Date()) {
   if (todayStr < resStartDate || todayStr > resEndDate) return null
 
   const billType = reservation.bill_type || 'hourly'
-  const daily = billType === 'night' ? nightWindowForDate(todayStr) : STORE_OPEN
+  const daily = NIGHT_BILL_TYPES.has(billType) ? nightWindowForDate(todayStr) : STORE_OPEN
 
   let dayOpen = combineDateTime(todayStr, daily.start)
   dayOpen = new Date(dayOpen.getTime() - OPEN_EARLY_MS)
@@ -81,14 +82,14 @@ function getOpenWindowHint(reservation, now = new Date()) {
   }
 
   const billType = reservation.bill_type || 'hourly'
-  if (billType === 'night') {
+  if (NIGHT_BILL_TYPES.has(billType)) {
     const win = nightWindowForDate(todayStr)
     return `${win.start}-${win.end} 可开门`
   }
   return `${STORE_OPEN.start}-${STORE_OPEN.end} 可开门`
 }
 
-function mapBleOpenFailure({ errorCode, errorMsg, canOpen, reservation, mode = 'ble' }) {
+function mapBleOpenFailure({ errorCode, errorMsg, canOpen, reservation }) {
   const msg = String(errorMsg || '').toLowerCase()
   const code = Number(errorCode)
 
@@ -96,19 +97,9 @@ function mapBleOpenFailure({ errorCode, errorMsg, canOpen, reservation, mode = '
     const now = new Date()
     const end = parseTime(reservation.end_time)
     if (now > end) {
-      return {
-        title: '订单已结束',
-        content: '订单已过期，请重新预约',
-        retryLabel: '',
-        showRemote: false,
-      }
+      return { content: '订单已过期，请重新预约' }
     }
-    return {
-      title: '不在开门时段',
-      content: getOpenWindowHint(reservation, now),
-      retryLabel: '',
-      showRemote: false,
-    }
+    return { content: getOpenWindowHint(reservation, now) }
   }
 
   if (
@@ -117,12 +108,7 @@ function mapBleOpenFailure({ errorCode, errorMsg, canOpen, reservation, mode = '
     || msg.includes('adapter')
     || code === 10001
   ) {
-    return {
-      title: '请开启蓝牙',
-      content: '请开启蓝牙并靠近门锁',
-      retryLabel: '重试',
-      showRemote: true,
-    }
+    return { content: '请开启蓝牙并靠近门锁' }
   }
 
   if (
@@ -131,12 +117,7 @@ function mapBleOpenFailure({ errorCode, errorMsg, canOpen, reservation, mode = '
     || msg.includes('timed out')
     || code === 10012
   ) {
-    return {
-      title: '连接超时',
-      content: '请靠近门锁并重试',
-      retryLabel: '重试',
-      showRemote: true,
-    }
+    return { content: '请靠近门锁并重试' }
   }
 
   if (
@@ -144,31 +125,14 @@ function mapBleOpenFailure({ errorCode, errorMsg, canOpen, reservation, mode = '
     || msg.includes('authorize')
     || msg.includes('授权')
   ) {
-    return {
-      title: '需要蓝牙权限',
-      content: '请在设置中允许蓝牙权限',
-      retryLabel: '重试',
-      showRemote: mode === 'ble',
-    }
+    return { content: '请在设置中允许蓝牙权限' }
   }
 
   if (msg.includes('key') || msg.includes('钥匙') || msg.includes('lockdata')) {
-    return {
-      title: '钥匙无效',
-      content: '请刷新页面后重试',
-      retryLabel: '刷新重试',
-      showRemote: true,
-      refresh: true,
-    }
+    return { content: '请刷新页面后重试', refresh: true }
   }
 
-  const detail = errorMsg || (mode === 'remote' ? '远程开门失败' : '蓝牙开门失败')
-  return {
-    title: mode === 'remote' ? '远程开门失败' : '开门失败',
-    content: detail || '请靠近门锁重试',
-    retryLabel: '重试',
-    showRemote: mode === 'ble',
-  }
+  return { content: errorMsg || '请靠近门锁重试' }
 }
 
 module.exports = {

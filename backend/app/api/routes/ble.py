@@ -65,16 +65,11 @@ def get_ble_key(
             )
         )
         lock = db.get(BleLock, ble_key.lock_id) if ble_key else None
-        ttlock_configured = bool(settings.ttlock_client_id and settings.ttlock_client_secret)
         return ResponseModel(
             data={
                 "reservationId": reservation_id,
                 "lockData": cached,
                 "lockName": lock.lock_name if lock else None,
-                "gatewayUnlock": ttlock_configured
-                and lock
-                and lock.lock_id
-                and not str(lock.lock_id).startswith("mock_"),
                 "blePlugin": True,
             }
         )
@@ -90,13 +85,11 @@ def get_ble_key(
         raise HTTPException(status_code=404, detail="蓝牙钥匙未生成")
 
     lock = db.get(BleLock, ble_key.lock_id)
-    ttlock_configured = bool(settings.ttlock_client_id and settings.ttlock_client_secret)
     return ResponseModel(
         data={
             "reservationId": reservation_id,
             "lockData": ble_key.lock_data,
             "lockName": lock.lock_name if lock else None,
-            "gatewayUnlock": ttlock_configured and lock and lock.lock_id and not str(lock.lock_id).startswith("mock_"),
             "blePlugin": True,
         }
     )
@@ -108,7 +101,9 @@ async def remote_unlock_door(
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """通过 WiFi 网关远程开锁（无需蓝牙插件，个体户可用）。"""
+    """通过 WiFi 网关远程开锁（需门锁绑定网关，默认关闭）。"""
+    if not settings.ttlock_remote_unlock_enabled:
+        raise HTTPException(status_code=501, detail="门店门锁不支持远程开门，请使用蓝牙开门")
     reservation = db.get(Reservation, reservation_id)
     if not reservation or reservation.user_id != user.id:
         raise HTTPException(status_code=404, detail="订单不存在")
@@ -169,6 +164,8 @@ def report_door_log(
         raise HTTPException(status_code=404, detail="钥匙不存在")
 
     reservation = db.get(Reservation, reservation_id)
+    if not reservation or reservation.user_id != user.id:
+        raise HTTPException(status_code=404, detail="订单不存在")
 
     log = DoorLog(
         lock_id=ble_key.lock_id,
@@ -179,6 +176,11 @@ def report_door_log(
         fail_reason=body.error_msg,
     )
     if body.result == "success":
+        if reservation.pay_status != 1:
+            raise HTTPException(status_code=400, detail="订单未支付")
+        if not reservation_unlock_allowed(reservation):
+            detail = reservation_unlock_message(reservation) or "当前无法开门"
+            raise HTTPException(status_code=400, detail=detail)
         ble_key.used_at = datetime.now()
         lock = db.get(BleLock, ble_key.lock_id)
         if lock and lock.battery_level is not None and lock.battery_level > 0:
