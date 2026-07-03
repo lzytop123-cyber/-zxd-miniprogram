@@ -68,8 +68,11 @@ const OFFICE_NIGHT_USAGE_RULE = '默认30天固定座位 · 工作日 18:00-23:3
 function isOfficeNightMonthlyCard(card) {
   if (!card) return false
   if (card.card_type === 'night_monthly') return true
-  const name = card.card_name || ''
-  return card.card_type === 'monthly' && (name.includes('上班族') || name.includes('晚自习'))
+  if (card.usage_rule) return true
+  if (card.card_type !== 'monthly') return false
+  const name = String(card.card_name || '').replace(/\s/g, '')
+  if (name.includes('上班族') || name.includes('晚自习') || name.includes('夜读')) return true
+  return !!(card.daily_start)
 }
 
 function nightWindowForDate(dateStr) {

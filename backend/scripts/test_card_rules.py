@@ -169,6 +169,25 @@ def test_legacy_monthly_office_card_uses_night_bill():
         assert "夜读" in str(e)
 
 
+def test_legacy_monthly_office_card_auto_upgraded():
+    from app.models import PeriodCard
+    from app.services.card_service import ensure_office_night_card_type, validate_period_card_for_reservation
+
+    card = PeriodCard(
+        user_id=1,
+        card_name="「上班族」月卡",
+        card_type=CardType.monthly,
+        status=1,
+        start_date=datetime(2026, 7, 3).date(),
+        end_date=datetime(2026, 8, 1).date(),
+    )
+    start = datetime(2026, 7, 3, 0, 0, 0)
+    end = datetime(2026, 8, 1, 23, 59, 59)
+    validate_period_card_for_reservation(None, card, BillType.night, start, end, 1)
+    assert card.card_type == CardType.night_monthly
+    assert card.daily_start is not None
+
+
 def test_reservation_open_window_night_weekday():
     from app.models import Reservation
     from app.services.booking import reservation_open_window, reservation_unlock_allowed
@@ -237,6 +256,7 @@ if __name__ == "__main__":
     test_office_night_monthly_period()
     test_office_night_rejects_over_30_days()
     test_legacy_monthly_office_card_uses_night_bill()
+    test_legacy_monthly_office_card_auto_upgraded()
     test_reservation_open_window_night_weekday()
     test_reservation_open_window_night_weekend()
     test_reservation_open_window_store_hours()

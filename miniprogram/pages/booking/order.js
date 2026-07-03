@@ -118,7 +118,7 @@ Page({
           return bookingH <= Number(c.remaining_hours)
         }
         if (c.card_type === 'session') return billType === 'session'
-        if (isOfficeNightMonthlyCard(c)) return billType === 'night'
+        if (isOfficeNightMonthlyCard(c) || c.usage_rule) return billType === 'night'
         if (c.card_type === 'night_monthly') return billType === 'night'
         if (c.card_type === 'daily') {
           if (billType !== 'daily') return false

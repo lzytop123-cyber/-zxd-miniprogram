@@ -20,6 +20,7 @@ OFFICE_NIGHT_WEEKEND_START = datetime.strptime("07:30", "%H:%M").time()
 OFFICE_NIGHT_WEEKEND_END = datetime.strptime("23:30", "%H:%M").time()
 OFFICE_NIGHT_USAGE_RULE = "默认30天固定座位 · 工作日 18:00-23:30 · 周末 7:30-23:30 可使用"
 OFFICE_NIGHT_MAX_DAYS = 30
+OFFICE_NIGHT_BILL_TYPES = frozenset({BillType.night, BillType.night_monthly})
 
 
 def validate_office_night_reservation(start_time: datetime, end_time: datetime) -> None:
@@ -31,12 +32,34 @@ def validate_office_night_reservation(start_time: datetime, end_time: datetime) 
         raise ValueError(f"夜读月卡单次预约最长 {OFFICE_NIGHT_MAX_DAYS} 天")
 
 
+def _normalize_card_name(name: str | None) -> str:
+    return (name or "").replace(" ", "").replace("　", "")
+
+
 def is_office_night_monthly_card(card: PeriodCard) -> bool:
     """上班族/晚自习月卡（含历史误发为 monthly 的同名额卡）。"""
     if card.card_type == CardType.night_monthly:
         return True
-    name = card.card_name or ""
-    return card.card_type == CardType.monthly and ("上班族" in name or "晚自习" in name)
+    if card.card_type != CardType.monthly:
+        return False
+    name = _normalize_card_name(card.card_name)
+    if any(k in name for k in ("上班族", "晚自习", "夜读")):
+        return True
+    # 误发为 monthly 的夜读卡兑换时会写入 daily_start
+    return card.daily_start is not None
+
+
+def ensure_office_night_card_type(db: Session | None, card: PeriodCard) -> None:
+    """将误发为 monthly 的上班族/夜读月卡纠正为 night_monthly。"""
+    if card.card_type != CardType.monthly or not is_office_night_monthly_card(card):
+        return
+    card.card_type = CardType.night_monthly
+    if not card.daily_start:
+        card.daily_start = OFFICE_NIGHT_WEEKDAY_START
+    if not card.daily_end:
+        card.daily_end = OFFICE_NIGHT_WEEKDAY_END
+    if db is not None:
+        db.flush()
 
 
 def night_window_for_date(day: date) -> tuple[time, time, str]:
@@ -239,8 +262,9 @@ def validate_period_card_for_reservation(
         _validate_reservation_within_card_period(card, start_time, end_time)
         return
 
+    ensure_office_night_card_type(db, card)
     if is_office_night_monthly_card(card):
-        if reservation_bill_type != BillType.night:
+        if reservation_bill_type not in OFFICE_NIGHT_BILL_TYPES:
             raise ValueError("该月卡请使用「夜读」预约方式选座")
         validate_office_night_reservation(start_time, end_time)
         _validate_reservation_within_card_period(card, start_time, end_time)
@@ -260,6 +284,8 @@ def validate_period_card_for_reservation(
     }
     expected = type_map.get(card.card_type)
     if expected and reservation_bill_type != expected:
+        if reservation_bill_type in OFFICE_NIGHT_BILL_TYPES:
+            raise ValueError("该月卡请使用「夜读」预约方式选座")
         raise ValueError("期限卡类型与预约方式不匹配")
     if card.card_type in (CardType.monthly, CardType.weekly, CardType.quarterly):
         _validate_reservation_within_card_period(card, start_time, end_time)
@@ -291,12 +317,11 @@ def consume_period_card(
     elif card.card_type == CardType.weekly:
         # 周卡：完成一次预约即核销
         card.status = 0
+    elif is_office_night_monthly_card(card) or card.card_type == CardType.night_monthly:
+        card.status = 0
     elif card.card_type == CardType.monthly:
-        # 月卡：开卡后30天内完成一次预约即核销
         card.status = 0
     elif card.card_type == CardType.quarterly:
-        card.status = 0
-    elif card.card_type == CardType.night_monthly:
         card.status = 0
     if card.card_type == CardType.session and card.remaining_sessions <= 0:
         card.status = 0
