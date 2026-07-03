@@ -1,7 +1,6 @@
-const { nightWindowForDate } = require('./cardDisplay')
+const { nightWindowForDate, STORE_OPEN } = require('./storeHours')
 
 const OPEN_EARLY_MS = 15 * 60000
-const STORE_OPEN = { start: '07:30', end: '23:30', label: '营业' }
 
 function parseTime(iso) {
   return new Date(String(iso).replace(' ', 'T'))

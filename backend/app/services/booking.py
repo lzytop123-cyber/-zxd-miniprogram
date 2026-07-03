@@ -7,8 +7,13 @@ from sqlalchemy.orm import Session
 
 from app.models import BillType, PeriodCard, PricingRule, Reservation, Seat, StudyStat, User, WalletLog
 from app.services.points import add_points
-from app.services.seat_setup import seat_code_to_slot
-from app.services.business import find_seat_conflict, update_study_title
+from app.services.store_hours import (
+    STORE_HOURS_LABEL,
+    STORE_OPEN_END,
+    STORE_OPEN_START,
+    night_window_for_date,
+    validate_store_time_range,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -23,6 +28,7 @@ def resolve_booking_window(
     if bill_type == BillType.hourly:
         if not end_time:
             raise ValueError("按小时预约需要结束时间")
+        validate_store_time_range(start_time, end_time)
         return start_time, end_time
 
     if bill_type == BillType.daily:
@@ -345,8 +351,6 @@ def fulfill_recharge_order(db: Session, order) -> bool:
 
 
 EARLY_CHECKIN_MINUTES = 15
-STORE_OPEN_START = time(7, 30)
-STORE_OPEN_END = time(23, 30)
 
 
 def reservation_open_window(
@@ -354,8 +358,6 @@ def reservation_open_window(
     now: datetime | None = None,
 ) -> tuple[datetime, datetime] | None:
     """当日允许开门/入座的时间窗（营业时间与预约时段的交集）。"""
-    from app.services.card_service import night_window_for_date
-
     now = now or datetime.now()
     today = now.date()
     res_start = reservation.start_time
@@ -392,8 +394,6 @@ def reservation_open_window(
 
 def reservation_unlock_message(reservation: Reservation, now: datetime | None = None) -> str:
     """无法开门时的提示文案。"""
-    from app.services.card_service import night_window_for_date
-
     now = now or datetime.now()
     if reservation.pay_status != 1:
         return "订单未支付"

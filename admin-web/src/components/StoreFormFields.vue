@@ -55,10 +55,10 @@
     </el-form-item>
 
     <el-form-item label="开门时间">
-      <el-input v-model="form.open_time" placeholder="08:00" />
+      <el-input v-model="form.open_time" placeholder="07:30" />
     </el-form-item>
     <el-form-item label="关门时间">
-      <el-input v-model="form.close_time" placeholder="23:00" />
+      <el-input v-model="form.close_time" placeholder="23:30" />
     </el-form-item>
     <el-form-item label="WiFi 名称">
       <el-input v-model="form.wifi_name" />

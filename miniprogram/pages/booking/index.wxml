@@ -43,7 +43,7 @@
         <view class="chip" bindtap="setHours" data-h="4">4小时</view>
         <view class="chip" bindtap="setHours" data-h="8">8小时</view>
       </view>
-      <view class="hint">最少2小时，最长24小时</view>
+      <view class="hint">{{storeHoursHint}} · 最少2小时，最长24小时</view>
     </block>
 
     <!-- 天卡 -->

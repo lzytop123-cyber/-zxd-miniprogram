@@ -52,8 +52,8 @@
         <el-form-item label="闭店">
           <el-switch v-model="form.is_closed" :active-value="1" :inactive-value="0" />
         </el-form-item>
-        <el-form-item v-if="!form.is_closed" label="开门"><el-input v-model="form.open_time" placeholder="09:00" /></el-form-item>
-        <el-form-item v-if="!form.is_closed" label="关门"><el-input v-model="form.close_time" placeholder="22:00" /></el-form-item>
+        <el-form-item v-if="!form.is_closed" label="开门"><el-input v-model="form.open_time" placeholder="07:30" /></el-form-item>
+        <el-form-item v-if="!form.is_closed" label="关门"><el-input v-model="form.close_time" placeholder="23:30" /></el-form-item>
         <el-form-item label="备注"><el-input v-model="form.remark" /></el-form-item>
       </el-form>
       <template #footer>

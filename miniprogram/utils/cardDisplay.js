@@ -63,8 +63,13 @@ const TYPE_LABELS = {
   night_monthly: '夜读月卡',
 }
 
-const OFFICE_NIGHT_USAGE_RULE = '可提前预约固定座位 · 晚间 18:00-23:30 固定入座 · 白天座位可与他人分时共用'
-const OFFICE_NIGHT_BOOKING_HINT = '选择开始使用日期即可，最长连续 30 天；每日具体时段在到店开门时校验'
+const {
+  OFFICE_NIGHT_USAGE_RULE,
+  OFFICE_NIGHT_BOOKING_HINT,
+  nightWindowForDate,
+  compareClock,
+  clampClock: clampNightClock,
+} = require('./storeHours')
 
 function isOfficeNightMonthlyCard(card) {
   if (!card) return false
@@ -74,27 +79,6 @@ function isOfficeNightMonthlyCard(card) {
   const name = String(card.card_name || '').replace(/\s/g, '')
   if (name.includes('上班族') || name.includes('晚自习') || name.includes('夜读')) return true
   return !!(card.daily_start)
-}
-
-function nightWindowForDate(dateStr) {
-  const d = new Date(`${dateStr}T12:00:00`)
-  const day = d.getDay()
-  const isWeekend = day === 0 || day === 6
-  return isWeekend
-    ? { start: '07:30', end: '23:30', label: '周末' }
-    : { start: '18:00', end: '23:30', label: '工作日' }
-}
-
-function compareClock(a, b) {
-  const [ah, am] = String(a || '00:00').split(':').map(Number)
-  const [bh, bm] = String(b || '00:00').split(':').map(Number)
-  return ah * 60 + am - (bh * 60 + bm)
-}
-
-function clampNightClock(clock, min, max) {
-  if (compareClock(clock, min) < 0) return min
-  if (compareClock(clock, max) > 0) return max
-  return clock
 }
 
 function normalizeNightBookingTimes(dateStr, startClock, endClock) {

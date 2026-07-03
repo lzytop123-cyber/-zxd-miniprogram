@@ -4,7 +4,21 @@ const routes = require('../../utils/routes')
 const { FLOOR_PLAN } = require('../../utils/assets')
 const { getLayout } = require('../../utils/seat-layout')
 const { debounce } = require('../../utils/debounce')
-const { dailyPassDays, isOfficeNightMonthlyCard, isCardUsable, OFFICE_NIGHT_USAGE_RULE, OFFICE_NIGHT_BOOKING_HINT } = require('../../utils/cardDisplay')
+const {
+  dailyPassDays,
+  isOfficeNightMonthlyCard,
+  isCardUsable,
+  OFFICE_NIGHT_USAGE_RULE,
+  OFFICE_NIGHT_BOOKING_HINT,
+} = require('../../utils/cardDisplay')
+const {
+  STORE_HOURS_LABEL,
+  defaultHourlyStartClock,
+  validateStoreTimeRange,
+  clampHourlyClocks,
+  STORE_OPEN,
+  compareClock,
+} = require('../../utils/storeHours')
 const {
   formatLocalDateTime,
   todayStr,
@@ -15,7 +29,7 @@ const {
 } = require('../../utils/datetime')
 
 const BILL_DEFAULTS = {
-  hourly: { startClock: '09:00', endClock: '11:00', hours: 2 },
+  hourly: { startClock: '07:30', endClock: '09:30', hours: 2 },
   daily: { endOffset: 0 },
   weekly: { endOffset: 6 },
   quarterly: { endOffset: 89 },
@@ -41,8 +55,8 @@ Page({
     today: todayStr(),
     startDate: '',
     endDate: '',
-    startClock: '09:00',
-    endClock: '11:00',
+    startClock: '07:30',
+    endClock: '09:30',
     hours: 2,
     seatId: null,
     seatCode: '',
@@ -56,6 +70,7 @@ Page({
     startTime: '',
     endTime: '',
     timeSummary: '',
+    storeHoursHint: `营业时间 ${STORE_HOURS_LABEL}`,
     nightHint: OFFICE_NIGHT_BOOKING_HINT,
     activeNightCard: null,
     nightDateMin: '',
@@ -92,8 +107,11 @@ Page({
       storeId: options.storeId,
       startDate: today,
       endDate: today,
-      startClock: nowTimeStr(),
-      endClock: this._addHoursToClock(nowTimeStr(), 2),
+      startClock: defaultHourlyStartClock(today, today, nowTimeStr()),
+      endClock: this._addHoursToClock(
+        defaultHourlyStartClock(today, today, nowTimeStr()),
+        2,
+      ),
       planSeatCount: this._layout.planSeatCount,
       showSeatMap: true,
     }, () => {
@@ -234,7 +252,7 @@ Page({
     const patch = { billType, seatId: null, seatCode: '', selectedId: null, selectedLabel: '', selectedZone: '', preview: null }
 
     if (billType === 'hourly') {
-      const startClock = startDate === todayStr() ? nowTimeStr() : '09:00'
+      const startClock = defaultHourlyStartClock(startDate, todayStr(), nowTimeStr())
       Object.assign(patch, {
         startClock,
         endClock: this._addHoursToClock(startClock, defaults.hours),
@@ -283,8 +301,9 @@ Page({
       Object.assign(patch, this._applyNightPeriod(startDate, this.data.activeNightCard))
     }
     if (this.data.billType === 'hourly' && startDate === todayStr()) {
-      patch.startClock = nowTimeStr()
-      patch.endClock = this._addHoursToClock(patch.startClock, this.data.hours)
+      const startClock = defaultHourlyStartClock(startDate, todayStr(), nowTimeStr())
+      patch.startClock = startClock
+      patch.endClock = this._addHoursToClock(startClock, this.data.hours)
     }
     this.setData(patch, () => this.refreshPreview())
   },
@@ -307,23 +326,47 @@ Page({
   },
 
   onStartClockChange(e) {
-    const startClock = e.detail.value
+    let startClock = e.detail.value
     const patch = { startClock }
     if (this.data.billType === 'hourly') {
-      patch.endClock = this._addHoursToClock(startClock, this.data.hours)
+      const clamped = clampHourlyClocks(this.data.startDate, startClock, this.data.endClock)
+      patch.startClock = clamped.startClock
+      patch.endClock = this._addHoursToClock(clamped.startClock, this.data.hours)
+      const err = validateStoreTimeRange(this.data.startDate, patch.startClock, patch.endClock)
+      if (err) {
+        wx.showToast({ title: err, icon: 'none' })
+        return
+      }
     }
     this.setData(patch, () => this.refreshPreview())
   },
 
   onEndClockChange(e) {
-    this.setData({ endClock: e.detail.value }, () => this.refreshPreview())
+    let endClock = e.detail.value
+    if (this.data.billType === 'hourly') {
+      const clamped = clampHourlyClocks(this.data.startDate, this.data.startClock, endClock)
+      endClock = clamped.endClock
+      const err = validateStoreTimeRange(this.data.startDate, this.data.startClock, endClock)
+      if (err) {
+        wx.showToast({ title: err, icon: 'none' })
+        return
+      }
+    }
+    this.setData({ endClock }, () => this.refreshPreview())
   },
 
   setHours(e) {
     const hours = Number(e.currentTarget.dataset.h)
+    let endClock = this._addHoursToClock(this.data.startClock, hours)
+    if (this.data.billType === 'hourly') {
+      if (compareClock(endClock, STORE_OPEN.end) > 0) {
+        wx.showToast({ title: `结束时间不能晚于 ${STORE_OPEN.end}`, icon: 'none' })
+        endClock = STORE_OPEN.end
+      }
+    }
     this.setData({
       hours,
-      endClock: this._addHoursToClock(this.data.startClock, hours),
+      endClock,
     }, () => this.refreshPreview())
   },
 
@@ -354,6 +397,8 @@ Page({
     if (billType === 'hourly') {
       start = this._clockToDate(startDate, startClock)
       end = this._clockToDate(startDate, endClock)
+      const err = validateStoreTimeRange(startDate, startClock, endClock)
+      if (err) throw new Error(err)
       if (end <= start) {
         end.setDate(end.getDate() + 1)
       }

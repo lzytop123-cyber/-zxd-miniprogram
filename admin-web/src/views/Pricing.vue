@@ -69,8 +69,8 @@
           <el-input-number v-model="form.valid_days" :min="1" style="width:100%" />
           <div v-if="form.bill_type === 'session'" class="field-hint">次卡在线购买时发放的次数</div>
         </el-form-item>
-        <el-form-item label="夜读开始"><el-input v-model="form.night_start" placeholder="22:00" /></el-form-item>
-        <el-form-item label="夜读结束"><el-input v-model="form.night_end" placeholder="08:00" /></el-form-item>
+        <el-form-item label="夜读开始"><el-input v-model="form.night_start" placeholder="18:00" /></el-form-item>
+        <el-form-item label="夜读结束"><el-input v-model="form.night_end" placeholder="23:30" /></el-form-item>
         <el-form-item label="说明"><el-input v-model="form.remark" /></el-form-item>
         <el-form-item label="排序"><el-input-number v-model="form.sort_order" :min="0" style="width:100%" /></el-form-item>
         <el-form-item label="启用">

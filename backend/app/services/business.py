@@ -259,7 +259,7 @@ def _night_reservation_blocks_interval(
     query_start: datetime,
     query_end: datetime,
 ) -> bool:
-    from app.services.card_service import night_seat_block_window_for_date
+    from app.services.store_hours import night_seat_block_window_for_date
 
     overlap_start = max(reservation.start_time.date(), query_start.date())
     overlap_end = min(reservation.end_time.date(), query_end.date())
