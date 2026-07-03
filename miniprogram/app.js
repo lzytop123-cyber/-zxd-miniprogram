@@ -1,5 +1,4 @@
 const { getApiBase } = require('./config')
-const { FLOOR_PLAN } = require('./utils/assets')
 
 App({
   globalData: {
@@ -13,7 +12,6 @@ App({
 
   onLaunch() {
     this.globalData.apiBase = getApiBase()
-    wx.getImageInfo({ src: FLOOR_PLAN })
     const auth = require('./utils/auth')
     // 不再启动时静默 wx.login；仅恢复已有 token 的会话
     if (auth.isLoggedIn()) {

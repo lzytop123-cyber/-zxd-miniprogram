@@ -1,7 +1,6 @@
 const { request } = require('../../utils/request')
 const auth = require('../../utils/auth')
 const routes = require('../../utils/routes')
-const { FLOOR_PLAN } = require('../../utils/assets')
 const { getLayout } = require('../../utils/seat-layout')
 const { debounce } = require('./utils/debounce')
 const {
@@ -42,20 +41,42 @@ const BILL_DEFAULTS = {
   night: { endOffset: 29 },
 }
 
+const PERIOD_TYPES = ['weekly', 'monthly', 'quarterly']
+
+const BILL_TYPE_LABELS = {
+  hourly: '按小时',
+  daily: '天卡',
+  session: '次卡',
+  weekly: '周卡（7天）',
+  monthly: '月卡（30天）',
+  quarterly: '季卡（90天）',
+  night: '夜读月卡',
+}
+
+const PRIMARY_GROUPS = [
+  { key: 'hourly', label: '按小时', hint: '灵活时段' },
+  { key: 'daily', label: '天卡', hint: '按天' },
+  { key: 'session', label: '次卡', hint: '扣次数' },
+  { key: 'period', label: '周期卡', hint: '周/月/季' },
+]
+
+const PERIOD_OPTIONS = [
+  { type: 'weekly', label: '周卡', days: '7天' },
+  { type: 'monthly', label: '月卡', days: '30天' },
+  { type: 'quarterly', label: '季卡', days: '90天' },
+]
+
 Page({
   data: {
     storeId: null,
     storeName: '',
     billType: 'hourly',
-    billTypes: [
-      { type: 'hourly', label: '按小时' },
-      { type: 'daily', label: '天卡' },
-      { type: 'weekly', label: '周卡' },
-      { type: 'session', label: '次卡' },
-      { type: 'monthly', label: '月卡' },
-      { type: 'quarterly', label: '季卡' },
-      { type: 'night', label: '夜读' },
-    ],
+    primaryGroups: PRIMARY_GROUPS,
+    periodOptions: PERIOD_OPTIONS,
+    activePrimaryKey: 'hourly',
+    selectedTypeLabel: '按小时',
+    showPeriodSubs: false,
+    showNightType: false,
     today: todayStr(),
     startDate: '',
     endDate: '',
@@ -105,8 +126,6 @@ Page({
     const today = todayStr()
     this._layout = getLayout()
     this._refreshPreviewDebounced = debounce(() => this._doRefreshPreview(), 450)
-    wx.getImageInfo({ src: FLOOR_PLAN })
-
     this.setData({
       storeId: options.storeId,
       startDate: today,
@@ -118,6 +137,7 @@ Page({
       ),
       planSeatCount: this._layout.planSeatCount,
       showSeatMap: true,
+      ...this._typeUiPatch('hourly', false),
     }, () => {
       this.refreshPreview({ immediate: true })
     })
@@ -182,6 +202,7 @@ Page({
         } else if (this.data.billType === 'night') {
           Object.assign(patch, this._applyNightPeriod(this.data.startDate, officeNight || this.data.activeNightCard))
         }
+        Object.assign(patch, this._typeUiPatch(patch.billType || this.data.billType, !!officeNight))
         this.setData(patch, () => {
           if (patch.billType === 'night') this.refreshPreview({ immediate: true })
         })
@@ -249,6 +270,36 @@ Page({
     }, () => this.refreshPreview())
   },
 
+  _typeUiPatch(billType, showNight) {
+    const period = PERIOD_TYPES.includes(billType)
+    let activePrimaryKey = billType
+    if (period) activePrimaryKey = 'period'
+    else if (billType === 'night') activePrimaryKey = 'night'
+
+    let selectedTypeLabel = BILL_TYPE_LABELS[billType] || billType
+    if (period) selectedTypeLabel = `周期卡 · ${BILL_TYPE_LABELS[billType]}`
+
+    return {
+      activePrimaryKey,
+      showPeriodSubs: period,
+      showNightType: showNight !== undefined ? showNight : !!this.data.activeNightCard,
+      selectedTypeLabel,
+    }
+  },
+
+  switchPrimary(e) {
+    const key = e.currentTarget.dataset.key
+    if (key === 'period') {
+      const type = PERIOD_TYPES.includes(this.data.billType) ? this.data.billType : 'weekly'
+      this.switchType({ currentTarget: { dataset: { type } } })
+      return
+    }
+    const map = { hourly: 'hourly', daily: 'daily', session: 'session' }
+    if (map[key]) {
+      this.switchType({ currentTarget: { dataset: { type: map[key] } } })
+    }
+  },
+
   switchType(e) {
     const billType = e.currentTarget.dataset.type
     const { startDate } = this.data
@@ -283,6 +334,7 @@ Page({
       Object.assign(patch, this._applyNightPeriod(startDate, this.data.activeNightCard))
     }
 
+    Object.assign(patch, this._typeUiPatch(billType))
     this.setData(patch, () => this.refreshPreview())
   },
 

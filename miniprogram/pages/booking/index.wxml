@@ -10,17 +10,49 @@
   <!-- 套餐类型 -->
   <view class="bk-card">
     <view class="bk-sec"><view class="bk-bar"></view><text>选择套餐</text></view>
-    <scroll-view class="type-scroll" scroll-x enable-flex>
-      <view class="type-track">
-        <view
-          wx:for="{{billTypes}}"
-          wx:key="type"
-          class="type-pill {{billType===item.type?'active':''}}"
-          bindtap="switchType"
-          data-type="{{item.type}}"
-        >{{item.label}}</view>
+
+    <view class="type-current">
+      <view class="type-current-icon">✓</view>
+      <view class="type-current-body">
+        <text class="type-current-label">当前已选</text>
+        <text class="type-current-value">{{selectedTypeLabel}}</text>
       </view>
-    </scroll-view>
+    </view>
+
+    <view class="type-primary-grid">
+      <view
+        wx:for="{{primaryGroups}}"
+        wx:key="key"
+        class="type-primary {{activePrimaryKey===item.key?'active':''}}"
+        bindtap="switchPrimary"
+        data-key="{{item.key}}"
+      >
+        <text class="type-primary-label">{{item.label}}</text>
+        <text class="type-primary-hint">{{item.hint}}</text>
+      </view>
+      <view
+        wx:if="{{showNightType}}"
+        class="type-primary type-primary--night {{activePrimaryKey==='night'?'active':''}}"
+        bindtap="switchType"
+        data-type="night"
+      >
+        <text class="type-primary-label">夜读</text>
+        <text class="type-primary-hint">月卡专用</text>
+      </view>
+    </view>
+
+    <view class="type-sub-row" wx:if="{{showPeriodSubs}}">
+      <view
+        wx:for="{{periodOptions}}"
+        wx:key="type"
+        class="type-sub {{billType===item.type?'active':''}}"
+        bindtap="switchType"
+        data-type="{{item.type}}"
+      >
+        <text class="type-sub-label">{{item.label}}</text>
+        <text class="type-sub-days">{{item.days}}</text>
+      </view>
+    </view>
   </view>
 
   <!-- 时间设置 -->
