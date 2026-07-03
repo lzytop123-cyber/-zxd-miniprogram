@@ -132,7 +132,7 @@ Page({
     const avatarTempPath = isLocalAvatarPath(avatarDisplay) ? avatarDisplay : undefined
     const hasAvatar = !!(avatarTempPath || user?.avatar_url)
     if (!hasAvatar) {
-      wx.showToast({ title: '请点击头像使用微信头像', icon: 'none' })
+      wx.showToast({ title: '请设置头像', icon: 'none' })
       return
     }
     if (!nickname) {
@@ -151,7 +151,7 @@ Page({
       auth.syncAppUser(profile)
       if (profile?.needs_profile_setup) {
         wx.hideLoading()
-        wx.showToast({ title: '请先完成头像设置', icon: 'none' })
+        wx.showToast({ title: '请设置头像', icon: 'none' })
         return
       }
       wx.hideLoading()

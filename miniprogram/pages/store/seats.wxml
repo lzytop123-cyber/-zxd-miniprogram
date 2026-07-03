@@ -4,7 +4,7 @@
       <view class="seat-head-bar"></view>
       <text class="seat-head-title">选择座位</text>
     </view>
-    <view class="seat-map-tip">点击平面图编号选座 · 双指缩放 · 下拉刷新座位状态</view>
+    <view class="seat-map-tip">点击编号选座 · 双指缩放</view>
 
     <view class="seat-legend">
       <view class="seat-legend-item"><view class="seat-dot available"></view><text>可选</text></view>
@@ -31,7 +31,7 @@
       已选 <text class="seat-selected-code">{{selectedLabel}}号</text>
       <text class="seat-selected-meta" wx:if="{{selectedZone}}"> · {{selectedZone}}</text>
     </view>
-    <view class="seat-selected seat-selected--ph" wx:else>请在分布图中点选座位</view>
+    <view class="seat-selected seat-selected--ph" wx:else>请选座</view>
     <view class="btn-primary {{selectedCode ? '' : 'disabled'}}" bindtap="confirm">下一步</view>
   </view>
 </view>

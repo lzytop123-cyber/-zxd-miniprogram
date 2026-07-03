@@ -17,7 +17,7 @@
   </view>
 
   <view class="orders-tip card" wx:if="{{orders.length}}">
-    预约时段内自动入座，到店开门即可，无需手动签到
+    到店开门即可
   </view>
 
   <view class="empty card" wx:if="{{!orders.length}}">

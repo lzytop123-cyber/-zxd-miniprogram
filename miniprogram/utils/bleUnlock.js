@@ -73,19 +73,19 @@ function getOpenWindowHint(reservation, now = new Date()) {
     const pad = (n) => (n < 10 ? `0${n}` : `${n}`)
     return `${pad(resStart.getMonth() + 1)}月${pad(resStart.getDate())}日 起可开门`
   }
-  if (todayStr > resEndDate) return '订单已结束，无法开门'
+  if (todayStr > resEndDate) return '订单已结束'
 
   const window = reservationOpenWindow(reservation, now)
   if (window && now >= window.openFrom && now <= window.openUntil) {
-    return '已可开门，请站在门口操作'
+    return '可开门'
   }
 
   const billType = reservation.bill_type || 'hourly'
   if (billType === 'night') {
     const win = nightWindowForDate(todayStr)
-    return `${win.label}夜读时段 ${win.start}-${win.end} 可开门（可提前 15 分钟）`
+    return `${win.start}-${win.end} 可开门`
   }
-  return `营业时间 ${STORE_OPEN.start}-${STORE_OPEN.end} 可开门（可提前 15 分钟）`
+  return `${STORE_OPEN.start}-${STORE_OPEN.end} 可开门`
 }
 
 function mapBleOpenFailure({ errorCode, errorMsg, canOpen, reservation, mode = 'ble' }) {
@@ -98,14 +98,14 @@ function mapBleOpenFailure({ errorCode, errorMsg, canOpen, reservation, mode = '
     if (now > end) {
       return {
         title: '订单已结束',
-        content: '当前订单已过期，无法开门。如需继续学习请重新预约。',
+        content: '订单已过期，请重新预约',
         retryLabel: '',
         showRemote: false,
       }
     }
     return {
       title: '不在开门时段',
-      content: `${getOpenWindowHint(reservation, now)}。请在有效时段内再试。`,
+      content: getOpenWindowHint(reservation, now),
       retryLabel: '',
       showRemote: false,
     }
@@ -119,7 +119,7 @@ function mapBleOpenFailure({ errorCode, errorMsg, canOpen, reservation, mode = '
   ) {
     return {
       title: '请开启蓝牙',
-      content: '请在手机设置中打开蓝牙，并靠近门锁后重试。也可尝试远程开门。',
+      content: '请开启蓝牙并靠近门锁',
       retryLabel: '重试',
       showRemote: true,
     }
@@ -133,7 +133,7 @@ function mapBleOpenFailure({ errorCode, errorMsg, canOpen, reservation, mode = '
   ) {
     return {
       title: '连接超时',
-      content: '未能在限时内连上门锁。请确认已靠近门锁、蓝牙已开启，然后重试。',
+      content: '请靠近门锁并重试',
       retryLabel: '重试',
       showRemote: true,
     }
@@ -146,7 +146,7 @@ function mapBleOpenFailure({ errorCode, errorMsg, canOpen, reservation, mode = '
   ) {
     return {
       title: '需要蓝牙权限',
-      content: '请在小程序设置中允许使用蓝牙，然后返回重试。',
+      content: '请在设置中允许蓝牙权限',
       retryLabel: '重试',
       showRemote: mode === 'ble',
     }
@@ -155,7 +155,7 @@ function mapBleOpenFailure({ errorCode, errorMsg, canOpen, reservation, mode = '
   if (msg.includes('key') || msg.includes('钥匙') || msg.includes('lockdata')) {
     return {
       title: '钥匙无效',
-      content: '开门钥匙未就绪或已过期，请下拉刷新页面后重试。',
+      content: '请刷新页面后重试',
       retryLabel: '刷新重试',
       showRemote: true,
       refresh: true,
@@ -165,7 +165,7 @@ function mapBleOpenFailure({ errorCode, errorMsg, canOpen, reservation, mode = '
   const detail = errorMsg || (mode === 'remote' ? '远程开门失败' : '蓝牙开门失败')
   return {
     title: mode === 'remote' ? '远程开门失败' : '开门失败',
-    content: `${detail}。请靠近门锁重试，或联系店长协助。`,
+    content: detail || '请靠近门锁重试',
     retryLabel: '重试',
     showRemote: mode === 'ble',
   }

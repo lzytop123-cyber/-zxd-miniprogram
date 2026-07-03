@@ -13,22 +13,22 @@ function hourlyAllowsPartialUse(card) {
 
 function hourlyRuleText(card) {
   if (hourlyAllowsMultiUse(card)) {
-    return '按实际时长扣减，可多次预约直至小时用完'
+    return '按实际时长扣减，可多次预约'
   }
   const h = card.remaining_hours != null ? card.remaining_hours : ''
-  return `可预约不超过 ${h} 小时，一次性核销后失效`
+  return `可约 ≤${h} 小时，一次性核销`
 }
 
 function hourlyDetailLines(card) {
   if (hourlyAllowsMultiUse(card)) {
     return [
-      '按实际预约时长扣减，预约时自动抵扣',
-      '可在有效期内多次使用直至小时用完',
+      '按实际预约时长扣减',
+      '有效期内可多次使用',
     ]
   }
   return [
-    '预约时长可少于卡面小时数（如 4 小时卡约 3 小时）',
-    '完成预约后该卡一次性核销，不可再次使用',
+    '可少于卡面时长（如 4h 卡约 3h）',
+    '完成预约后一次性核销',
   ]
 }
 
@@ -125,46 +125,42 @@ function validateNightBookingTimes(dateStr, startClock, endClock) {
 
 const RULE_LINES = {
   daily: '全天不限时，用一次即核销',
-  weekly: '7天内完成一次预约即核销',
-  monthly: '开卡后30天内可预约一次，使用后即失效',
-  quarterly: '90天内完成一次预约即核销',
-  session: '按自然日扣次，连选N天扣N次',
+  weekly: '7天内预约一次即核销',
+  monthly: '30天内预约一次即核销',
+  quarterly: '90天内预约一次即核销',
+  session: '按自然日扣次',
   hourly: '可约不超过卡面时长，一次性核销',
-  night_monthly: '30天内固定座位，完成一次预约即核销',
+  night_monthly: '30天固定座位，预约一次即核销',
 }
 
 const CARD_DETAIL_LINES = {
   daily: [
     '兑换或购买后即时开卡',
-    '全天不限时，完成一次预约即核销',
-    '需在有效期内使用',
+    '全天不限时，预约一次即核销',
   ],
   weekly: [
-    '兑换即开卡，连续7个自然日有效',
-    '7天内完成一次预约即核销',
-    '不可暂停',
+    '连续7个自然日有效',
+    '7天内预约一次即核销',
   ],
   monthly: [
-    '兑换即开卡，连续30个自然日有效',
-    '30天内可预约一次，使用后即失效',
-    '不可暂停',
+    '连续30个自然日有效',
+    '30天内预约一次即核销',
   ],
   quarterly: [
-    '兑换即开卡，连续90个自然日有效',
-    '90天内完成一次预约即核销',
-    '不可暂停',
+    '连续90个自然日有效',
+    '90天内预约一次即核销',
   ],
   session: [
-    '按自然日扣次，连选N天扣N次',
-    '可在有效期内多次预约直至次数用完',
+    '按自然日扣次',
+    '有效期内可多次预约',
   ],
   hourly: [
-    '预约时长可少于卡面小时数',
-    '完成预约后该卡一次性核销',
+    '可少于卡面时长',
+    '完成预约后一次性核销',
   ],
   night_monthly: [
     OFFICE_NIGHT_USAGE_RULE,
-    '选座时请选择「夜读」套餐，默认预约30天',
+    '预约时选「夜读」，默认30天',
   ],
 }
 
@@ -229,7 +225,9 @@ function buildCardDetail(card) {
   if (card.validityText) lines.unshift(card.validityText)
   if (card.remainText) lines.unshift(card.remainText)
   if (card.daily_start) lines.push(`可用时段：${card.daily_start} 起`)
-  if (isOfficeNightMonthlyCard(card)) lines.push(OFFICE_NIGHT_USAGE_RULE)
+  if (isOfficeNightMonthlyCard(card) && card.card_type !== 'night_monthly') {
+    lines.push(OFFICE_NIGHT_USAGE_RULE)
+  }
   return {
     mode: 'owned',
     title: card.card_name || card.typeLabel,
@@ -256,7 +254,7 @@ function enrichPackage(item) {
   }
 
   const priceText = Number(item.price).toFixed(item.price % 1 === 0 ? 0 : 2)
-  const ruleText = item.remark || hint.rule || '购买后发放至「我的期限卡」'
+  const ruleText = item.remark || hint.rule || '购买后进「我的期限卡」'
 
   return {
     ...item,
@@ -274,7 +272,7 @@ function buildPackageDetail(pkg) {
   }
   if (pkg.remark) lines.push(pkg.remark)
   lines.push(...(CARD_DETAIL_LINES[pkg.bill_type] || []))
-  lines.push('购买后发放至「我的期限卡」，预约时选择期限卡支付')
+  if (!pkg.remark) lines.push('购买后进「我的期限卡」')
 
   return {
     mode: 'buy',

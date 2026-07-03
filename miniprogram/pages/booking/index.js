@@ -47,17 +47,17 @@ const BILL_TYPE_LABELS = {
   hourly: '按小时',
   daily: '天卡',
   session: '次卡',
-  weekly: '周卡（7天）',
-  monthly: '月卡（30天）',
-  quarterly: '季卡（90天）',
-  night: '夜读月卡',
+  weekly: '周卡',
+  monthly: '月卡',
+  quarterly: '季卡',
+  night: '夜读',
 }
 
 const PRIMARY_GROUPS = [
-  { key: 'hourly', label: '按小时', hint: '灵活时段' },
-  { key: 'daily', label: '天卡', hint: '按天' },
-  { key: 'session', label: '次卡', hint: '扣次数' },
-  { key: 'period', label: '周期卡', hint: '周/月/季' },
+  { key: 'hourly', label: '按小时' },
+  { key: 'daily', label: '天卡' },
+  { key: 'session', label: '次卡' },
+  { key: 'period', label: '周期卡' },
 ]
 
 const PERIOD_OPTIONS = [
@@ -95,7 +95,7 @@ Page({
     startTime: '',
     endTime: '',
     timeSummary: '',
-    storeHoursHint: `营业时间 ${STORE_HOURS_LABEL}`,
+    storeHoursHint: `营业 ${STORE_HOURS_LABEL}`,
     nightHint: OFFICE_NIGHT_BOOKING_HINT,
     activeNightCard: null,
     nightDateMin: '',
@@ -233,7 +233,7 @@ Page({
       endDate: end,
       nightDateMin: min,
       nightDateMax: max,
-      nightHint: `${OFFICE_NIGHT_BOOKING_HINT}。${OFFICE_NIGHT_USAGE_RULE}`,
+      nightHint: OFFICE_NIGHT_BOOKING_HINT,
     }
   },
 
@@ -277,7 +277,6 @@ Page({
     else if (billType === 'night') activePrimaryKey = 'night'
 
     let selectedTypeLabel = BILL_TYPE_LABELS[billType] || billType
-    if (period) selectedTypeLabel = `周期卡 · ${BILL_TYPE_LABELS[billType]}`
 
     return {
       activePrimaryKey,
@@ -667,7 +666,7 @@ Page({
   selectSeat(e) {
     const { id, code, status } = e.detail
     if (this.data.seatsLoading) {
-      wx.showToast({ title: '座位状态更新中', icon: 'none' })
+      wx.showToast({ title: '更新中…', icon: 'none' })
       return
     }
     if (!id || status === 'empty') {
@@ -697,7 +696,7 @@ Page({
       return
     }
     if (!seatId) {
-      wx.showToast({ title: '请先点击平面图选座', icon: 'none' })
+      wx.showToast({ title: '请先选座', icon: 'none' })
       return
     }
     if (this.data.previewLoading) {

@@ -51,14 +51,13 @@
   </view>
 
   <view class="my-strip my-strip--guest" wx:else bindtap="goLogin">
-    <text>登录后查看我的期限卡</text>
+    <text>登录查看</text>
     <text class="my-strip-link">去登录 ›</text>
   </view>
 
   <!-- 购买期限卡：页面主体 -->
   <view class="section-head">
-    <view class="section-title">购买期限卡</view>
-    <view class="section-sub" wx:if="{{!loading && packages.length}}">共 {{displayPackages.length}} 款</view>
+    <view class="section-title">购买套餐</view>
   </view>
 
   <view class="buy-body">

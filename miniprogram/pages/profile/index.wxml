@@ -4,7 +4,7 @@
       <view class="guest-header" bindtap="goLogin">
         <view class="avatar avatar-placeholder guest">?</view>
         <view class="nickname">未登录</view>
-        <view class="guest-login-tip">点击登录 · 预约座位、查看订单与积分</view>
+        <view class="guest-login-tip">点击登录</view>
       </view>
     </block>
 
@@ -33,7 +33,7 @@
       </view>
 
       <view class="phone-line" wx:if="{{user.phone}}">手机 {{user.phone}}</view>
-      <view class="phone-line muted" wx:else>未绑定手机 · 建议绑定便于店长联系</view>
+      <view class="phone-line muted" wx:else>未绑定手机</view>
 
       <view class="stats-row">
         <view class="stat-pill">
@@ -53,8 +53,7 @@
   </view>
 
   <view class="goal-card card" wx:if="{{loginState === 'ready' && user}}">
-    <view class="goal-card-title">备考方向（选填）</view>
-    <view class="goal-card-desc">方便我们了解同学需求，可不选</view>
+    <view class="goal-card-title">备考方向</view>
     <view class="goal-chips">
       <view
         wx:for="{{goalOptions}}"
@@ -64,7 +63,6 @@
         bindtap="saveStudyGoal"
       >{{item.label}}</view>
     </view>
-    <view class="goal-current" wx:if="{{user.study_goal_label}}">当前：{{user.study_goal_label}}</view>
   </view>
 
   <view class="menu-grid card">

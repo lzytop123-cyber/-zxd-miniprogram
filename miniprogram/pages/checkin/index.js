@@ -365,7 +365,7 @@ Page({
     }
     wx.showModal({
       title: '提前离座',
-      content: '确定要提前结束本次学习吗？学习时长将计入统计。',
+      content: '确定提前离座？',
       confirmColor: '#2D6A4F',
       success: (res) => {
         if (res.confirm) {

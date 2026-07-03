@@ -11,7 +11,7 @@
   <view wx:elif="{{!reservation}}" class="empty card empty-card">
     <view class="empty-icon">📚</view>
     <view class="empty-text">暂无进行中的订单</view>
-    <view class="empty-hint">预约成功后到店开门即可，无需手动签到</view>
+    <view class="empty-hint">预约后到店开门即可</view>
     <view class="btn-primary" bindtap="goBooking">立即预定</view>
   </view>
 
@@ -20,14 +20,14 @@
       <view class="hero-header">
         <view class="hero-header-main">
           <view class="hero-title">{{reservation.store_name}}</view>
-          <view class="hero-subtitle">{{statusHint || '到店后可直接开门'}}</view>
+          <view class="hero-subtitle">{{statusHint || '到店开门'}}</view>
         </view>
         <view class="hero-badge" wx:if="{{statusLabel}}">{{statusLabel}}</view>
       </view>
 
       <view class="seat-ring">
         <view class="seat-no">{{reservation.seat_code}}</view>
-        <view class="seat-label">您的座位</view>
+        <view class="seat-label">座位</view>
       </view>
 
       <view class="hero-grid">
@@ -44,13 +44,12 @@
       <view class="hero-footer" wx:if="{{reservation.status === 1 && reservation.check_in_time}}">
         入座于 {{checkInDisplay}}
       </view>
-      <view class="hero-footer" wx:elif="{{statusHint && reservation.status === 0}}">{{statusHint}}</view>
     </view>
 
     <view class="order-switch card" wx:if="{{activeList.length > 1}}">
       <view class="order-switch-head">
         <view class="order-switch-label">切换订单</view>
-        <view class="order-switch-count">{{activeList.length}} 个进行中</view>
+        <view class="order-switch-count">{{activeList.length}} 笔</view>
       </view>
       <view class="order-switch-list">
         <view
@@ -68,9 +67,8 @@
 
     <view class="open-section card">
       <view class="open-status-wrap">
-        <view class="tip ended" wx:if="{{countdown === '已结束'}}">订单已结束，无法开门</view>
+        <view class="tip ended" wx:if="{{countdown === '已结束'}}">订单已结束</view>
         <view class="tip" wx:elif="{{!canOpen}}">{{openWindowHint}}</view>
-        <view class="tip ok" wx:elif="{{canOpen}}">已可开门，请站在门口操作</view>
       </view>
 
       <view class="tip warn" wx:if="{{lastOpenError}}">{{lastOpenError}}</view>
@@ -85,7 +83,7 @@
         <view class="open-btn-main">
           <view class="open-btn-title">{{opening ? '开门中…' : '蓝牙开门'}}</view>
           <view class="open-btn-desc" wx:if="{{!pluginReady}}">{{pluginHint || '插件未加载'}}</view>
-          <view class="open-btn-desc" wx:elif="{{canOpen && pluginReady}}">开启蓝牙并靠近门锁</view>
+          <view class="open-btn-desc" wx:elif="{{canOpen && pluginReady}}">靠近门锁</view>
           <view class="open-btn-desc" wx:else>到时段后自动可用</view>
         </view>
         <text class="open-btn-chevron">›</text>
@@ -93,7 +91,7 @@
 
       <view class="open-footer">
         <view class="checkout-link" bindtap="checkout" wx:if="{{reservation.status === 1}}">提前离座</view>
-        <view class="checkout-hint" wx:elif="{{reservation.status === 0 && canOpen}}">开门入座后可提前离座</view>
+        <view class="checkout-hint" wx:elif="{{reservation.status === 0 && canOpen}}">开门后可提前离座</view>
       </view>
     </view>
   </view>

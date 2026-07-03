@@ -102,16 +102,14 @@
   <view class="entries">
     <view class="entry entry-book" bindtap="goNearestStore">
       <view class="entry-deco"></view>
-      <view class="entry-en">RESERVE SEAT</view>
       <view class="entry-cn">学习订座</view>
-      <view class="entry-desc">选座 · 计时 · 专注</view>
+      <view class="entry-desc">在线选座预约</view>
       <view class="entry-icon">📖</view>
     </view>
     <view class="entry entry-verify" bindtap="goExchange">
       <view class="entry-deco"></view>
-      <view class="entry-en">VERIFY VOUCHER</view>
       <view class="entry-cn">团购验券</view>
-      <view class="entry-desc">美团 / 抖音 / 大众点评核销</view>
+      <view class="entry-desc">美团 · 抖音</view>
       <view class="entry-icon">🎟️</view>
     </view>
   </view>
@@ -143,7 +141,7 @@
       <view wx:else class="member-avatar member-avatar-ph">岛</view>
       <view class="member-info">
         <view class="member-hi">{{user ? (user.nickname) : '欢迎来到知行岛'}}</view>
-        <view class="member-badge">{{user.title || '注册即享专注会员权益'}}</view>
+        <view class="member-badge">{{user.title || '新同学'}}</view>
       </view>
       <view class="member-arrow">›</view>
     </view>

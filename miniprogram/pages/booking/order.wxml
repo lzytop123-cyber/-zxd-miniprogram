@@ -6,22 +6,22 @@
     <view class="row"><text class="row-label">开始</text><text>{{startDisplay}}</text></view>
     <view class="row"><text class="row-label">结束</text><text>{{endDisplay}}</text></view>
     <view class="hint-warn" wx:if="{{billType === 'night' && nightDays > 0}}">
-      固定座位 {{nightDays}} 天 · {{nightBookingHint}}
+      {{nightBookingHint}}
     </view>
 
     <view class="section-title inner" wx:if="{{usableCoupons.length}}">优惠券</view>
     <picker wx:if="{{usableCoupons.length}}" mode="selector" range="{{usableCoupons}}" range-key="coupon_name" bindchange="selectCoupon">
       <view class="picker-row">
-        {{selectedCouponId ? '已选优惠券' : '选择优惠券（可选）'}}
+        {{selectedCouponId ? '已选优惠券' : '选择优惠券'}}
       </view>
     </picker>
 
     <view class="hint-warn" wx:if="{{billType === 'session' && sessionDays > 0}}">
-      本次预约 {{sessionDays}} 天，使用次卡将扣 {{sessionDays}} 次
+      连约 {{sessionDays}} 天，扣 {{sessionDays}} 次
     </view>
 
     <view class="hint-warn" wx:if="{{cards.length && !usableCards.length}}">
-      您有 {{cards.length}} 张期限卡，但当前「{{billTypeLabel}}」预约不可用。请先在上一页切换对应的预定方式（如周卡选「周卡」）。
+      期限卡与当前套餐不匹配，请返回切换
     </view>
 
     <view class="fee-block">

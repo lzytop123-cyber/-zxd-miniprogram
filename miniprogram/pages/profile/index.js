@@ -125,7 +125,7 @@ Page({
   doLogout() {
     wx.showModal({
       title: '退出登录',
-      content: '退出后需重新微信登录才能使用预约等功能',
+      content: '退出后需重新登录',
       confirmColor: '#2D6A4F',
       success: (res) => {
         if (!res.confirm) return
