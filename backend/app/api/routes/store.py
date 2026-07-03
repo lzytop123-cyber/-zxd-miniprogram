@@ -10,7 +10,7 @@ from app.db.session import get_db
 from app.models import PricingRule, Reservation, Seat, Store, Zone
 from app.schemas.common import ResponseModel
 from app.schemas.store import PricingItem, SeatItem, StoreDetail, StoreListItem
-from app.services.business import calc_distance, get_seat_status, _seat_conflict_query
+from app.services.business import calc_distance, find_busy_seat_ids, get_seat_status
 
 router = APIRouter(prefix="/store", tags=["门店"])
 
@@ -56,10 +56,10 @@ def get_availability(
     seats = db.scalars(
         select(Seat).where(Seat.store_id == store_id, Seat.is_buffer == 0, Seat.status == 1)
     ).all()
+    busy_ids = find_busy_seat_ids(db, [s.id for s in seats], start_time, end_time)
     items = []
     for s in seats:
-        conflict = db.scalar(_seat_conflict_query(s.id, start_time, end_time))
-        status = "occupied" if conflict else "available"
+        status = "occupied" if s.id in busy_ids else "available"
         items.append(
             SeatItem(
                 id=s.id,

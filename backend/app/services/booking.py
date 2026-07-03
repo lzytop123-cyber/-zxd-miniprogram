@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 
 from app.models import BillType, PeriodCard, PricingRule, Reservation, Seat, StudyStat, User, WalletLog
 from app.services.points import add_points
-from app.services.business import _seat_conflict_query, update_study_title
+from app.services.business import find_seat_conflict, update_study_title
 
 logger = logging.getLogger(__name__)
 
@@ -113,7 +113,7 @@ def validate_seat_for_booking(db: Session, seat: Seat | None, store_id: int, sta
         raise ValueError("请选择座位")
     if seat.store_id != store_id or seat.is_buffer or seat.status != 1:
         raise ValueError("座位不可用")
-    conflict = db.scalar(_seat_conflict_query(seat.id, start, end))
+    conflict = find_seat_conflict(db, seat.id, start, end)
     if conflict:
         raise ValueError("该座位时段已被预约")
     return seat
@@ -126,10 +126,7 @@ def seat_conflict_excluding(
     end: datetime,
     exclude_reservation_id: int | None = None,
 ) -> Reservation | None:
-    query = _seat_conflict_query(seat_id, start, end)
-    if exclude_reservation_id:
-        query = query.where(Reservation.id != exclude_reservation_id)
-    return db.scalar(query)
+    return find_seat_conflict(db, seat_id, start, end, exclude_reservation_id)
 
 
 def change_reservation_seat(db: Session, reservation: Reservation, new_seat_id: int) -> tuple[Seat, Seat]:

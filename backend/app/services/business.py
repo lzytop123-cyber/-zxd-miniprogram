@@ -234,8 +234,51 @@ def calc_distance(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
     return round(6371 * 2 * asin(sqrt(a)), 2)
 
 
+NIGHT_BILL_TYPES = frozenset({BillType.night, BillType.night_monthly})
+
+
+def _intervals_overlap(a_start: datetime, a_end: datetime, b_start: datetime, b_end: datetime) -> bool:
+    return a_start < b_end and a_end > b_start
+
+
+def reservation_blocks_interval(
+    reservation: Reservation,
+    query_start: datetime,
+    query_end: datetime,
+) -> bool:
+    """该预约是否在 query 时段内占用座位（夜读按每日可用时段，非全天）。"""
+    if reservation.bill_type in NIGHT_BILL_TYPES:
+        return _night_reservation_blocks_interval(reservation, query_start, query_end)
+    return _intervals_overlap(
+        reservation.start_time, reservation.end_time, query_start, query_end
+    )
+
+
+def _night_reservation_blocks_interval(
+    reservation: Reservation,
+    query_start: datetime,
+    query_end: datetime,
+) -> bool:
+    from app.services.card_service import night_window_for_date
+
+    overlap_start = max(reservation.start_time.date(), query_start.date())
+    overlap_end = min(reservation.end_time.date(), query_end.date())
+    if overlap_start > overlap_end:
+        return False
+
+    day = overlap_start
+    while day <= overlap_end:
+        win_start, win_end, _ = night_window_for_date(day)
+        block_start = datetime.combine(day, win_start)
+        block_end = datetime.combine(day, win_end)
+        if _intervals_overlap(block_start, block_end, query_start, query_end):
+            return True
+        day += timedelta(days=1)
+    return False
+
+
 def _seat_conflict_query(seat_id: int, start: datetime, end: datetime):
-    """仅已支付且未取消/结束的预约视为占用（未支付不占座，避免支付失败锁死座位）。"""
+    """SQL 粗筛候选预约；精确冲突请用 find_seat_conflict。"""
     now = datetime.now()
     return select(Reservation).where(
         Reservation.seat_id == seat_id,
@@ -247,35 +290,79 @@ def _seat_conflict_query(seat_id: int, start: datetime, end: datetime):
     )
 
 
+def find_seat_conflict(
+    db: Session,
+    seat_id: int,
+    start: datetime,
+    end: datetime,
+    exclude_reservation_id: int | None = None,
+) -> Reservation | None:
+    """查找与时段真正冲突的已支付预约。"""
+    query = _seat_conflict_query(seat_id, start, end)
+    if exclude_reservation_id:
+        query = query.where(Reservation.id != exclude_reservation_id)
+    for reservation in db.scalars(query).all():
+        if reservation_blocks_interval(reservation, start, end):
+            return reservation
+    return None
+
+
+def find_busy_seat_ids(
+    db: Session,
+    seat_ids: list[int],
+    start: datetime,
+    end: datetime,
+) -> set[int]:
+    """批量判断哪些座位在时段内被占用。"""
+    if not seat_ids:
+        return set()
+    now = datetime.now()
+    reservations = db.scalars(
+        select(Reservation).where(
+            Reservation.seat_id.in_(seat_ids),
+            Reservation.status.in_([0, 1]),
+            Reservation.pay_status == 1,
+            Reservation.end_time > now,
+            Reservation.start_time < end,
+            Reservation.end_time > start,
+        )
+    ).all()
+    busy: set[int] = set()
+    for reservation in reservations:
+        if reservation_blocks_interval(reservation, start, end):
+            busy.add(reservation.seat_id)
+    return busy
+
+
 def get_seat_status(db: Session, seat_id: int, at: datetime | None = None) -> str:
     at = at or datetime.now()
     seat = db.get(Seat, seat_id)
     if not seat or seat.status != 1:
         return "disabled"
 
-    active = db.scalar(
+    candidates = db.scalars(
         select(Reservation).where(
             Reservation.seat_id == seat_id,
             Reservation.pay_status == 1,
             Reservation.status.in_([0, 1]),
-            Reservation.start_time <= at,
+            Reservation.end_time > at,
+            Reservation.start_time < at + timedelta(hours=2),
             Reservation.end_time > at,
         )
-    )
-    if active:
-        return "occupied" if active.status == 1 else "reserved"
+    ).all()
 
-    upcoming = db.scalar(
-        select(Reservation).where(
-            Reservation.seat_id == seat_id,
-            Reservation.pay_status == 1,
-            Reservation.status == 0,
-            Reservation.end_time > at,
-            Reservation.start_time > at,
-            Reservation.start_time <= at + timedelta(hours=2),
-        )
-    )
-    return "reserved" if upcoming else "available"
+    moment_end = at + timedelta(seconds=1)
+    for reservation in candidates:
+        if reservation_blocks_interval(reservation, at, moment_end):
+            return "occupied" if reservation.status == 1 else "reserved"
+
+    for reservation in candidates:
+        if reservation.status != 0:
+            continue
+        if reservation_blocks_interval(reservation, at, at + timedelta(hours=2)):
+            return "reserved"
+
+    return "available"
 
 
 def find_available_seat(
@@ -292,21 +379,7 @@ def find_available_seat(
     if not seats:
         return None
 
-    # 一次性查出该时段被占用的座位集合，避免逐座位查询（N+1）
-    now = datetime.now()
-    seat_ids = [s.id for s in seats]
-    busy = set(
-        db.scalars(
-            select(Reservation.seat_id).where(
-                Reservation.seat_id.in_(seat_ids),
-                Reservation.status.in_([0, 1]),
-                Reservation.pay_status == 1,
-                Reservation.end_time > now,
-                Reservation.start_time < end,
-                Reservation.end_time > start,
-            )
-        ).all()
-    )
+    busy = find_busy_seat_ids(db, [s.id for s in seats], start, end)
     for seat in seats:
         if seat.id not in busy:
             return seat
