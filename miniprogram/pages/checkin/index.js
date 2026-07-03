@@ -61,6 +61,7 @@ Page({
     selectedId: null,
     reservation: null,
     endDisplay: '',
+    checkInDisplay: '',
     statusLabel: '',
     statusHint: '',
     countdown: '',
@@ -162,6 +163,7 @@ Page({
     this.setData({
       reservation,
       endDisplay: formatDate(reservation.end_time),
+      checkInDisplay: reservation.check_in_time ? formatDate(reservation.check_in_time) : '',
       statusLabel: reservation.status_label || '',
       statusHint: reservation.status_hint || '',
       canOpen,
@@ -357,9 +359,14 @@ Page({
 
   checkout() {
     const { reservation } = this.data
+    if (!reservation || reservation.status !== 1) {
+      wx.showToast({ title: '请先开门入座', icon: 'none' })
+      return
+    }
     wx.showModal({
       title: '提前离座',
-      content: '确定要提前结束本次学习吗？',
+      content: '确定要提前结束本次学习吗？学习时长将计入统计。',
+      confirmColor: '#2D6A4F',
       success: (res) => {
         if (res.confirm) {
           request({ url: `/reservation/${reservation.id}/checkout`, method: 'POST' }).then(() => {

@@ -20,7 +20,7 @@
       <view class="hero-header">
         <view class="hero-header-main">
           <view class="hero-title">{{reservation.store_name}}</view>
-          <view class="hero-subtitle">正在使用中 · 到店后可直接开门</view>
+          <view class="hero-subtitle">{{statusHint || '到店后可直接开门'}}</view>
         </view>
         <view class="hero-badge" wx:if="{{statusLabel}}">{{statusLabel}}</view>
       </view>
@@ -41,7 +41,10 @@
         </view>
       </view>
 
-      <view class="hero-footer" wx:if="{{statusHint}}">{{statusHint}}</view>
+      <view class="hero-footer" wx:if="{{reservation.status === 1 && reservation.check_in_time}}">
+        入座于 {{checkInDisplay}}
+      </view>
+      <view class="hero-footer" wx:elif="{{statusHint && reservation.status === 0}}">{{statusHint}}</view>
     </view>
 
     <view class="order-switch card" wx:if="{{activeList.length > 1}}">
@@ -73,18 +76,24 @@
       <view class="tip warn" wx:if="{{lastOpenError}}">{{lastOpenError}}</view>
 
       <view
-        class="open-hero {{canOpen && pluginReady && !opening ? '' : 'disabled'}}"
+        class="open-btn {{canOpen && pluginReady && !opening ? 'open-btn--active' : 'open-btn--disabled'}}"
         bindtap="openDoorBle"
       >
-        <view class="open-hero-icon">📶</view>
-        <view class="open-hero-text">{{opening ? '开门中…' : '蓝牙开门'}}</view>
-        <view class="open-hero-sub" wx:if="{{!pluginReady}}">{{pluginHint || '插件未加载'}}</view>
-        <view class="open-hero-sub" wx:elif="{{canOpen && pluginReady}}">开启手机蓝牙并靠近门锁</view>
-        <view class="open-hero-sub" wx:elif="{{!canOpen}}">到时间后按钮自动可用</view>
+        <view class="open-btn-icon-wrap">
+          <text class="open-btn-icon">📶</text>
+        </view>
+        <view class="open-btn-main">
+          <view class="open-btn-title">{{opening ? '开门中…' : '蓝牙开门'}}</view>
+          <view class="open-btn-desc" wx:if="{{!pluginReady}}">{{pluginHint || '插件未加载'}}</view>
+          <view class="open-btn-desc" wx:elif="{{canOpen && pluginReady}}">开启蓝牙并靠近门锁</view>
+          <view class="open-btn-desc" wx:else>到时段后自动可用</view>
+        </view>
+        <text class="open-btn-chevron">›</text>
       </view>
 
-      <view class="action-row">
-        <view class="btn-outline" bindtap="checkout" wx:if="{{reservation.status === 1}}">提前离座</view>
+      <view class="open-footer">
+        <view class="checkout-link" bindtap="checkout" wx:if="{{reservation.status === 1}}">提前离座</view>
+        <view class="checkout-hint" wx:elif="{{reservation.status === 0 && canOpen}}">开门入座后可提前离座</view>
       </view>
     </view>
   </view>
