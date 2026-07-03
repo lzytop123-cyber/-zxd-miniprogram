@@ -4,7 +4,7 @@ const routes = require('../../utils/routes')
 const { FLOOR_PLAN } = require('../../utils/assets')
 const { getLayout } = require('../../utils/seat-layout')
 const { debounce } = require('../../utils/debounce')
-const { dailyPassDays, isOfficeNightMonthlyCard, isCardUsable, nightWindowForDate } = require('../../utils/cardDisplay')
+const { dailyPassDays, isOfficeNightMonthlyCard, isCardUsable, OFFICE_NIGHT_USAGE_RULE } = require('../../utils/cardDisplay')
 const {
   formatLocalDateTime,
   todayStr,
@@ -21,7 +21,7 @@ const BILL_DEFAULTS = {
   quarterly: { endOffset: 89 },
   monthly: { endOffset: 29 },
   session: { endOffset: 0 },
-  night: { startClock: '18:00', endClock: '23:30' },
+  night: { endOffset: 29 },
 }
 
 Page({
@@ -56,7 +56,10 @@ Page({
     startTime: '',
     endTime: '',
     timeSummary: '',
-    nightHint: '工作日 18:00-23:30 · 周末 7:30-23:30',
+    nightHint: OFFICE_NIGHT_USAGE_RULE,
+    activeNightCard: null,
+    nightDateMin: '',
+    nightDateMax: '',
     pricingMap: {},
     seatsLoading: false,
     previewLoading: false,
@@ -135,17 +138,6 @@ Page({
     ;(rules || []).forEach((r) => {
       pricingMap[r.bill_type] = r
     })
-    const night = pricingMap.night
-    if (night && night.night_start) {
-      const start = String(night.night_start).slice(0, 5)
-      const end = night.night_end ? String(night.night_end).slice(0, 5) : '24:00'
-      return {
-        pricingMap,
-        startClock: start,
-        endClock: end === '00:00' ? '23:59' : end,
-        nightHint: `${start} - ${end === '00:00' ? '次日 00:00' : end}`,
-      }
-    }
     return { pricingMap }
   },
 
@@ -157,14 +149,16 @@ Page({
           userCards: list,
           hasMultiDayDailyCard: !!this._findMultiDayDailyCard(list),
         }
-        const officeNight = list.find((c) => isOfficeNightMonthlyCard(c) && isCardUsable(c))
+        const officeNight = this._findActiveNightCard(list)
+        patch.activeNightCard = officeNight
+        if (officeNight) {
+          patch.nightDateMin = officeNight.start_date || todayStr()
+          patch.nightDateMax = officeNight.end_date || ''
+        }
         if (officeNight && this.data.billType === 'hourly') {
-          const win = nightWindowForDate(this.data.startDate || todayStr())
-          Object.assign(patch, {
-            billType: 'night',
-            startClock: win.start,
-            endClock: win.end,
-          })
+          Object.assign(patch, { billType: 'night' }, this._applyNightPeriod(this.data.startDate, officeNight))
+        } else if (this.data.billType === 'night') {
+          Object.assign(patch, this._applyNightPeriod(this.data.startDate, officeNight || this.data.activeNightCard))
         }
         this.setData(patch, () => {
           if (patch.billType === 'night') this.refreshPreview({ immediate: true })
@@ -173,13 +167,30 @@ Page({
       .catch(() => {})
   },
 
-  _applyNightWindowForDate(dateStr) {
-    const win = nightWindowForDate(dateStr || this.data.startDate || todayStr())
-    return {
-      startClock: win.start,
-      endClock: win.end,
-      nightHint: '工作日 18:00-23:30 · 周末 7:30-23:30',
+  _applyNightPeriod(startDate, card) {
+    const today = todayStr()
+    let start = startDate || today
+    let end = addDays(start, BILL_DEFAULTS.night.endOffset)
+    let min = today
+    let max = ''
+    if (card && card.start_date && card.end_date) {
+      min = card.start_date > today ? card.start_date : today
+      max = card.end_date
+      if (start < min) start = min
+      if (start > card.end_date) start = min
+      end = card.end_date
     }
+    return {
+      startDate: start,
+      endDate: end,
+      nightDateMin: min,
+      nightDateMax: max,
+      nightHint: `${OFFICE_NIGHT_USAGE_RULE}，完成一次预约即核销`,
+    }
+  },
+
+  _findActiveNightCard(cards) {
+    return (cards || []).find((c) => isOfficeNightMonthlyCard(c) && isCardUsable(c)) || null
   },
 
   _findMultiDayDailyCard(cards) {
@@ -239,12 +250,7 @@ Page({
     } else if (billType === 'quarterly') {
       Object.assign(patch, { endDate: addDays(startDate, defaults.endOffset) })
     } else if (billType === 'night') {
-      const win = nightWindowForDate(startDate)
-      Object.assign(patch, {
-        startClock: win.start,
-        endClock: win.end,
-        nightHint: '工作日 18:00-23:30 · 周末 7:30-23:30',
-      })
+      Object.assign(patch, this._applyNightPeriod(startDate, this.data.activeNightCard))
     }
 
     this.setData(patch, () => this.refreshPreview())
@@ -269,7 +275,7 @@ Page({
     } else if (this.data.billType === 'quarterly') {
       patch.endDate = addDays(startDate, 89)
     } else if (this.data.billType === 'night') {
-      Object.assign(patch, this._applyNightWindowForDate(startDate))
+      Object.assign(patch, this._applyNightPeriod(startDate, this.data.activeNightCard))
     }
     if (this.data.billType === 'hourly' && startDate === todayStr()) {
       patch.startClock = nowTimeStr()
@@ -368,11 +374,11 @@ Page({
       end = new Date(`${endDate}T23:59:59`)
       if (end <= start) throw new Error('结束日期须晚于开始日期')
     } else if (billType === 'night') {
-      start = this._clockToDate(startDate, startClock)
-      end = this._clockToDate(startDate, endClock)
-      if (end <= start) {
-        end.setDate(end.getDate() + 1)
-      }
+      start = new Date(`${startDate}T00:00:00`)
+      end = new Date(`${endDate}T23:59:59`)
+      if (end <= start) throw new Error('结束日期须晚于开始日期')
+      const days = Math.floor((end - start) / 86400000) + 1
+      if (days > 30) throw new Error('夜读月卡单次最多预约30天')
     }
 
     return {

@@ -118,16 +118,13 @@
 
     <!-- 夜读 -->
     <block wx:if="{{billType==='night'}}">
-      <picker mode="date" value="{{startDate}}" start="{{today}}" bindchange="onStartDateChange">
-        <view class="field"><text class="field-key">使用日期</text><text class="field-val">{{startDate}} ›</text></view>
+      <picker mode="date" value="{{startDate}}" start="{{nightDateMin || today}}" end="{{nightDateMax || ''}}" bindchange="onStartDateChange">
+        <view class="field"><text class="field-key">开始日期</text><text class="field-val">{{startDate}} ›</text></view>
       </picker>
-      <picker mode="time" value="{{startClock}}" bindchange="onStartClockChange">
-        <view class="field"><text class="field-key">开始时间</text><text class="field-val">{{startClock}} ›</text></view>
+      <picker mode="date" value="{{endDate}}" start="{{startDate}}" end="{{nightDateMax || ''}}" bindchange="onEndDateChange">
+        <view class="field"><text class="field-key">结束日期</text><text class="field-val">{{endDate}} ›</text></view>
       </picker>
-      <picker mode="time" value="{{endClock}}" bindchange="onEndClockChange">
-        <view class="field"><text class="field-key">结束时间</text><text class="field-val">{{endClock}} ›</text></view>
-      </picker>
-      <view class="hint">工作日 18:00-23:30 · 周末 7:30-23:30</view>
+      <view class="hint">{{nightHint}}</view>
     </block>
 
     <view class="time-summary" wx:if="{{timeSummary}}">

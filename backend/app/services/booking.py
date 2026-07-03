@@ -345,13 +345,89 @@ def fulfill_recharge_order(db: Session, order) -> bool:
 
 
 EARLY_CHECKIN_MINUTES = 15
+STORE_OPEN_START = time(7, 30)
+STORE_OPEN_END = time(23, 30)
+
+
+def reservation_open_window(
+    reservation: Reservation,
+    now: datetime | None = None,
+) -> tuple[datetime, datetime] | None:
+    """当日允许开门/入座的时间窗（营业时间与预约时段的交集）。"""
+    from app.services.card_service import night_window_for_date
+
+    now = now or datetime.now()
+    today = now.date()
+    res_start = reservation.start_time
+    res_end = reservation.end_time
+
+    if today < res_start.date() or today > res_end.date():
+        return None
+
+    if reservation.bill_type == BillType.night:
+        win_start, win_end, _ = night_window_for_date(today)
+    else:
+        win_start, win_end = STORE_OPEN_START, STORE_OPEN_END
+
+    day_open = datetime.combine(today, win_start) - timedelta(minutes=EARLY_CHECKIN_MINUTES)
+    day_close = datetime.combine(today, win_end)
+
+    if res_start.date() == res_end.date() == today:
+        open_from = max(day_open, res_start - timedelta(minutes=EARLY_CHECKIN_MINUTES))
+        open_until = min(day_close, res_end)
+    elif res_start.date() == today:
+        open_from = max(day_open, res_start - timedelta(minutes=EARLY_CHECKIN_MINUTES))
+        open_until = day_close
+    elif res_end.date() == today:
+        open_from = day_open
+        open_until = min(day_close, res_end)
+    else:
+        open_from = day_open
+        open_until = day_close
+
+    if open_until <= open_from:
+        return None
+    return open_from, open_until
+
+
+def reservation_unlock_message(reservation: Reservation, now: datetime | None = None) -> str:
+    """无法开门时的提示文案。"""
+    from app.services.card_service import night_window_for_date
+
+    now = now or datetime.now()
+    if reservation.pay_status != 1:
+        return "订单未支付"
+    if reservation.status == 3:
+        return "订单已取消"
+    if reservation.status == 2:
+        return "订单已结束"
+    if now.date() < reservation.start_time.date():
+        return f"{reservation.start_time.strftime('%m月%d日')} 起可开门"
+    if now.date() > reservation.end_time.date():
+        return "订单已结束，无法开门"
+
+    window = reservation_open_window(reservation, now)
+    if window and window[0] <= now <= window[1]:
+        return ""
+
+    today = now.date()
+    if reservation.bill_type == BillType.night:
+        win_start, win_end, label = night_window_for_date(today)
+        return (
+            f"{label}夜读时段 {win_start.strftime('%H:%M')}-{win_end.strftime('%H:%M')} 可开门"
+            f"（可提前 {EARLY_CHECKIN_MINUTES} 分钟）"
+        )
+    return (
+        f"营业时间 {STORE_OPEN_START.strftime('%H:%M')}-{STORE_OPEN_END.strftime('%H:%M')} 可开门"
+        f"（可提前 {EARLY_CHECKIN_MINUTES} 分钟）"
+    )
 
 
 def reservation_unlock_allowed(
     reservation: Reservation,
     now: datetime | None = None,
 ) -> bool:
-    """是否在允许开门的时间窗内（开始前15分钟至预约结束）。"""
+    """是否在允许开门/入座的时间窗内。"""
     now = now or datetime.now()
     if reservation.pay_status != 1:
         return False
@@ -359,8 +435,10 @@ def reservation_unlock_allowed(
         return False
     if reservation.status == 2:
         return False
-    early = reservation.start_time - timedelta(minutes=EARLY_CHECKIN_MINUTES)
-    return early <= now <= reservation.end_time
+    window = reservation_open_window(reservation, now)
+    if not window:
+        return False
+    return window[0] <= now <= window[1]
 
 
 def finalize_expired_reservation(
@@ -396,15 +474,14 @@ def auto_checkin_reservation(
     when: datetime | None = None,
 ) -> bool:
     """预约时段内自动入座，无需用户手动签到。"""
-    now = when or datetime.now()
+    when = when or datetime.now()
     if reservation.pay_status != 1 or reservation.status != 0:
         return False
-    if now < reservation.start_time - timedelta(minutes=EARLY_CHECKIN_MINUTES):
-        return False
-    if now > reservation.end_time:
+    window = reservation_open_window(reservation, when)
+    if not window or not (window[0] <= when <= window[1]):
         return False
     reservation.status = 1
-    reservation.check_in_time = now
+    reservation.check_in_time = when
     return True
 
 

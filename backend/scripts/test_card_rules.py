@@ -118,41 +118,36 @@ def test_daily_pass_three_day_continuous():
         assert "连续使用" in str(e)
 
 
-def test_office_night_weekday_window():
-    from datetime import time
-
+def test_office_night_monthly_period():
     card = PeriodCard(
         user_id=1,
         card_name="「上班族」月卡",
         card_type=CardType.night_monthly,
         status=1,
-        start_date=datetime(2026, 7, 6).date(),  # Monday
-        end_date=datetime(2026, 8, 4).date(),
+        start_date=datetime(2026, 7, 3).date(),
+        end_date=datetime(2026, 8, 1).date(),
     )
-    start = datetime(2026, 7, 6, 18, 0, 0)
-    end = datetime(2026, 7, 6, 23, 30, 0)
+    start = datetime(2026, 7, 3, 0, 0, 0)
+    end = datetime(2026, 8, 1, 23, 59, 59)
     validate_period_card_for_reservation(None, card, BillType.night, start, end, 1)
 
-    too_early = datetime(2026, 7, 6, 17, 30, 0)
-    try:
-        validate_period_card_for_reservation(None, card, BillType.night, too_early, end, 1)
-        raise AssertionError("工作日不应允许17:30开始")
-    except ValueError as e:
-        assert "工作日" in str(e)
 
-
-def test_office_night_weekend_window():
+def test_office_night_rejects_over_30_days():
     card = PeriodCard(
         user_id=1,
         card_name="知行岛晚自习月卡",
         card_type=CardType.night_monthly,
         status=1,
-        start_date=datetime(2026, 7, 4).date(),  # Saturday
-        end_date=datetime(2026, 8, 3).date(),
+        start_date=datetime(2026, 7, 3).date(),
+        end_date=datetime(2026, 9, 1).date(),
     )
-    start = datetime(2026, 7, 4, 7, 30, 0)
-    end = datetime(2026, 7, 4, 23, 30, 0)
-    validate_period_card_for_reservation(None, card, BillType.night, start, end, 1)
+    start = datetime(2026, 7, 3, 0, 0, 0)
+    end = datetime(2026, 8, 3, 23, 59, 59)
+    try:
+        validate_period_card_for_reservation(None, card, BillType.night, start, end, 1)
+        raise AssertionError("不应超过30天")
+    except ValueError as e:
+        assert "30" in str(e)
 
 
 def test_legacy_monthly_office_card_uses_night_bill():
@@ -161,17 +156,75 @@ def test_legacy_monthly_office_card_uses_night_bill():
         card_name="「上班族」月卡",
         card_type=CardType.monthly,
         status=1,
-        start_date=datetime(2026, 7, 6).date(),
-        end_date=datetime(2026, 8, 4).date(),
+        start_date=datetime(2026, 7, 3).date(),
+        end_date=datetime(2026, 8, 1).date(),
     )
-    start = datetime(2026, 7, 6, 18, 0, 0)
-    end = datetime(2026, 7, 6, 23, 0, 0)
+    start = datetime(2026, 7, 3, 0, 0, 0)
+    end = datetime(2026, 8, 1, 23, 59, 59)
     validate_period_card_for_reservation(None, card, BillType.night, start, end, 1)
     try:
         validate_period_card_for_reservation(None, card, BillType.monthly, start, end, 1)
         raise AssertionError("上班族月卡不应走普通月卡预约")
     except ValueError as e:
         assert "夜读" in str(e)
+
+
+def test_reservation_open_window_night_weekday():
+    from app.models import Reservation
+    from app.services.booking import reservation_open_window, reservation_unlock_allowed
+
+    res = Reservation(
+        user_id=1,
+        seat_id=1,
+        bill_type=BillType.night,
+        pay_status=1,
+        status=0,
+        start_time=datetime(2026, 7, 6, 0, 0, 0),
+        end_time=datetime(2026, 8, 4, 23, 59, 59),
+    )
+    assert reservation_open_window(res, datetime(2026, 7, 6, 10, 0, 0)) is not None
+    assert not reservation_unlock_allowed(res, datetime(2026, 7, 6, 10, 0, 0))
+    win = reservation_open_window(res, datetime(2026, 7, 6, 19, 0, 0))
+    assert win is not None
+    assert reservation_unlock_allowed(res, datetime(2026, 7, 6, 17, 45, 0))
+    assert reservation_unlock_allowed(res, datetime(2026, 7, 6, 23, 30, 0))
+    assert not reservation_unlock_allowed(res, datetime(2026, 7, 6, 23, 31, 0))
+
+
+def test_reservation_open_window_night_weekend():
+    from app.models import Reservation
+    from app.services.booking import reservation_unlock_allowed
+
+    res = Reservation(
+        user_id=1,
+        seat_id=1,
+        bill_type=BillType.night,
+        pay_status=1,
+        status=0,
+        start_time=datetime(2026, 7, 5, 0, 0, 0),
+        end_time=datetime(2026, 8, 3, 23, 59, 59),
+    )
+    assert reservation_unlock_allowed(res, datetime(2026, 7, 5, 8, 0, 0))
+    assert not reservation_unlock_allowed(res, datetime(2026, 7, 5, 7, 0, 0))
+
+
+def test_reservation_open_window_store_hours():
+    from app.models import Reservation
+    from app.services.booking import reservation_unlock_allowed
+
+    res = Reservation(
+        user_id=1,
+        seat_id=1,
+        bill_type=BillType.hourly,
+        pay_status=1,
+        status=0,
+        start_time=datetime(2026, 7, 6, 9, 0, 0),
+        end_time=datetime(2026, 7, 6, 12, 0, 0),
+    )
+    assert reservation_unlock_allowed(res, datetime(2026, 7, 6, 8, 45, 0))
+    assert not reservation_unlock_allowed(res, datetime(2026, 7, 6, 7, 0, 0))
+    assert reservation_unlock_allowed(res, datetime(2026, 7, 6, 11, 0, 0))
+    assert not reservation_unlock_allowed(res, datetime(2026, 7, 6, 12, 30, 0))
 
 
 if __name__ == "__main__":
@@ -181,7 +234,10 @@ if __name__ == "__main__":
     test_hourly_single_use_must_match_remaining()
     test_hourly_50h_partial_use()
     test_daily_pass_three_day_continuous()
-    test_office_night_weekday_window()
-    test_office_night_weekend_window()
+    test_office_night_monthly_period()
+    test_office_night_rejects_over_30_days()
     test_legacy_monthly_office_card_uses_night_bill()
+    test_reservation_open_window_night_weekday()
+    test_reservation_open_window_night_weekend()
+    test_reservation_open_window_store_hours()
     print("All card rule tests passed.")

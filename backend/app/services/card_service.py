@@ -18,7 +18,17 @@ OFFICE_NIGHT_WEEKDAY_START = datetime.strptime("18:00", "%H:%M").time()
 OFFICE_NIGHT_WEEKDAY_END = datetime.strptime("23:30", "%H:%M").time()
 OFFICE_NIGHT_WEEKEND_START = datetime.strptime("07:30", "%H:%M").time()
 OFFICE_NIGHT_WEEKEND_END = datetime.strptime("23:30", "%H:%M").time()
-OFFICE_NIGHT_USAGE_RULE = "工作日 18:00-23:30 · 周末 7:30-23:30"
+OFFICE_NIGHT_USAGE_RULE = "默认30天固定座位 · 工作日 18:00-23:30 · 周末 7:30-23:30 可使用"
+OFFICE_NIGHT_MAX_DAYS = 30
+
+
+def validate_office_night_reservation(start_time: datetime, end_time: datetime) -> None:
+    """夜读月卡：预约整段日期（最长30天）；每日可用时段在入座/开门时校验。"""
+    if end_time <= start_time:
+        raise ValueError("结束日期须晚于开始日期")
+    days = (end_time.date() - start_time.date()).days + 1
+    if days > OFFICE_NIGHT_MAX_DAYS:
+        raise ValueError(f"夜读月卡单次预约最长 {OFFICE_NIGHT_MAX_DAYS} 天")
 
 
 def is_office_night_monthly_card(card: PeriodCard) -> bool:
@@ -33,20 +43,6 @@ def night_window_for_date(day: date) -> tuple[time, time, str]:
     if day.weekday() < 5:
         return OFFICE_NIGHT_WEEKDAY_START, OFFICE_NIGHT_WEEKDAY_END, "工作日"
     return OFFICE_NIGHT_WEEKEND_START, OFFICE_NIGHT_WEEKEND_END, "周末"
-
-
-def validate_office_night_reservation(start_time: datetime, end_time: datetime) -> None:
-    if start_time.date() != end_time.date():
-        raise ValueError("夜读月卡须预约单日时段")
-    win_start, win_end, label = night_window_for_date(start_time.date())
-    start_s = win_start.strftime("%H:%M")
-    end_s = win_end.strftime("%H:%M")
-    if start_time.time() < win_start:
-        raise ValueError(f"{label}可用时段为 {start_s}-{end_s}")
-    if end_time.time() > win_end:
-        raise ValueError(f"{label}可用时段为 {start_s}-{end_s}")
-    if end_time <= start_time:
-        raise ValueError("结束时间须晚于开始时间")
 
 
 REWARD_TO_CARD: dict[RewardType, CardType] = {

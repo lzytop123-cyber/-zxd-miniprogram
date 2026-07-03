@@ -1,21 +1,92 @@
+const { nightWindowForDate } = require('./cardDisplay')
+
 const OPEN_EARLY_MS = 15 * 60000
+const STORE_OPEN = { start: '07:30', end: '23:30', label: '营业' }
 
 function parseTime(iso) {
   return new Date(String(iso).replace(' ', 'T'))
 }
 
-function computeCanOpen(startTime, endTime, now = new Date()) {
-  const start = parseTime(startTime)
-  const end = parseTime(endTime)
-  return now >= new Date(start.getTime() - OPEN_EARLY_MS) && now <= end
+function formatDateOnly(d) {
+  const pad = (n) => (n < 10 ? `0${n}` : `${n}`)
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
 }
 
-function getOpenWindowHint(reservation) {
+function combineDateTime(dateStr, clock) {
+  return new Date(`${dateStr}T${clock}:00`)
+}
+
+function reservationOpenWindow(reservation, now = new Date()) {
+  if (!reservation || !reservation.start_time || !reservation.end_time) return null
+
+  const resStart = parseTime(reservation.start_time)
+  const resEnd = parseTime(reservation.end_time)
+  const todayStr = formatDateOnly(now)
+  const resStartDate = formatDateOnly(resStart)
+  const resEndDate = formatDateOnly(resEnd)
+
+  if (todayStr < resStartDate || todayStr > resEndDate) return null
+
+  const billType = reservation.bill_type || 'hourly'
+  const daily = billType === 'night' ? nightWindowForDate(todayStr) : STORE_OPEN
+
+  let dayOpen = combineDateTime(todayStr, daily.start)
+  dayOpen = new Date(dayOpen.getTime() - OPEN_EARLY_MS)
+  const dayClose = combineDateTime(todayStr, daily.end)
+
+  let openFrom
+  let openUntil
+  if (resStartDate === resEndDate && resStartDate === todayStr) {
+    openFrom = new Date(Math.max(dayOpen.getTime(), resStart.getTime() - OPEN_EARLY_MS))
+    openUntil = new Date(Math.min(dayClose.getTime(), resEnd.getTime()))
+  } else if (resStartDate === todayStr) {
+    openFrom = new Date(Math.max(dayOpen.getTime(), resStart.getTime() - OPEN_EARLY_MS))
+    openUntil = dayClose
+  } else if (resEndDate === todayStr) {
+    openFrom = dayOpen
+    openUntil = new Date(Math.min(dayClose.getTime(), resEnd.getTime()))
+  } else {
+    openFrom = dayOpen
+    openUntil = dayClose
+  }
+
+  if (openUntil <= openFrom) return null
+  return { openFrom, openUntil }
+}
+
+function computeCanOpen(reservation, now = new Date()) {
+  if (!reservation) return false
+  const window = reservationOpenWindow(reservation, now)
+  if (!window) return false
+  return now >= window.openFrom && now <= window.openUntil
+}
+
+function getOpenWindowHint(reservation, now = new Date()) {
   if (!reservation) return ''
-  const start = parseTime(reservation.start_time)
-  const openFrom = new Date(start.getTime() - OPEN_EARLY_MS)
-  const pad = (n) => (n < 10 ? `0${n}` : `${n}`)
-  return `${pad(openFrom.getHours())}:${pad(openFrom.getMinutes())} 起可开门`
+
+  const resStart = parseTime(reservation.start_time)
+  const resEnd = parseTime(reservation.end_time)
+  const todayStr = formatDateOnly(now)
+  const resStartDate = formatDateOnly(resStart)
+  const resEndDate = formatDateOnly(resEnd)
+
+  if (todayStr < resStartDate) {
+    const pad = (n) => (n < 10 ? `0${n}` : `${n}`)
+    return `${pad(resStart.getMonth() + 1)}月${pad(resStart.getDate())}日 起可开门`
+  }
+  if (todayStr > resEndDate) return '订单已结束，无法开门'
+
+  const window = reservationOpenWindow(reservation, now)
+  if (window && now >= window.openFrom && now <= window.openUntil) {
+    return '已可开门，请站在门口操作'
+  }
+
+  const billType = reservation.bill_type || 'hourly'
+  if (billType === 'night') {
+    const win = nightWindowForDate(todayStr)
+    return `${win.label}夜读时段 ${win.start}-${win.end} 可开门（可提前 15 分钟）`
+  }
+  return `营业时间 ${STORE_OPEN.start}-${STORE_OPEN.end} 可开门（可提前 15 分钟）`
 }
 
 function mapBleOpenFailure({ errorCode, errorMsg, canOpen, reservation, mode = 'ble' }) {
@@ -35,7 +106,7 @@ function mapBleOpenFailure({ errorCode, errorMsg, canOpen, reservation, mode = '
     }
     return {
       title: '不在开门时段',
-      content: `${getOpenWindowHint(reservation)}。请在有效时段内再试。`,
+      content: `${getOpenWindowHint(reservation, now)}。请在有效时段内再试。`,
       retryLabel: '',
       showRemote: false,
     }
@@ -137,5 +208,6 @@ module.exports = {
   computeCanOpen,
   getOpenWindowHint,
   mapBleOpenFailure,
+  reservationOpenWindow,
   showOpenFailureModal,
 }

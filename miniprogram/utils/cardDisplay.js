@@ -63,7 +63,7 @@ const TYPE_LABELS = {
   night_monthly: '夜读月卡',
 }
 
-const OFFICE_NIGHT_USAGE_RULE = '工作日 18:00-23:30 · 周末 7:30-23:30，有效期内完成一次预约即核销'
+const OFFICE_NIGHT_USAGE_RULE = '默认30天固定座位 · 工作日 18:00-23:30 · 周末 7:30-23:30 可使用'
 
 function isOfficeNightMonthlyCard(card) {
   if (!card) return false
@@ -81,6 +81,53 @@ function nightWindowForDate(dateStr) {
     : { start: '18:00', end: '23:30', label: '工作日' }
 }
 
+function compareClock(a, b) {
+  const [ah, am] = String(a || '00:00').split(':').map(Number)
+  const [bh, bm] = String(b || '00:00').split(':').map(Number)
+  return ah * 60 + am - (bh * 60 + bm)
+}
+
+function clampNightClock(clock, min, max) {
+  if (compareClock(clock, min) < 0) return min
+  if (compareClock(clock, max) > 0) return max
+  return clock
+}
+
+function normalizeNightBookingTimes(dateStr, startClock, endClock) {
+  const win = nightWindowForDate(dateStr)
+  let start = clampNightClock(startClock, win.start, win.end)
+  let end = clampNightClock(endClock, win.start, win.end)
+  if (compareClock(end, start) <= 0) {
+    end = win.end
+    if (compareClock(end, start) <= 0) start = win.start
+  }
+  return {
+    startClock: start,
+    endClock: end,
+    nightHint: `${win.label}可选 ${win.start}-${win.end}`,
+  }
+}
+
+function validateNightBookingTimes(dateStr, startClock, endClock) {
+  const win = nightWindowForDate(dateStr)
+  if (compareClock(startClock, win.start) < 0) {
+    return `${win.label}开始时间不能早于 ${win.start}`
+  }
+  if (compareClock(startClock, win.end) > 0) {
+    return `${win.label}开始时间不能晚于 ${win.end}`
+  }
+  if (compareClock(endClock, win.start) < 0) {
+    return `${win.label}结束时间不能早于 ${win.start}`
+  }
+  if (compareClock(endClock, win.end) > 0) {
+    return `${win.label}结束时间不能晚于 ${win.end}`
+  }
+  if (compareClock(endClock, startClock) <= 0) {
+    return '结束时间须晚于开始时间'
+  }
+  return ''
+}
+
 const RULE_LINES = {
   daily: '全天不限时，用一次即核销',
   weekly: '7天内完成一次预约即核销',
@@ -88,7 +135,7 @@ const RULE_LINES = {
   quarterly: '90天内完成一次预约即核销',
   session: '按自然日扣次，连选N天扣N次',
   hourly: '须一次性预约用完剩余时长',
-  night_monthly: '有效期内完成一次预约即核销',
+  night_monthly: '30天内固定座位，完成一次预约即核销',
 }
 
 const CARD_DETAIL_LINES = {
@@ -122,7 +169,7 @@ const CARD_DETAIL_LINES = {
   ],
   night_monthly: [
     OFFICE_NIGHT_USAGE_RULE,
-    '选座时请选择「夜读」套餐',
+    '选座时请选择「夜读」套餐，默认预约30天',
   ],
 }
 
@@ -139,7 +186,7 @@ const PKG_HINTS = {
   monthly: { tag: '30天内有效', rule: '开卡后30天内可预约一次' },
   quarterly: { tag: '90天内有效', rule: '90天内完成一次预约即核销' },
   session: { tag: '按次扣减', rule: '连选N天扣N次' },
-  night_monthly: { tag: '夜读月卡', rule: OFFICE_NIGHT_USAGE_RULE },
+  night_monthly: { tag: '30天夜读', rule: OFFICE_NIGHT_USAGE_RULE },
 }
 
 function formatValidity(card) {
@@ -258,6 +305,8 @@ module.exports = {
   isCardUsable,
   isOfficeNightMonthlyCard,
   nightWindowForDate,
+  normalizeNightBookingTimes,
+  validateNightBookingTimes,
   hourlyAllowsPartialUse,
   dailyPassDays,
   enrichPackage,

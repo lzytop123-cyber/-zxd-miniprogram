@@ -2,6 +2,7 @@ const { request } = require('../../utils/request')
 const auth = require('../../utils/auth')
 const {
   computeCanOpen,
+  getOpenWindowHint,
   mapBleOpenFailure,
   showOpenFailureModal,
 } = require('../../utils/bleUnlock')
@@ -64,6 +65,7 @@ Page({
     statusHint: '',
     countdown: '',
     canOpen: false,
+    openWindowHint: '',
     lockData: '',
     lockName: '',
     gatewayUnlock: false,
@@ -155,13 +157,15 @@ Page({
     if (!reservation) return
     if (this._timer) clearInterval(this._timer)
     this._expiredReloadFor = null
-    const canOpen = computeCanOpen(reservation.start_time, reservation.end_time)
+    const canOpen = computeCanOpen(reservation)
+    const openWindowHint = getOpenWindowHint(reservation)
     this.setData({
       reservation,
       endDisplay: formatDate(reservation.end_time),
       statusLabel: reservation.status_label || '',
       statusHint: reservation.status_hint || '',
       canOpen,
+      openWindowHint,
       lastOpenError: '',
     })
     this.loadBleKey(canOpen ? reservation.id : null)
@@ -192,9 +196,10 @@ Page({
       const now = new Date()
       const end = parseTime(reservation.end_time)
       const diff = end - now
-      const canOpen = computeCanOpen(reservation.start_time, reservation.end_time, now)
+      const canOpen = computeCanOpen(reservation, now)
+      const openWindowHint = getOpenWindowHint(reservation, now)
       if (diff <= 0) {
-        this.setData({ countdown: '已结束', canOpen: false })
+        this.setData({ countdown: '已结束', canOpen: false, openWindowHint: '订单已结束，无法开门' })
         if (this._expiredReloadFor !== reservation.id) {
           this._expiredReloadFor = reservation.id
           this.loadActive()
@@ -204,6 +209,7 @@ Page({
       this.setData({
         countdown: formatCountdown(diff),
         canOpen,
+        openWindowHint,
       })
     }
     tick()
