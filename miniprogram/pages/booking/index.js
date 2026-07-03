@@ -3,7 +3,7 @@ const auth = require('../../utils/auth')
 const routes = require('../../utils/routes')
 const { FLOOR_PLAN } = require('../../utils/assets')
 const { getLayout } = require('../../utils/seat-layout')
-const { debounce } = require('../../utils/debounce')
+const { debounce } = require('./utils/debounce')
 const {
   dailyPassDays,
   isOfficeNightMonthlyCard,
@@ -30,7 +30,7 @@ const {
   combineDateTime,
   nowTimeStr,
   pad,
-} = require('../../utils/datetime')
+} = require('./utils/datetime')
 
 const BILL_DEFAULTS = {
   hourly: { startClock: '07:30', endClock: '09:30', hours: 2 },
