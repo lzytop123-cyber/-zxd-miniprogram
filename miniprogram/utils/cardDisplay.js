@@ -63,7 +63,8 @@ const TYPE_LABELS = {
   night_monthly: '夜读月卡',
 }
 
-const OFFICE_NIGHT_USAGE_RULE = '默认30天固定座位 · 工作日 18:00-23:30 · 周末 7:30-23:30 可使用'
+const OFFICE_NIGHT_USAGE_RULE = '可提前预约固定座位 · 每日可用：工作日 18:00-23:30 · 周末 7:30-23:30（开门时生效）'
+const OFFICE_NIGHT_BOOKING_HINT = '选择开始使用日期即可，最长连续 30 天；每日具体时段在到店开门时校验'
 
 function isOfficeNightMonthlyCard(card) {
   if (!card) return false
@@ -304,6 +305,7 @@ module.exports = {
   TYPE_LABELS,
   PKG_CATEGORY_TABS,
   OFFICE_NIGHT_USAGE_RULE,
+  OFFICE_NIGHT_BOOKING_HINT,
   formatCard,
   isCardUsable,
   isOfficeNightMonthlyCard,

@@ -1,6 +1,6 @@
 const { request } = require('../../utils/request')
 const { getLayout } = require('../../utils/seat-layout')
-const { hourlyAllowsPartialUse, dailyPassDays, isOfficeNightMonthlyCard } = require('../../utils/cardDisplay')
+const { hourlyAllowsPartialUse, dailyPassDays, isOfficeNightMonthlyCard, OFFICE_NIGHT_BOOKING_HINT } = require('../../utils/cardDisplay')
 const { completeWechatPay } = require('../../utils/pay')
 
 const BILL_LABELS = { hourly: '按小时', daily: '天卡', weekly: '周卡', session: '次卡', monthly: '月卡', quarterly: '季卡', night: '夜读' }
@@ -28,9 +28,28 @@ function bookingHours(startIso, endIso) {
 }
 
 function formatDate(iso) {
-  const d = new Date(iso)
+  const d = new Date(String(iso).replace(' ', 'T'))
   const pad = (n) => (n < 10 ? '0' + n : '' + n)
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`
+}
+
+function formatOrderRange(billType, startIso, endIso) {
+  const pad = (n) => (n < 10 ? '0' + n : '' + n)
+  const fmtDate = (iso) => {
+    const d = new Date(String(iso).replace(' ', 'T'))
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
+  }
+  if (billType === 'night') {
+    const start = fmtDate(startIso)
+    const end = fmtDate(endIso)
+    const days = countSessionDays(startIso, endIso)
+    return { startDisplay: start, endDisplay: end, nightDays: days }
+  }
+  return {
+    startDisplay: formatDate(startIso),
+    endDisplay: formatDate(endIso),
+    nightDays: 0,
+  }
 }
 
 Page({
@@ -59,6 +78,8 @@ Page({
     usableCoupons: [],
     selectedCouponId: null,
     sessionDays: 0,
+    nightDays: 0,
+    nightBookingHint: OFFICE_NIGHT_BOOKING_HINT,
     submitting: false,
   },
 
@@ -68,22 +89,25 @@ Page({
     const seatDisplay = display.mapLabel
       ? `${display.mapLabel} 号 · ${display.zoneName}`
       : (options.seatCode || '-')
+    const startTime = decodeURIComponent(options.start)
+    const endTime = decodeURIComponent(options.end)
+    const billType = options.billType || 'hourly'
+    const range = formatOrderRange(billType, startTime, endTime)
     this.setData({
       storeId: options.storeId,
-      startTime: decodeURIComponent(options.start),
-      endTime: decodeURIComponent(options.end),
+      startTime,
+      endTime,
       seatId: options.seatId,
       seatCode: options.seatCode,
       seatDisplay,
       originalPrice: options.price,
       price: options.price,
-      billType: options.billType || 'hourly',
-      billTypeLabel: BILL_LABELS[options.billType] || '按小时',
-      startDisplay: formatDate(decodeURIComponent(options.start)),
-      endDisplay: formatDate(decodeURIComponent(options.end)),
-      sessionDays: options.billType === 'session'
-        ? countSessionDays(decodeURIComponent(options.start), decodeURIComponent(options.end))
-        : 0,
+      billType,
+      billTypeLabel: BILL_LABELS[billType] || '按小时',
+      startDisplay: range.startDisplay,
+      endDisplay: range.endDisplay,
+      nightDays: range.nightDays,
+      sessionDays: billType === 'session' ? countSessionDays(startTime, endTime) : 0,
     })
   },
 
@@ -118,8 +142,22 @@ Page({
           return bookingH <= Number(c.remaining_hours)
         }
         if (c.card_type === 'session') return billType === 'session'
-        if (isOfficeNightMonthlyCard(c) || c.usage_rule) return billType === 'night'
-        if (c.card_type === 'night_monthly') return billType === 'night'
+        if (isOfficeNightMonthlyCard(c) || c.usage_rule) {
+          if (billType !== 'night') return false
+          const start = this.data.startTime.slice(0, 10)
+          const end = this.data.endTime.slice(0, 10)
+          if (c.start_date && start < c.start_date) return false
+          if (c.end_date && end > c.end_date) return false
+          return true
+        }
+        if (c.card_type === 'night_monthly') {
+          if (billType !== 'night') return false
+          const start = this.data.startTime.slice(0, 10)
+          const end = this.data.endTime.slice(0, 10)
+          if (c.start_date && start < c.start_date) return false
+          if (c.end_date && end > c.end_date) return false
+          return true
+        }
         if (c.card_type === 'daily') {
           if (billType !== 'daily') return false
           const span = dailyPassDays(c)

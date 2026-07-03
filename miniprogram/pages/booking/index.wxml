@@ -119,7 +119,7 @@
     <!-- 夜读 -->
     <block wx:if="{{billType==='night'}}">
       <picker mode="date" value="{{startDate}}" start="{{nightDateMin || today}}" end="{{nightDateMax || ''}}" bindchange="onStartDateChange">
-        <view class="field"><text class="field-key">开始日期</text><text class="field-val">{{startDate}} ›</text></view>
+        <view class="field"><text class="field-key">开始使用日期</text><text class="field-val">{{startDate}} ›</text></view>
       </picker>
       <picker mode="date" value="{{endDate}}" start="{{startDate}}" end="{{nightDateMax || ''}}" bindchange="onEndDateChange">
         <view class="field"><text class="field-key">结束日期</text><text class="field-val">{{endDate}} ›</text></view>

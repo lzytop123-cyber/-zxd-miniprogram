@@ -18,7 +18,7 @@ OFFICE_NIGHT_WEEKDAY_START = datetime.strptime("18:00", "%H:%M").time()
 OFFICE_NIGHT_WEEKDAY_END = datetime.strptime("23:30", "%H:%M").time()
 OFFICE_NIGHT_WEEKEND_START = datetime.strptime("07:30", "%H:%M").time()
 OFFICE_NIGHT_WEEKEND_END = datetime.strptime("23:30", "%H:%M").time()
-OFFICE_NIGHT_USAGE_RULE = "默认30天固定座位 · 工作日 18:00-23:30 · 周末 7:30-23:30 可使用"
+OFFICE_NIGHT_USAGE_RULE = "可提前预约固定座位 · 每日可用：工作日 18:00-23:30 · 周末 7:30-23:30（开门时生效）"
 OFFICE_NIGHT_MAX_DAYS = 30
 OFFICE_NIGHT_BILL_TYPES = frozenset({BillType.night, BillType.night_monthly})
 

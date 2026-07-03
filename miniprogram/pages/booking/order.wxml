@@ -5,6 +5,9 @@
     <view class="row"><text class="row-label">座位</text><text>{{seatDisplay || seatCode}}</text></view>
     <view class="row"><text class="row-label">开始</text><text>{{startDisplay}}</text></view>
     <view class="row"><text class="row-label">结束</text><text>{{endDisplay}}</text></view>
+    <view class="hint-warn" wx:if="{{billType === 'night' && nightDays > 0}}">
+      固定座位 {{nightDays}} 天 · {{nightBookingHint}}
+    </view>
 
     <view class="section-title inner" wx:if="{{usableCoupons.length}}">优惠券</view>
     <picker wx:if="{{usableCoupons.length}}" mode="selector" range="{{usableCoupons}}" range-key="coupon_name" bindchange="selectCoupon">

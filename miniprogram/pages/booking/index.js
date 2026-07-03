@@ -4,7 +4,7 @@ const routes = require('../../utils/routes')
 const { FLOOR_PLAN } = require('../../utils/assets')
 const { getLayout } = require('../../utils/seat-layout')
 const { debounce } = require('../../utils/debounce')
-const { dailyPassDays, isOfficeNightMonthlyCard, isCardUsable, OFFICE_NIGHT_USAGE_RULE } = require('../../utils/cardDisplay')
+const { dailyPassDays, isOfficeNightMonthlyCard, isCardUsable, OFFICE_NIGHT_USAGE_RULE, OFFICE_NIGHT_BOOKING_HINT } = require('../../utils/cardDisplay')
 const {
   formatLocalDateTime,
   todayStr,
@@ -56,7 +56,7 @@ Page({
     startTime: '',
     endTime: '',
     timeSummary: '',
-    nightHint: OFFICE_NIGHT_USAGE_RULE,
+    nightHint: OFFICE_NIGHT_BOOKING_HINT,
     activeNightCard: null,
     nightDateMin: '',
     nightDateMax: '',
@@ -167,25 +167,30 @@ Page({
       .catch(() => {})
   },
 
+  _nightMaxEnd(startDate, card) {
+    let end = addDays(startDate, BILL_DEFAULTS.night.endOffset)
+    if (card && card.end_date && end > card.end_date) end = card.end_date
+    return end
+  },
+
   _applyNightPeriod(startDate, card) {
     const today = todayStr()
     let start = startDate || today
-    let end = addDays(start, BILL_DEFAULTS.night.endOffset)
     let min = today
     let max = ''
     if (card && card.start_date && card.end_date) {
       min = card.start_date > today ? card.start_date : today
       max = card.end_date
       if (start < min) start = min
-      if (start > card.end_date) start = min
-      end = card.end_date
+      if (start > max) start = min
     }
+    const end = this._nightMaxEnd(start, card)
     return {
       startDate: start,
       endDate: end,
       nightDateMin: min,
       nightDateMax: max,
-      nightHint: `${OFFICE_NIGHT_USAGE_RULE}，完成一次预约即核销`,
+      nightHint: `${OFFICE_NIGHT_BOOKING_HINT}。${OFFICE_NIGHT_USAGE_RULE}`,
     }
   },
 
@@ -286,7 +291,19 @@ Page({
 
   onEndDateChange(e) {
     if (this.data.billType === 'daily' && this.data.dailyUseMode === 'multi_pass') return
-    this.setData({ endDate: e.detail.value }, () => this.refreshPreview())
+    const endDate = e.detail.value
+    if (this.data.billType === 'night') {
+      const maxEnd = this._nightMaxEnd(this.data.startDate, this.data.activeNightCard)
+      if (endDate > maxEnd) {
+        wx.showToast({ title: `结束日期不能晚于 ${maxEnd}`, icon: 'none' })
+        return
+      }
+      if (endDate < this.data.startDate) {
+        wx.showToast({ title: '结束日期不能早于开始日期', icon: 'none' })
+        return
+      }
+    }
+    this.setData({ endDate }, () => this.refreshPreview())
   },
 
   onStartClockChange(e) {
@@ -388,6 +405,15 @@ Page({
   },
 
   _formatSummary(start, end) {
+    if (this.data.billType === 'night') {
+      const fmtDate = (s) => {
+        const d = new Date(s.replace(' ', 'T'))
+        const w = ['日', '一', '二', '三', '四', '五', '六'][d.getDay()]
+        return `${s.slice(0, 10)} 周${w}`
+      }
+      const days = Math.floor((new Date(end.replace(' ', 'T')) - new Date(start.replace(' ', 'T'))) / 86400000) + 1
+      return `${fmtDate(start)}  →  ${fmtDate(end)} · 共 ${days} 天`
+    }
     const fmt = (s) => {
       const d = new Date(s.replace(' ', 'T'))
       const w = ['日', '一', '二', '三', '四', '五', '六'][d.getDay()]
