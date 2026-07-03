@@ -24,6 +24,12 @@
       期限卡与当前套餐不匹配，请返回切换
     </view>
 
+    <view class="hint-warn" wx:if="{{payOptionsError}}">{{payOptionsError}}</view>
+
+    <view class="hint-soft" wx:if="{{usableCards.length && payType === 'wechat'}}">
+      有 {{usableCards.length}} 张期限卡可用，可切换支付方式
+    </view>
+
     <view class="fee-block">
       <view class="row" wx:if="{{discountPrice > 0}}"><text class="row-label">优惠</text><text class="discount">-¥{{discountPrice}}</text></view>
       <view class="row price-row"><text class="row-label">应付</text><text class="price">¥{{price}}</text></view>

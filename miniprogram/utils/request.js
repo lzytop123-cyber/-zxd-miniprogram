@@ -144,4 +144,11 @@ function invalidateCache(match) {
   requestCache.invalidate(match)
 }
 
-module.exports = { request, invalidateCache }
+function formatRequestError(err) {
+  if (!err) return '请求失败'
+  if (typeof err.detail === 'string') return err.detail
+  if (typeof err.message === 'string' && err.message) return err.message
+  return '请求失败'
+}
+
+module.exports = { request, invalidateCache, getErrorMessage, formatRequestError }

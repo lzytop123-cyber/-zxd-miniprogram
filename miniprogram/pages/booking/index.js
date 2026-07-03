@@ -1,4 +1,4 @@
-const { request } = require('../../utils/request')
+const { request, formatRequestError } = require('../../utils/request')
 const auth = require('../../utils/auth')
 const routes = require('../../utils/routes')
 const { getLayout } = require('../../utils/seat-layout')
@@ -101,6 +101,10 @@ Page({
     nightDateMin: '',
     nightDateMax: '',
     pricingMap: {},
+    hourlyMinHours: 2,
+    hourlyMaxHours: 24,
+    hourlyHint: '最少2小时，最长24小时',
+    previewError: '',
     seatsLoading: false,
     previewLoading: false,
     showSeatMap: false,
@@ -180,7 +184,22 @@ Page({
     ;(rules || []).forEach((r) => {
       pricingMap[r.bill_type] = r
     })
-    return { pricingMap }
+    const hourly = pricingMap.hourly || {}
+    const minH = hourly.min_hours || 2
+    const maxH = hourly.max_hours || 24
+    return {
+      pricingMap,
+      hourlyMinHours: minH,
+      hourlyMaxHours: maxH,
+      hourlyHint: `最少${minH}小时，最长${maxH}小时`,
+    }
+  },
+
+  _hourlyLimits() {
+    return {
+      min: this.data.hourlyMinHours || 2,
+      max: this.data.hourlyMaxHours || 24,
+    }
   },
 
   loadUserCards() {
@@ -500,11 +519,12 @@ Page({
       const err = validateStoreTimeRange(startDate, startClock, endClock)
       if (err) throw new Error(err)
       if (end <= start) {
-        end.setDate(end.getDate() + 1)
+        throw new Error('结束时间须晚于开始时间')
       }
+      const { min, max } = this._hourlyLimits()
       const diffH = (end - start) / 3600000
-      if (diffH < 2) throw new Error('按小时预约最少2小时')
-      if (diffH > 24) throw new Error('按小时预约最长24小时')
+      if (diffH < min) throw new Error(`按小时预约最少${min}小时`)
+      if (diffH > max) throw new Error(`按小时预约最长${max}小时`)
     } else if (billType === 'night') {
       ;({ start, end } = nightRangeDateTimes(startDate, endDate))
       if (end <= start) throw new Error('结束日期须晚于开始日期')
@@ -588,6 +608,7 @@ Page({
         endTime: '',
         previewLoading: false,
         showSeatMap: false,
+        previewError: err.message || '请检查使用时间',
       })
       return Promise.resolve()
     }
@@ -598,6 +619,7 @@ Page({
       timeSummary: this._formatSummary(start, end),
       previewLoading: true,
       showSeatMap: true,
+      previewError: '',
     })
 
     const seatPromise = this.loadSeats(start, end, options)
@@ -617,7 +639,13 @@ Page({
         }
         this.setData(patch)
       })
-      .catch(() => this.setData({ preview: null, previewLoading: false }))
+      .catch((e) => {
+        this.setData({
+          preview: null,
+          previewLoading: false,
+          previewError: formatRequestError(e),
+        })
+      })
 
     return Promise.all([seatPromise, previewPromise])
   },

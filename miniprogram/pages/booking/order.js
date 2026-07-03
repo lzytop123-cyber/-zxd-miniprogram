@@ -1,19 +1,9 @@
-const { request } = require('../../utils/request')
+const { request, formatRequestError } = require('../../utils/request')
 const { getLayout } = require('../../utils/seat-layout')
 const { dailyPassDays, isOfficeNightMonthlyCard, OFFICE_NIGHT_BOOKING_HINT } = require('../../utils/cardDisplay')
 const { completeWechatPay } = require('../../utils/pay')
 
 const BILL_LABELS = { hourly: '按小时', daily: '天卡', weekly: '周卡', session: '次卡', monthly: '月卡', quarterly: '季卡', night: '夜读' }
-
-const CARD_BILL_MAP = {
-  hourly: ['hourly'],
-  daily: ['daily'],
-  weekly: ['weekly'],
-  session: ['session'],
-  monthly: ['monthly'],
-  quarterly: ['quarterly'],
-  night: ['night', 'night_monthly'],
-}
 
 function countSessionDays(startIso, endIso) {
   const s = new Date(startIso.replace(' ', 'T'))
@@ -25,6 +15,63 @@ function bookingHours(startIso, endIso) {
   const s = new Date(startIso.replace(' ', 'T'))
   const e = new Date(endIso.replace(' ', 'T'))
   return Math.round((e - s) / 3600000 * 10) / 10
+}
+
+function withinCardPeriod(card, startIso, endIso) {
+  const start = startIso.slice(0, 10)
+  const end = endIso.slice(0, 10)
+  if (card.start_date && start < card.start_date) return false
+  if (card.end_date && end > card.end_date) return false
+  return true
+}
+
+function isUsableCard(card, ctx) {
+  const {
+    storeId, billType, startTime, endTime, sessionDays, bookingH,
+  } = ctx
+  if (card.store_id && card.store_id !== storeId) return false
+
+  if (card.card_type === 'hourly') {
+    if (billType !== 'hourly') return false
+    if (!(Number(card.remaining_hours) > 0)) return false
+    return bookingH > 0 && bookingH <= Number(card.remaining_hours)
+  }
+
+  if (card.card_type === 'session') {
+    if (billType !== 'session') return false
+    if (!(Number(card.remaining_sessions) > 0)) return false
+    return sessionDays >= 1 && sessionDays <= Number(card.remaining_sessions)
+      && withinCardPeriod(card, startTime, endTime)
+  }
+
+  if (isOfficeNightMonthlyCard(card) || card.card_type === 'night_monthly' || card.usage_rule) {
+    if (billType !== 'night') return false
+    return withinCardPeriod(card, startTime, endTime)
+  }
+
+  if (card.card_type === 'daily') {
+    if (billType !== 'daily') return false
+    const span = dailyPassDays(card)
+    const start = startTime.slice(0, 10)
+    const end = endTime.slice(0, 10)
+    if (span > 1) {
+      return start === card.start_date && end === card.end_date
+    }
+    if (start !== end) return false
+    return withinCardPeriod(card, startTime, endTime)
+  }
+
+  if (card.card_type === 'weekly') {
+    return billType === 'weekly' && withinCardPeriod(card, startTime, endTime)
+  }
+  if (card.card_type === 'monthly') {
+    return billType === 'monthly' && withinCardPeriod(card, startTime, endTime)
+  }
+  if (card.card_type === 'quarterly') {
+    return billType === 'quarterly' && withinCardPeriod(card, startTime, endTime)
+  }
+
+  return false
 }
 
 function formatDate(iso) {
@@ -80,6 +127,7 @@ Page({
     sessionDays: 0,
     nightDays: 0,
     nightBookingHint: OFFICE_NIGHT_BOOKING_HINT,
+    payOptionsError: '',
     submitting: false,
   },
 
@@ -128,80 +176,41 @@ Page({
       ])
       const storeId = Number(this.data.storeId)
       const billType = this.data.billType
-      const bookingH = billType === 'hourly' ? bookingHours(this.data.startTime, this.data.endTime) : 0
-      const allowedTypes = CARD_BILL_MAP[billType] || [billType]
-      const usableCards = (cards || []).filter((c) => {
-        if (c.store_id && c.store_id !== storeId) return false
-        if (c.card_type === 'hourly' && !(c.remaining_hours > 0)) return false
-        if (c.card_type === 'session' && !(c.remaining_sessions > 0)) return false
-        if (c.card_type === 'hourly') {
-          if (billType !== 'hourly') return false
-          return bookingH <= Number(c.remaining_hours)
-        }
-        if (c.card_type === 'session') return billType === 'session'
-        if (isOfficeNightMonthlyCard(c) || c.usage_rule) {
-          if (billType !== 'night') return false
-          const start = this.data.startTime.slice(0, 10)
-          const end = this.data.endTime.slice(0, 10)
-          if (c.start_date && start < c.start_date) return false
-          if (c.end_date && end > c.end_date) return false
-          return true
-        }
-        if (c.card_type === 'night_monthly') {
-          if (billType !== 'night') return false
-          const start = this.data.startTime.slice(0, 10)
-          const end = this.data.endTime.slice(0, 10)
-          if (c.start_date && start < c.start_date) return false
-          if (c.end_date && end > c.end_date) return false
-          return true
-        }
-        if (c.card_type === 'daily') {
-          if (billType !== 'daily') return false
-          const span = dailyPassDays(c)
-          const start = this.data.startTime.slice(0, 10)
-          const end = this.data.endTime.slice(0, 10)
-          if (span > 1) {
-            return start === c.start_date && end === c.end_date
-          }
-          if (start !== end) return false
-          if (c.start_date && start < c.start_date) return false
-          if (c.end_date && end > c.end_date) return false
-          return true
-        }
-        if (c.card_type === 'weekly') return billType === 'weekly'
-        if (c.card_type === 'monthly') return billType === 'monthly'
-        if (c.card_type === 'quarterly') return billType === 'quarterly'
-        return allowedTypes.includes(c.card_type)
-      })
+      const { startTime, endTime } = this.data
+      const sessionDays = billType === 'session' ? countSessionDays(startTime, endTime) : 0
+      const bookingH = billType === 'hourly' ? bookingHours(startTime, endTime) : 0
+      const ctx = { storeId, billType, startTime, endTime, sessionDays, bookingH }
+      const usableCards = (cards || []).filter((c) => isUsableCard(c, ctx))
       const originalPrice = Number(this.data.originalPrice)
       const usableCoupons = (coupons || []).filter(
         (c) => c.status === 0 && originalPrice >= (c.min_amount || 0)
       )
-      const patch = { cards, usableCards, coupons, usableCoupons }
-      if (
-        usableCards.length
-        && this.data.payType === 'wechat'
-        && !this.data.orderNo
-      ) {
-        const cur = usableCards[0]
-        patch.payType = 'period_card'
-        patch.selectedCardId = cur.id
-        patch.selectedCardName = cur.card_name || cur.card_type
-        patch.price = 0
-        patch.discountPrice = 0
-      } else if (this.data.payType === 'period_card' && usableCards.length) {
+      const patch = {
+        cards,
+        usableCards,
+        coupons,
+        usableCoupons,
+        payOptionsError: '',
+      }
+      if (this.data.payType === 'period_card') {
         const cur = usableCards.find((c) => c.id === this.data.selectedCardId) || usableCards[0]
-        patch.selectedCardId = cur.id
-        patch.selectedCardName = cur.card_name || cur.card_type
-        patch.price = 0
-        patch.discountPrice = 0
+        if (cur) {
+          patch.selectedCardId = cur.id
+          patch.selectedCardName = cur.card_name || cur.card_type
+          patch.price = 0
+          patch.discountPrice = 0
+        } else {
+          patch.payType = 'wechat'
+          patch.selectedCardId = null
+          patch.selectedCardName = ''
+        }
       } else if (!usableCards.length) {
         patch.selectedCardId = null
         patch.selectedCardName = ''
       }
       this.setData(patch)
     } catch (e) {
-      // ignore
+      this.setData({ payOptionsError: formatRequestError(e) })
     }
   },
 
@@ -267,7 +276,7 @@ Page({
         originalPrice: preview.original_price,
       })
     } catch (e) {
-      wx.showToast({ title: e.message || '优惠券不可用', icon: 'none' })
+      wx.showToast({ title: formatRequestError(e), icon: 'none' })
     }
   },
 
@@ -336,7 +345,7 @@ Page({
         }).catch(() => {})
         this.setData({ reservationId: null, orderNo: '' })
       }
-      wx.showToast({ title: e.detail || e.message || '下单失败', icon: 'none' })
+      wx.showToast({ title: formatRequestError(e), icon: 'none' })
     } finally {
       this._submitting = false
       this.setData({ submitting: false })

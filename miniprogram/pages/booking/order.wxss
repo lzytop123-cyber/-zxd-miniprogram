@@ -73,6 +73,13 @@
   line-height: 1.6;
 }
 
+.hint-soft {
+  color: #5C7567;
+  font-size: 24rpx;
+  margin: 8rpx 0 16rpx;
+  line-height: 1.5;
+}
+
 .pay-types {
   display: flex;
   gap: 16rpx;

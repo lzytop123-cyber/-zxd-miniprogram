@@ -226,6 +226,16 @@
   margin-bottom: 8rpx;
 }
 
+.preview-error {
+  margin-top: 16rpx;
+  padding: 18rpx 20rpx;
+  border-radius: 16rpx;
+  background: #FFF5F5;
+  color: #C0392B;
+  font-size: 24rpx;
+  line-height: 1.5;
+}
+
 .time-summary {
   display: flex;
   align-items: center;
