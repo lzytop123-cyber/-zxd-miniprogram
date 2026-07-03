@@ -13,6 +13,8 @@ def guess_reward_from_name(name: str) -> tuple[RewardType, int]:
         return RewardType.hours, 4
     if "季卡" in name:
         return RewardType.quarter_pass, 90
+    if "上班族" in name and "月" in name:
+        return RewardType.night_monthly, 30
     if "晚自习" in name or ("夜" in name and "月" in name):
         return RewardType.night_monthly, 30
     if "月卡" in name:

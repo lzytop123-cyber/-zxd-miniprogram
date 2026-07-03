@@ -127,7 +127,7 @@
       <picker mode="time" value="{{endClock}}" bindchange="onEndClockChange">
         <view class="field"><text class="field-key">结束时间</text><text class="field-val">{{endClock}} ›</text></view>
       </picker>
-      <view class="hint">夜读时段默认 {{nightHint}}</view>
+      <view class="hint">工作日 18:00-23:30 · 周末 7:30-23:30</view>
     </block>
 
     <view class="time-summary" wx:if="{{timeSummary}}">

@@ -118,6 +118,62 @@ def test_daily_pass_three_day_continuous():
         assert "连续使用" in str(e)
 
 
+def test_office_night_weekday_window():
+    from datetime import time
+
+    card = PeriodCard(
+        user_id=1,
+        card_name="「上班族」月卡",
+        card_type=CardType.night_monthly,
+        status=1,
+        start_date=datetime(2026, 7, 6).date(),  # Monday
+        end_date=datetime(2026, 8, 4).date(),
+    )
+    start = datetime(2026, 7, 6, 18, 0, 0)
+    end = datetime(2026, 7, 6, 23, 30, 0)
+    validate_period_card_for_reservation(None, card, BillType.night, start, end, 1)
+
+    too_early = datetime(2026, 7, 6, 17, 30, 0)
+    try:
+        validate_period_card_for_reservation(None, card, BillType.night, too_early, end, 1)
+        raise AssertionError("工作日不应允许17:30开始")
+    except ValueError as e:
+        assert "工作日" in str(e)
+
+
+def test_office_night_weekend_window():
+    card = PeriodCard(
+        user_id=1,
+        card_name="知行岛晚自习月卡",
+        card_type=CardType.night_monthly,
+        status=1,
+        start_date=datetime(2026, 7, 4).date(),  # Saturday
+        end_date=datetime(2026, 8, 3).date(),
+    )
+    start = datetime(2026, 7, 4, 7, 30, 0)
+    end = datetime(2026, 7, 4, 23, 30, 0)
+    validate_period_card_for_reservation(None, card, BillType.night, start, end, 1)
+
+
+def test_legacy_monthly_office_card_uses_night_bill():
+    card = PeriodCard(
+        user_id=1,
+        card_name="「上班族」月卡",
+        card_type=CardType.monthly,
+        status=1,
+        start_date=datetime(2026, 7, 6).date(),
+        end_date=datetime(2026, 8, 4).date(),
+    )
+    start = datetime(2026, 7, 6, 18, 0, 0)
+    end = datetime(2026, 7, 6, 23, 0, 0)
+    validate_period_card_for_reservation(None, card, BillType.night, start, end, 1)
+    try:
+        validate_period_card_for_reservation(None, card, BillType.monthly, start, end, 1)
+        raise AssertionError("上班族月卡不应走普通月卡预约")
+    except ValueError as e:
+        assert "夜读" in str(e)
+
+
 if __name__ == "__main__":
     test_session_multi_day_deduct()
     test_weekly_one_shot()
@@ -125,4 +181,7 @@ if __name__ == "__main__":
     test_hourly_single_use_must_match_remaining()
     test_hourly_50h_partial_use()
     test_daily_pass_three_day_continuous()
+    test_office_night_weekday_window()
+    test_office_night_weekend_window()
+    test_legacy_monthly_office_card_uses_night_bill()
     print("All card rule tests passed.")

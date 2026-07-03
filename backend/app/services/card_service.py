@@ -1,4 +1,4 @@
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, time, timedelta
 from decimal import Decimal
 
 from sqlalchemy import select
@@ -13,6 +13,40 @@ from app.models import (
     RewardType,
 )
 MULTI_USE_HOURLY_THRESHOLD = Decimal("50")
+
+OFFICE_NIGHT_WEEKDAY_START = datetime.strptime("18:00", "%H:%M").time()
+OFFICE_NIGHT_WEEKDAY_END = datetime.strptime("23:30", "%H:%M").time()
+OFFICE_NIGHT_WEEKEND_START = datetime.strptime("07:30", "%H:%M").time()
+OFFICE_NIGHT_WEEKEND_END = datetime.strptime("23:30", "%H:%M").time()
+OFFICE_NIGHT_USAGE_RULE = "工作日 18:00-23:30 · 周末 7:30-23:30"
+
+
+def is_office_night_monthly_card(card: PeriodCard) -> bool:
+    """上班族/晚自习月卡（含历史误发为 monthly 的同名额卡）。"""
+    if card.card_type == CardType.night_monthly:
+        return True
+    name = card.card_name or ""
+    return card.card_type == CardType.monthly and ("上班族" in name or "晚自习" in name)
+
+
+def night_window_for_date(day: date) -> tuple[time, time, str]:
+    if day.weekday() < 5:
+        return OFFICE_NIGHT_WEEKDAY_START, OFFICE_NIGHT_WEEKDAY_END, "工作日"
+    return OFFICE_NIGHT_WEEKEND_START, OFFICE_NIGHT_WEEKEND_END, "周末"
+
+
+def validate_office_night_reservation(start_time: datetime, end_time: datetime) -> None:
+    if start_time.date() != end_time.date():
+        raise ValueError("夜读月卡须预约单日时段")
+    win_start, win_end, label = night_window_for_date(start_time.date())
+    start_s = win_start.strftime("%H:%M")
+    end_s = win_end.strftime("%H:%M")
+    if start_time.time() < win_start:
+        raise ValueError(f"{label}可用时段为 {start_s}-{end_s}")
+    if end_time.time() > win_end:
+        raise ValueError(f"{label}可用时段为 {start_s}-{end_s}")
+    if end_time <= start_time:
+        raise ValueError("结束时间须晚于开始时间")
 
 
 REWARD_TO_CARD: dict[RewardType, CardType] = {
@@ -209,13 +243,10 @@ def validate_period_card_for_reservation(
         _validate_reservation_within_card_period(card, start_time, end_time)
         return
 
-    if card.card_type == CardType.night_monthly:
+    if is_office_night_monthly_card(card):
         if reservation_bill_type != BillType.night:
-            raise ValueError("晚自习月卡仅可用于夜读预约")
-        if card.daily_start:
-            limit = card.daily_start
-            if start_time.time() < limit:
-                raise ValueError(f"晚自习月卡每日 {limit.strftime('%H:%M')} 后方可使用")
+            raise ValueError("该月卡请使用「夜读」预约方式选座")
+        validate_office_night_reservation(start_time, end_time)
         _validate_reservation_within_card_period(card, start_time, end_time)
         return
 

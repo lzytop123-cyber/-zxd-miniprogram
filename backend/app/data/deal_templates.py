@@ -11,7 +11,7 @@ DEAL_MAPPING_TEMPLATES: tuple[tuple[str, str, RewardType, int, None, None], ...]
     ("1378191332", "「全区域通用 可自选」四小时卡", RewardType.hours, 4, None, None),
     ("1358350526", "「全区域通用」十次卡", RewardType.session, 10, None, None),
     ("1345243007", "「可分次·十次通用库」50小时", RewardType.hours, 50, None, None),
-    ("1344290952", "「上班族」月卡", RewardType.month_pass, 30, None, None),
+    ("1344290952", "「上班族」月卡", RewardType.night_monthly, 30, None, None),
     ("1344305321", "「新客专享·全区域通用」月卡", RewardType.month_pass, 30, None, None),
     ("1344307152", "「全区域通用 固定座位」月卡", RewardType.month_pass, 30, None, None),
     ("1344310042", "「全区域通用」周卡", RewardType.week_pass, 7, None, None),

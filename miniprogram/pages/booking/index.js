@@ -4,7 +4,7 @@ const routes = require('../../utils/routes')
 const { FLOOR_PLAN } = require('../../utils/assets')
 const { getLayout } = require('../../utils/seat-layout')
 const { debounce } = require('../../utils/debounce')
-const { dailyPassDays } = require('../../utils/cardDisplay')
+const { dailyPassDays, isOfficeNightMonthlyCard, isCardUsable, nightWindowForDate } = require('../../utils/cardDisplay')
 const {
   formatLocalDateTime,
   todayStr,
@@ -21,7 +21,7 @@ const BILL_DEFAULTS = {
   quarterly: { endOffset: 89 },
   monthly: { endOffset: 29 },
   session: { endOffset: 0 },
-  night: { startClock: '18:00', endClock: '23:59' },
+  night: { startClock: '18:00', endClock: '23:30' },
 }
 
 Page({
@@ -56,7 +56,7 @@ Page({
     startTime: '',
     endTime: '',
     timeSummary: '',
-    nightHint: '18:00 - 次日 00:00',
+    nightHint: '工作日 18:00-23:30 · 周末 7:30-23:30',
     pricingMap: {},
     seatsLoading: false,
     previewLoading: false,
@@ -153,12 +153,33 @@ Page({
     return request({ url: '/user/cards', silent: true })
       .then((cards) => {
         const list = cards || []
-        this.setData({
+        const patch = {
           userCards: list,
           hasMultiDayDailyCard: !!this._findMultiDayDailyCard(list),
+        }
+        const officeNight = list.find((c) => isOfficeNightMonthlyCard(c) && isCardUsable(c))
+        if (officeNight && this.data.billType === 'hourly') {
+          const win = nightWindowForDate(this.data.startDate || todayStr())
+          Object.assign(patch, {
+            billType: 'night',
+            startClock: win.start,
+            endClock: win.end,
+          })
+        }
+        this.setData(patch, () => {
+          if (patch.billType === 'night') this.refreshPreview({ immediate: true })
         })
       })
       .catch(() => {})
+  },
+
+  _applyNightWindowForDate(dateStr) {
+    const win = nightWindowForDate(dateStr || this.data.startDate || todayStr())
+    return {
+      startClock: win.start,
+      endClock: win.end,
+      nightHint: '工作日 18:00-23:30 · 周末 7:30-23:30',
+    }
   },
 
   _findMultiDayDailyCard(cards) {
@@ -218,11 +239,12 @@ Page({
     } else if (billType === 'quarterly') {
       Object.assign(patch, { endDate: addDays(startDate, defaults.endOffset) })
     } else if (billType === 'night') {
-      const night = this.data.pricingMap.night
-      const startClock = night?.night_start ? String(night.night_start).slice(0, 5) : defaults.startClock
-      let endClock = night?.night_end ? String(night.night_end).slice(0, 5) : defaults.endClock
-      if (endClock === '00:00') endClock = '23:59'
-      Object.assign(patch, { startClock, endClock })
+      const win = nightWindowForDate(startDate)
+      Object.assign(patch, {
+        startClock: win.start,
+        endClock: win.end,
+        nightHint: '工作日 18:00-23:30 · 周末 7:30-23:30',
+      })
     }
 
     this.setData(patch, () => this.refreshPreview())
@@ -246,6 +268,8 @@ Page({
       patch.endDate = addDays(startDate, 29)
     } else if (this.data.billType === 'quarterly') {
       patch.endDate = addDays(startDate, 89)
+    } else if (this.data.billType === 'night') {
+      Object.assign(patch, this._applyNightWindowForDate(startDate))
     }
     if (this.data.billType === 'hourly' && startDate === todayStr()) {
       patch.startClock = nowTimeStr()

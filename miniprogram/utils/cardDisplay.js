@@ -63,6 +63,24 @@ const TYPE_LABELS = {
   night_monthly: '夜读月卡',
 }
 
+const OFFICE_NIGHT_USAGE_RULE = '工作日 18:00-23:30 · 周末 7:30-23:30，有效期内完成一次预约即核销'
+
+function isOfficeNightMonthlyCard(card) {
+  if (!card) return false
+  if (card.card_type === 'night_monthly') return true
+  const name = card.card_name || ''
+  return card.card_type === 'monthly' && (name.includes('上班族') || name.includes('晚自习'))
+}
+
+function nightWindowForDate(dateStr) {
+  const d = new Date(`${dateStr}T12:00:00`)
+  const day = d.getDay()
+  const isWeekend = day === 0 || day === 6
+  return isWeekend
+    ? { start: '07:30', end: '23:30', label: '周末' }
+    : { start: '18:00', end: '23:30', label: '工作日' }
+}
+
 const RULE_LINES = {
   daily: '全天不限时，用一次即核销',
   weekly: '7天内完成一次预约即核销',
@@ -70,7 +88,7 @@ const RULE_LINES = {
   quarterly: '90天内完成一次预约即核销',
   session: '按自然日扣次，连选N天扣N次',
   hourly: '须一次性预约用完剩余时长',
-  night_monthly: '夜读时段内完成一次预约即核销',
+  night_monthly: '有效期内完成一次预约即核销',
 }
 
 const CARD_DETAIL_LINES = {
@@ -103,8 +121,8 @@ const CARD_DETAIL_LINES = {
     '可在有效期内多次使用直至小时用完',
   ],
   night_monthly: [
-    '限夜读时段内预约使用',
-    '有效期内完成一次预约即核销',
+    OFFICE_NIGHT_USAGE_RULE,
+    '选座时请选择「夜读」套餐',
   ],
 }
 
@@ -121,7 +139,7 @@ const PKG_HINTS = {
   monthly: { tag: '30天内有效', rule: '开卡后30天内可预约一次' },
   quarterly: { tag: '90天内有效', rule: '90天内完成一次预约即核销' },
   session: { tag: '按次扣减', rule: '连选N天扣N次' },
-  night_monthly: { tag: '夜读时段', rule: '有效期内完成一次预约即核销' },
+  night_monthly: { tag: '夜读月卡', rule: OFFICE_NIGHT_USAGE_RULE },
 }
 
 function formatValidity(card) {
@@ -169,6 +187,7 @@ function buildCardDetail(card) {
   if (card.validityText) lines.unshift(card.validityText)
   if (card.remainText) lines.unshift(card.remainText)
   if (card.daily_start) lines.push(`可用时段：${card.daily_start} 起`)
+  if (isOfficeNightMonthlyCard(card)) lines.push(OFFICE_NIGHT_USAGE_RULE)
   return {
     mode: 'owned',
     title: card.card_name || card.typeLabel,
@@ -234,8 +253,11 @@ function filterPackages(packages, tabKey) {
 module.exports = {
   TYPE_LABELS,
   PKG_CATEGORY_TABS,
+  OFFICE_NIGHT_USAGE_RULE,
   formatCard,
   isCardUsable,
+  isOfficeNightMonthlyCard,
+  nightWindowForDate,
   hourlyAllowsPartialUse,
   dailyPassDays,
   enrichPackage,

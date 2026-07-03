@@ -267,7 +267,7 @@ def seed():
                 ("100001", "知行岛4小时畅学券", RewardType.hours, 4, None, None),
                 ("100002", "知行岛天卡", RewardType.day_pass, 1, None, None),
                 ("100004", "知行岛月卡", RewardType.month_pass, 30, None, None),
-                ("100005", "知行岛晚自习月卡", RewardType.night_monthly, 30, time(18, 0), time(23, 59, 59)),
+                ("100005", "知行岛晚自习月卡", RewardType.night_monthly, 30, time(18, 0), time(23, 30)),
                 ("100007", "知行岛10次卡", RewardType.session, 10, None, None),
             ]
             for deal_id, name, reward_type, value, ns, ne in mappings:
