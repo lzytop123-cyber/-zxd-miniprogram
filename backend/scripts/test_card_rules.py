@@ -57,21 +57,27 @@ def test_quarterly_bill_type():
         assert "不匹配" in str(e)
 
 
-def test_hourly_single_use_must_match_remaining():
+def test_hourly_one_shot_flexible_duration():
+    """4 小时卡可约 3 小时，一次性核销整张卡。"""
     card = _card(CardType.hourly, remaining_hours=Decimal("4"), total_hours=Decimal("4"))
     start = datetime(2026, 6, 24, 9, 0, 0)
-    end = datetime(2026, 6, 24, 11, 0, 0)
-    try:
-        validate_period_card_for_reservation(None, card, BillType.hourly, start, end, 1)
-        raise AssertionError("4小时卡不应允许2小时预约")
-    except ValueError as e:
-        assert "一次性" in str(e)
-
-    end4 = datetime(2026, 6, 24, 13, 0, 0)
-    validate_period_card_for_reservation(None, card, BillType.hourly, start, end4, 1)
-    consume_period_card(None, card, BillType.hourly, start, end4, 1)
+    end3 = datetime(2026, 6, 24, 12, 0, 0)
+    assert not hourly_allows_partial_use(card)
+    validate_period_card_for_reservation(None, card, BillType.hourly, start, end3, 1)
+    consume_period_card(None, card, BillType.hourly, start, end3, 1)
     assert card.remaining_hours == Decimal("0")
     assert card.status == 0
+
+
+def test_hourly_rejects_over_balance():
+    card = _card(CardType.hourly, remaining_hours=Decimal("4"), total_hours=Decimal("4"))
+    start = datetime(2026, 6, 24, 9, 0, 0)
+    end5 = datetime(2026, 6, 24, 14, 0, 0)
+    try:
+        validate_period_card_for_reservation(None, card, BillType.hourly, start, end5, 1)
+        raise AssertionError("不应允许超过余额的预约")
+    except ValueError as e:
+        assert "不能超过" in str(e) or "余额" in str(e)
 
 
 def test_hourly_50h_partial_use():
@@ -323,7 +329,8 @@ if __name__ == "__main__":
     test_session_multi_day_deduct()
     test_weekly_one_shot()
     test_quarterly_bill_type()
-    test_hourly_single_use_must_match_remaining()
+    test_hourly_one_shot_flexible_duration()
+    test_hourly_rejects_over_balance()
     test_hourly_50h_partial_use()
     test_daily_pass_three_day_continuous()
     test_office_night_monthly_period()

@@ -1,27 +1,34 @@
-function hourlyAllowsPartialUse(card) {
+function hourlyAllowsMultiUse(card) {
+  if (!card || card.card_type !== 'hourly') return false
   if (card.total_hours != null) return Number(card.total_hours) >= 50
   if (Number(card.remaining_hours) >= 50) return true
   const name = card.card_name || ''
   return name.includes('50') && name.includes('小时')
 }
 
+/** @deprecated 使用 hourlyAllowsMultiUse */
+function hourlyAllowsPartialUse(card) {
+  return hourlyAllowsMultiUse(card)
+}
+
 function hourlyRuleText(card) {
-  if (hourlyAllowsPartialUse(card)) {
-    return '按小时扣减，可多次预约直至小时用完'
+  if (hourlyAllowsMultiUse(card)) {
+    return '按实际时长扣减，可多次预约直至小时用完'
   }
-  return '须一次性预约用完剩余时长，核销后失效'
+  const h = card.remaining_hours != null ? card.remaining_hours : ''
+  return `可预约不超过 ${h} 小时，一次性核销后失效`
 }
 
 function hourlyDetailLines(card) {
-  if (hourlyAllowsPartialUse(card)) {
+  if (hourlyAllowsMultiUse(card)) {
     return [
-      '按小时扣减，预约时自动抵扣',
+      '按实际预约时长扣减，预约时自动抵扣',
       '可在有效期内多次使用直至小时用完',
     ]
   }
   return [
-    '须一次性预约用完剩余全部时长',
-    '核销后该卡失效，不可分次使用',
+    '预约时长可少于卡面小时数（如 4 小时卡约 3 小时）',
+    '完成预约后该卡一次性核销，不可再次使用',
   ]
 }
 
@@ -122,7 +129,7 @@ const RULE_LINES = {
   monthly: '开卡后30天内可预约一次，使用后即失效',
   quarterly: '90天内完成一次预约即核销',
   session: '按自然日扣次，连选N天扣N次',
-  hourly: '须一次性预约用完剩余时长',
+  hourly: '可约不超过卡面时长，一次性核销',
   night_monthly: '30天内固定座位，完成一次预约即核销',
 }
 
@@ -152,8 +159,8 @@ const CARD_DETAIL_LINES = {
     '可在有效期内多次预约直至次数用完',
   ],
   hourly: [
-    '按小时扣减，预约时自动抵扣',
-    '可在有效期内多次使用直至小时用完',
+    '预约时长可少于卡面小时数',
+    '完成预约后该卡一次性核销',
   ],
   night_monthly: [
     OFFICE_NIGHT_USAGE_RULE,
@@ -211,7 +218,7 @@ function formatCard(card) {
     validityText: formatValidity(card),
     remainText: formatRemain(card),
     ruleText,
-    hourlyMultiUse: card.card_type === 'hourly' ? hourlyAllowsPartialUse(card) : false,
+    hourlyMultiUse: card.card_type === 'hourly' ? hourlyAllowsMultiUse(card) : false,
   }
 }
 
@@ -296,6 +303,7 @@ module.exports = {
   nightWindowForDate,
   normalizeNightBookingTimes,
   validateNightBookingTimes,
+  hourlyAllowsMultiUse,
   hourlyAllowsPartialUse,
   dailyPassDays,
   enrichPackage,

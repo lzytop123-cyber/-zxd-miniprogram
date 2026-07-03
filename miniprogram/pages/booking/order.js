@@ -1,6 +1,6 @@
 const { request } = require('../../utils/request')
 const { getLayout } = require('../../utils/seat-layout')
-const { hourlyAllowsPartialUse, dailyPassDays, isOfficeNightMonthlyCard, OFFICE_NIGHT_BOOKING_HINT } = require('../../utils/cardDisplay')
+const { dailyPassDays, isOfficeNightMonthlyCard, OFFICE_NIGHT_BOOKING_HINT } = require('../../utils/cardDisplay')
 const { completeWechatPay } = require('../../utils/pay')
 
 const BILL_LABELS = { hourly: '按小时', daily: '天卡', weekly: '周卡', session: '次卡', monthly: '月卡', quarterly: '季卡', night: '夜读' }
@@ -136,9 +136,6 @@ Page({
         if (c.card_type === 'session' && !(c.remaining_sessions > 0)) return false
         if (c.card_type === 'hourly') {
           if (billType !== 'hourly') return false
-          if (!hourlyAllowsPartialUse(c)) {
-            return Math.abs(bookingH - Number(c.remaining_hours)) < 0.05
-          }
           return bookingH <= Number(c.remaining_hours)
         }
         if (c.card_type === 'session') return billType === 'session'
