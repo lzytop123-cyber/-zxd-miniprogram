@@ -4,7 +4,6 @@ const {
   computeCanOpen,
   getOpenWindowHint,
   mapBleOpenFailure,
-  showOpenFailureModal,
 } = require('../../utils/bleUnlock')
 
 const CHECKIN_SELECT_KEY = 'checkin_selected_id'
@@ -258,25 +257,16 @@ Page({
         error_msg: errorMsg || failure.content,
       },
     })
-    showOpenFailureModal(failure, {
-      onRetry: () => this.openDoorBle(),
-      onRefresh: () => {
-        this.loadBleKey(reservation.id)
-        setTimeout(() => this.openDoorBle(), 500)
-      },
-    })
+    if (failure.refresh) {
+      this.loadBleKey(reservation.id)
+    }
   },
 
   async openDoorBle() {
     if (!this.data.canOpen || this.data.opening) return
     if (!this.data.pluginReady) {
-      const appId = this.data.runtimeAppId || getRuntimeAppId()
       const hint = this.data.pluginHint || '通通锁插件未加载'
-      wx.showModal({
-        title: '蓝牙开门不可用',
-        content: `${hint}。请确认已在 wx4d3a834429fc6538 后台添加插件并重新上传体验版；当前运行 AppID：${appId || '未知'}。`,
-        showCancel: false,
-      })
+      this.setData({ lastOpenError: hint })
       return
     }
     const { reservation } = this.data
@@ -291,9 +281,7 @@ Page({
         reservation,
         mode: 'ble',
       })
-      showOpenFailureModal(failure, {
-        onRetry: () => this.openDoorBle(),
-      })
+      this.setData({ opening: false, lastOpenError: failure.content })
       return
     }
 
@@ -303,12 +291,7 @@ Page({
 
     if (!plugin || typeof plugin.controlLock !== 'function') {
       wx.hideLoading()
-      this.setData({ opening: false })
-      wx.showModal({
-        title: '蓝牙开门不可用',
-        content: '通通锁插件未正确加载，请重新上传体验版。',
-        showCancel: false,
-      })
+      this.setData({ opening: false, lastOpenError: '蓝牙插件未加载' })
       return
     }
 
@@ -320,13 +303,8 @@ Page({
         reservation,
         mode: 'ble',
       })
-      this.setData({ opening: false })
-      showOpenFailureModal(failure, {
-        onRefresh: () => {
-          this.loadBleKey(reservation.id)
-          setTimeout(() => this.openDoorBle(), 500)
-        },
-      })
+      this.setData({ opening: false, lastOpenError: failure.content })
+      this.loadBleKey(reservation.id)
       return
     }
 

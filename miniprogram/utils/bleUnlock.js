@@ -171,42 +171,9 @@ function mapBleOpenFailure({ errorCode, errorMsg, canOpen, reservation, mode = '
   }
 }
 
-function showOpenFailureModal(failure, { onRetry, onRemote, onRefresh } = {}) {
-  const buttons = []
-  if (failure.showRemote && typeof onRemote === 'function') {
-    buttons.push({ text: '远程开门', action: onRemote })
-  }
-  if (failure.retryLabel) {
-    buttons.push({
-      text: failure.retryLabel,
-      action: failure.refresh ? onRefresh : onRetry,
-    })
-  }
-  buttons.push({ text: '知道了', action: null })
-
-  const itemList = buttons.map((b) => b.text)
-  wx.showActionSheet({
-    itemList,
-    success(res) {
-      const picked = buttons[res.tapIndex]
-      if (picked && typeof picked.action === 'function') {
-        picked.action()
-      }
-    },
-    fail() {
-      wx.showModal({
-        title: failure.title,
-        content: failure.content,
-        showCancel: false,
-      })
-    },
-  })
-}
-
 module.exports = {
   computeCanOpen,
   getOpenWindowHint,
   mapBleOpenFailure,
   reservationOpenWindow,
-  showOpenFailureModal,
 }
