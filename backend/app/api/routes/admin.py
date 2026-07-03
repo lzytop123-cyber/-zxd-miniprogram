@@ -54,7 +54,7 @@ from app.services.booking import add_wallet_log, auto_checkin_reservation, chang
 from app.services.card_service import BILL_TYPE_LABELS
 from app.services.deal_mapping_service import mark_pending_resolved_by_deal_id, resolve_pending_deal
 from app.services.schema_migrate import get_last_migration_result, run_schema_migrations
-from app.services.seat_setup import ensure_store_seats, store_seat_summary
+from app.services.seat_setup import ensure_store_seats, migrate_store_seat_codes, seat_code_to_slot, store_seat_summary
 from app.services.wechat_pay import WechatPayService
 
 router = APIRouter(prefix="/admin", tags=["后台管理"])
@@ -594,11 +594,12 @@ def list_seats(
         z.id: z.name
         for z in db.scalars(select(Zone).where(Zone.store_id == store_id)).all()
     }
-    seats = db.scalars(
-        select(Seat)
-        .where(Seat.store_id == store_id, Seat.is_buffer == 0)
-        .order_by(Seat.seat_code)
-    ).all()
+    seats = list(
+        db.scalars(
+            select(Seat).where(Seat.store_id == store_id, Seat.is_buffer == 0)
+        ).all()
+    )
+    seats.sort(key=lambda s: seat_code_to_slot(s.seat_code) or 9999)
     return ResponseModel(
         data=[
             {
@@ -653,12 +654,12 @@ def admin_ensure_store_seats(
     store = db.get(Store, store_id)
     if not store:
         raise HTTPException(status_code=404, detail="门店不存在")
-    added = ensure_store_seats(db, store)
+    result = migrate_store_seat_codes(db, store)
     db.commit()
     summary = store_seat_summary(db, store_id)
     return ResponseModel(
-        message=f"已补全座位，本次新增 {added} 个",
-        data={**summary, "added": added},
+        message=f"已补全座位，迁移 {result['renamed']} 个、新增 {result['added']} 个",
+        data={**summary, "added": result["added"], "renamed": result["renamed"]},
     )
 
 

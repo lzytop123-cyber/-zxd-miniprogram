@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 
 from app.models import BillType, PeriodCard, PricingRule, Reservation, Seat, StudyStat, User, WalletLog
 from app.services.points import add_points
+from app.services.seat_setup import seat_code_to_slot
 from app.services.business import find_seat_conflict, update_study_title
 
 logger = logging.getLogger(__name__)
@@ -170,11 +171,13 @@ def seat_options_for_change(db: Session, reservation: Reservation) -> list[dict]
         z.id: z.name
         for z in db.scalars(select(Zone).where(Zone.store_id == reservation.store_id)).all()
     }
-    seats = db.scalars(
-        select(Seat)
-        .where(Seat.store_id == reservation.store_id, Seat.is_buffer == 0)
-        .order_by(Seat.seat_code)
-    ).all()
+    seats = sorted(
+        db.scalars(
+            select(Seat)
+            .where(Seat.store_id == reservation.store_id, Seat.is_buffer == 0)
+        ).all(),
+        key=lambda s: seat_code_to_slot(s.seat_code) or 9999,
+    )
 
     options: list[dict] = []
     for seat in seats:

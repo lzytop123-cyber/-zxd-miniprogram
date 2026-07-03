@@ -22,7 +22,7 @@
       show-icon
       class="summary-alert"
       :title="`座位不完整：当前 ${summary.actual_count}/${summary.expected_count}，缺少 ${summary.missing_codes.join('、')}`"
-      description="点击右上角「补全标准座位」可一键创建 A/B/C/D 共 27 个标准座位（含 D01–D03）。"
+      description="点击右上角「补全标准座位」可一键创建平面图 1–27 号共 27 个座位。"
     />
     <el-alert
       v-else-if="summary && summary.is_complete"
