@@ -34,20 +34,17 @@ Page({
   },
 
   async bootstrap() {
-    if (!auth.isLoggedIn()) {
-      this.setData({ step: 'login', user: null, loginError: '', avatarDisplay: '' })
-      return
-    }
-
     this.setData({ step: 'loading', loginError: '' })
     try {
-      await auth.waitForLogin()
-      const user = await request({ url: '/user/profile', silent: true })
+      if (!auth.isLoggedIn()) {
+        await auth.login({ silent: false, force: true })
+      }
+      const user = await request({ url: '/user/profile', silent: true, force: true })
       auth.syncAppUser(user)
       await this.applyUser(user)
     } catch (err) {
       this.setData({
-        step: 'login',
+        step: 'error',
         loginError: err.detail || err.message || '登录失败，请重试',
       })
     }
@@ -70,25 +67,14 @@ Page({
     auth.finishLoginRedirect(this.data.redirect)
   },
 
-  doLogin() {
-    wx.showLoading({ title: '登录中...' })
-    auth
-      .login({ silent: false, force: true })
-      .then(() => this.bootstrap())
-      .catch((err) => {
-        this.setData({
-          step: 'login',
-          loginError: err.detail || err.message || '登录失败',
-        })
-      })
-      .finally(() => wx.hideLoading())
+  retryLogin() {
+    this.bootstrap()
   },
 
   async onChooseAvatar(e) {
     const { avatarUrl } = e.detail
     if (!avatarUrl || this.data.avatarUploading) return
 
-    // 先立刻更新界面（微信临时路径可直接显示）
     this.setData({ avatarDisplay: avatarUrl, avatarUploading: true })
     wx.showLoading({ title: '同步头像...' })
     try {
@@ -101,7 +87,6 @@ Page({
       })
       wx.showToast({ title: '头像已同步', icon: 'success' })
     } catch (err) {
-      // 上传失败也保留本地预览
       wx.showToast({ title: err.detail || err.message || '头像同步失败', icon: 'none' })
     } finally {
       wx.hideLoading()
@@ -155,8 +140,8 @@ Page({
         return
       }
       wx.hideLoading()
-      wx.showToast({ title: '登录成功', icon: 'success' })
-      setTimeout(() => auth.finishLoginRedirect(this.data.redirect), 1500)
+      wx.showToast({ title: '欢迎加入知行岛', icon: 'success' })
+      setTimeout(() => auth.finishLoginRedirect(this.data.redirect), 800)
     } catch (err) {
       wx.hideLoading()
       wx.showToast({ title: err.detail || err.message || '保存失败', icon: 'none' })

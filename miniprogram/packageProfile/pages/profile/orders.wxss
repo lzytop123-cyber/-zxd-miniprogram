@@ -58,20 +58,114 @@
   color: #8C9BA5;
 }
 
-.order-seat {
-  margin-top: 12rpx;
-  font-size: 26rpx;
-  color: #4A5A50;
+.order-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12rpx;
+  margin-top: 16rpx;
 }
 
-.order-time {
-  margin-top: 8rpx;
-  font-size: 24rpx;
+.tag {
+  font-size: 22rpx;
+  font-weight: 600;
+  padding: 6rpx 16rpx;
+  border-radius: 8rpx;
+}
+
+.tag-usage {
+  background: #E8F5E9;
+  color: #2D6A4F;
+}
+
+.tag-zone {
+  background: #F4FAF6;
+  color: #5A6B62;
+}
+
+.zone-immersion {
+  background: #EDE7F6;
+  color: #5E35B1;
+}
+
+.zone-workspace {
+  background: #E3F2FD;
+  color: #1565C0;
+}
+
+.zone-standard {
+  background: #FFF3E0;
+  color: #E65100;
+}
+
+.order-meta {
+  margin-top: 16rpx;
+  padding: 16rpx 20rpx;
+  background: #F8FBF9;
+  border-radius: 16rpx;
+}
+
+.meta-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 20rpx;
+  font-size: 26rpx;
+  line-height: 1.5;
+}
+
+.meta-row + .meta-row {
+  margin-top: 10rpx;
+}
+
+.meta-label {
+  flex-shrink: 0;
+  width: 72rpx;
   color: #8C9BA5;
 }
 
+.meta-value {
+  flex: 1;
+  min-width: 0;
+  color: #2D3436;
+  word-break: break-all;
+}
+
+.meta-price {
+  font-weight: 700;
+  color: #2D6A4F;
+}
+
+.source-meituan {
+  color: #E65100;
+  font-weight: 600;
+}
+
+.source-douyin {
+  color: #111;
+  font-weight: 600;
+}
+
+.source-wechat {
+  color: #07C160;
+  font-weight: 600;
+}
+
+.source-balance {
+  color: #1565C0;
+  font-weight: 600;
+}
+
+.source-card {
+  color: #2D6A4F;
+  font-weight: 600;
+}
+
+.source-pending {
+  color: #8A6D3B;
+  font-weight: 600;
+}
+
 .order-hint {
-  margin-top: 10rpx;
+  margin-top: 12rpx;
   font-size: 24rpx;
   color: #52B788;
   line-height: 1.5;

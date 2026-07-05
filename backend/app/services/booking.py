@@ -5,7 +5,20 @@ from decimal import Decimal
 from sqlalchemy import func, select, update
 from sqlalchemy.orm import Session
 
-from app.models import BillType, PeriodCard, PricingRule, Reservation, Seat, StudyStat, User, WalletLog
+from app.models import (
+    BillType,
+    CardSource,
+    CardType,
+    PayType,
+    PeriodCard,
+    PricingRule,
+    Reservation,
+    Seat,
+    StudyStat,
+    User,
+    WalletLog,
+    Zone,
+)
 from app.services.business import find_seat_conflict
 from app.services.seat_setup import seat_code_to_slot
 from app.services.points import add_points
@@ -489,6 +502,92 @@ def auto_checkin_due_batch(db: Session) -> int:
     if count:
         db.commit()
     return count
+
+
+BILL_TYPE_LABELS = {
+    BillType.hourly: "按小时",
+    BillType.daily: "天卡",
+    BillType.weekly: "周卡",
+    BillType.monthly: "月卡",
+    BillType.quarterly: "季卡",
+    BillType.night: "夜读票",
+    BillType.night_monthly: "夜读月卡",
+    BillType.session: "次卡",
+}
+
+CARD_TYPE_LABELS = {
+    CardType.hourly: "小时卡",
+    CardType.daily: "天卡",
+    CardType.weekly: "周卡",
+    CardType.monthly: "月卡",
+    CardType.quarterly: "季卡",
+    CardType.night_monthly: "夜读月卡",
+    CardType.session: "次卡",
+}
+
+CARD_SOURCE_LABELS = {
+    CardSource.meituan: "美团/点评团购",
+    CardSource.douyin: "抖音团购",
+    CardSource.purchase: "微信购卡",
+    CardSource.admin: "门店发放",
+    CardSource.gift: "赠送",
+}
+
+
+def reservation_display_meta(db: Session, reservation: Reservation) -> dict:
+    """订单列表展示：套餐类型、用卡、支付来源、座位区域。"""
+    bill_label = BILL_TYPE_LABELS.get(reservation.bill_type, reservation.bill_type.value)
+
+    seat = db.get(Seat, reservation.seat_id)
+    zone_name = None
+    if seat and seat.zone_id:
+        zone = db.get(Zone, seat.zone_id)
+        zone_name = zone.name if zone else None
+    if not zone_name and seat:
+        from app.services.seat_setup import seat_code_to_slot, zone_name_by_slot
+
+        zone_name = zone_name_by_slot(seat_code_to_slot(seat.seat_code))
+
+    card_name = None
+    card_type_label = None
+    pay_source_label = None
+    usage_label = bill_label
+
+    if reservation.pay_status != 1:
+        pay_source_label = "待支付"
+    elif reservation.pay_type == PayType.wechat:
+        pay_source_label = "微信支付"
+    elif reservation.pay_type == PayType.balance:
+        pay_source_label = "余额支付"
+    elif reservation.pay_type == PayType.period_card or reservation.period_card_id:
+        card = (
+            db.get(PeriodCard, reservation.period_card_id)
+            if reservation.period_card_id
+            else None
+        )
+        if card:
+            card_name = card.card_name
+            card_type_label = CARD_TYPE_LABELS.get(card.card_type, "期限卡")
+            pay_source_label = CARD_SOURCE_LABELS.get(card.source, "期限卡")
+            usage_label = card_type_label
+            if card_name and card_name != card_type_label:
+                usage_label = f"{card_type_label} · {card_name}"
+        else:
+            pay_source_label = "期限卡"
+    elif (reservation.final_price or Decimal("0")) > 0:
+        pay_source_label = "微信支付"
+    else:
+        pay_source_label = "期限卡抵扣"
+
+    return {
+        "zone_name": zone_name,
+        "bill_type_label": bill_label,
+        "usage_label": usage_label,
+        "card_name": card_name,
+        "card_type_label": card_type_label,
+        "pay_source_label": pay_source_label,
+        "pay_type": reservation.pay_type.value if reservation.pay_type else None,
+    }
 
 
 def reservation_status_display(

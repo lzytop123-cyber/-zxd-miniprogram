@@ -31,6 +31,7 @@ from app.services.booking import (
     finalize_expired_reservation,
     finalize_reservation_after_pay,
     record_study_on_checkout,
+    reservation_display_meta,
     reservation_status_display,
     reservation_unlock_allowed,
     reservation_unlock_message,
@@ -129,6 +130,7 @@ def _to_item(db: Session, r: Reservation) -> ReservationItem:
     seat = db.get(Seat, r.seat_id)
     store = db.get(Store, r.store_id)
     label, hint = reservation_status_display(r)
+    meta = reservation_display_meta(db, r)
     return ReservationItem(
         id=r.id,
         order_no=r.order_no,
@@ -146,6 +148,7 @@ def _to_item(db: Session, r: Reservation) -> ReservationItem:
         created_at=r.created_at,
         status_label=label,
         status_hint=hint,
+        **meta,
     )
 
 

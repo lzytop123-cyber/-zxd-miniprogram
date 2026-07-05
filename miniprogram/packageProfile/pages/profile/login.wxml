@@ -1,18 +1,19 @@
 <view class="page-login page-safe-bottom">
   <view class="login-loading" wx:if="{{step === 'loading'}}">
-    <view class="loading-text">加载中...</view>
+    <view class="login-logo">岛</view>
+    <view class="loading-text">正在登录...</view>
   </view>
 
-  <view class="login-panel card" wx:elif="{{step === 'login'}}">
+  <view class="login-panel card" wx:elif="{{step === 'error'}}">
     <view class="login-logo">岛</view>
-    <view class="login-title">登录知行岛</view>
-    <view class="login-desc">微信登录后可预约与学习</view>
+    <view class="login-title">登录失败</view>
     <view class="login-error" wx:if="{{loginError}}">{{loginError}}</view>
-    <view class="btn-primary login-btn" bindtap="doLogin">微信登录</view>
+    <view class="btn-primary login-btn" bindtap="retryLogin">重试</view>
   </view>
 
   <view class="setup-card card" wx:elif="{{step === 'setup' && user}}">
-    <view class="setup-title">完善资料</view>
+    <view class="setup-title">设置学员资料</view>
+    <view class="setup-desc">选择头像和昵称，即可预约自习</view>
 
     <button class="avatar-picker" hover-class="none" open-type="chooseAvatar" bindchooseavatar="onChooseAvatar">
       <image
@@ -22,7 +23,7 @@
         mode="aspectFill"
       />
       <view wx:else class="avatar avatar-placeholder avatar-placeholder--add">+</view>
-      <view class="avatar-tip">{{avatarUploading ? '同步中…' : '同步微信头像'}}</view>
+      <view class="avatar-tip">{{avatarUploading ? '同步中…' : '点击选择微信头像'}}</view>
     </button>
 
     <view class="nickname-field">
@@ -38,7 +39,7 @@
     </view>
 
     <view class="goal-field">
-      <view class="field-label">备考方向</view>
+      <view class="field-label">备考方向（选填）</view>
       <view class="goal-chips">
         <view
           wx:for="{{goalOptions}}"
@@ -50,7 +51,7 @@
       </view>
     </view>
 
-    <view class="btn-primary setup-save" bindtap="saveProfile">完成登录</view>
+    <view class="btn-primary setup-save" bindtap="saveProfile">开始使用</view>
     <view class="setup-note">学号 #{{user.id}}</view>
   </view>
 </view>

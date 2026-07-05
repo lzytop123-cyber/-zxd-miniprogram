@@ -41,6 +41,40 @@ const BILL_DEFAULTS = {
   night: { endOffset: 29 },
 }
 
+const QUICK_HOURS = [2, 4, 8]
+
+function wholeHoursBetween(startClock, endClock) {
+  const [sh, sm] = String(startClock).split(':').map(Number)
+  const [eh, em] = String(endClock).split(':').map(Number)
+  const mins = eh * 60 + em - (sh * 60 + sm)
+  if (mins <= 0 || mins % 60 !== 0) return null
+  return mins / 60
+}
+
+function matchQuickHours(hours) {
+  return hours != null && QUICK_HOURS.includes(hours) ? hours : null
+}
+
+const QUICK_SESSION_DAYS = [1, 3, 7]
+
+function daysBetweenDates(startDate, endDate) {
+  const s = new Date(`${startDate}T00:00:00`)
+  const e = new Date(`${endDate}T00:00:00`)
+  const diff = Math.floor((e - s) / 86400000) + 1
+  return diff > 0 ? diff : null
+}
+
+function matchQuickSessionDays(days) {
+  return days != null && QUICK_SESSION_DAYS.includes(days) ? days : null
+}
+
+function matchDailyPreset(startClock, endClock) {
+  if (startClock === STORE_OPEN.start && endClock === STORE_OPEN.end) return 'full'
+  if (startClock === '08:00' && endClock === '18:00') return '8-18'
+  if (startClock === '09:00' && endClock === '21:00') return '9-21'
+  return null
+}
+
 const PERIOD_TYPES = ['weekly', 'monthly', 'quarterly']
 
 const BILL_TYPE_LABELS = {
@@ -83,6 +117,9 @@ Page({
     startClock: '07:30',
     endClock: '09:30',
     hours: 2,
+    quickHours: 2,
+    quickDailyPreset: null,
+    quickSessionDays: 1,
     seatId: null,
     seatCode: '',
     selectedId: null,
@@ -139,6 +176,7 @@ Page({
         defaultHourlyStartClock(today, today, nowTimeStr()),
         2,
       ),
+      quickHours: 2,
       planSeatCount: this._layout.planSeatCount,
       showSeatMap: true,
       ...this._typeUiPatch('hourly', false),
@@ -330,9 +368,12 @@ Page({
         startClock,
         endClock: this._addHoursToClock(startClock, defaults.hours),
         hours: defaults.hours,
+        quickHours: matchQuickHours(defaults.hours),
+        quickDailyPreset: null,
+        quickSessionDays: null,
       })
     } else if (billType === 'session') {
-      Object.assign(patch, { endDate: startDate })
+      Object.assign(patch, { endDate: startDate, quickSessionDays: 1, quickDailyPreset: null, quickHours: null })
     } else if (billType === 'daily') {
       const clocks = defaultDailyClocks(startDate, todayStr(), nowTimeStr())
       Object.assign(patch, {
@@ -341,6 +382,9 @@ Page({
         multiDayDailyCard: null,
         startClock: clocks.startClock,
         endClock: clocks.endClock,
+        quickDailyPreset: matchDailyPreset(clocks.startClock, clocks.endClock),
+        quickHours: null,
+        quickSessionDays: null,
       })
     } else if (billType === 'weekly') {
       Object.assign(patch, { endDate: addDays(startDate, defaults.endOffset) })
@@ -368,6 +412,7 @@ Page({
       }
     } else if (this.data.billType === 'session') {
       patch.endDate = startDate
+      patch.quickSessionDays = 1
     } else if (this.data.billType === 'weekly') {
       patch.endDate = addDays(startDate, 6)
     } else if (this.data.billType === 'monthly') {
@@ -381,6 +426,7 @@ Page({
       const startClock = defaultHourlyStartClock(startDate, todayStr(), nowTimeStr())
       patch.startClock = startClock
       patch.endClock = this._addHoursToClock(startClock, this.data.hours)
+      patch.quickHours = matchQuickHours(this.data.hours)
     } else if (
       this.data.billType === 'daily'
       && this.data.dailyUseMode === 'single'
@@ -389,6 +435,7 @@ Page({
       const clocks = defaultDailyClocks(startDate, todayStr(), nowTimeStr())
       patch.startClock = clocks.startClock
       patch.endClock = clocks.endClock
+      patch.quickDailyPreset = matchDailyPreset(clocks.startClock, clocks.endClock)
     }
     this.setData(patch, () => this.refreshPreview())
   },
@@ -396,6 +443,7 @@ Page({
   onEndDateChange(e) {
     if (this.data.billType === 'daily' && this.data.dailyUseMode === 'multi_pass') return
     const endDate = e.detail.value
+    const patch = { endDate }
     if (this.data.billType === 'night') {
       const maxEnd = this._nightMaxEnd(this.data.startDate, this.data.activeNightCard)
       if (endDate > maxEnd) {
@@ -407,7 +455,12 @@ Page({
         return
       }
     }
-    this.setData({ endDate }, () => this.refreshPreview())
+    if (this.data.billType === 'session') {
+      patch.quickSessionDays = matchQuickSessionDays(
+        daysBetweenDates(this.data.startDate, endDate),
+      )
+    }
+    this.setData(patch, () => this.refreshPreview())
   },
 
   _isDailySingleDay() {
@@ -425,6 +478,7 @@ Page({
       const clamped = clampHourlyClocks(this.data.startDate, startClock, this.data.endClock)
       patch.startClock = clamped.startClock
       patch.endClock = this._addHoursToClock(clamped.startClock, this.data.hours)
+      patch.quickHours = matchQuickHours(this.data.hours)
       const err = validateStoreTimeRange(this.data.startDate, patch.startClock, patch.endClock)
       if (err) {
         wx.showToast({ title: err, icon: 'none' })
@@ -434,6 +488,7 @@ Page({
       const clamped = clampHourlyClocks(this.data.startDate, startClock, this.data.endClock)
       patch.startClock = clamped.startClock
       patch.endClock = clamped.endClock
+      patch.quickDailyPreset = matchDailyPreset(patch.startClock, patch.endClock)
       const err = validateStoreTimeRange(this.data.startDate, patch.startClock, patch.endClock)
       if (err) {
         wx.showToast({ title: err, icon: 'none' })
@@ -445,22 +500,33 @@ Page({
 
   onEndClockChange(e) {
     let endClock = e.detail.value
+    const patch = { endClock }
     if (this.data.billType === 'hourly' || this._isDailySingleDay()) {
       const clamped = clampHourlyClocks(this.data.startDate, this.data.startClock, endClock)
-      endClock = clamped.endClock
-      const err = validateStoreTimeRange(this.data.startDate, this.data.startClock, endClock)
+      patch.endClock = clamped.endClock
+      const err = validateStoreTimeRange(this.data.startDate, this.data.startClock, patch.endClock)
       if (err) {
         wx.showToast({ title: err, icon: 'none' })
         return
       }
+      if (this.data.billType === 'hourly') {
+        const span = wholeHoursBetween(this.data.startClock, patch.endClock)
+        if (span) patch.hours = span
+        patch.quickHours = matchQuickHours(span)
+      } else if (this._isDailySingleDay()) {
+        patch.quickDailyPreset = matchDailyPreset(this.data.startClock, patch.endClock)
+      }
     }
-    this.setData({ endClock }, () => this.refreshPreview())
+    this.setData(patch, () => this.refreshPreview())
   },
 
   setDailyFullDay() {
+    const startClock = STORE_OPEN.start
+    const endClock = STORE_OPEN.end
     this.setData({
-      startClock: STORE_OPEN.start,
-      endClock: STORE_OPEN.end,
+      startClock,
+      endClock,
+      quickDailyPreset: 'full',
     }, () => this.refreshPreview())
   },
 
@@ -471,7 +537,11 @@ Page({
       wx.showToast({ title: err, icon: 'none' })
       return
     }
-    this.setData({ startClock: start, endClock: end }, () => this.refreshPreview())
+    this.setData({
+      startClock: start,
+      endClock: end,
+      quickDailyPreset: matchDailyPreset(start, end),
+    }, () => this.refreshPreview())
   },
 
   setHours(e) {
@@ -483,9 +553,11 @@ Page({
         endClock = STORE_OPEN.end
       }
     }
+    const span = wholeHoursBetween(this.data.startClock, endClock)
     this.setData({
-      hours,
+      hours: span || hours,
       endClock,
+      quickHours: matchQuickHours(span),
     }, () => this.refreshPreview())
   },
 
@@ -493,6 +565,7 @@ Page({
     const days = Number(e.currentTarget.dataset.d)
     this.setData({
       endDate: addDays(this.data.startDate, days - 1),
+      quickSessionDays: matchQuickSessionDays(days),
     }, () => this.refreshPreview())
   },
 

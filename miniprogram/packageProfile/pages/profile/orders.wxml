@@ -4,9 +4,33 @@
       <view class="order-store">{{item.store_name}}</view>
       <view class="order-status status-{{item.statusTone}}">{{item.statusLabel}}</view>
     </view>
-    <view class="order-seat">座位 {{item.seatDisplay}} · ¥{{item.final_price}}</view>
-    <view class="order-time">{{item.timeRange}}</view>
+
+    <view class="order-tags">
+      <view class="tag tag-usage">{{item.usageLabel}}</view>
+      <view class="tag tag-zone zone-{{item.zoneTone}}" wx:if="{{item.zoneName}}">{{item.zoneName}}</view>
+    </view>
+
+    <view class="order-meta">
+      <view class="meta-row">
+        <text class="meta-label">座位</text>
+        <text class="meta-value">{{item.seatLine}}</text>
+      </view>
+      <view class="meta-row">
+        <text class="meta-label">来源</text>
+        <text class="meta-value source-{{item.sourceTone}}">{{item.paySourceLabel}}</text>
+      </view>
+      <view class="meta-row">
+        <text class="meta-label">时间</text>
+        <text class="meta-value">{{item.timeRange}}</text>
+      </view>
+      <view class="meta-row">
+        <text class="meta-label">金额</text>
+        <text class="meta-value meta-price">{{item.priceText}}</text>
+      </view>
+    </view>
+
     <view class="order-hint" wx:if="{{item.statusHint}}">{{item.statusHint}}</view>
+
     <view class="order-action" wx:if="{{item.canOpen}}">
       <view class="action-btn" catchtap="goOpen" data-id="{{item.id}}">去开门</view>
     </view>

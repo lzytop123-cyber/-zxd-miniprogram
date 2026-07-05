@@ -65,9 +65,9 @@
         <view class="field"><text class="field-key">结束时间</text><text class="field-val">{{endClock}} ›</text></view>
       </picker>
       <view class="quick-btns">
-        <view class="chip" bindtap="setHours" data-h="2">2小时</view>
-        <view class="chip" bindtap="setHours" data-h="4">4小时</view>
-        <view class="chip" bindtap="setHours" data-h="8">8小时</view>
+        <view class="chip {{quickHours===2?'active':''}}" bindtap="setHours" data-h="2">2小时</view>
+        <view class="chip {{quickHours===4?'active':''}}" bindtap="setHours" data-h="4">4小时</view>
+        <view class="chip {{quickHours===8?'active':''}}" bindtap="setHours" data-h="8">8小时</view>
       </view>
       <view class="hint">{{hourlyHint}}</view>
     </block>
@@ -92,11 +92,11 @@
           <picker mode="time" value="{{endClock}}" bindchange="onEndClockChange">
             <view class="field"><text class="field-key">结束时间</text><text class="field-val">{{endClock}} ›</text></view>
           </picker>
-          <view class="quick-btns">
-            <view class="chip" bindtap="setDailyFullDay">全天</view>
-            <view class="chip" bindtap="setDailyPreset" data-start="08:00" data-end="18:00">8-18点</view>
-            <view class="chip" bindtap="setDailyPreset" data-start="09:00" data-end="21:00">9-21点</view>
-          </view>
+      <view class="quick-btns">
+        <view class="chip {{quickDailyPreset==='full'?'active':''}}" bindtap="setDailyFullDay">全天</view>
+        <view class="chip {{quickDailyPreset==='8-18'?'active':''}}" bindtap="setDailyPreset" data-start="08:00" data-end="18:00">8-18点</view>
+        <view class="chip {{quickDailyPreset==='9-21'?'active':''}}" bindtap="setDailyPreset" data-start="09:00" data-end="21:00">9-21点</view>
+      </view>
         </block>
         <view class="hint">单日可选时段，跨日全天</view>
       </block>
@@ -115,9 +115,9 @@
         <view class="field"><text class="field-key">结束日期</text><text class="field-val">{{endDate}} ›</text></view>
       </picker>
       <view class="quick-btns">
-        <view class="chip" bindtap="setSessionDays" data-d="1">1天</view>
-        <view class="chip" bindtap="setSessionDays" data-d="3">3天</view>
-        <view class="chip" bindtap="setSessionDays" data-d="7">7天</view>
+        <view class="chip {{quickSessionDays===1?'active':''}}" bindtap="setSessionDays" data-d="1">1天</view>
+        <view class="chip {{quickSessionDays===3?'active':''}}" bindtap="setSessionDays" data-d="3">3天</view>
+        <view class="chip {{quickSessionDays===7?'active':''}}" bindtap="setSessionDays" data-d="7">7天</view>
       </view>
       <view class="hint">每自然日扣 1 次</view>
     </block>

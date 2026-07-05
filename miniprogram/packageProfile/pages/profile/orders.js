@@ -18,10 +18,27 @@ function formatRange(start, end) {
   return `${fmtDate(s)} ${fmtTime(s)} ~ ${fmtDate(e)} ${fmtTime(e)}`
 }
 
-function formatSeat(item) {
-  const display = seatDisplay({ seat_code: item.seat_code || '' })
-  if (!display.mapLabel) return item.seat_code || '-'
-  return display.zoneName ? `${display.mapLabel}号 · ${display.zoneName}` : `${display.mapLabel}号`
+function formatSeatNum(seatCode) {
+  const display = seatDisplay({ seat_code: seatCode || '' })
+  return display.mapLabel ? `${display.mapLabel}号` : (seatCode || '-')
+}
+
+function zoneTone(zoneName) {
+  if (zoneName === '沉浸区') return 'immersion'
+  if (zoneName === '工位区') return 'workspace'
+  if (zoneName === '标准区') return 'standard'
+  return 'default'
+}
+
+function sourceTone(paySourceLabel) {
+  const s = paySourceLabel || ''
+  if (s.includes('美团') || s.includes('点评')) return 'meituan'
+  if (s.includes('抖音')) return 'douyin'
+  if (s.includes('微信')) return 'wechat'
+  if (s.includes('余额')) return 'balance'
+  if (s.includes('期限') || s.includes('发放') || s.includes('赠送')) return 'card'
+  if (s === '待支付') return 'pending'
+  return 'default'
 }
 
 function enrichOrder(item) {
@@ -37,12 +54,31 @@ function enrichOrder(item) {
             : 'booked'
   const canOpen =
     item.pay_status === 1 && [0, 1].includes(item.status) && parseDate(item.end_time) > new Date()
-  // 待支付且未取消：可去支付 / 取消
   const canPay = item.pay_status !== 1 && item.status === 0 && parseDate(item.end_time) > new Date()
+
+  const display = seatDisplay({ seat_code: item.seat_code || '' })
+  const zoneName = item.zone_name || display.zoneName || ''
+  const seatNum = formatSeatNum(item.seat_code)
+  const seatLine = zoneName ? `${seatNum} · ${zoneName}` : seatNum
+
+  const usageLabel = item.usage_label || item.bill_type_label || item.bill_type || '预约'
+  const paySourceLabel = item.pay_source_label || (item.pay_status !== 1 ? '待支付' : '—')
+  const priceText =
+    item.final_price != null && Number(item.final_price) > 0
+      ? `¥${item.final_price}`
+      : '期限卡抵扣'
+
   return {
     ...item,
     timeRange: formatRange(item.start_time, item.end_time),
-    seatDisplay: formatSeat(item),
+    seatNum,
+    zoneName,
+    seatLine,
+    zoneTone: zoneTone(zoneName),
+    usageLabel,
+    paySourceLabel,
+    sourceTone: sourceTone(paySourceLabel),
+    priceText,
     statusLabel: item.status_label || '未知',
     statusHint: item.status_hint || '',
     statusTone: tone,

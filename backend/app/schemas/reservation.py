@@ -51,7 +51,14 @@ class ReservationItem(BaseModel):
     seat_id: int
     seat_code: str | None = None
     store_name: str | None = None
+    zone_name: str | None = None
     bill_type: BillType
+    bill_type_label: str | None = None
+    usage_label: str | None = None
+    card_name: str | None = None
+    card_type_label: str | None = None
+    pay_type: str | None = None
+    pay_source_label: str | None = None
     start_time: datetime
     end_time: datetime
     final_price: Decimal | None = None

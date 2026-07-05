@@ -119,7 +119,7 @@ Page({
   },
 
   goLogin() {
-    auth.goLogin('/pages/profile/index')
+    auth.goLogin('/pages/profile/index', { replace: true })
   },
 
   doLogout() {

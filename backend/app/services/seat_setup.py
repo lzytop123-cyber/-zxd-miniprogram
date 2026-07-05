@@ -42,6 +42,14 @@ SEAT_LAYOUT: list[tuple[int, str, str, int, float, float]] = [
 
 ZONE_ORDER = {"标准区": 0, "工位区": 1, "沉浸区": 2}
 
+SLOT_ZONE: dict[int, str] = {slot: zone_name for slot, zone_name, *_ in SEAT_LAYOUT}
+
+
+def zone_name_by_slot(slot: int | None) -> str | None:
+    if not slot:
+        return None
+    return SLOT_ZONE.get(slot)
+
 # 历史 A01/B08/D01 等 → 平面图号
 LEGACY_CODE_TO_SLOT: dict[str, int] = {
     "C01": 1, "C02": 2, "A01": 3, "A02": 4, "A03": 5, "A04": 6,

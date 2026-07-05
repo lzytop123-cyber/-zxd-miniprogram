@@ -16,6 +16,11 @@ page {
   max-width: 100vw;
 }
 
+.page-checkin .card {
+  margin: 0;
+  width: 100%;
+}
+
 .empty-card {
   text-align: center;
   padding: 92rpx 32rpx;
@@ -43,8 +48,6 @@ page {
 }
 
 .hero {
-  width: 100%;
-  max-width: 100%;
   box-sizing: border-box;
   padding: 30rpx 24rpx 28rpx;
   overflow: hidden;
@@ -164,7 +167,7 @@ page {
 }
 
 .order-switch {
-  padding: 18rpx 20rpx 20rpx;
+  padding: 18rpx 24rpx 20rpx;
   overflow: hidden;
 }
 
@@ -241,8 +244,7 @@ page {
 }
 
 .open-section {
-  width: 100%;
-  padding: 24rpx 22rpx 20rpx;
+  padding: 24rpx 24rpx 20rpx;
   display: flex;
   flex-direction: column;
   gap: 14rpx;
@@ -392,6 +394,6 @@ page {
 }
 
 .skeleton-checkin-wrap {
-  padding: 24rpx 0;
+  padding: 0;
 }
 

@@ -7,6 +7,10 @@
   text-align: center;
 }
 
+.login-loading .login-logo {
+  margin-bottom: 32rpx;
+}
+
 .loading-text {
   font-size: 28rpx;
   color: #8C9BA5;
