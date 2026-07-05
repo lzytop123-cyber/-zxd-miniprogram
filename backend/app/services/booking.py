@@ -19,7 +19,7 @@ from app.models import (
     WalletLog,
     Zone,
 )
-from app.services.business import find_seat_conflict
+from app.services.business import find_seat_conflict, update_study_title
 from app.services.seat_setup import seat_code_to_slot
 from app.services.points import add_points
 from app.services.store_hours import (
