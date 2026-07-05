@@ -1,4 +1,4 @@
-const { request, formatRequestError } = require('../../utils/request')
+const { request, formatRequestError, invalidateCache } = require('../../utils/request')
 const { getLayout } = require('../../utils/seat-layout')
 const { dailyPassDays, isOfficeNightMonthlyCard, OFFICE_NIGHT_BOOKING_HINT, cardValidUntil, withinCardValidity, weeklyPassDays, monthlyPassDays, officeNightPassDays } = require('../../utils/cardDisplay')
 const { completeWechatPay } = require('../../utils/pay')
@@ -440,6 +440,7 @@ Page({
   async submitOrder() {
     if (this._submitting) return
     this._submitting = true
+    this._payCompleted = false
     this.setData({ submitting: true })
     wx.showLoading({ title: '提交中' })
     try {
@@ -489,12 +490,17 @@ Page({
         )
       }
 
+      this._payCompleted = true
+      invalidateCache('/reservation/')
+      invalidateCache('/user/cards')
+      wx.setStorageSync('checkin_selected_id', created.id)
+
       wx.hideLoading()
       wx.showToast({ title: '预约成功', icon: 'success' })
       setTimeout(() => wx.switchTab({ url: '/pages/checkin/index' }), 1200)
     } catch (e) {
       wx.hideLoading()
-      if (this.data.reservationId) {
+      if (this.data.reservationId && !this._payCompleted) {
         request({
           url: `/reservation/${this.data.reservationId}/cancel`,
           method: 'POST',

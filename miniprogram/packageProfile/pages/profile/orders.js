@@ -91,7 +91,7 @@ Page({
   data: { orders: [] },
 
   onShow() {
-    this.loadOrders({ silent: true })
+    this.loadOrders({ silent: true, force: true })
   },
 
   onPullDownRefresh() {

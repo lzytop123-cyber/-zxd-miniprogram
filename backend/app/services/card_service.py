@@ -389,6 +389,7 @@ def validate_period_card_for_reservation(
     end_time: datetime,
     store_id: int,
 ) -> None:
+    repair_misissued_card_validity(card)
     if card.status != 1:
         raise ValueError("期限卡已失效")
     today = date.today()
