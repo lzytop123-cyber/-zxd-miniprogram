@@ -56,6 +56,7 @@ function enrichOrder(item) {
   const canOpen =
     item.pay_status === 1 && [0, 1].includes(item.status) && parseDate(item.end_time) > new Date()
   const canPay = item.pay_status !== 1 && item.status === 0 && parseDate(item.end_time) > new Date()
+  const canChangeSeat = canOpen
 
   const display = seatDisplay({ seat_code: item.seat_code || '' })
   const zoneName = item.zone_name || display.zoneName || ''
@@ -85,6 +86,7 @@ function enrichOrder(item) {
     statusTone: tone,
     canOpen,
     canPay,
+    canChangeSeat,
   }
 }
 
@@ -105,6 +107,7 @@ function safeEnrichOrder(item) {
       statusTone: 'default',
       canOpen: false,
       canPay: false,
+      canChangeSeat: false,
     }
   }
 }
@@ -197,6 +200,12 @@ Page({
     }
     invalidateCache('/reservation/active/list')
     wx.switchTab({ url: '/pages/checkin/index' })
+  },
+
+  goChangeSeat(e) {
+    const id = Number(e.currentTarget.dataset.id)
+    if (!id) return
+    wx.navigateTo({ url: `${routes.profileChangeSeat}?id=${id}` })
   },
 
   goPay(e) {

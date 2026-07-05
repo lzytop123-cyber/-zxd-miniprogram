@@ -1,0 +1,22 @@
+@import '../../../pages/store/seats.wxss';
+
+.change-meta {
+  position: relative;
+  z-index: 1;
+  margin: 0 0 12rpx;
+  font-size: 26rpx;
+  color: #5A6B62;
+}
+
+.change-meta-strong {
+  font-weight: 700;
+  color: #2D6A4F;
+}
+
+.loading {
+  margin: 32rpx;
+  padding: 48rpx;
+  text-align: center;
+  color: #8C9BA5;
+  font-size: 28rpx;
+}

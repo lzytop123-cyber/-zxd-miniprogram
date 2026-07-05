@@ -10,6 +10,7 @@ module.exports = {
   profileLogin: '/packageProfile/pages/profile/login',
   profileWallet: '/packageProfile/pages/profile/wallet',
   profileOrders: '/packageProfile/pages/profile/orders',
+  profileChangeSeat: '/packageProfile/pages/profile/change-seat',
   profileCards: '/packageProfile/pages/profile/cards',
   profileCoupons: '/packageProfile/pages/profile/coupons',
   profilePoints: '/packageProfile/pages/profile/points',

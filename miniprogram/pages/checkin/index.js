@@ -1,5 +1,6 @@
 const { request } = require('../../utils/request')
 const auth = require('../../utils/auth')
+const routes = require('../../utils/routes')
 const {
   computeCanOpen,
   getOpenWindowHint,
@@ -53,6 +54,13 @@ function formatCountdown(diff) {
   return `剩余 ${parts.join('')}`
 }
 
+function canChangeSeatFor(reservation, now = new Date()) {
+  if (!reservation) return false
+  if (reservation.pay_status !== 1) return false
+  if (![0, 1].includes(reservation.status)) return false
+  return parseTime(reservation.end_time) > now
+}
+
 Page({
   data: {
     pageLoading: true,
@@ -65,6 +73,7 @@ Page({
     statusHint: '',
     countdown: '',
     canOpen: false,
+    canChangeSeat: false,
     openWindowHint: '',
     lockData: '',
     lockName: '',
@@ -166,6 +175,7 @@ Page({
       statusLabel: reservation.status_label || '',
       statusHint: reservation.status_hint || '',
       canOpen,
+      canChangeSeat: canChangeSeatFor(reservation),
       openWindowHint,
       lastOpenError: '',
     })
@@ -199,7 +209,12 @@ Page({
       const canOpen = computeCanOpen(reservation, now)
       const openWindowHint = getOpenWindowHint(reservation, now)
       if (diff <= 0) {
-        this.setData({ countdown: '已结束', canOpen: false, openWindowHint: '订单已结束' })
+        this.setData({
+          countdown: '已结束',
+          canOpen: false,
+          canChangeSeat: false,
+          openWindowHint: '订单已结束',
+        })
         if (this._expiredReloadFor !== reservation.id) {
           this._expiredReloadFor = reservation.id
           this.loadActive()
@@ -209,6 +224,7 @@ Page({
       this.setData({
         countdown: formatCountdown(diff),
         canOpen,
+        canChangeSeat: canChangeSeatFor(reservation, now),
         openWindowHint,
       })
     }
@@ -333,6 +349,12 @@ Page({
     }
   },
 
+
+  goChangeSeat() {
+    const { reservation, canChangeSeat } = this.data
+    if (!reservation || !canChangeSeat) return
+    wx.navigateTo({ url: `${routes.profileChangeSeat}?id=${reservation.id}` })
+  },
 
   checkout() {
     const { reservation } = this.data

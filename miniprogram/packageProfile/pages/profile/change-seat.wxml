@@ -1,0 +1,45 @@
+<view class="page-seats page-safe-bottom">
+  <view wx:if="{{pageLoading}}" class="loading card">加载座位中…</view>
+
+  <view wx:else class="card seat-card seat-card--premium">
+    <view class="seat-head">
+      <view class="seat-head-bar"></view>
+      <text class="seat-head-title">换座</text>
+    </view>
+    <view class="change-meta" wx:if="{{currentSeatCode}}">
+      当前座位 <text class="change-meta-strong">{{currentSeatCode}}</text>
+    </view>
+    <view class="seat-map-tip">点击可选座位 · 双指缩放</view>
+
+    <view class="seat-legend">
+      <view class="seat-legend-item"><view class="seat-dot available"></view><text>可选</text></view>
+      <view class="seat-legend-item"><view class="seat-dot selected"></view><text>已选</text></view>
+      <view class="seat-legend-item"><view class="seat-dot reserved"></view><text>已约</text></view>
+      <view class="seat-legend-item"><view class="seat-dot occupied"></view><text>当前/使用中</text></view>
+      <view class="seat-count">
+        <text class="seat-count-num">{{availableSeatCount}}</text>
+        <text>/ {{planSeatCount}} 可换</text>
+      </view>
+    </view>
+
+    <view class="seat-map-frame seat-map-frame--premium">
+      <floor-plan-map
+        seats="{{seats}}"
+        selectedId="{{selectedId}}"
+        bind:select="selectSeat"
+      />
+    </view>
+  </view>
+
+  <view class="fixed-bottom-spacer" wx:if="{{!pageLoading}}"></view>
+  <view class="fixed-bottom-bar seat-bottom" wx:if="{{!pageLoading}}">
+    <view class="seat-selected" wx:if="{{selectedCode}}">
+      换到 <text class="seat-selected-code">{{selectedLabel}}号</text>
+      <text class="seat-selected-meta" wx:if="{{selectedZone}}"> · {{selectedZone}}</text>
+    </view>
+    <view class="seat-selected seat-selected--ph" wx:else>请选择新座位</view>
+    <view class="btn-primary {{selectedCode && !submitting ? '' : 'disabled'}}" bindtap="confirm">
+      {{submitting ? '提交中…' : '确认换座'}}
+    </view>
+  </view>
+</view>

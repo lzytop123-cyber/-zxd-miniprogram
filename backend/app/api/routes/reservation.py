@@ -3,6 +3,7 @@ from decimal import Decimal
 import logging
 
 from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -29,6 +30,7 @@ from app.services.business import (
 from app.services.booking import (
     add_wallet_log,
     auto_checkin_reservation,
+    change_reservation_seat,
     finalize_expired_reservation,
     finalize_reservation_after_pay,
     record_study_on_checkout,
@@ -38,6 +40,7 @@ from app.services.booking import (
     reservation_unlock_message,
     resolve_booking_window,
     seat_conflict_excluding,
+    seat_options_for_change,
     validate_seat_for_booking,
 )
 from app.services.card_service import (
@@ -506,6 +509,69 @@ def active_reservation(user: User = Depends(get_current_user), db: Session = Dep
     if not reservation_unlock_allowed(row, now):
         return ResponseModel(data=None)
     return ResponseModel(data=_to_item(db, row))
+
+
+class ChangeSeatRequest(BaseModel):
+    seat_id: int
+
+
+def _assert_user_can_change_seat(reservation: Reservation) -> None:
+    if reservation.pay_status != 1:
+        raise HTTPException(status_code=400, detail="仅已付款订单可换座")
+    if reservation.status not in (0, 1):
+        raise HTTPException(status_code=400, detail="当前订单状态不可换座")
+    if reservation.end_time <= datetime.now():
+        raise HTTPException(status_code=400, detail="预约已结束，不可换座")
+
+
+@router.get("/{reservation_id}/seat-options", response_model=ResponseModel)
+def reservation_seat_options(
+    reservation_id: int,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    reservation = db.get(Reservation, reservation_id)
+    if not reservation or reservation.user_id != user.id:
+        raise HTTPException(status_code=404, detail="订单不存在")
+    _assert_user_can_change_seat(reservation)
+
+    current = db.get(Seat, reservation.seat_id)
+    return ResponseModel(
+        data={
+            "reservation_id": reservation.id,
+            "order_no": reservation.order_no,
+            "store_id": reservation.store_id,
+            "current_seat_id": reservation.seat_id,
+            "current_seat_code": current.seat_code if current else None,
+            "start_time": reservation.start_time.isoformat(),
+            "end_time": reservation.end_time.isoformat(),
+            "seats": seat_options_for_change(db, reservation),
+        }
+    )
+
+
+@router.post("/{reservation_id}/change-seat", response_model=ResponseModel[ReservationItem])
+def user_change_reservation_seat(
+    reservation_id: int,
+    body: ChangeSeatRequest,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    reservation = db.get(Reservation, reservation_id)
+    if not reservation or reservation.user_id != user.id:
+        raise HTTPException(status_code=404, detail="订单不存在")
+    _assert_user_can_change_seat(reservation)
+    try:
+        new_seat, old_seat = change_reservation_seat(db, reservation, body.seat_id)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    db.commit()
+    db.refresh(reservation)
+    return ResponseModel(
+        message=f"已换座：{old_seat.seat_code} → {new_seat.seat_code}",
+        data=_to_item(db, reservation),
+    )
 
 
 @router.get("/{reservation_id}", response_model=ResponseModel[ReservationItem])

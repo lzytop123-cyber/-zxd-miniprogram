@@ -31,8 +31,9 @@
 
     <view class="order-hint" wx:if="{{item.statusHint}}">{{item.statusHint}}</view>
 
-    <view class="order-action" wx:if="{{item.canOpen}}">
-      <view class="action-btn" catchtap="goOpen" data-id="{{item.id}}">去开门</view>
+    <view class="order-action" wx:if="{{item.canChangeSeat || item.canOpen}}">
+      <view class="action-btn ghost" wx:if="{{item.canChangeSeat}}" catchtap="goChangeSeat" data-id="{{item.id}}">换座</view>
+      <view class="action-btn" wx:if="{{item.canOpen}}" catchtap="goOpen" data-id="{{item.id}}">去开门</view>
     </view>
     <view class="order-action" wx:if="{{item.canPay}}">
       <view class="action-btn ghost" catchtap="cancelOrder" data-id="{{item.id}}">取消</view>

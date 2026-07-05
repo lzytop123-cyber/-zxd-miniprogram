@@ -38,6 +38,7 @@
         "pages/profile/login",
         "pages/profile/wallet",
         "pages/profile/orders",
+        "pages/profile/change-seat",
         "pages/profile/cards",
         "pages/profile/coupons",
         "pages/profile/points",

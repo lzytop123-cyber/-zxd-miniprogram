@@ -1,0 +1,6 @@
+{
+  "navigationBarTitleText": "换座",
+  "usingComponents": {
+    "floor-plan-map": "../../../components/floor-plan-map/index"
+  }
+}
