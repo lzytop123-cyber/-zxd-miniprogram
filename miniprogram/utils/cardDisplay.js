@@ -241,6 +241,22 @@ function withinMonthlyCardUseWindow(card, startIso) {
   return withinCardValidity(card, startIso)
 }
 
+const PERIOD_PASS_TYPES = new Set(['daily', 'weekly', 'monthly', 'quarterly', 'night_monthly'])
+
+/** 卡面效期天数（兑换后），与 pricing valid_days（预约跨度）不同 */
+const CARD_FACE_VALIDITY_DAYS = {
+  daily: 90,
+  weekly: 90,
+  monthly: 180,
+  quarterly: 180,
+  night_monthly: 90,
+  session: { 10: 90, 30: 360, _default: 90 },
+}
+
+function isPeriodPassCard(card) {
+  return PERIOD_PASS_TYPES.has(resolveCardType(card))
+}
+
 function todayDateStr() {
   const d = new Date()
   const pad = (n) => (n < 10 ? '0' + n : '' + n)
@@ -268,6 +284,10 @@ function formatValidityRemain(card) {
   if (left == null) return { text: '', urgent: false }
   if (left < 0) return { text: '已过期', urgent: true }
   if (left === 0) return { text: '今日到期', urgent: true }
+  if (isPeriodPassCard(card)) {
+    if (left <= 7) return { text: `${left} 天后到期`, urgent: true }
+    return { text: '', urgent: false }
+  }
   if (left <= 7) return { text: `剩 ${left} 天`, urgent: true }
   return { text: `剩 ${left} 天`, urgent: false }
 }
@@ -289,7 +309,9 @@ function formatValidity(card) {
   const range = formatValidityRange(card)
   const { text: remain } = formatValidityRemain(card)
   if (range && remain) return `效期 ${range} · ${remain}`
-  if (range) return `效期 ${range}`
+  if (range) {
+    return isPeriodPassCard(card) ? `效期 ${range} · 待预约` : `效期 ${range}`
+  }
   return remain
 }
 
@@ -297,9 +319,12 @@ function formatValidity(card) {
 function formatValidityShort(card) {
   const range = formatValidityRange(card)
   const { text: remain } = formatValidityRemain(card)
-  if (remain && range) return `${remain} · ${range}`
-  if (range) return range
-  return remain
+  if (remain) return remain
+  if (range) {
+    if (isPeriodPassCard(card) && card.end_date) return `效期至 ${card.end_date}`
+    return range
+  }
+  return ''
 }
 
 /** 预约页关联卡提示：卡名 + 效期 + 可选后缀 */
@@ -309,7 +334,7 @@ function cardValidityHint(card, suffix) {
   const name = c.card_name ? `「${c.card_name}」` : ''
   const base = c.validityRangeText ? `效期 ${c.validityRangeText}` : (c.validityText || '')
   const parts = [name, base].filter(Boolean)
-  if (c.validityRemainText && !base.includes(c.validityRemainText)) {
+  if (c.validityRemainUrgent && c.validityRemainText) {
     parts.push(c.validityRemainText)
   }
   if (suffix) parts.push(suffix)
@@ -339,7 +364,7 @@ function formatCard(card) {
   const remainText = formatRemain(card)
   const chipMeta = (displayType === 'hourly' || displayType === 'session')
     ? (remainText || validityShort || ruleText)
-    : (validityShort || remainText || ruleText)
+    : (validityShort || ruleText)
   return {
     ...card,
     displayType,
@@ -380,21 +405,32 @@ function buildCardDetail(card) {
   }
 }
 
+function packageFaceValidityDays(item) {
+  const billType = item.bill_type
+  if (billType === 'session') {
+    const count = item.session_count || item.valid_days || 10
+    const map = CARD_FACE_VALIDITY_DAYS.session
+    return map[count] || map._default
+  }
+  return CARD_FACE_VALIDITY_DAYS[billType] || null
+}
+
 function enrichPackage(item) {
   const hint = PKG_HINTS[item.bill_type] || {}
-  const validDays = item.valid_days
   const sessionCount = item.session_count
   let tag = hint.tag
 
   if (item.bill_type === 'session') {
-    const count = sessionCount || 10
-    tag = `含 ${count} 次`
-  } else if (validDays && item.bill_type === 'daily' && validDays > 1) {
-    tag = `${validDays}天内有效`
-  } else if (validDays && ['weekly', 'monthly', 'quarterly'].includes(item.bill_type)) {
-    tag = `${validDays}天内有效`
-  } else if (validDays && item.bill_type === 'night_monthly') {
-    tag = `${validDays}天有效`
+    const count = sessionCount || item.valid_days || 10
+    const faceDays = packageFaceValidityDays(item)
+    tag = faceDays ? `${faceDays}天效期 · 含${count}次` : `含 ${count} 次`
+  } else {
+    const faceDays = packageFaceValidityDays(item)
+    if (faceDays) {
+      tag = `${faceDays}天效期`
+    } else if (item.bill_type === 'daily') {
+      tag = hint.tag
+    }
   }
 
   const priceText = Number(item.price).toFixed(item.price % 1 === 0 ? 0 : 2)
@@ -410,9 +446,11 @@ function enrichPackage(item) {
 
 function buildPackageDetail(pkg) {
   const lines = []
-  if (pkg.tagText) lines.push(pkg.tagText)
-  if (pkg.valid_days && pkg.bill_type !== 'session') {
-    lines.push(`有效天数：${pkg.valid_days} 天`)
+  const faceDays = packageFaceValidityDays(pkg)
+  if (faceDays) {
+    lines.push(`兑换后 ${faceDays} 天效期内可预约`)
+  } else if (pkg.tagText) {
+    lines.push(pkg.tagText)
   }
   if (pkg.remark) lines.push(pkg.remark)
   lines.push(...(CARD_DETAIL_LINES[pkg.bill_type] || []))
