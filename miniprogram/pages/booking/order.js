@@ -521,14 +521,37 @@ Page({
     } catch (e) {
       wx.hideLoading()
       if (this.data.reservationId && !this._payCompleted) {
-        request({
-          url: `/reservation/${this.data.reservationId}/cancel`,
-          method: 'POST',
-          silent: true,
-        }).catch(() => {})
-        this.setData({ reservationId: null, orderNo: '' })
+        let paidOnServer = false
+        try {
+          const row = await request({
+            url: `/reservation/${this.data.reservationId}`,
+            silent: true,
+            force: true,
+          })
+          if (row && row.pay_status === 1) {
+            paidOnServer = true
+            this._payCompleted = true
+            invalidateCache('/reservation/')
+            invalidateCache('/user/cards')
+            wx.setStorageSync('checkin_selected_id', row.id)
+            wx.showToast({ title: '预约成功', icon: 'success' })
+            setTimeout(() => wx.switchTab({ url: '/pages/checkin/index' }), 1200)
+          }
+        } catch (_) {
+          // ignore
+        }
+        if (!paidOnServer) {
+          request({
+            url: `/reservation/${this.data.reservationId}/cancel`,
+            method: 'POST',
+            silent: true,
+          }).catch(() => {})
+          this.setData({ reservationId: null, orderNo: '' })
+          wx.showToast({ title: formatRequestError(e), icon: 'none' })
+        }
+      } else {
+        wx.showToast({ title: formatRequestError(e), icon: 'none' })
       }
-      wx.showToast({ title: formatRequestError(e), icon: 'none' })
     } finally {
       this._submitting = false
       this.setData({ submitting: false })

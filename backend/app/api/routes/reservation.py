@@ -1,5 +1,6 @@
 from datetime import datetime, timedelta
 from decimal import Decimal
+import logging
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
@@ -49,6 +50,7 @@ from app.services.coupon_service import apply_coupon, mark_coupon_used
 from app.services.wechat_pay import WechatPayService
 
 router = APIRouter(prefix="/reservation", tags=["预约"])
+logger = logging.getLogger(__name__)
 
 SEAT_LOCK_EXPIRE = 10
 
@@ -151,6 +153,14 @@ def _to_item(db: Session, r: Reservation) -> ReservationItem:
         status_hint=hint,
         **meta,
     )
+
+
+def _safe_to_item(db: Session, r: Reservation) -> ReservationItem | None:
+    try:
+        return _to_item(db, r)
+    except Exception:
+        logger.exception("reservation list item failed id=%s order=%s", r.id, r.order_no)
+        return None
 
 
 def _sync_user_active_reservations(
@@ -464,7 +474,8 @@ def list_reservations(user: User = Depends(get_current_user), db: Session = Depe
         db.commit()
         for row in rows:
             db.refresh(row)
-    return ResponseModel(data=[_to_item(db, r) for r in rows])
+    items = [_safe_to_item(db, r) for r in rows]
+    return ResponseModel(data=[item for item in items if item is not None])
 
 
 @router.get("/active/list", response_model=ResponseModel[list[ReservationItem]])
@@ -474,7 +485,8 @@ def list_active_reservations(
 ):
     now = datetime.now()
     rows = _sync_user_active_reservations(db, user, now)
-    return ResponseModel(data=[_to_item(db, row) for row in rows])
+    items = [_safe_to_item(db, row) for row in rows]
+    return ResponseModel(data=[item for item in items if item is not None])
 
 
 @router.get("/active", response_model=ResponseModel[ReservationItem | None])

@@ -1,4 +1,5 @@
-const { request, invalidateCache } = require('../../../utils/request')
+const auth = require('../../../utils/auth')
+const { request, invalidateCache, formatRequestError } = require('../../../utils/request')
 const routes = require('../../../utils/routes')
 const { seatDisplay } = require('../../../utils/seat-layout')
 
@@ -87,27 +88,105 @@ function enrichOrder(item) {
   }
 }
 
+function safeEnrichOrder(item) {
+  try {
+    return enrichOrder(item)
+  } catch (e) {
+    console.warn('[orders] enrich failed', item && item.id, e)
+    return {
+      ...item,
+      timeRange: item.start_time && item.end_time ? `${item.start_time} ~ ${item.end_time}` : '-',
+      seatLine: item.seat_code || '-',
+      usageLabel: item.bill_type || '预约',
+      paySourceLabel: item.pay_status !== 1 ? '待支付' : '—',
+      priceText: '—',
+      statusLabel: item.status_label || '未知',
+      statusHint: '',
+      statusTone: 'default',
+      canOpen: false,
+      canPay: false,
+    }
+  }
+}
+
 Page({
-  data: { orders: [] },
+  data: {
+    orders: [],
+    pageLoading: true,
+    loadError: '',
+    needLogin: false,
+  },
 
   onShow() {
-    this.loadOrders({ silent: true, force: true })
+    this.bootstrap()
   },
 
   onPullDownRefresh() {
-    this.loadOrders({ force: true }).finally(() => wx.stopPullDownRefresh())
+    this.bootstrap({ fromPull: true }).finally(() => wx.stopPullDownRefresh())
   },
 
-  loadOrders(options = {}) {
-    const { force = false } = options
-    return request({ url: '/reservation/list', silent: true, force })
-      .then((orders) => {
-        this.setData({ orders: (orders || []).map(enrichOrder) })
+  goLogin() {
+    auth.goLogin(routes.profileOrders)
+  },
+
+  async bootstrap(options = {}) {
+    const { fromPull = false } = options
+    if (!auth.isLoggedIn()) {
+      this.setData({
+        pageLoading: false,
+        needLogin: true,
+        loadError: '',
+        orders: [],
       })
-      .catch(() => {
-        if (!this.data.orders.length) {
-          this.setData({ orders: [] })
+      return
+    }
+    if (!fromPull || !this.data.orders.length) {
+      this.setData({ pageLoading: true, loadError: '', needLogin: false })
+    }
+    try {
+      await auth.waitForLogin()
+      await this.loadOrders({ force: true })
+    } catch (e) {
+      this.setData({
+        pageLoading: false,
+        loadError: formatRequestError(e) || '加载失败，请下拉刷新',
+      })
+    }
+  },
+
+  loadOrders(options = {}, retried = false) {
+    const { force = false } = options
+    invalidateCache('/reservation/list')
+    return request({ url: '/reservation/list', silent: true, force: true })
+      .then((orders) => {
+        const list = Array.isArray(orders) ? orders : []
+        this.setData({
+          orders: list.map(safeEnrichOrder),
+          pageLoading: false,
+          loadError: '',
+          needLogin: false,
+        })
+      })
+      .catch(async (err) => {
+        if (err && err.statusCode === 401 && !retried) {
+          try {
+            await auth.login({ silent: true, force: true })
+            return this.loadOrders(options, true)
+          } catch (loginErr) {
+            this.setData({
+              pageLoading: false,
+              needLogin: true,
+              loadError: formatRequestError(loginErr) || '登录已失效，请重新登录',
+              orders: [],
+            })
+            return Promise.reject(loginErr)
+          }
         }
+        this.setData({
+          pageLoading: false,
+          loadError: formatRequestError(err) || '加载失败，请下拉刷新',
+        })
+        return Promise.reject(err)
       })
   },
 
