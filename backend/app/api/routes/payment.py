@@ -8,12 +8,7 @@ from sqlalchemy.orm import Session
 from app.core.redis_client import RedisLock
 from app.db.session import get_db
 from app.models import CardPurchaseOrder, Coupon, PayType, RechargeOrder, Reservation
-from app.services.booking import (
-    auto_checkin_reservation,
-    finalize_reservation_after_pay,
-    fulfill_recharge_order,
-    seat_conflict_excluding,
-)
+from app.services.booking import finalize_reservation_after_pay, fulfill_recharge_order, seat_conflict_excluding
 from app.services.card_service import fulfill_card_purchase
 from app.services.coupon_service import mark_coupon_used
 from app.services.wechat_pay import WechatPayService
@@ -43,6 +38,56 @@ def _apply_coupon_from_attach(db: Session, reservation: Reservation, attach: str
     coupon = db.get(Coupon, coupon_id)
     if coupon and coupon.user_id == reservation.user_id and coupon.status == 0:
         mark_coupon_used(db, coupon, reservation)
+
+
+async def complete_reservation_wechat_payment(
+    db: Session,
+    reservation: Reservation,
+    *,
+    attach: str | None = None,
+    paid_fen: int | None = None,
+) -> str:
+    """
+    将预约标记为已支付并完成后续流程。
+    返回: paid | conflict | amount_mismatch | already_paid
+    """
+    if reservation.pay_status == 1:
+        return "already_paid"
+    if not _amount_ok(reservation.final_price, paid_fen):
+        logger.error(
+            "预约支付金额不符 %s 订单=%s 实付分=%s",
+            reservation.order_no,
+            reservation.final_price,
+            paid_fen,
+        )
+        return "amount_mismatch"
+
+    with RedisLock(f"seat_lock:{reservation.seat_id}", expire=10):
+        conflict = seat_conflict_excluding(
+            db,
+            reservation.seat_id,
+            reservation.start_time,
+            reservation.end_time,
+            reservation.id,
+        )
+        if conflict:
+            amount = reservation.final_price or Decimal("0")
+            try:
+                WechatPayService.refund(reservation.order_no, amount, amount, "座位冲突自动退款")
+            except Exception:
+                logger.exception("座位冲突自动退款失败 order_no=%s", reservation.order_no)
+            reservation.status = 3
+            reservation.pay_status = 2
+            db.commit()
+            return "conflict"
+
+        reservation.pay_status = 1
+        reservation.pay_type = PayType.wechat
+        _apply_coupon_from_attach(db, reservation, attach)
+        db.commit()
+
+    await finalize_reservation_after_pay(db, reservation)
+    return "paid"
 
 
 @router.post("/wechat/notify")
@@ -78,35 +123,10 @@ async def wechat_pay_notify(request: Request, db: Session = Depends(get_db)):
 
         reservation = db.scalar(select(Reservation).where(Reservation.order_no == order_no))
         if reservation and reservation.pay_status != 1:
-            if not _amount_ok(reservation.final_price, paid_fen):
-                logger.error(
-                    "回调金额不符 预约 %s 订单=%s 实付分=%s",
-                    order_no, reservation.final_price, paid_fen,
-                )
-                return {"code": "SUCCESS", "message": "成功"}
-            with RedisLock(f"seat_lock:{reservation.seat_id}", expire=10):
-                conflict = seat_conflict_excluding(
-                    db,
-                    reservation.seat_id,
-                    reservation.start_time,
-                    reservation.end_time,
-                    reservation.id,
-                )
-                if conflict:
-                    # 座位已被他人占用：自动退款并取消，避免超卖/重复占座
-                    amount = reservation.final_price or Decimal("0")
-                    try:
-                        WechatPayService.refund(order_no, amount, amount, "座位冲突自动退款")
-                    except Exception:
-                        logger.exception("座位冲突自动退款失败 order_no=%s", order_no)
-                    reservation.status = 3
-                    reservation.pay_status = 2
-                    db.commit()
-                    return {"code": "SUCCESS", "message": "成功"}
-
-                reservation.pay_status = 1
-                reservation.pay_type = PayType.wechat
-                _apply_coupon_from_attach(db, reservation, result.get("attach"))
-                db.commit()
-            await finalize_reservation_after_pay(db, reservation)
+            await complete_reservation_wechat_payment(
+                db,
+                reservation,
+                attach=result.get("attach"),
+                paid_fen=paid_fen,
+            )
     return {"code": "SUCCESS", "message": "成功"}

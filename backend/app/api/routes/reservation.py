@@ -44,6 +44,7 @@ from app.services.card_service import (
     refund_period_card_consume,
     validate_period_card_for_reservation,
 )
+from app.api.routes.payment import complete_reservation_wechat_payment
 from app.services.coupon_service import apply_coupon, mark_coupon_used
 from app.services.wechat_pay import WechatPayService
 
@@ -389,6 +390,39 @@ async def pay(
         )
 
     raise HTTPException(status_code=400, detail="不支持的支付方式")
+
+
+@router.post("/{reservation_id}/confirm-pay", response_model=ResponseModel[ReservationItem])
+async def confirm_pay(
+    reservation_id: int,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """微信支付客户端成功后主动确认入账（回调延迟时入座/订单页才能看到进行中预约）。"""
+    reservation = db.get(Reservation, reservation_id)
+    if not reservation or reservation.user_id != user.id:
+        raise HTTPException(status_code=404, detail="订单不存在")
+    if reservation.pay_status == 1:
+        return ResponseModel(data=_to_item(db, reservation))
+    if reservation.pay_type != PayType.wechat:
+        raise HTTPException(status_code=400, detail="订单尚未支付")
+
+    query = WechatPayService.query_order(reservation.order_no)
+    if not query or query.get("trade_state") != "SUCCESS":
+        raise HTTPException(status_code=400, detail="支付尚未到账，请稍后再试")
+
+    outcome = await complete_reservation_wechat_payment(
+        db,
+        reservation,
+        attach=query.get("attach"),
+        paid_fen=query.get("amount_total"),
+    )
+    if outcome == "conflict":
+        raise HTTPException(status_code=409, detail="座位已被占用，款项将原路退回")
+    if outcome == "amount_mismatch":
+        raise HTTPException(status_code=400, detail="支付金额异常，请联系店长")
+    db.refresh(reservation)
+    return ResponseModel(data=_to_item(db, reservation))
 
 
 @router.post("/{reservation_id}/mock-pay", response_model=ResponseModel)

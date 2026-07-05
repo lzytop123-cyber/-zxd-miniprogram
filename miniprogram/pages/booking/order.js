@@ -1,7 +1,7 @@
 const { request, formatRequestError, invalidateCache } = require('../../utils/request')
 const { getLayout } = require('../../utils/seat-layout')
 const { dailyPassDays, isOfficeNightMonthlyCard, OFFICE_NIGHT_BOOKING_HINT, cardValidUntil, withinCardValidity, weeklyPassDays, monthlyPassDays, officeNightPassDays } = require('../../utils/cardDisplay')
-const { completeWechatPay } = require('../../utils/pay')
+const { completeWechatPay, ensureReservationPaid } = require('../../utils/pay')
 
 const BILL_LABELS = { hourly: '按小时', daily: '天卡', weekly: '周卡', session: '次卡', monthly: '月卡', quarterly: '季卡', night: '夜读' }
 
@@ -286,6 +286,7 @@ Page({
   },
 
   onLoad(options) {
+    this._payTypePinned = false
     const layout = getLayout()
     const display = layout.seatDisplay({ seat_code: options.seatCode || '' })
     const seatDisplay = display.mapLabel
@@ -349,7 +350,15 @@ Page({
           ? ''
           : explainCardMismatch(cards, ctx),
       }
-      if (this.data.payType === 'period_card') {
+      if (usableCards.length && !this._payTypePinned && this.data.payType !== 'balance') {
+        const cur = usableCards.find((c) => c.id === this.data.selectedCardId) || usableCards[0]
+        patch.payType = 'period_card'
+        patch.selectedCardId = cur.id
+        patch.selectedCardName = cur.card_name || cur.card_type
+        patch.price = 0
+        patch.discountPrice = 0
+        patch.selectedCouponId = null
+      } else if (this.data.payType === 'period_card') {
         const cur = usableCards.find((c) => c.id === this.data.selectedCardId) || usableCards[0]
         if (cur) {
           patch.selectedCardId = cur.id
@@ -372,6 +381,7 @@ Page({
   },
 
   setPay(e) {
+    this._payTypePinned = true
     const payType = e.currentTarget.dataset.type
     const patch = { payType }
     if (payType === 'period_card' && this.data.usableCards.length) {
@@ -488,6 +498,16 @@ Page({
             method: 'POST',
           })
         )
+        await ensureReservationPaid(created.id, payRes.wechat_pay)
+      } else if (this.data.payType === 'period_card') {
+        const paid = await request({
+          url: `/reservation/${created.id}`,
+          silent: true,
+          force: true,
+        })
+        if (!paid || paid.pay_status !== 1) {
+          throw new Error('期限卡支付未完成，请重试')
+        }
       }
 
       this._payCompleted = true

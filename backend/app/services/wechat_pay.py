@@ -94,6 +94,35 @@ class WechatPayService:
         }
 
     @staticmethod
+    def query_order(order_no: str) -> dict | None:
+        """主动查询微信支付订单状态（回调延迟时用于确认入账）。"""
+        if _is_mock_mode():
+            return {
+                "out_trade_no": order_no,
+                "trade_state": "NOTPAY",
+                "attach": None,
+                "amount_total": None,
+            }
+
+        wxpay = _get_client()
+        code, message = wxpay.query(out_trade_no=order_no)
+        if code != 200:
+            logger.warning("wechat query failed: order=%s code=%s message=%s", order_no, code, message)
+            return None
+
+        data = json.loads(message)
+        amount = data.get("amount") or {}
+        amount_total = amount.get("payer_total")
+        if amount_total is None:
+            amount_total = amount.get("total")
+        return {
+            "out_trade_no": data.get("out_trade_no"),
+            "trade_state": data.get("trade_state"),
+            "attach": data.get("attach"),
+            "amount_total": amount_total,
+        }
+
+    @staticmethod
     def verify_notify(headers: dict, body: bytes) -> dict | None:
         if _is_mock_mode():
             return {"out_trade_no": "", "trade_state": "SUCCESS", "amount_total": None}
