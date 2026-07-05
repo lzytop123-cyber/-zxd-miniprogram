@@ -141,6 +141,9 @@
         <view class="detail-btn primary" wx:if="{{detail.mode === 'buy'}}" bindtap="buyFromDetail">
           立即购买 ¥{{detail.priceText}}
         </view>
+        <view class="detail-btn primary" wx:elif="{{detail.mode === 'owned'}}" bindtap="goBookWithCard">
+          去预约
+        </view>
         <view class="detail-btn" bindtap="closeDetail">{{detail.mode === 'buy' ? '再看看' : '知道了'}}</view>
       </view>
     </view>

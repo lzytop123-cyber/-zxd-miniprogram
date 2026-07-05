@@ -1,5 +1,6 @@
 import json
 import logging
+from datetime import date, datetime
 
 import httpx
 
@@ -16,6 +17,34 @@ def _use_mock() -> bool:
     if provider == "meituan":
         return not settings.yunlaoban_client_id
     return not settings.yunlaoban_client_id
+
+
+def parse_voucher_expire_date(ticket_data: dict | None) -> date | None:
+    """团购券自身有效期（须在此时前核销），来自云老板 ticketData.receiptEndDate 等。"""
+    if not ticket_data:
+        return None
+    for key in ("receiptEndDate", "receipt_end_date", "couponEndTime", "expireTime", "expire_time"):
+        raw = ticket_data.get(key)
+        if raw is None:
+            continue
+        try:
+            if isinstance(raw, (int, float)):
+                ts = float(raw)
+                if ts > 1e12:
+                    ts /= 1000.0
+                return datetime.fromtimestamp(ts).date()
+            text = str(raw).strip()
+            if not text:
+                continue
+            if text.isdigit():
+                ts = float(text)
+                if ts > 1e12:
+                    ts /= 1000.0
+                return datetime.fromtimestamp(ts).date()
+            return datetime.fromisoformat(text.replace("Z", "+00:00")).date()
+        except (ValueError, OSError, OverflowError):
+            continue
+    return None
 
 
 class YunlaobanService:

@@ -116,11 +116,28 @@ Page({
       if (storeId) reqUrl += `?store_id=${Number(storeId)}`
       const result = await request({ url: reqUrl, method: 'POST', silent: true })
       wx.hideLoading()
+      const lines = [result.card_name || '期限卡']
+      if (result.validity_range) {
+        lines.push(`卡面效期 ${result.validity_range}`)
+      } else if (result.start_date && result.end_date) {
+        lines.push(`卡面效期 ${result.start_date} ~ ${result.end_date}`)
+      } else if (result.end_date) {
+        lines.push(`卡面效期至 ${result.end_date}`)
+      }
+      if (result.remaining_hours != null) {
+        lines.push(`含 ${result.remaining_hours} 小时`)
+      } else if (result.remaining_sessions != null) {
+        lines.push(`含 ${result.remaining_sessions} 次`)
+      }
       wx.showModal({
         title: '兑换成功',
-        content: `已获得：${result.card_name || '期限卡'}`,
+        content: lines.join('\n'),
         showCancel: false,
-        success: () => wx.switchTab({ url: '/pages/packages/index' }),
+        success: () => {
+          const { invalidateCache } = require('../../utils/request')
+          invalidateCache('/user/cards')
+          wx.switchTab({ url: '/pages/packages/index' })
+        },
       })
     } catch (e) {
       wx.hideLoading()

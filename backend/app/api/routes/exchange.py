@@ -13,16 +13,17 @@ from app.models import (
     MeituanDealMapping,
     MeituanOrder,
     MeituanOrderStatus,
+    PeriodCard,
     User,
 )
 from app.schemas.common import ResponseModel
-from app.services.card_service import get_mapping_by_deal_id, issue_period_card
+from app.services.card_service import card_validity_api_fields, get_mapping_by_deal_id, issue_period_card
 from app.services.deal_mapping_service import (
     guess_reward_from_name,
     mark_pending_resolved_by_deal_id,
     record_pending_deal,
 )
-from app.services.yunlaoban import YunlaobanService
+from app.services.yunlaoban import YunlaobanService, parse_voucher_expire_date
 
 router = APIRouter(prefix="/exchange", tags=["兑换"])
 
@@ -126,6 +127,9 @@ async def _exchange(
         db.commit()
         db.refresh(mapping)
 
+    ticket_data = prepared.get("ticketData") or {}
+    voucher_expire = parse_voucher_expire_date(ticket_data)
+
     card = issue_period_card(
         db,
         user.id,
@@ -141,9 +145,15 @@ async def _exchange(
     order.store_id = body.store_id or mapping.store_id
     order.status = MeituanOrderStatus.verified
     order.verified_at = datetime.now()
-    order.meituan_raw = {"result": consume_result, "ticketData": prepared["ticketData"]}
+    order.meituan_raw = {
+        "result": consume_result,
+        "ticketData": ticket_data,
+        "voucherExpireDate": str(voucher_expire) if voucher_expire else None,
+    }
     db.commit()
     db.refresh(card)
+
+    validity = card_validity_api_fields(card)
 
     return ResponseModel(
         message=f"已成功兑换 {mapping.deal_name}",
@@ -151,7 +161,11 @@ async def _exchange(
             "card_id": card.id,
             "card_name": card.card_name,
             "card_type": card.card_type.value,
+            "source": source.value,
+            "start_date": str(card.start_date) if card.start_date else None,
             "end_date": str(card.end_date) if card.end_date else None,
+            **validity,
+            "voucher_expire_date": str(voucher_expire) if voucher_expire else None,
             "remaining_hours": float(card.remaining_hours) if card.remaining_hours else None,
             "total_hours": float(card.total_hours) if card.total_hours else None,
             "remaining_sessions": card.remaining_sessions,
@@ -167,15 +181,33 @@ def exchange_records(user: User = Depends(get_current_user), db: Session = Depen
         .order_by(MeituanOrder.created_at.desc())
         .limit(30)
     ).all()
-    return ResponseModel(
-        data=[
+    items = []
+    for r in rows:
+        card = db.scalar(
+            select(PeriodCard).where(
+                PeriodCard.user_id == user.id,
+                PeriodCard.meituan_receipt == r.coupon_code,
+            )
+        )
+        validity = card_validity_api_fields(card) if card else {}
+        voucher_expire = None
+        if r.meituan_raw and isinstance(r.meituan_raw, dict):
+            voucher_expire = r.meituan_raw.get("voucherExpireDate")
+            if not voucher_expire and r.meituan_raw.get("ticketData"):
+                vd = parse_voucher_expire_date(r.meituan_raw["ticketData"])
+                voucher_expire = str(vd) if vd else None
+        items.append(
             {
                 "id": r.id,
                 "deal_name": r.deal_name,
                 "coupon_code": r.coupon_code,
                 "status": r.status.value,
                 "verified_at": r.verified_at.isoformat() if r.verified_at else None,
+                "card_id": card.id if card else None,
+                "start_date": str(card.start_date) if card and card.start_date else None,
+                "end_date": str(card.end_date) if card and card.end_date else None,
+                **validity,
+                "voucher_expire_date": voucher_expire,
             }
-            for r in rows
-        ]
-    )
+        )
+    return ResponseModel(data=items)

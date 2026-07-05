@@ -10,6 +10,7 @@ const {
   filterPackages,
   buildCardDetail,
   buildPackageDetail,
+  cardBillTypeForBooking,
 } = require('../../utils/cardDisplay')
 
 Page({
@@ -17,6 +18,7 @@ Page({
     loggedIn: false,
     cards: [],
     activeCount: 0,
+    detailCard: null,
     myCardsSheetVisible: false,
     stores: [],
     storeId: null,
@@ -53,6 +55,7 @@ Page({
       this.setData({ cards: [], activeCount: 0, loggedIn: false })
       return Promise.resolve()
     }
+    if (force) invalidateCache('/user/cards')
     return request({ url: '/user/cards', silent: true, force })
       .then((cards) => {
         const list = (cards || []).filter(isCardUsable).map(formatCard)
@@ -157,6 +160,7 @@ Page({
     this.setData({
       myCardsSheetVisible: false,
       detailVisible: true,
+      detailCard: card,
       detail: buildCardDetail(card),
     })
   },
@@ -169,7 +173,25 @@ Page({
   },
 
   closeDetail() {
-    this.setData({ detailVisible: false, detail: null })
+    this.setData({ detailVisible: false, detail: null, detailCard: null })
+  },
+
+  goBookWithCard() {
+    const card = this.data.detailCard
+    const storeId = this.data.storeId
+    if (!card || !storeId) {
+      wx.showToast({ title: '请先选择门店', icon: 'none' })
+      return
+    }
+    const billType = cardBillTypeForBooking(card)
+    if (!billType) {
+      wx.showToast({ title: '该卡暂不支持在线预约', icon: 'none' })
+      return
+    }
+    wx.setStorageSync('pendingBooking', { storeId, billType })
+    invalidateCache('/user/cards')
+    this.setData({ detailVisible: false, detail: null, detailCard: null })
+    wx.navigateTo({ url: `${routes.bookingIndex}?storeId=${storeId}&billType=${billType}` })
   },
 
   noop() {},

@@ -1,6 +1,7 @@
 <view class="list-page page-safe-bottom">
   <view class="card item-card" wx:for="{{records}}" wx:key="id">
     <view class="name">{{item.deal_name || '团购兑换'}}</view>
+    <view class="info" wx:if="{{item.validityText}}">{{item.validityText}}</view>
     <view class="info">券码 {{item.coupon_code}}</view>
     <view class="info">状态 {{item.status === 'verified' ? '已兑换' : item.status}}</view>
     <view class="info" wx:if="{{item.verified_at}}">{{item.verified_at}}</view>

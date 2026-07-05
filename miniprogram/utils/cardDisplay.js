@@ -353,6 +353,25 @@ function isCardUsable(card) {
   return true
 }
 
+function cardBillTypeForBooking(card) {
+  if (!card) return ''
+  if (card.displayType === 'night_monthly' || card.card_type === 'night_monthly') return 'night'
+  if (isOfficeNightMonthlyCard(card)) return 'night'
+  if (card.card_type === 'hourly') return 'hourly'
+  if (card.card_type === 'session') return 'session'
+  if (card.card_type === 'daily') return 'daily'
+  if (['weekly', 'monthly', 'quarterly'].includes(card.card_type)) return card.card_type
+  return card.card_type || ''
+}
+
+function formatCardSourcePrefix(card) {
+  if (!card || !card.source) return ''
+  if (card.source === 'meituan') return '美团'
+  if (card.source === 'douyin') return '抖音'
+  if (card.source === 'purchase') return ''
+  return ''
+}
+
 function formatCard(card) {
   const displayType = resolveCardType(card)
   const ruleText = cardRuleText(card)
@@ -362,9 +381,12 @@ function formatCard(card) {
   const validityText = formatValidity(card)
   const validityShort = formatValidityShort(card)
   const remainText = formatRemain(card)
-  const chipMeta = (displayType === 'hourly' || displayType === 'session')
+  const sourcePrefix = formatCardSourcePrefix(card)
+  let chipMeta = (displayType === 'hourly' || displayType === 'session')
     ? (remainText || validityShort || ruleText)
     : (validityShort || ruleText)
+  if (sourcePrefix && chipMeta) chipMeta = `${sourcePrefix} · ${chipMeta}`
+  else if (sourcePrefix && !chipMeta) chipMeta = sourcePrefix
   return {
     ...card,
     displayType,
@@ -484,6 +506,7 @@ module.exports = {
   validityDaysRemaining,
   isCardUsable,
   isOfficeNightMonthlyCard,
+  cardBillTypeForBooking,
   officeNightPassDays,
   monthlyPassDays,
   weeklyPassDays,

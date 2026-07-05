@@ -234,6 +234,24 @@ def test_daily_pass_three_day_continuous():
         assert "连续使用" in str(e)
 
 
+def test_repair_misissued_monthly_validity():
+    from datetime import date
+
+    from app.services.card_service import repair_misissued_card_validity
+
+    card = PeriodCard(
+        user_id=1,
+        card_name="通坐月卡",
+        card_type=CardType.monthly,
+        status=1,
+        start_date=date(2026, 7, 1),
+        end_date=date(2026, 7, 30),
+        total_sessions=30,
+    )
+    assert repair_misissued_card_validity(card)
+    assert card.end_date == date(2026, 12, 27)
+
+
 def test_office_night_monthly_period():
     card = PeriodCard(
         user_id=1,

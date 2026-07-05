@@ -135,6 +135,33 @@ REWARD_TO_CARD: dict[RewardType, CardType] = {
 }
 
 
+def repair_misissued_card_validity(card: PeriodCard) -> bool:
+    """老数据：效期被误写成预约跨度（7/30天），导致无法在效期内约满连续天数。"""
+    if not card.start_date or not card.end_date or card.status != 1:
+        return False
+    window = (card.end_date - card.start_date).days + 1
+    expected: int | None = None
+    need_span = 1
+    if is_office_night_monthly_card(card) or card.card_type == CardType.night_monthly:
+        expected = NIGHT_MONTHLY_VALIDITY_DAYS
+        need_span = OFFICE_NIGHT_MAX_DAYS
+    elif card.card_type == CardType.monthly:
+        expected = MONTHLY_PASS_VALIDITY_DAYS
+        need_span = MONTHLY_PASS_CONSECUTIVE_DAYS
+    elif card.card_type == CardType.weekly:
+        expected = WEEKLY_PASS_VALIDITY_DAYS
+        need_span = WEEKLY_PASS_CONSECUTIVE_DAYS
+    else:
+        return False
+    if window >= expected:
+        return False
+    # 效期窗口不足以完成一次预约，或误把「连续天数」当成效期
+    if window < need_span or window <= need_span + 1:
+        card.end_date = card.start_date + timedelta(days=expected - 1)
+        return True
+    return False
+
+
 def issue_period_card(
     db: Session,
     user_id: int,

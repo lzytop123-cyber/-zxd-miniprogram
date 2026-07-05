@@ -41,9 +41,16 @@ def main() -> int:
         try:
             prepared = await YunlaobanService.prepare(1, code)
             deal_id = prepared["ticketData"].get("dealId")
+            ticket_data = prepared["ticketData"]
             print(f"\n[OK] prepare 成功")
             print(f"  ticketName = {prepared.get('ticketName')}")
             print(f"  dealId = {deal_id}")
+            from app.services.yunlaoban import parse_voucher_expire_date
+            voucher_expire = parse_voucher_expire_date(ticket_data)
+            if voucher_expire:
+                print(f"  receiptEndDate -> 团购券截止 {voucher_expire}")
+            else:
+                print(f"  ticketData keys = {list(ticket_data.keys())}")
         except ValueError as e:
             print(f"\n[FAIL] prepare: {e}")
             return 1

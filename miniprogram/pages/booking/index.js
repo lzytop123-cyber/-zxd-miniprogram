@@ -9,6 +9,8 @@ const {
   isCardUsable,
   cardValidUntil,
   officeNightPassDays,
+  monthlyPassDays,
+  weeklyPassDays,
   formatCard,
   cardValidityHint,
   OFFICE_NIGHT_USAGE_RULE,
@@ -188,9 +190,14 @@ Page({
       quickHours: 2,
       planSeatCount: this._layout.planSeatCount,
       showSeatMap: true,
-      ...this._typeUiPatch('hourly', false),
+      ...this._typeUiPatch(options.billType || 'hourly', false),
     }, () => {
-      this.refreshPreview({ immediate: true })
+      const billType = options.billType || this.data.billType || 'hourly'
+      if (billType !== 'hourly') {
+        this.switchType({ currentTarget: { dataset: { type: billType } } })
+      } else {
+        this.refreshPreview({ immediate: true })
+      }
     })
 
     request({ url: `/store/${options.storeId}`, silent: true }).then((s) => {
@@ -200,7 +207,7 @@ Page({
     this._fetchPricing(options.storeId).then(() => {
       this.refreshPreview({ immediate: true })
     })
-    this.loadUserCards()
+    this.loadUserCards({ force: !!options.billType })
   },
 
   onPullDownRefresh() {
@@ -249,8 +256,9 @@ Page({
     }
   },
 
-  loadUserCards() {
-    return request({ url: '/user/cards', silent: true })
+  loadUserCards(options = {}) {
+    const { force = false } = options
+    return request({ url: '/user/cards', silent: true, force })
       .then((cards) => {
         const list = (cards || []).filter(isCardUsable).map(formatCard)
         const patch = {
@@ -302,9 +310,27 @@ Page({
     )
   },
 
-  _periodMaxEnd(startDate, billType) {
+  _periodMaxEnd(startDate, billType, card) {
     const offset = BILL_DEFAULTS[billType]?.endOffset ?? 0
-    return addDays(startDate, offset)
+    let end = addDays(startDate, offset)
+    if (card && card.end_date && end > card.end_date) end = card.end_date
+    return end
+  },
+
+  _periodRequiredSpan(billType) {
+    if (billType === 'monthly') return monthlyPassDays({ card_type: 'monthly', total_sessions: 30 })
+    if (billType === 'weekly') return 7
+    return 0
+  },
+
+  _latestPeriodStart(card, billType) {
+    if (!card || !card.end_date) return null
+    const span = this._periodRequiredSpan(billType)
+    if (!span) return null
+    const latest = addDays(card.end_date, -(span - 1))
+    const today = todayStr()
+    const min = card.start_date && card.start_date > today ? card.start_date : today
+    return latest < min ? null : latest
   },
 
   _periodCardSuffix(billType) {
@@ -321,17 +347,27 @@ Page({
     if (card && card.start_date && card.end_date) {
       min = card.start_date > today ? card.start_date : today
       useDeadline = card.end_date
+      const latestStart = this._latestPeriodStart(card, billType)
+      if (latestStart && start > latestStart) start = latestStart
       if (start < min) start = min
       if (start > useDeadline) start = min
     }
-    const suffix = this._periodCardSuffix(billType)
+    let end = this._periodMaxEnd(start, billType, card)
+    const span = this._periodRequiredSpan(billType)
+    let periodCardHint = card ? cardValidityHint(card, this._periodCardSuffix(billType)) : ''
+    if (card && span && daysBetweenDates(start, end) !== span) {
+      periodCardHint = cardValidityHint(
+        card,
+        `须连续 ${span} 天，请将开始日期调至 ${this._latestPeriodStart(card, billType) || min} 前`,
+      )
+    }
     return {
       startDate: start,
-      endDate: this._periodMaxEnd(start, billType),
+      endDate: end,
       periodDateMin: min,
       periodUseDeadline: useDeadline,
       activePeriodCard: card,
-      periodCardHint: card ? cardValidityHint(card, suffix) : '',
+      periodCardHint,
     }
   },
 
@@ -521,7 +557,8 @@ Page({
       }
     }
     if (PERIOD_TYPES.includes(this.data.billType)) {
-      const maxEnd = this._periodMaxEnd(this.data.startDate, this.data.billType)
+      const card = this.data.activePeriodCard
+      const maxEnd = this._periodMaxEnd(this.data.startDate, this.data.billType, card)
       if (endDate > maxEnd) {
         wx.showToast({ title: `结束日期不能晚于 ${maxEnd}`, icon: 'none' })
         return
@@ -705,7 +742,19 @@ Page({
     } else {
       ;({ start, end } = storeRangeDateTimes(startDate, endDate))
       if (end < start) throw new Error('结束日期不能早于开始日期')
-      if (billType === 'session') {
+      if (billType === 'monthly' && this.data.activePeriodCard) {
+        const span = monthlyPassDays(this.data.activePeriodCard)
+        const days = daysBetweenDates(startDate, endDate)
+        if (days !== span) {
+          throw new Error(`月卡须连续预约 ${span} 天，请调整日期`)
+        }
+      } else if (billType === 'weekly' && this.data.activePeriodCard) {
+        const span = weeklyPassDays(this.data.activePeriodCard)
+        const days = daysBetweenDates(startDate, endDate)
+        if (days !== span) {
+          throw new Error(`周卡须连续预约 ${span} 天，请调整日期`)
+        }
+      } else if (billType === 'session') {
         const days = Math.floor((end - start) / 86400000) + 1
         if (days > 30) throw new Error('次卡单次最多连续预约30天')
       } else if (['weekly', 'monthly', 'quarterly'].includes(billType) && end <= start) {

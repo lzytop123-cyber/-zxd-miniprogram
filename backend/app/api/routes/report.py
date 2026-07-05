@@ -18,6 +18,7 @@ from app.services.card_service import (
     is_office_night_monthly_card,
     is_period_card_active,
     OFFICE_NIGHT_USAGE_RULE,
+    repair_misissued_card_validity,
 )
 from app.services.wechat_pay import WechatPayService
 
@@ -214,12 +215,15 @@ def get_cards(user: User = Depends(get_current_user), db: Session = Depends(get_
         .order_by(PeriodCard.created_at.desc())
     ).all()
     active = []
+    repaired = False
     for c in cards:
         if not is_period_card_active(c, today):
             c.status = 0
             continue
+        if repair_misissued_card_validity(c):
+            repaired = True
         active.append(c)
-    if len(active) < len(cards):
+    if repaired or len(active) < len(cards):
         db.commit()
     return ResponseModel(
         data=[
@@ -234,6 +238,7 @@ def get_cards(user: User = Depends(get_current_user), db: Session = Depends(get_
                 "start_date": str(c.start_date) if c.start_date else None,
                 "end_date": str(c.end_date) if c.end_date else None,
                 **card_validity_api_fields(c, today),
+                "source": c.source.value if c.source else None,
                 "daily_pass_days": daily_pass_days(c) if c.card_type.value == "daily" else None,
                 "daily_start": str(c.daily_start) if c.daily_start else None,
                 "daily_end": str(c.daily_end) if c.daily_end else None,
