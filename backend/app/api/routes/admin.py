@@ -50,7 +50,14 @@ from app.services.admin_ops import (
     update_admin_period_card,
     user_overview,
 )
-from app.services.booking import add_wallet_log, auto_checkin_reservation, change_reservation_seat, seat_options_for_change
+from app.services.booking import (
+    add_wallet_log,
+    auto_checkin_reservation,
+    change_reservation_seat,
+    finalize_expired_reservation,
+    seat_options_for_change,
+)
+from app.services.card_service import refund_period_card_consume, repair_misissued_card_validity
 from app.services.card_service import BILL_TYPE_LABELS
 from app.services.deal_mapping_service import mark_pending_resolved_by_deal_id, resolve_pending_deal
 from app.services.schema_migrate import get_last_migration_result, run_schema_migrations
@@ -135,24 +142,13 @@ def admin_reservations(
         query.order_by(Reservation.created_at.desc()).offset((page - 1) * page_size).limit(page_size)
     ).all()
 
-    changed = False
-    for r in rows:
-        if auto_checkin_reservation(db, r):
-            changed = True
-    if changed:
-        db.commit()
-
-    from app.api.routes.reservation import _to_item
+    _sync_reservation_rows_on_read(db, rows)
 
     items = []
     for r in rows:
-        base = _to_item(db, r).model_dump()
-        user = db.get(User, r.user_id)
-        base["user_id"] = r.user_id
-        base["user_nickname"] = user.nickname if user else None
-        base["user_phone"] = user.phone if user else None
-        base["pay_type"] = r.pay_type.value if r.pay_type else None
-        items.append(base)
+        base = _reservation_admin_item(db, r)
+        if base:
+            items.append(base)
 
     return ResponseModel(
         data=PageResult(items=items, total=total or 0, page=page, page_size=page_size)
@@ -845,16 +841,41 @@ def _user_admin_item(user: User) -> dict:
     }
 
 
-def _reservation_admin_item(db: Session, r: Reservation) -> dict:
-    from app.api.routes.reservation import _to_item
+def _reservation_admin_item(db: Session, r: Reservation) -> dict | None:
+    from app.api.routes.reservation import _safe_to_item
 
-    base = _to_item(db, r).model_dump()
+    item = _safe_to_item(db, r)
+    if not item:
+        return None
+    base = item.model_dump()
     user = db.get(User, r.user_id)
     base["user_id"] = r.user_id
     base["user_nickname"] = user.nickname if user else None
     base["user_phone"] = user.phone if user else None
     base["pay_type"] = r.pay_type.value if r.pay_type else None
     return base
+
+
+def _sync_reservation_rows_on_read(db: Session, rows: list[Reservation]) -> None:
+    """列表读取时同步过期/自动入座，失败时不阻断列表返回。"""
+    now = datetime.now()
+    changed = False
+    for row in rows:
+        try:
+            if finalize_expired_reservation(db, row, now):
+                changed = True
+            elif auto_checkin_reservation(db, row, when=now):
+                changed = True
+        except Exception:
+            continue
+    if not changed:
+        return
+    try:
+        db.commit()
+        for row in rows:
+            db.refresh(row)
+    except Exception:
+        db.rollback()
 
 
 @router.post("/reservations/{reservation_id}/cancel", response_model=ResponseModel)
@@ -891,6 +912,17 @@ def admin_cancel_reservation(
             WechatPayService.refund(
                 reservation.order_no, amount, amount, "管理员取消预约",
             )
+            reservation.pay_status = 2
+        elif reservation.pay_type == PayType.period_card:
+            if reservation.period_card_id:
+                card = db.get(PeriodCard, reservation.period_card_id)
+                if card:
+                    refund_period_card_consume(
+                        card,
+                        reservation.bill_type,
+                        reservation.start_time,
+                        reservation.end_time,
+                    )
             reservation.pay_status = 2
 
     reservation.status = 3
@@ -1160,9 +1192,15 @@ def list_period_cards_admin(
     rows = db.scalars(
         query.order_by(PeriodCard.created_at.desc()).offset((page - 1) * page_size).limit(page_size)
     ).all()
+    today = date.today()
+    repaired = False
     items = []
     for card in rows:
-        items.append(period_card_admin_dict(db, card))
+        if repair_misissued_card_validity(card):
+            repaired = True
+        items.append(period_card_admin_dict(db, card, today))
+    if repaired:
+        db.commit()
     return ResponseModel(
         data=PageResult(items=items, total=total or 0, page=page, page_size=page_size)
     )

@@ -128,8 +128,11 @@
             <el-table :data="overview.orders || []" size="small" stripe max-height="360">
               <el-table-column prop="order_no" label="订单号" width="150" />
               <el-table-column prop="seat_code" label="座位" width="70" />
-              <el-table-column label="支付" width="80">
-                <template #default="{ row }">{{ ['待付','已付','退款'][row.pay_status] || row.pay_status }}</template>
+              <el-table-column label="套餐" min-width="100" show-overflow-tooltip>
+                <template #default="{ row }">{{ row.usage_label || row.bill_type_label || row.bill_type }}</template>
+              </el-table-column>
+              <el-table-column label="来源" width="100" show-overflow-tooltip>
+                <template #default="{ row }">{{ row.pay_source_label || ['待付','已付','退款'][row.pay_status] }}</template>
               </el-table-column>
               <el-table-column prop="status_label" label="状态" width="90" />
               <el-table-column prop="start_time" label="开始" min-width="140" />
@@ -143,6 +146,9 @@
             <el-table :data="overview.cards || []" size="small" stripe max-height="360">
               <el-table-column prop="card_name" label="名称" min-width="120" />
               <el-table-column prop="card_type" label="类型" width="90" />
+              <el-table-column label="效期" min-width="160" show-overflow-tooltip>
+                <template #default="{ row }">{{ row.validity_range || (row.start_date && row.end_date ? `${row.start_date} ~ ${row.end_date}` : '-') }}</template>
+              </el-table-column>
               <el-table-column label="余量" width="100">
                 <template #default="{ row }">
                   <span v-if="row.remaining_hours != null">{{ row.remaining_hours }}h</span>

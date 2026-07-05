@@ -106,18 +106,6 @@
   border-left: 3rpx dashed var(--dash);
 }
 
-/* ============ 休息区（虚线围合） ============ */
-.rest {
-  position: absolute;
-  box-sizing: border-box;
-  left: 19.03%;
-  top: 61.18%;
-  width: 13.71%;
-  height: 22.63%;
-  border: 3rpx dashed var(--dash);
-  border-radius: 6rpx;
-}
-
 /* ============ 1、2 号座位间 ============ */
 .niche {
   position: absolute;
@@ -389,18 +377,13 @@
 }
 
 .lbl--zd {
-  left: 16.84%;
-  top: 66%;
+  left: 19.04%;
+  top: 73.56%;
 }
 
 .lbl--wc {
   left: 46.7%;
   top: 68.6%;
-}
-
-.lbl--rest {
-  left: 25.9%;
-  top: 72%;
 }
 
 .lbl--tea {

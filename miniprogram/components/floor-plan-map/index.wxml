@@ -22,9 +22,6 @@
         <view class="svc svc--strip"></view>
         <view class="strip-split"></view>
 
-        <!-- 休息区（虚线围合） -->
-        <view class="rest"></view>
-
         <!-- 1、2 号座位间 -->
         <view class="niche"></view>
 
@@ -66,7 +63,6 @@
         <text class="lbl lbl--zone lbl--zc">标准区</text>
         <text class="lbl lbl--zone lbl--zd">沉浸区</text>
         <text class="lbl lbl--svc lbl--wc">卫生间</text>
-        <text class="lbl lbl--svc lbl--rest">休息区</text>
         <text class="lbl lbl--svc lbl--tea">茶水间</text>
         <text class="lbl lbl--svc lbl--dine">餐厅</text>
         <text class="lbl lbl--entry">入口</text>

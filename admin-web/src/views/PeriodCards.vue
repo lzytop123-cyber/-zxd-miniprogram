@@ -35,10 +35,11 @@
           <span v-else>-</span>
         </template>
       </el-table-column>
-      <el-table-column label="有效期" width="220">
+      <el-table-column label="有效期" min-width="240">
         <template #default="{ row }">
-          <div>{{ row.start_date || '-' }} ~ {{ row.end_date || '-' }}</div>
-          <div v-if="row.end_date" class="sub">{{ validityRemainLabel(row.end_date) }}</div>
+          <div>{{ row.validity_range || formatValidityRange(row) }}</div>
+          <div v-if="row.usage_rule" class="sub">{{ row.usage_rule }}</div>
+          <div v-else-if="validityHint(row)" class="sub">{{ validityHint(row) }}</div>
         </template>
       </el-table-column>
       <el-table-column label="来源" width="90">
@@ -155,21 +156,31 @@ const cardTypes = [
 
 const cardTypeMap: Record<string, string> = Object.fromEntries(cardTypes.map((t) => [t.value, t.label]))
 const sourceMap: Record<string, string> = {
-  purchase: '在线购买', meituan: '美团兑换', douyin: '抖音兑换', admin: '后台发放', gift: '赠送',
+  purchase: '微信购卡',
+  meituan: '美团/点评团购',
+  douyin: '抖音团购',
+  admin: '门店发放',
+  gift: '赠送',
 }
 
 function cardTypeLabel(v: string) { return cardTypeMap[v] || v }
 function sourceLabel(v: string) { return sourceMap[v] || v }
 
-function validityRemainLabel(endDate: string | null | undefined) {
-  if (!endDate) return ''
-  const end = new Date(`${endDate}T00:00:00`)
-  const today = new Date()
-  today.setHours(0, 0, 0, 0)
-  const left = Math.floor((end.getTime() - today.getTime()) / 86400000)
-  if (left < 0) return '已过期'
-  if (left === 0) return '今日到期'
-  return `剩 ${left} 天`
+function formatValidityRange(row: any) {
+  if (row.start_date && row.end_date) return `${row.start_date} ~ ${row.end_date}`
+  if (row.end_date) return `至 ${row.end_date}`
+  if (row.start_date) return `${row.start_date} 起`
+  return '-'
+}
+
+function validityHint(row: any) {
+  const remain = row.validity_days_remaining
+  if (remain == null) return ''
+  if (remain < 0) return '已过期'
+  if (remain === 0) return '今日到期'
+  if (remain <= 7) return `剩 ${remain} 天`
+  if (row.end_date) return `效期至 ${row.end_date}`
+  return ''
 }
 
 const route = useRoute()

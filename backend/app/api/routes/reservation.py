@@ -466,14 +466,21 @@ def list_reservations(user: User = Depends(get_current_user), db: Session = Depe
     ).all()
     changed = False
     for row in rows:
-        if finalize_expired_reservation(db, row, now):
-            changed = True
-        elif auto_checkin_reservation(db, row, when=now):
-            changed = True
+        try:
+            if finalize_expired_reservation(db, row, now):
+                changed = True
+            elif auto_checkin_reservation(db, row, when=now):
+                changed = True
+        except Exception:
+            logger.exception("reservation row sync skipped id=%s", row.id)
     if changed:
-        db.commit()
-        for row in rows:
-            db.refresh(row)
+        try:
+            db.commit()
+            for row in rows:
+                db.refresh(row)
+        except Exception:
+            logger.exception("reservation list commit failed user=%s", user.id)
+            db.rollback()
     items = [_safe_to_item(db, r) for r in rows]
     return ResponseModel(data=[item for item in items if item is not None])
 

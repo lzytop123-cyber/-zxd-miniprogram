@@ -27,7 +27,12 @@ from app.models import (
 )
 from app.services.booking import auto_checkin_reservation, record_study_on_checkout, reservation_unlock_allowed
 from app.services.business import TTLockService
-from app.services.card_service import issue_period_card
+from app.services.card_service import (
+    card_validity_api_fields,
+    is_office_night_monthly_card,
+    issue_period_card,
+)
+from app.services.store_hours import OFFICE_NIGHT_USAGE_RULE
 
 CARD_TYPE_LABELS = {
     CardType.hourly: "小时卡",
@@ -50,8 +55,10 @@ CARD_TYPE_TO_REWARD: dict[CardType, RewardType] = {
 }
 
 
-def period_card_admin_dict(db: Session, card: PeriodCard) -> dict:
+def period_card_admin_dict(db: Session, card: PeriodCard, today: date | None = None) -> dict:
+    today = today or date.today()
     user = db.get(User, card.user_id)
+    validity = card_validity_api_fields(card, today)
     return {
         "id": card.id,
         "user_id": card.user_id,
@@ -66,7 +73,9 @@ def period_card_admin_dict(db: Session, card: PeriodCard) -> dict:
         "total_sessions": card.total_sessions,
         "start_date": str(card.start_date) if card.start_date else None,
         "end_date": str(card.end_date) if card.end_date else None,
-        "source": card.source.value,
+        **validity,
+        "usage_rule": OFFICE_NIGHT_USAGE_RULE if is_office_night_monthly_card(card) else None,
+        "source": card.source.value if card.source else None,
         "status": card.status,
         "remark": card.remark,
         "created_at": card.created_at.isoformat() if card.created_at else None,
@@ -197,7 +206,8 @@ def user_overview(db: Session, user_id: int) -> dict:
     if not user:
         raise ValueError("用户不存在")
 
-    from app.api.routes.reservation import _to_item
+    from app.api.routes.reservation import _safe_to_item
+    from app.services.card_service import repair_misissued_card_validity
 
     orders = db.scalars(
         select(Reservation)
@@ -224,15 +234,31 @@ def user_overview(db: Session, user_id: int) -> dict:
         .limit(20)
     ).all()
 
-    return {
-        "orders": [
+    today = date.today()
+    repaired = False
+    card_items = []
+    for c in cards:
+        if repair_misissued_card_validity(c):
+            repaired = True
+        card_items.append(period_card_admin_dict(db, c, today))
+    if repaired:
+        db.commit()
+
+    order_items = []
+    for r in orders:
+        item = _safe_to_item(db, r)
+        if not item:
+            continue
+        order_items.append(
             {
-                **_to_item(db, r).model_dump(),
+                **item.model_dump(),
                 "pay_type": r.pay_type.value if r.pay_type else None,
             }
-            for r in orders
-        ],
-        "cards": [period_card_admin_dict(db, c) for c in cards],
+        )
+
+    return {
+        "orders": order_items,
+        "cards": card_items,
         "exchanges": [
             {
                 "id": e.id,

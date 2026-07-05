@@ -57,16 +57,21 @@
           <div class="sub">ID {{ row.user_id }}</div>
         </template>
       </el-table-column>
-      <el-table-column prop="store_name" label="门店" width="120" />
-      <el-table-column prop="seat_code" label="座位" width="70" />
-      <el-table-column label="类型" width="90">
-        <template #default="{ row }">{{ billLabel(row.bill_type) }}</template>
+      <el-table-column prop="store_name" label="门店" width="110" />
+      <el-table-column label="座位/区域" width="100">
+        <template #default="{ row }">
+          <div>{{ row.seat_code || '-' }}</div>
+          <div v-if="row.zone_name" class="sub">{{ row.zone_name }}</div>
+        </template>
       </el-table-column>
-      <el-table-column label="支付" width="90">
-        <template #default="{ row }">{{ payTypeLabel(row.pay_type) }}</template>
+      <el-table-column label="套餐" min-width="120" show-overflow-tooltip>
+        <template #default="{ row }">{{ row.usage_label || row.bill_type_label || billLabel(row.bill_type) }}</template>
       </el-table-column>
-      <el-table-column prop="final_price" label="金额" width="70">
-        <template #default="{ row }">¥{{ row.final_price ?? 0 }}</template>
+      <el-table-column label="来源" width="110" show-overflow-tooltip>
+        <template #default="{ row }">{{ row.pay_source_label || payTypeLabel(row.pay_type) }}</template>
+      </el-table-column>
+      <el-table-column label="金额" width="90">
+        <template #default="{ row }">{{ priceText(row) }}</template>
       </el-table-column>
       <el-table-column prop="pay_status" label="支付状态" width="90">
         <template #default="{ row }">
@@ -210,6 +215,13 @@ function payTypeLabel(v: string) {
   return payTypeMap[v] || v || '-'
 }
 
+function priceText(row: any) {
+  if (row.pay_type === 'period_card' || (Number(row.final_price) === 0 && row.pay_status === 1)) {
+    return row.card_name ? `期限卡 · ${row.card_name}` : '期限卡抵扣'
+  }
+  return `¥${row.final_price ?? 0}`
+}
+
 function statusLabel(status: number) {
   return ['已预约', '使用中', '已完成', '已取消'][status] || String(status)
 }
@@ -250,8 +262,12 @@ async function load() {
     if (filters.pay_status !== null && filters.pay_status !== undefined) params.pay_status = filters.pay_status
     if (filters.status !== null && filters.status !== undefined) params.status = filters.status
     const res = await http.get('/admin/reservations', { params })
-    list.value = res.data.items
-    total.value = res.data.total
+    list.value = res.data.items || []
+    total.value = res.data.total || 0
+  } catch (e: any) {
+    list.value = []
+    total.value = 0
+    ElMessage.error(e?.response?.data?.detail || e?.message || '加载订单失败')
   } finally {
     loading.value = false
   }
