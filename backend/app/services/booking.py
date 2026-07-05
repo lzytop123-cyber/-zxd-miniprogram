@@ -605,6 +605,9 @@ def reservation_status_display(
             hint = f"结束于 {_fmt_status_time(reservation.actual_end_time)}"
         return "已完成", hint
     if reservation.status == 1:
+        if now > reservation.end_time:
+            end_at = reservation.actual_end_time or reservation.end_time
+            return "已完成", f"结束于 {_fmt_status_time(end_at)}"
         if reservation.check_in_time:
             return "使用中", f"自 {_fmt_status_time(reservation.check_in_time)} 起"
         return "使用中", "可到店开门或直接入座"

@@ -1,4 +1,4 @@
-const { request } = require('../../../utils/request')
+const { request, invalidateCache } = require('../../../utils/request')
 const routes = require('../../../utils/routes')
 const { seatDisplay } = require('../../../utils/seat-layout')
 
@@ -116,6 +116,7 @@ Page({
     if (id) {
       wx.setStorageSync('checkin_selected_id', id)
     }
+    invalidateCache('/reservation/active/list')
     wx.switchTab({ url: '/pages/checkin/index' })
   },
 

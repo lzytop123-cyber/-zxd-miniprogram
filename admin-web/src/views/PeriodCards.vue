@@ -35,9 +35,10 @@
           <span v-else>-</span>
         </template>
       </el-table-column>
-      <el-table-column label="有效期" width="200">
+      <el-table-column label="有效期" width="220">
         <template #default="{ row }">
-          {{ row.start_date || '-' }} ~ {{ row.end_date || '-' }}
+          <div>{{ row.start_date || '-' }} ~ {{ row.end_date || '-' }}</div>
+          <div v-if="row.end_date" class="sub">{{ validityRemainLabel(row.end_date) }}</div>
         </template>
       </el-table-column>
       <el-table-column label="来源" width="90">
@@ -159,6 +160,17 @@ const sourceMap: Record<string, string> = {
 
 function cardTypeLabel(v: string) { return cardTypeMap[v] || v }
 function sourceLabel(v: string) { return sourceMap[v] || v }
+
+function validityRemainLabel(endDate: string | null | undefined) {
+  if (!endDate) return ''
+  const end = new Date(`${endDate}T00:00:00`)
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  const left = Math.floor((end.getTime() - today.getTime()) / 86400000)
+  if (left < 0) return '已过期'
+  if (left === 0) return '今日到期'
+  return `剩 ${left} 天`
+}
 
 const route = useRoute()
 

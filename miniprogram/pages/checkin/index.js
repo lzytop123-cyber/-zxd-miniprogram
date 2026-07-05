@@ -84,7 +84,8 @@ Page({
       this._preferredId = Number(preferred)
     }
     this.setData({ ...pluginState, runtimeAppId })
-    this.loadActive({ silent: true })
+    // 入座页需实时数据，避免缓存空列表导致与订单页不一致
+    this.loadActive({ silent: true, force: true })
   },
 
   onPullDownRefresh() {

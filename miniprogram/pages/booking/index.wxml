@@ -124,12 +124,13 @@
 
     <!-- 周卡 / 月卡 / 季卡 -->
     <block wx:if="{{billType==='weekly' || billType==='monthly' || billType==='quarterly'}}">
-      <picker mode="date" value="{{startDate}}" start="{{today}}" bindchange="onStartDateChange">
+      <picker mode="date" value="{{startDate}}" start="{{periodDateMin || today}}" end="{{periodUseDeadline || ''}}" bindchange="onStartDateChange">
         <view class="field"><text class="field-key">开始日期</text><text class="field-val">{{startDate}} ›</text></view>
       </picker>
       <picker mode="date" value="{{endDate}}" start="{{startDate}}" bindchange="onEndDateChange">
         <view class="field"><text class="field-key">结束日期</text><text class="field-val">{{endDate}} ›</text></view>
       </picker>
+      <view class="hint" wx:if="{{activePeriodCard && periodCardHint}}">{{periodCardHint}}</view>
     </block>
 
     <!-- 夜读 -->
@@ -140,7 +141,8 @@
       <picker mode="date" value="{{endDate}}" start="{{startDate}}" end="{{nightDateMax || ''}}" bindchange="onEndDateChange">
         <view class="field"><text class="field-key">结束日期</text><text class="field-val">{{endDate}} ›</text></view>
       </picker>
-      <view class="hint">{{nightHint}}</view>
+      <view class="hint" wx:if="{{activeNightCard && nightCardHint}}">{{nightCardHint}}</view>
+      <view class="hint" wx:else>{{nightHint}}</view>
     </block>
 
     <view class="time-summary" wx:if="{{timeSummary}}">

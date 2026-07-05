@@ -7,6 +7,10 @@ const {
   dailyPassDays,
   isOfficeNightMonthlyCard,
   isCardUsable,
+  cardValidUntil,
+  officeNightPassDays,
+  formatCard,
+  cardValidityHint,
   OFFICE_NIGHT_USAGE_RULE,
   OFFICE_NIGHT_BOOKING_HINT,
 } = require('../../utils/cardDisplay')
@@ -135,6 +139,7 @@ Page({
     storeHoursHint: `营业 ${STORE_HOURS_LABEL}`,
     nightHint: OFFICE_NIGHT_BOOKING_HINT,
     activeNightCard: null,
+    nightCardHint: '',
     nightDateMin: '',
     nightDateMax: '',
     pricingMap: {},
@@ -146,6 +151,10 @@ Page({
     previewLoading: false,
     showSeatMap: false,
     userCards: [],
+    activePeriodCard: null,
+    periodCardHint: '',
+    periodDateMin: '',
+    periodUseDeadline: '',
     hasMultiDayDailyCard: false,
     dailyUseMode: 'single',
     multiDayDailyCard: null,
@@ -243,7 +252,7 @@ Page({
   loadUserCards() {
     return request({ url: '/user/cards', silent: true })
       .then((cards) => {
-        const list = cards || []
+        const list = (cards || []).filter(isCardUsable).map(formatCard)
         const patch = {
           userCards: list,
           hasMultiDayDailyCard: !!this._findMultiDayDailyCard(list),
@@ -258,6 +267,12 @@ Page({
           Object.assign(patch, { billType: 'night' }, this._applyNightPeriod(this.data.startDate, officeNight))
         } else if (this.data.billType === 'night') {
           Object.assign(patch, this._applyNightPeriod(this.data.startDate, officeNight || this.data.activeNightCard))
+        } else if (PERIOD_TYPES.includes(this.data.billType)) {
+          const periodCard = this._findPeriodCard(list, this.data.billType)
+          Object.assign(
+            patch,
+            this._applyPeriodDates(this.data.startDate, this.data.billType, periodCard),
+          )
         }
         Object.assign(patch, this._typeUiPatch(patch.billType || this.data.billType, !!officeNight))
         this.setData(patch, () => {
@@ -271,6 +286,53 @@ Page({
     let end = addDays(startDate, BILL_DEFAULTS.night.endOffset)
     if (card && card.end_date && end > card.end_date) end = card.end_date
     return end
+  },
+
+  _findPeriodCard(cards, billType) {
+    if (!PERIOD_TYPES.includes(billType)) return null
+    const storeId = Number(this.data.storeId)
+    return (
+      (cards || []).find((c) => {
+        if (c.card_type !== billType) return false
+        if (isOfficeNightMonthlyCard(c)) return false
+        if (!isCardUsable(c)) return false
+        if (c.store_id && Number(c.store_id) !== storeId) return false
+        return true
+      }) || null
+    )
+  },
+
+  _periodMaxEnd(startDate, billType) {
+    const offset = BILL_DEFAULTS[billType]?.endOffset ?? 0
+    return addDays(startDate, offset)
+  },
+
+  _periodCardSuffix(billType) {
+    if (billType === 'monthly') return '须连续 30 天'
+    if (billType === 'weekly') return '须连续 7 天'
+    return ''
+  },
+
+  _applyPeriodDates(startDate, billType, card) {
+    const today = todayStr()
+    let start = startDate || today
+    let min = today
+    let useDeadline = ''
+    if (card && card.start_date && card.end_date) {
+      min = card.start_date > today ? card.start_date : today
+      useDeadline = card.end_date
+      if (start < min) start = min
+      if (start > useDeadline) start = min
+    }
+    const suffix = this._periodCardSuffix(billType)
+    return {
+      startDate: start,
+      endDate: this._periodMaxEnd(start, billType),
+      periodDateMin: min,
+      periodUseDeadline: useDeadline,
+      activePeriodCard: card,
+      periodCardHint: card ? cardValidityHint(card, suffix) : '',
+    }
   },
 
   _applyNightPeriod(startDate, card) {
@@ -291,6 +353,7 @@ Page({
       nightDateMin: min,
       nightDateMax: max,
       nightHint: OFFICE_NIGHT_BOOKING_HINT,
+      nightCardHint: card ? cardValidityHint(card, '须连续 30 天') : OFFICE_NIGHT_BOOKING_HINT,
     }
   },
 
@@ -386,12 +449,9 @@ Page({
         quickHours: null,
         quickSessionDays: null,
       })
-    } else if (billType === 'weekly') {
-      Object.assign(patch, { endDate: addDays(startDate, defaults.endOffset) })
-    } else if (billType === 'monthly') {
-      Object.assign(patch, { endDate: addDays(startDate, defaults.endOffset) })
-    } else if (billType === 'quarterly') {
-      Object.assign(patch, { endDate: addDays(startDate, defaults.endOffset) })
+    } else if (PERIOD_TYPES.includes(billType)) {
+      const card = this._findPeriodCard(this.data.userCards, billType)
+      Object.assign(patch, this._applyPeriodDates(startDate, billType, card))
     } else if (billType === 'night') {
       Object.assign(patch, this._applyNightPeriod(startDate, this.data.activeNightCard))
     }
@@ -413,12 +473,9 @@ Page({
     } else if (this.data.billType === 'session') {
       patch.endDate = startDate
       patch.quickSessionDays = 1
-    } else if (this.data.billType === 'weekly') {
-      patch.endDate = addDays(startDate, 6)
-    } else if (this.data.billType === 'monthly') {
-      patch.endDate = addDays(startDate, 29)
-    } else if (this.data.billType === 'quarterly') {
-      patch.endDate = addDays(startDate, 89)
+    } else if (PERIOD_TYPES.includes(this.data.billType)) {
+      const card = this._findPeriodCard(this.data.userCards, this.data.billType)
+      Object.assign(patch, this._applyPeriodDates(startDate, this.data.billType, card))
     } else if (this.data.billType === 'night') {
       Object.assign(patch, this._applyNightPeriod(startDate, this.data.activeNightCard))
     }
@@ -446,6 +503,25 @@ Page({
     const patch = { endDate }
     if (this.data.billType === 'night') {
       const maxEnd = this._nightMaxEnd(this.data.startDate, this.data.activeNightCard)
+      if (endDate > maxEnd) {
+        wx.showToast({ title: `结束日期不能晚于 ${maxEnd}`, icon: 'none' })
+        return
+      }
+      if (endDate < this.data.startDate) {
+        wx.showToast({ title: '结束日期不能早于开始日期', icon: 'none' })
+        return
+      }
+      if (this.data.activeNightCard) {
+        const span = officeNightPassDays(this.data.activeNightCard)
+        const days = daysBetweenDates(this.data.startDate, endDate)
+        if (days !== span) {
+          wx.showToast({ title: `须连续 ${span} 天`, icon: 'none' })
+          return
+        }
+      }
+    }
+    if (PERIOD_TYPES.includes(this.data.billType)) {
+      const maxEnd = this._periodMaxEnd(this.data.startDate, this.data.billType)
       if (endDate > maxEnd) {
         wx.showToast({ title: `结束日期不能晚于 ${maxEnd}`, icon: 'none' })
         return
@@ -602,7 +678,12 @@ Page({
       ;({ start, end } = nightRangeDateTimes(startDate, endDate))
       if (end <= start) throw new Error('结束日期须晚于开始日期')
       const days = Math.floor((end - start) / 86400000) + 1
-      if (days > 30) throw new Error('夜读月卡单次最多预约30天')
+      if (this.data.activeNightCard) {
+        const span = officeNightPassDays(this.data.activeNightCard)
+        if (days !== span) throw new Error(`夜读月卡须连续预约 ${span} 天`)
+      } else if (days > 30) {
+        throw new Error('夜读单次最多预约30天')
+      }
     } else if (billType === 'daily') {
       const multi = this.data.dailyUseMode === 'multi_pass' ? this.data.multiDayDailyCard : null
       if (multi) {

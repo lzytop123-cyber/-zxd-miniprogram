@@ -413,6 +413,7 @@ async def mock_pay(
 
 @router.get("/list", response_model=ResponseModel[list[ReservationItem]])
 def list_reservations(user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    now = datetime.now()
     rows = db.scalars(
         select(Reservation)
         .where(Reservation.user_id == user.id)
@@ -421,10 +422,14 @@ def list_reservations(user: User = Depends(get_current_user), db: Session = Depe
     ).all()
     changed = False
     for row in rows:
-        if auto_checkin_reservation(db, row):
+        if finalize_expired_reservation(db, row, now):
+            changed = True
+        elif auto_checkin_reservation(db, row, when=now):
             changed = True
     if changed:
         db.commit()
+        for row in rows:
+            db.refresh(row)
     return ResponseModel(data=[_to_item(db, r) for r in rows])
 
 

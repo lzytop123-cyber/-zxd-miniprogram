@@ -20,8 +20,8 @@
       连约 {{sessionDays}} 天，扣 {{sessionDays}} 次
     </view>
 
-    <view class="hint-warn" wx:if="{{cards.length && !usableCards.length}}">
-      期限卡与当前套餐不匹配，请返回切换
+    <view class="hint-warn" wx:if="{{cardMismatchHint}}">
+      {{cardMismatchHint}}
     </view>
 
     <view class="hint-warn" wx:if="{{payOptionsError}}">{{payOptionsError}}</view>

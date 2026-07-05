@@ -12,7 +12,13 @@ from app.models import PeriodCard, RechargeOrder, Reservation, Seat, StudyStat, 
 from app.schemas.common import ResponseModel
 from app.schemas.report import DailyStatItem, LeaderboardItem, ReportSummary, RechargeRequest, WalletInfo
 from app.services.booking import add_wallet_log, fulfill_recharge_order
-from app.services.card_service import daily_pass_days, is_office_night_monthly_card, is_period_card_active, OFFICE_NIGHT_USAGE_RULE
+from app.services.card_service import (
+    card_validity_api_fields,
+    daily_pass_days,
+    is_office_night_monthly_card,
+    is_period_card_active,
+    OFFICE_NIGHT_USAGE_RULE,
+)
 from app.services.wechat_pay import WechatPayService
 
 router = APIRouter(tags=["学习报告"])
@@ -227,6 +233,7 @@ def get_cards(user: User = Depends(get_current_user), db: Session = Depends(get_
                 "remaining_sessions": c.remaining_sessions,
                 "start_date": str(c.start_date) if c.start_date else None,
                 "end_date": str(c.end_date) if c.end_date else None,
+                **card_validity_api_fields(c, today),
                 "daily_pass_days": daily_pass_days(c) if c.card_type.value == "daily" else None,
                 "daily_start": str(c.daily_start) if c.daily_start else None,
                 "daily_end": str(c.daily_end) if c.daily_end else None,

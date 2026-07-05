@@ -18,7 +18,11 @@
         <view class="ticket-badge">可用</view>
       </view>
       <view class="ticket-name">{{item.card_name || item.typeLabel}}</view>
-      <view class="ticket-meta" wx:if="{{item.validityText}}">{{item.validityText}}</view>
+      <view class="ticket-meta" wx:if="{{item.validityRangeText}}">
+        <text>效期 {{item.validityRangeText}}</text>
+        <text class="ticket-remain {{item.validityRemainUrgent ? 'urgent' : ''}}" wx:if="{{item.validityRemainText}}"> · {{item.validityRemainText}}</text>
+      </view>
+      <view class="ticket-meta" wx:elif="{{item.validityText}}">{{item.validityText}}</view>
       <view class="ticket-meta highlight" wx:if="{{item.remainText}}">{{item.remainText}}</view>
       <view class="ticket-rule" wx:if="{{item.ruleText}}">{{item.ruleText}}</view>
     </view>

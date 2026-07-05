@@ -25,14 +25,73 @@ MULTI_USE_HOURLY_THRESHOLD = Decimal("50")
 OFFICE_NIGHT_MAX_DAYS = 30
 OFFICE_NIGHT_BILL_TYPES = frozenset({BillType.night, BillType.night_monthly})
 
+# 卡面效期（自然日，含兑换日）。详见 app/data/deal_templates.py
+HOURLY_VALIDITY_DAYS: dict[int, int] = {4: 90, 50: 180}
+DEFAULT_HOURLY_VALIDITY_DAYS = 90
+SESSION_VALIDITY_DAYS: dict[int, int] = {10: 90, 30: 360}
+DEFAULT_SESSION_VALIDITY_DAYS = 90
+DAILY_PASS_VALIDITY_DAYS = 90
+MULTI_DAY_PASS_VALIDITY_DAYS = 15
+WEEKLY_PASS_VALIDITY_DAYS = 90
+WEEKLY_PASS_CONSECUTIVE_DAYS = 7
+MONTHLY_PASS_VALIDITY_DAYS = 180
+MONTHLY_PASS_CONSECUTIVE_DAYS = 30
+QUARTERLY_PASS_VALIDITY_DAYS = 180
+NIGHT_MONTHLY_VALIDITY_DAYS = 90
+LEGACY_FIXED_USAGE_WINDOW_MAX_DAYS = 7
+
+
+def validity_days_for_reward(reward_type: RewardType, value: int) -> int | None:
+    """兑换后卡面效期天数（None 表示不写日期）。"""
+    if reward_type == RewardType.hours:
+        return HOURLY_VALIDITY_DAYS.get(value, DEFAULT_HOURLY_VALIDITY_DAYS)
+    if reward_type == RewardType.session:
+        return SESSION_VALIDITY_DAYS.get(value, DEFAULT_SESSION_VALIDITY_DAYS)
+    if reward_type == RewardType.day_pass:
+        return MULTI_DAY_PASS_VALIDITY_DAYS if value > 1 else DAILY_PASS_VALIDITY_DAYS
+    if reward_type == RewardType.week_pass:
+        return WEEKLY_PASS_VALIDITY_DAYS
+    if reward_type == RewardType.month_pass:
+        return MONTHLY_PASS_VALIDITY_DAYS
+    if reward_type == RewardType.quarter_pass:
+        return QUARTERLY_PASS_VALIDITY_DAYS
+    if reward_type == RewardType.night_monthly:
+        return NIGHT_MONTHLY_VALIDITY_DAYS
+    return None
+
+
+def _set_card_validity(card: PeriodCard, today: date, valid_days: int) -> None:
+    card.start_date = today
+    card.end_date = today + timedelta(days=valid_days - 1)
+
+
+def card_validity_api_fields(card: PeriodCard, today: date | None = None) -> dict:
+    """卡面效期字段，供小程序/后台展示。"""
+    today = today or date.today()
+    start = str(card.start_date) if card.start_date else None
+    end = str(card.end_date) if card.end_date else None
+    remain = (card.end_date - today).days if card.end_date else None
+    if start and end:
+        validity_range = f"{start} ~ {end}"
+    elif end:
+        validity_range = f"至 {end}"
+    elif start:
+        validity_range = f"{start} 起"
+    else:
+        validity_range = None
+    return {
+        "validity_range": validity_range,
+        "validity_days_remaining": remain,
+    }
+
 
 def validate_office_night_reservation(start_time: datetime, end_time: datetime) -> None:
-    """夜读月卡：预约整段日期（最长30天）；每日可用时段在入座/开门时校验。"""
+    """夜读/上班族月卡：须一次预约连续 30 天；每日可用时段在入座/开门时校验。"""
     if end_time <= start_time:
         raise ValueError("结束日期须晚于开始日期")
     days = (end_time.date() - start_time.date()).days + 1
-    if days > OFFICE_NIGHT_MAX_DAYS:
-        raise ValueError(f"夜读月卡单次预约最长 {OFFICE_NIGHT_MAX_DAYS} 天")
+    if days != OFFICE_NIGHT_MAX_DAYS:
+        raise ValueError(f"夜读月卡须预约连续 {OFFICE_NIGHT_MAX_DAYS} 天")
 
 
 def _normalize_card_name(name: str | None) -> str:
@@ -102,14 +161,20 @@ def issue_period_card(
         hours = Decimal(str(value))
         card.remaining_hours = hours
         card.total_hours = hours
+        days = validity_days_for_reward(RewardType.hours, value)
+        if days:
+            _set_card_validity(card, today, days)
     elif mapping.reward_type == RewardType.session:
         card.total_sessions = value
         card.remaining_sessions = value
-        card.start_date = today
-        card.end_date = today + timedelta(days=364)
+        days = validity_days_for_reward(RewardType.session, value)
+        if days:
+            _set_card_validity(card, today, days)
     elif mapping.reward_type == RewardType.night_monthly:
-        card.start_date = today
-        card.end_date = today + timedelta(days=value - 1)
+        days = validity_days_for_reward(RewardType.night_monthly, value)
+        if days:
+            _set_card_validity(card, today, days)
+        card.total_sessions = value or OFFICE_NIGHT_MAX_DAYS
         card.daily_start = mapping.night_start or OFFICE_NIGHT_WEEKDAY_START
         card.daily_end = mapping.night_end
     elif mapping.reward_type in (
@@ -118,21 +183,17 @@ def issue_period_card(
         RewardType.month_pass,
         RewardType.quarter_pass,
     ):
-        # 兑换即开卡，连续自然日有效，不可暂停
-        card.start_date = today
+        days = validity_days_for_reward(mapping.reward_type, value)
+        if days:
+            _set_card_validity(card, today, days)
         if mapping.reward_type == RewardType.day_pass and value > 1:
-            card.end_date = today + timedelta(days=value - 1)
-        else:
-            days_map = {
-                RewardType.day_pass: 0,
-                RewardType.week_pass: 6,
-                RewardType.month_pass: 29,
-                RewardType.quarter_pass: 89,
-            }
-            card.end_date = today + timedelta(days=days_map.get(mapping.reward_type, value - 1))
+            card.total_sessions = value
+        elif mapping.reward_type == RewardType.week_pass:
+            card.total_sessions = value or WEEKLY_PASS_CONSECUTIVE_DAYS
+        elif mapping.reward_type == RewardType.month_pass:
+            card.total_sessions = value or MONTHLY_PASS_CONSECUTIVE_DAYS
     else:
-        card.start_date = today
-        card.end_date = today + timedelta(days=29)
+        _set_card_validity(card, today, 30)
 
     db.add(card)
     db.flush()
@@ -144,7 +205,7 @@ def _validate_reservation_within_card_period(
     start_time: datetime,
     end_time: datetime,
 ) -> None:
-    """期限卡（含月卡）：预约时段须在兑换后的有效期内。"""
+    """预约整段须在卡有效期内（次卡/夜读/日卡等）。"""
     if not card.start_date and not card.end_date:
         return
     res_start = start_time.date()
@@ -153,6 +214,70 @@ def _validate_reservation_within_card_period(
         raise ValueError(f"预约开始日期早于卡生效日（{card.start_date}）")
     if card.end_date and res_end > card.end_date:
         raise ValueError(f"预约结束日期超出卡有效期（{card.end_date}）")
+
+
+def office_night_pass_days(card: PeriodCard) -> int:
+    if not is_office_night_monthly_card(card):
+        return 0
+    if card.total_sessions and card.total_sessions > 1:
+        return card.total_sessions
+    return OFFICE_NIGHT_MAX_DAYS
+
+
+def monthly_pass_days(card: PeriodCard) -> int:
+    if card.card_type != CardType.monthly:
+        return 0
+    if card.total_sessions and card.total_sessions > 1:
+        return card.total_sessions
+    return MONTHLY_PASS_CONSECUTIVE_DAYS
+
+
+def weekly_pass_days(card: PeriodCard) -> int:
+    if card.card_type != CardType.weekly:
+        return 0
+    if card.total_sessions and card.total_sessions > 1:
+        return card.total_sessions
+    return WEEKLY_PASS_CONSECUTIVE_DAYS
+
+
+def _validate_consecutive_pass_in_validity(
+    card: PeriodCard,
+    start_time: datetime,
+    end_time: datetime,
+    span: int,
+) -> None:
+    """效期内须一次预约连续 span 天（三天卡、周卡）。"""
+    today = date.today()
+    if card.end_date and today > card.end_date:
+        raise ValueError("期限卡已过期")
+    days = _session_days(start_time, end_time)
+    if days != span:
+        raise ValueError(f"须预约连续 {span} 天")
+    res_start = start_time.date()
+    res_end = end_time.date()
+    if card.start_date and res_start < card.start_date:
+        raise ValueError(f"预约开始日期早于卡生效日（{card.start_date}）")
+    if card.end_date and res_start > card.end_date:
+        raise ValueError(f"须在 {card.end_date} 前开始预约")
+    if card.end_date and res_end > card.end_date:
+        raise ValueError(f"预约结束日期超出卡有效期（{card.end_date}）")
+
+
+def _validate_booking_starts_within_validity(
+    card: PeriodCard,
+    start_time: datetime,
+    now: datetime | None = None,
+) -> None:
+    """周/月/季卡：须在卡面有效期内开始预约；预约时长由套餐决定。"""
+    now = now or datetime.now()
+    today = now.date()
+    res_start = start_time.date()
+    if card.end_date and today > card.end_date:
+        raise ValueError("期限卡已过期")
+    if card.start_date and res_start < card.start_date:
+        raise ValueError(f"预约开始日期早于卡生效日（{card.start_date}）")
+    if card.end_date and res_start > card.end_date:
+        raise ValueError(f"须在 {card.end_date} 前开始预约")
 
 
 def is_period_card_active(card: PeriodCard, today: date | None = None) -> bool:
@@ -174,11 +299,15 @@ def _session_days(start_time: datetime, end_time: datetime) -> int:
 
 
 def daily_pass_days(card: PeriodCard) -> int:
-    """天卡覆盖的连续自然日数（如三天卡为 3，日卡为 1）。"""
+    """天卡单次可用连续自然日数（如三天卡为 3，日卡为 1）。"""
     if card.card_type != CardType.daily:
         return 0
+    if card.total_sessions and card.total_sessions > 1:
+        return card.total_sessions
     if card.start_date and card.end_date:
-        return (card.end_date - card.start_date).days + 1
+        span = (card.end_date - card.start_date).days + 1
+        if span <= LEGACY_FIXED_USAGE_WINDOW_MAX_DAYS:
+            return span
     return 1
 
 
@@ -190,7 +319,11 @@ def _validate_daily_pass_reservation(
     span = daily_pass_days(card)
     res_start = start_time.date()
     res_end = end_time.date()
-    if span > 1:
+    if span > 1 and card.start_date and card.end_date:
+        window = (card.end_date - card.start_date).days + 1
+        if window > LEGACY_FIXED_USAGE_WINDOW_MAX_DAYS:
+            _validate_consecutive_pass_in_validity(card, start_time, end_time, span)
+            return
         if res_start != card.start_date or res_end != card.end_date:
             raise ValueError(
                 f"该卡须连续使用 {span} 天（{card.start_date} 至 {card.end_date}），请按完整时段预约"
@@ -240,6 +373,8 @@ def validate_period_card_for_reservation(
     if card.card_type == CardType.hourly:
         if reservation_bill_type != BillType.hourly:
             raise ValueError("小时卡仅可用于按小时预约")
+        if card.end_date and today > card.end_date:
+            raise ValueError("小时卡已过期")
         hours = _reservation_hours(start_time, end_time)
         remaining = (card.remaining_hours or Decimal(0)).quantize(Decimal("0.1"))
         if hours <= 0:
@@ -267,14 +402,31 @@ def validate_period_card_for_reservation(
     if is_office_night_monthly_card(card):
         if reservation_bill_type not in OFFICE_NIGHT_BILL_TYPES:
             raise ValueError("该月卡请使用「夜读」预约方式选座")
-        validate_office_night_reservation(start_time, end_time)
-        _validate_reservation_within_card_period(card, start_time, end_time)
+        _validate_consecutive_pass_in_validity(
+            card, start_time, end_time, office_night_pass_days(card)
+        )
         return
 
     if card.card_type == CardType.daily:
         if reservation_bill_type != BillType.daily:
             raise ValueError("天卡请使用「天卡」预约方式")
         _validate_daily_pass_reservation(card, start_time, end_time)
+        return
+
+    if card.card_type == CardType.weekly:
+        if reservation_bill_type != BillType.weekly:
+            raise ValueError("周卡请使用「周卡」预约方式")
+        _validate_consecutive_pass_in_validity(
+            card, start_time, end_time, weekly_pass_days(card)
+        )
+        return
+
+    if card.card_type == CardType.monthly:
+        if reservation_bill_type != BillType.monthly:
+            raise ValueError("月卡请使用「月卡」预约方式")
+        _validate_consecutive_pass_in_validity(
+            card, start_time, end_time, monthly_pass_days(card)
+        )
         return
 
     type_map = {
@@ -288,8 +440,8 @@ def validate_period_card_for_reservation(
         if reservation_bill_type in OFFICE_NIGHT_BILL_TYPES:
             raise ValueError("该月卡请使用「夜读」预约方式选座")
         raise ValueError("期限卡类型与预约方式不匹配")
-    if card.card_type in (CardType.monthly, CardType.weekly, CardType.quarterly):
-        _validate_reservation_within_card_period(card, start_time, end_time)
+    if card.card_type == CardType.quarterly:
+        _validate_booking_starts_within_validity(card, start_time)
 
 
 def consume_period_card(

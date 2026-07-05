@@ -17,7 +17,7 @@ OFFICE_NIGHT_USAGE_RULE = (
     "工作日 18:00-23:30 · 周六日 7:30-23:30 可入座"
     "（工作日白天座位可与他人分时共用）"
 )
-OFFICE_NIGHT_BOOKING_HINT = "选择开始使用日期即可，最长连续 30 天；每日具体时段在到店开门时校验"
+OFFICE_NIGHT_BOOKING_HINT = "须一次预约连续 30 天；工作日 18:00-23:30、周六日按门店营业时间入座"
 
 
 def night_window_for_date(day: date) -> tuple[time, time, str]:

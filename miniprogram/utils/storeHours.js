@@ -6,7 +6,7 @@ const STORE_HOURS_LABEL = '7:30-23:30'
 const OFFICE_NIGHT_USAGE_RULE =
   '工作日 18:00-23:30，周末 7:30-23:30'
 const OFFICE_NIGHT_BOOKING_HINT =
-  '选开始日期，最长30天；入座时段以开门时为准'
+  '须连续 30 天；工作日 18:00-23:30、周六日 7:30-23:30 可入座'
 
 function compareClock(a, b) {
   const [ah, am] = String(a || '00:00').split(':').map(Number)

@@ -1,6 +1,6 @@
 const { request, formatRequestError } = require('../../utils/request')
 const { getLayout } = require('../../utils/seat-layout')
-const { dailyPassDays, isOfficeNightMonthlyCard, OFFICE_NIGHT_BOOKING_HINT } = require('../../utils/cardDisplay')
+const { dailyPassDays, isOfficeNightMonthlyCard, OFFICE_NIGHT_BOOKING_HINT, cardValidUntil, withinCardValidity, weeklyPassDays, monthlyPassDays, officeNightPassDays } = require('../../utils/cardDisplay')
 const { completeWechatPay } = require('../../utils/pay')
 
 const BILL_LABELS = { hourly: '按小时', daily: '天卡', weekly: '周卡', session: '次卡', monthly: '月卡', quarterly: '季卡', night: '夜读' }
@@ -25,6 +25,135 @@ function withinCardPeriod(card, startIso, endIso) {
   return true
 }
 
+function bookingSpanDays(startIso, endIso) {
+  return countSessionDays(startIso, endIso)
+}
+
+function cardTypeMatchesBill(card, billType) {
+  if (isOfficeNightMonthlyCard(card) || card.card_type === 'night_monthly' || card.usage_rule) {
+    return billType === 'night'
+  }
+  if (card.card_type === 'hourly') return billType === 'hourly'
+  if (card.card_type === 'session') return billType === 'session'
+  if (card.card_type === 'daily') return billType === 'daily'
+  return card.card_type === billType
+}
+
+function explainCardMismatch(cards, ctx) {
+  const { storeId, billType, startTime, endTime } = ctx
+  const owned = (cards || []).filter((c) => {
+    if (c.store_id && Number(c.store_id) !== storeId) return false
+    return true
+  })
+  if (!owned.length) return '暂无可用期限卡'
+
+  const typeMatched = owned.filter((c) => cardTypeMatchesBill(c, billType))
+  if (!typeMatched.length) {
+    return '期限卡类型与当前预约方式不匹配，请返回切换套餐'
+  }
+
+  const periodOk = typeMatched.find((c) => {
+    if (isOfficeNightMonthlyCard(c) || c.card_type === 'night_monthly' || c.usage_rule) {
+      return (
+        billType === 'night'
+        && bookingSpanDays(startTime, endTime) === officeNightPassDays(c)
+        && withinCardPeriod(c, startTime, endTime)
+      )
+    }
+    if (c.card_type === 'weekly') {
+      return (
+        billType === 'weekly'
+        && bookingSpanDays(startTime, endTime) === weeklyPassDays(c)
+        && withinCardPeriod(c, startTime, endTime)
+      )
+    }
+    if (c.card_type === 'daily') {
+      const span = dailyPassDays(c)
+      if (span > 1 && c.start_date && c.end_date) {
+        const window = Math.floor(
+          (new Date(`${c.end_date}T00:00:00`) - new Date(`${c.start_date}T00:00:00`)) / 86400000
+        ) + 1
+        if (window > 7) {
+          return (
+            billType === 'daily'
+            && bookingSpanDays(startTime, endTime) === span
+            && withinCardPeriod(c, startTime, endTime)
+          )
+        }
+      }
+    }
+    if (c.card_type === 'monthly' && !isOfficeNightMonthlyCard(c)) {
+      return (
+        billType === 'monthly'
+        && bookingSpanDays(startTime, endTime) === monthlyPassDays(c)
+        && withinCardPeriod(c, startTime, endTime)
+      )
+    }
+    if (c.card_type === 'quarterly') {
+      return withinCardValidity(c, startTime)
+    }
+    return withinCardPeriod(c, startTime, endTime)
+  })
+  if (periodOk) return ''
+
+  const card = typeMatched[0]
+  const start = startTime.slice(0, 10)
+  const end = endTime.slice(0, 10)
+  if (isOfficeNightMonthlyCard(card) || card.card_type === 'night_monthly' || card.usage_rule) {
+    const span = officeNightPassDays(card)
+    if (bookingSpanDays(startTime, endTime) !== span) {
+      return `须预约连续 ${span} 天，请返回调整`
+    }
+    if (!withinCardPeriod(card, startTime, endTime)) {
+      if (card.end_date && end > card.end_date) {
+        return `预约须落在效期内（至 ${card.end_date}），请返回调整`
+      }
+    }
+    return '当前无法使用该夜读月卡，请返回调整'
+  }
+  if (card.card_type === 'weekly') {
+    const span = weeklyPassDays(card)
+    if (bookingSpanDays(startTime, endTime) !== span) {
+      return `须预约连续 ${span} 天，请返回调整`
+    }
+    if (!withinCardPeriod(card, startTime, endTime)) {
+      if (card.end_date && end > card.end_date) {
+        return `预约须落在效期内（至 ${card.end_date}），请返回调整`
+      }
+    }
+    return '当前无法使用该周卡，请返回调整'
+  }
+  if (card.card_type === 'monthly' && !isOfficeNightMonthlyCard(card)) {
+    const span = monthlyPassDays(card)
+    if (bookingSpanDays(startTime, endTime) !== span) {
+      return `须预约连续 ${span} 天，请返回调整`
+    }
+    if (!withinCardPeriod(card, startTime, endTime)) {
+      if (card.end_date && end > card.end_date) {
+        return `预约须落在效期内（至 ${card.end_date}），请返回调整`
+      }
+    }
+    return '当前无法使用该月卡，请返回调整'
+  }
+  if (card.card_type === 'quarterly') {
+    if (card.start_date && start < card.start_date) {
+      return `预约开始日早于卡生效日（${card.start_date}），请返回调整`
+    }
+    const until = cardValidUntil(card)
+    if (until && start > until) {
+      return `须在 ${until} 前开始预约，请返回调整开始日期`
+    }
+    return '当前无法使用该期限卡，请返回调整'
+  }
+  if (card.start_date && start < card.start_date) {
+    return `预约开始日早于卡生效日（${card.start_date}），请返回调整`
+  }
+  if (card.end_date && end > card.end_date) {
+    return `预约结束日超出卡有效期（${card.end_date}），请返回调整结束日期`
+  }
+  return '当前预约时段无法使用该期限卡，请返回调整'
+}
+
 function isUsableCard(card, ctx) {
   const {
     storeId, billType, startTime, endTime, sessionDays, bookingH,
@@ -34,6 +163,8 @@ function isUsableCard(card, ctx) {
   if (card.card_type === 'hourly') {
     if (billType !== 'hourly') return false
     if (!(Number(card.remaining_hours) > 0)) return false
+    if (card.end_date && startTime.slice(0, 10) > card.end_date) return false
+    if (card.start_date && startTime.slice(0, 10) < card.start_date) return false
     return bookingH > 0 && bookingH <= Number(card.remaining_hours)
   }
 
@@ -46,29 +177,51 @@ function isUsableCard(card, ctx) {
 
   if (isOfficeNightMonthlyCard(card) || card.card_type === 'night_monthly' || card.usage_rule) {
     if (billType !== 'night') return false
-    return withinCardPeriod(card, startTime, endTime)
+    return (
+      bookingSpanDays(startTime, endTime) === officeNightPassDays(card)
+      && withinCardPeriod(card, startTime, endTime)
+    )
   }
 
   if (card.card_type === 'daily') {
     if (billType !== 'daily') return false
     const span = dailyPassDays(card)
-    const start = startTime.slice(0, 10)
-    const end = endTime.slice(0, 10)
-    if (span > 1) {
+    if (span > 1 && card.start_date && card.end_date) {
+      const window = Math.floor(
+        (new Date(`${card.end_date}T00:00:00`) - new Date(`${card.start_date}T00:00:00`)) / 86400000
+      ) + 1
+      if (window > 7) {
+        return (
+          bookingSpanDays(startTime, endTime) === span
+          && withinCardPeriod(card, startTime, endTime)
+        )
+      }
+      const start = startTime.slice(0, 10)
+      const end = endTime.slice(0, 10)
       return start === card.start_date && end === card.end_date
     }
+    const start = startTime.slice(0, 10)
+    const end = endTime.slice(0, 10)
     if (start !== end) return false
     return withinCardPeriod(card, startTime, endTime)
   }
 
   if (card.card_type === 'weekly') {
-    return billType === 'weekly' && withinCardPeriod(card, startTime, endTime)
+    if (billType !== 'weekly') return false
+    return (
+      bookingSpanDays(startTime, endTime) === weeklyPassDays(card)
+      && withinCardPeriod(card, startTime, endTime)
+    )
   }
-  if (card.card_type === 'monthly') {
-    return billType === 'monthly' && withinCardPeriod(card, startTime, endTime)
+  if (card.card_type === 'monthly' && !isOfficeNightMonthlyCard(card)) {
+    if (billType !== 'monthly') return false
+    return (
+      bookingSpanDays(startTime, endTime) === monthlyPassDays(card)
+      && withinCardPeriod(card, startTime, endTime)
+    )
   }
   if (card.card_type === 'quarterly') {
-    return billType === 'quarterly' && withinCardPeriod(card, startTime, endTime)
+    return billType === 'quarterly' && withinCardValidity(card, startTime)
   }
 
   return false
@@ -128,6 +281,7 @@ Page({
     nightDays: 0,
     nightBookingHint: OFFICE_NIGHT_BOOKING_HINT,
     payOptionsError: '',
+    cardMismatchHint: '',
     submitting: false,
   },
 
@@ -191,6 +345,9 @@ Page({
         coupons,
         usableCoupons,
         payOptionsError: '',
+        cardMismatchHint: usableCards.length
+          ? ''
+          : explainCardMismatch(cards, ctx),
       }
       if (this.data.payType === 'period_card') {
         const cur = usableCards.find((c) => c.id === this.data.selectedCardId) || usableCards[0]

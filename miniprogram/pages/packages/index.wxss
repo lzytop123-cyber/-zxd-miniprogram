@@ -456,6 +456,11 @@
   opacity: 1;
 }
 
+.ticket-remain.urgent {
+  color: #ffe082;
+  font-weight: 600;
+}
+
 .ticket-foot {
   display: flex;
   align-items: center;

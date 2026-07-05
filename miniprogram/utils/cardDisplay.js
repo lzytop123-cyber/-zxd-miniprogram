@@ -34,15 +34,26 @@ function hourlyDetailLines(card) {
 
 function dailyPassDays(card) {
   if (card.daily_pass_days != null) return Number(card.daily_pass_days)
+  if (card.total_sessions != null && Number(card.total_sessions) > 1) {
+    return Number(card.total_sessions)
+  }
   if (!card.start_date || !card.end_date) return 1
-  const s = new Date(`${card.start_date}T00:00:00`)
-  const e = new Date(`${card.end_date}T00:00:00`)
-  return Math.floor((e - s) / 86400000) + 1
+  const span = Math.floor(
+    (new Date(`${card.end_date}T00:00:00`) - new Date(`${card.start_date}T00:00:00`)) / 86400000
+  ) + 1
+  if (span <= 7) return span
+  return 1
 }
 
 function dailyRuleText(card) {
   const span = dailyPassDays(card)
-  if (span > 1) {
+  if (span > 1 && card.start_date && card.end_date) {
+    const window = Math.floor(
+      (new Date(`${card.end_date}T00:00:00`) - new Date(`${card.start_date}T00:00:00`)) / 86400000
+    ) + 1
+    if (window > 7) {
+      return `${window} 天内须预约连续 ${span} 天`
+    }
     return `连续 ${span} 天不限时，须一次约满 ${card.start_date} 至 ${card.end_date}`
   }
   return RULE_LINES.daily
@@ -124,13 +135,13 @@ function validateNightBookingTimes(dateStr, startClock, endClock) {
 }
 
 const RULE_LINES = {
-  daily: '全天不限时，用一次即核销',
-  weekly: '7天内预约一次即核销',
-  monthly: '30天内预约一次即核销',
-  quarterly: '90天内预约一次即核销',
+  daily: '效期内预约一次即核销',
+  weekly: '效期内须一次预约连续 7 天',
+  monthly: '效期内须一次预约连续 30 天',
+  quarterly: '效期内预约一次即核销',
   session: '按自然日扣次',
   hourly: '可约不超过卡面时长，一次性核销',
-  night_monthly: '30天固定座位，预约一次即核销',
+  night_monthly: '效期内须一次预约连续 30 天',
 }
 
 const CARD_DETAIL_LINES = {
@@ -139,12 +150,12 @@ const CARD_DETAIL_LINES = {
     '全天不限时，预约一次即核销',
   ],
   weekly: [
-    '连续7个自然日有效',
-    '7天内预约一次即核销',
+    '兑换即开卡，效期见卡面日期',
+    '效期内须一次预约连续 7 天',
   ],
   monthly: [
-    '连续30个自然日有效',
-    '30天内预约一次即核销',
+    '兑换即开卡，效期见卡面日期',
+    '效期内须一次预约连续 30 天',
   ],
   quarterly: [
     '连续90个自然日有效',
@@ -160,7 +171,7 @@ const CARD_DETAIL_LINES = {
   ],
   night_monthly: [
     OFFICE_NIGHT_USAGE_RULE,
-    '预约时选「夜读」，默认30天',
+    '预约时选「夜读」，须一次约满连续 30 天',
   ],
 }
 
@@ -173,22 +184,136 @@ const PKG_CATEGORY_TABS = [
 
 const PKG_HINTS = {
   daily: { tag: '1天内有效', rule: '全天不限时，用一次即核销' },
-  weekly: { tag: '7天内有效', rule: '7天内完成一次预约即核销' },
-  monthly: { tag: '30天内有效', rule: '开卡后30天内可预约一次' },
+  weekly: { tag: '效期见卡面', rule: '效期内须一次预约连续 7 天' },
+  monthly: { tag: '效期见卡面', rule: '效期内须一次预约连续 30 天' },
   quarterly: { tag: '90天内有效', rule: '90天内完成一次预约即核销' },
   session: { tag: '按次扣减', rule: '连选N天扣N次' },
-  night_monthly: { tag: '30天夜读', rule: OFFICE_NIGHT_USAGE_RULE },
+  night_monthly: { tag: '30天夜读', rule: '效期内须连续 30 天 · ' + OFFICE_NIGHT_USAGE_RULE },
+}
+
+const MONTHLY_CARD_USE_DAYS = 180
+
+function officeNightPassDays(card) {
+  if (!isOfficeNightMonthlyCard(card)) return 0
+  if (card.total_sessions != null && Number(card.total_sessions) > 1) {
+    return Number(card.total_sessions)
+  }
+  return 30
+}
+
+function monthlyPassDays(card) {
+  if (!card || card.card_type !== 'monthly') return 0
+  if (isOfficeNightMonthlyCard(card)) return 0
+  if (card.total_sessions != null && Number(card.total_sessions) > 1) {
+    return Number(card.total_sessions)
+  }
+  return 30
+}
+
+function weeklyPassDays(card) {
+  if (!card || card.card_type !== 'weekly') return 0
+  if (card.total_sessions != null && Number(card.total_sessions) > 1) {
+    return Number(card.total_sessions)
+  }
+  return 7
+}
+
+function cardValidUntil(card) {
+  return (card && card.end_date) || ''
+}
+
+/** 预约开始日须在卡面效期内。 */
+function withinCardValidity(card, startIso) {
+  if (!card) return false
+  const start = startIso.slice(0, 10)
+  if (card.start_date && start < card.start_date) return false
+  if (card.end_date && start > card.end_date) return false
+  return true
+}
+
+/** @deprecated 使用 cardValidUntil */
+function monthlyCardUseDeadline(card) {
+  return cardValidUntil(card)
+}
+
+/** @deprecated 使用 withinCardValidity */
+function withinMonthlyCardUseWindow(card, startIso) {
+  return withinCardValidity(card, startIso)
+}
+
+function todayDateStr() {
+  const d = new Date()
+  const pad = (n) => (n < 10 ? '0' + n : '' + n)
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
+}
+
+function validityDaysRemaining(card) {
+  if (!card || !card.end_date) return null
+  if (card.validity_days_remaining != null) return Number(card.validity_days_remaining)
+  const t = new Date(`${todayDateStr()}T00:00:00`)
+  const e = new Date(`${card.end_date}T00:00:00`)
+  return Math.floor((e - t) / 86400000)
+}
+
+function formatValidityRange(card) {
+  if (card.validity_range) return card.validity_range
+  if (card.start_date && card.end_date) return `${card.start_date} ~ ${card.end_date}`
+  if (card.end_date) return `至 ${card.end_date}`
+  if (card.start_date) return `${card.start_date} 起`
+  return ''
+}
+
+function formatValidityRemain(card) {
+  const left = validityDaysRemaining(card)
+  if (left == null) return { text: '', urgent: false }
+  if (left < 0) return { text: '已过期', urgent: true }
+  if (left === 0) return { text: '今日到期', urgent: true }
+  if (left <= 7) return { text: `剩 ${left} 天`, urgent: true }
+  return { text: `剩 ${left} 天`, urgent: false }
+}
+
+function resolveCardType(card) {
+  if (!card) return ''
+  if (isOfficeNightMonthlyCard(card)) return 'night_monthly'
+  return card.card_type
+}
+
+function cardRuleText(card) {
+  const displayType = resolveCardType(card)
+  if (displayType === 'hourly') return hourlyRuleText(card)
+  if (displayType === 'daily') return dailyRuleText(card)
+  return RULE_LINES[displayType] || ''
 }
 
 function formatValidity(card) {
-  if (card.card_type === 'monthly' && card.start_date && card.end_date) {
-    return `${card.start_date} 至 ${card.end_date} · 不可暂停`
+  const range = formatValidityRange(card)
+  const { text: remain } = formatValidityRemain(card)
+  if (range && remain) return `效期 ${range} · ${remain}`
+  if (range) return `效期 ${range}`
+  return remain
+}
+
+/** 紧凑展示：顶部 chip、预约提示 */
+function formatValidityShort(card) {
+  const range = formatValidityRange(card)
+  const { text: remain } = formatValidityRemain(card)
+  if (remain && range) return `${remain} · ${range}`
+  if (range) return range
+  return remain
+}
+
+/** 预约页关联卡提示：卡名 + 效期 + 可选后缀 */
+function cardValidityHint(card, suffix) {
+  if (!card) return suffix || ''
+  const c = card.validityRangeText != null ? card : formatCard(card)
+  const name = c.card_name ? `「${c.card_name}」` : ''
+  const base = c.validityRangeText ? `效期 ${c.validityRangeText}` : (c.validityText || '')
+  const parts = [name, base].filter(Boolean)
+  if (c.validityRemainText && !base.includes(c.validityRemainText)) {
+    parts.push(c.validityRemainText)
   }
-  if (card.start_date && card.end_date && ['weekly', 'quarterly', 'night_monthly'].includes(card.card_type)) {
-    return `兑换即开卡 · ${card.start_date} 至 ${card.end_date}`
-  }
-  if (card.end_date) return `有效期至 ${card.end_date}`
-  return ''
+  if (suffix) parts.push(suffix)
+  return parts.join('，')
 }
 
 function formatRemain(card) {
@@ -204,28 +329,47 @@ function isCardUsable(card) {
 }
 
 function formatCard(card) {
-  const ruleText = card.card_type === 'hourly'
-    ? hourlyRuleText(card)
-    : (card.card_type === 'daily' ? dailyRuleText(card) : (RULE_LINES[card.card_type] || ''))
-  const span = card.card_type === 'daily' ? dailyPassDays(card) : 0
+  const displayType = resolveCardType(card)
+  const ruleText = cardRuleText(card)
+  const span = displayType === 'daily' ? dailyPassDays(card) : 0
+  const validityRangeText = formatValidityRange(card)
+  const { text: validityRemainText, urgent: validityRemainUrgent } = formatValidityRemain(card)
+  const validityText = formatValidity(card)
+  const validityShort = formatValidityShort(card)
+  const remainText = formatRemain(card)
+  const chipMeta = (displayType === 'hourly' || displayType === 'session')
+    ? (remainText || validityShort || ruleText)
+    : (validityShort || remainText || ruleText)
   return {
     ...card,
-    typeLabel: span > 1 ? `${span}天卡` : (TYPE_LABELS[card.card_type] || '期限卡'),
-    validityText: formatValidity(card),
-    remainText: formatRemain(card),
+    displayType,
+    typeLabel: span > 1 ? `${span}天卡` : (TYPE_LABELS[displayType] || TYPE_LABELS[card.card_type] || '期限卡'),
+    validityRangeText,
+    validityRemainText,
+    validityRemainUrgent,
+    validityText,
+    validityShort,
+    remainText,
     ruleText,
-    hourlyMultiUse: card.card_type === 'hourly' ? hourlyAllowsMultiUse(card) : false,
+    chipMeta,
+    hourlyMultiUse: displayType === 'hourly' ? hourlyAllowsMultiUse(card) : false,
   }
 }
 
 function buildCardDetail(card) {
-  const lines = card.card_type === 'hourly'
+  const displayType = resolveCardType(card)
+  const lines = displayType === 'hourly'
     ? [...hourlyDetailLines(card)]
-    : (card.card_type === 'daily' ? [...dailyDetailLines(card)] : [...(CARD_DETAIL_LINES[card.card_type] || [])])
-  if (card.validityText) lines.unshift(card.validityText)
+    : (displayType === 'daily' ? [...dailyDetailLines(card)] : [...(CARD_DETAIL_LINES[displayType] || CARD_DETAIL_LINES[card.card_type] || [])])
+  if (card.validityRangeText) {
+    lines.unshift(`效期 ${card.validityRangeText}`)
+  } else if (card.validityText) {
+    lines.unshift(card.validityText)
+  }
+  if (card.validityRemainText) lines.unshift(card.validityRemainText)
   if (card.remainText) lines.unshift(card.remainText)
   if (card.daily_start) lines.push(`可用时段：${card.daily_start} 起`)
-  if (isOfficeNightMonthlyCard(card) && card.card_type !== 'night_monthly') {
+  if (isOfficeNightMonthlyCard(card)) {
     lines.push(OFFICE_NIGHT_USAGE_RULE)
   }
   return {
@@ -296,8 +440,20 @@ module.exports = {
   OFFICE_NIGHT_USAGE_RULE,
   OFFICE_NIGHT_BOOKING_HINT,
   formatCard,
+  formatValidity,
+  formatValidityShort,
+  cardValidityHint,
+  validityDaysRemaining,
   isCardUsable,
   isOfficeNightMonthlyCard,
+  officeNightPassDays,
+  monthlyPassDays,
+  weeklyPassDays,
+  cardValidUntil,
+  withinCardValidity,
+  monthlyCardUseDeadline,
+  withinMonthlyCardUseWindow,
+  MONTHLY_CARD_USE_DAYS,
   nightWindowForDate,
   normalizeNightBookingTimes,
   validateNightBookingTimes,
