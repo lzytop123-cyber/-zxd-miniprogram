@@ -2,9 +2,16 @@
   min-height: 100vh;
 }
 
-/* 助手模式：固定高度，聊天区滚动 + 输入框吸底 */
+/* 报告模式：底部避让悬浮 tabBar */
+.report-body {
+  padding-bottom: calc(160rpx + env(safe-area-inset-bottom));
+}
+
+/* 助手模式：固定高度，聊天区滚动 + 输入框吸底（预留悬浮 tabBar 空间） */
 .page-report.chat-mode {
   height: 100vh;
+  box-sizing: border-box;
+  padding-bottom: calc(140rpx + env(safe-area-inset-bottom));
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -336,7 +343,7 @@
   display: flex;
   align-items: center;
   gap: 16rpx;
-  padding: 16rpx 24rpx calc(16rpx + env(safe-area-inset-bottom));
+  padding: 16rpx 24rpx;
   background: #FFFFFF;
   box-shadow: 0 -4rpx 20rpx rgba(28, 43, 32, 0.06);
 }

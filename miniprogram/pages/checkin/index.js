@@ -1,6 +1,7 @@
 const { request } = require('../../utils/request')
 const auth = require('../../utils/auth')
 const routes = require('../../utils/routes')
+const { handleTabScroll } = require('../../utils/tabbar')
 const {
   computeCanOpen,
   getOpenWindowHint,
@@ -85,6 +86,10 @@ Page({
   },
 
   onShow() {
+    if (typeof this.getTabBar === 'function' && this.getTabBar()) {
+      this.getTabBar().setData({ selected: 2, collapsed: false })
+    }
+    this._tabbarLastTop = 0
     const pluginState = detectPlugin()
     const runtimeAppId = getRuntimeAppId()
     const preferred = wx.getStorageSync(CHECKIN_SELECT_KEY)
@@ -99,6 +104,10 @@ Page({
 
   onPullDownRefresh() {
     this.loadActive({ force: true }).finally(() => wx.stopPullDownRefresh())
+  },
+
+  onPageScroll(e) {
+    handleTabScroll(this, e.scrollTop)
   },
 
   loadActive(options = {}) {

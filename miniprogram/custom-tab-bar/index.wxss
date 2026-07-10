@@ -1,0 +1,171 @@
+.tabbar-wrap {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 100;
+  padding: 0 24rpx calc(4rpx + env(safe-area-inset-bottom));
+  pointer-events: none;
+}
+
+/* 导航后的渐隐蒙版：让滚动内容在贴近导航前融入背景 */
+.tabbar-scrim {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: calc(190rpx + env(safe-area-inset-bottom));
+  pointer-events: none;
+  background: linear-gradient(
+    180deg,
+    rgba(244, 250, 246, 0) 0%,
+    rgba(244, 250, 246, 0.85) 50%,
+    #f4faf6 100%
+  );
+  opacity: 1;
+  transition: opacity 0.25s ease;
+}
+
+.tabbar-wrap.is-collapsed .tabbar-scrim {
+  opacity: 0;
+}
+
+.tabbar {
+  pointer-events: auto;
+  display: flex;
+  align-items: center;
+  height: 108rpx;
+  padding: 0 10rpx;
+  background: #FFFFFF;
+  backdrop-filter: blur(20rpx);
+  border-radius: 40rpx;
+  border: 1rpx solid rgba(0, 0, 0, 0.06);
+  box-shadow:
+    0 8rpx 30rpx rgba(0, 0, 0, 0.1),
+    0 2rpx 8rpx rgba(0, 0, 0, 0.05);
+  transform-origin: left bottom;
+  transition: opacity 0.25s ease, transform 0.34s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.tabbar-wrap.is-collapsed .tabbar {
+  opacity: 0;
+  transform: translateY(16rpx) scale(0.9);
+  pointer-events: none;
+}
+
+/* 收起态：单个悬浮圆钮 */
+.tabbar-mini {
+  pointer-events: none;
+  position: absolute;
+  left: 24rpx;
+  bottom: calc(4rpx + env(safe-area-inset-bottom));
+  width: 96rpx;
+  height: 96rpx;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #52B788 0%, #2D6A4F 100%);
+  box-shadow: 0 12rpx 30rpx rgba(45, 106, 79, 0.36);
+  opacity: 0;
+  transform: scale(0.4);
+  transition: opacity 0.25s ease, transform 0.34s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.tabbar-wrap.is-collapsed .tabbar-mini {
+  pointer-events: auto;
+  opacity: 1;
+  transform: scale(1);
+}
+
+.tabbar-mini-icon {
+  width: 48rpx;
+  height: 48rpx;
+  filter: brightness(0) invert(1);
+}
+
+.tab-item {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+}
+
+.tab-item-inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6rpx;
+  min-width: 92rpx;
+  padding: 10rpx 8rpx;
+  border-radius: 26rpx;
+  transition: background 0.2s ease, transform 0.12s ease;
+}
+
+.tab-item.is-on .tab-item-inner {
+  background: linear-gradient(180deg, #E8F7EE 0%, #D4F0DC 100%);
+}
+
+.tab-item:active .tab-item-inner {
+  transform: scale(0.92);
+}
+
+.tab-item-icon {
+  width: 42rpx;
+  height: 42rpx;
+}
+
+.tab-item-text {
+  font-size: 20rpx;
+  line-height: 1;
+  color: #8C9BA5;
+}
+
+.tab-item.is-on .tab-item-text {
+  color: #2D6A4F;
+  font-weight: 600;
+}
+
+.tab-item-icon-box {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* 中间「入座」放大主按钮（FAB） */
+.tab-item.is-center .tab-item-inner {
+  background: transparent;
+  gap: 4rpx;
+}
+
+.tab-item.is-center .tab-item-icon-box {
+  width: 92rpx;
+  height: 92rpx;
+  margin-top: -48rpx;
+  border-radius: 50%;
+  border: 6rpx solid #FFFFFF;
+  background: linear-gradient(135deg, #52B788 0%, #2D6A4F 100%);
+  box-shadow: 0 10rpx 24rpx rgba(45, 106, 79, 0.4);
+  transition: transform 0.16s ease;
+}
+
+.tab-item.is-center:active .tab-item-inner {
+  transform: none;
+}
+
+.tab-item.is-center:active .tab-item-icon-box {
+  transform: scale(0.92);
+}
+
+.tab-item.is-center .tab-item-icon {
+  width: 46rpx;
+  height: 46rpx;
+  filter: brightness(0) invert(1);
+}
+
+.tab-item.is-center .tab-item-text {
+  color: #2D6A4F;
+  font-weight: 600;
+}

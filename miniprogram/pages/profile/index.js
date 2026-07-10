@@ -2,6 +2,7 @@ const auth = require('../../utils/auth')
 const { request } = require('../../utils/request')
 const { normalizeUser, pickAvatarDisplay } = require('../../utils/user')
 const routes = require('../../utils/routes')
+const { handleTabScroll } = require('../../utils/tabbar')
 
 const GOAL_OPTIONS = [
   { value: 'kaoyan', label: '考研' },
@@ -27,7 +28,15 @@ Page({
   },
 
   onShow() {
+    if (typeof this.getTabBar === 'function' && this.getTabBar()) {
+      this.getTabBar().setData({ selected: 4, collapsed: false })
+    }
+    this._tabbarLastTop = 0
     this.bootstrap({ silent: true })
+  },
+
+  onPageScroll(e) {
+    handleTabScroll(this, e.scrollTop)
   },
 
   onPullDownRefresh() {

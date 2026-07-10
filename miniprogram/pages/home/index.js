@@ -2,6 +2,7 @@ const { request } = require('../../utils/request')
 const auth = require('../../utils/auth')
 const { normalizeUser } = require('../../utils/user')
 const routes = require('../../utils/routes')
+const { handleTabScroll } = require('../../utils/tabbar')
 const TAB_PAGES = [
   '/pages/home/index',
   '/pages/packages/index',
@@ -50,7 +51,15 @@ Page({
   },
 
   onShow() {
+    if (typeof this.getTabBar === 'function' && this.getTabBar()) {
+      this.getTabBar().setData({ selected: 0, collapsed: false })
+    }
+    this._tabbarLastTop = 0
     this.refreshHome({ silent: true })
+  },
+
+  onPageScroll(e) {
+    handleTabScroll(this, e.scrollTop)
   },
 
   onPullDownRefresh() {
@@ -482,10 +491,6 @@ Page({
     wx.switchTab({ url: '/pages/packages/index' })
   },
 
-  goReport() {
-    wx.switchTab({ url: '/pages/report/index' })
-  },
-
   goCoupons() {
     wx.navigateTo({ url: routes.profileCoupons })
   },
@@ -498,16 +503,8 @@ Page({
     wx.navigateTo({ url: routes.profilePoints })
   },
 
-  goOrders() {
-    wx.navigateTo({ url: routes.profileOrders })
-  },
-
   goInvite() {
     wx.navigateTo({ url: routes.profileInvite })
-  },
-
-  goCheckin() {
-    wx.switchTab({ url: '/pages/checkin/index' })
   },
 
   goProfile() {

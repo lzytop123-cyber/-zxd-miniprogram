@@ -1,0 +1,24 @@
+<view class="tabbar-wrap {{collapsed ? 'is-collapsed' : ''}}">
+  <view class="tabbar-scrim"></view>
+  <view class="tabbar">
+    <view
+      class="tab-item {{selected === index ? 'is-on' : ''}} {{index === 2 ? 'is-center' : ''}}"
+      wx:for="{{list}}"
+      wx:key="pagePath"
+      data-index="{{index}}"
+      data-path="{{item.pagePath}}"
+      bindtap="onTap"
+    >
+      <view class="tab-item-inner">
+        <view class="tab-item-icon-box">
+          <image class="tab-item-icon" src="{{selected === index ? item.selectedIcon : item.icon}}" mode="aspectFit" />
+        </view>
+        <text class="tab-item-text">{{item.text}}</text>
+      </view>
+    </view>
+  </view>
+
+  <view class="tabbar-mini" bindtap="onExpand">
+    <image class="tabbar-mini-icon" src="{{list[selected].icon}}" mode="aspectFit" />
+  </view>
+</view>

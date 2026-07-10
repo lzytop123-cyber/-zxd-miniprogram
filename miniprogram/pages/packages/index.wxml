@@ -1,4 +1,4 @@
-<view class="packages-page">
+<view class="packages-page tabbar-clear">
   <view class="page-header">
     <view class="store-row">
       <view class="store-name">{{storeName || '请选择门店'}}</view>

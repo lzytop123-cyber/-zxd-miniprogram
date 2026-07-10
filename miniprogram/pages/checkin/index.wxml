@@ -1,4 +1,4 @@
-<view class="page-checkin page-safe-bottom">
+<view class="page-checkin page-safe-bottom tabbar-clear">
   <view wx:if="{{pageLoading}}" class="skeleton-checkin-wrap">
     <view class="card skeleton-checkin-card">
       <view class="skeleton-line skeleton-line--lg skeleton-shimmer" style="margin: 0 auto 24rpx;"></view>

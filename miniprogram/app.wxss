@@ -146,6 +146,11 @@ page {
   padding-bottom: calc(24rpx + env(safe-area-inset-bottom));
 }
 
+/* 悬浮胶囊 tabBar 的内容避让（仅 tab 页使用） */
+.tabbar-clear {
+  padding-bottom: calc(160rpx + env(safe-area-inset-bottom)) !important;
+}
+
 .fixed-bottom-bar {
   position: fixed;
   left: 0;

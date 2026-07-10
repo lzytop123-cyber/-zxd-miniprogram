@@ -1,4 +1,5 @@
 const { request } = require('../../utils/request')
+const { handleTabScroll } = require('../../utils/tabbar')
 
 Page({
   data: {
@@ -23,6 +24,10 @@ Page({
   },
 
   onShow() {
+    if (typeof this.getTabBar === 'function' && this.getTabBar()) {
+      this.getTabBar().setData({ selected: 3, collapsed: false })
+    }
+    this._tabbarLastTop = 0
     this.load({ silent: true })
     if (this.data.tab === 'assistant' && !this.data.introLoaded) {
       this.loadIntro()
@@ -36,6 +41,14 @@ Page({
       tasks.push(this.loadIntro({ force: true }))
     }
     Promise.all(tasks).finally(() => wx.stopPullDownRefresh())
+  },
+
+  onPageScroll(e) {
+    handleTabScroll(this, e.scrollTop)
+  },
+
+  onChatScroll(e) {
+    handleTabScroll(this, e.detail.scrollTop)
   },
 
   load(options = {}) {

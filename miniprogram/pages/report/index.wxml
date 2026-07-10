@@ -73,6 +73,7 @@
       scroll-y
       scroll-into-view="{{scrollInto}}"
       scroll-with-animation
+      bindscroll="onChatScroll"
     >
       <view class="chat-inner">
         <view class="msg-row left" wx:if="{{greeting}}">

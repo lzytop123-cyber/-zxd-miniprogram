@@ -1,4 +1,4 @@
-<view class="page-profile page-safe-bottom">
+<view class="page-profile page-safe-bottom tabbar-clear">
   <view class="profile-header {{loginState === 'guest' ? 'guest' : ''}}">
     <block wx:if="{{loginState === 'guest'}}">
       <view class="guest-header" bindtap="goLogin">
