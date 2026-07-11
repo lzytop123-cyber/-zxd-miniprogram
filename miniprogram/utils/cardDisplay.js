@@ -204,9 +204,37 @@ function officeNightPassDays(card) {
 function inferPassDaysFromCardName(name) {
   const text = String(name || '').replace(/\s/g, '').replace(/　/g, '')
   if (/双月|两个月|2个月/.test(text)) return 60
-  if (/四个月|4个月/.test(text)) return 120
-  if (/三个月|3个月/.test(text)) return 90
+  const monthMatch = text.match(/(\d+)个?月/)
+  if (monthMatch) return Number(monthMatch[1]) * 30
+  const weekMatch = text.match(/(\d+)个?周/)
+  if (weekMatch) return Number(weekMatch[1]) * 7
+  const dayMatch = text.match(/(\d+)天/)
+  if (dayMatch && Number(dayMatch[1]) > 1) return Number(dayMatch[1])
   return 0
+}
+
+function faceValidityDays(card) {
+  if (!card) return null
+  if (card.face_validity_days != null) return Number(card.face_validity_days)
+  if (card.start_date && card.end_date) {
+    const s = new Date(`${card.start_date}T00:00:00`)
+    const e = new Date(`${card.end_date}T00:00:00`)
+    return Math.floor((e - s) / 86400000) + 1
+  }
+  const displayType = resolveCardType(card)
+  const fallback = CARD_FACE_VALIDITY_DAYS[displayType]
+  return typeof fallback === 'number' ? fallback : null
+}
+
+function periodPassRuleText(card, billType) {
+  const span = periodPassSpan(billType || cardBillTypeForBooking(card), card)
+  const faceDays = faceValidityDays(card)
+  const faceHint = faceDays ? `卡面效期 ${faceDays} 天` : '效期内'
+  if (!span) return ''
+  const durationLabel = formatPassDurationLabel(span)
+  return durationLabel
+    ? `${faceHint}，${durationLabel}须一次约满`
+    : `${faceHint}，须连续 ${span} 天`
 }
 
 function formatPassDurationLabel(span) {
@@ -219,14 +247,14 @@ function formatPassDurationLabel(span) {
 function monthlyPassDays(card) {
   if (!card || card.card_type !== 'monthly') return 0
   if (isOfficeNightMonthlyCard(card)) return 0
-  const inferred = inferPassDaysFromCardName(card.card_name)
-  if (inferred) return inferred
   if (card.period_pass_days != null && Number(card.period_pass_days) > 0) {
     return Number(card.period_pass_days)
   }
   if (card.total_sessions != null && Number(card.total_sessions) > 1) {
     return Number(card.total_sessions)
   }
+  const inferred = inferPassDaysFromCardName(card.card_name)
+  if (inferred) return inferred
   return 30
 }
 
@@ -238,6 +266,8 @@ function quarterlyPassDays(card) {
   if (card.total_sessions != null && Number(card.total_sessions) > 1) {
     return Number(card.total_sessions)
   }
+  const inferred = inferPassDaysFromCardName(card.card_name)
+  if (inferred) return inferred
   return 90
 }
 
@@ -259,9 +289,14 @@ function periodPassSpan(billType, card) {
 
 function weeklyPassDays(card) {
   if (!card || card.card_type !== 'weekly') return 0
+  if (card.period_pass_days != null && Number(card.period_pass_days) > 0) {
+    return Number(card.period_pass_days)
+  }
   if (card.total_sessions != null && Number(card.total_sessions) > 1) {
     return Number(card.total_sessions)
   }
+  const inferred = inferPassDaysFromCardName(card.card_name)
+  if (inferred) return inferred
   return 7
 }
 
@@ -355,7 +390,13 @@ function cardRuleText(card) {
   }
   if (displayType === 'monthly') {
     const span = monthlyPassDays(card)
-    return span ? `效期内须一次预约连续 ${span} 天` : RULE_LINES.monthly
+    const faceDays = faceValidityDays(card)
+    if (span) {
+      return faceDays
+        ? `卡面效期 ${faceDays} 天，须连续 ${span} 天`
+        : `须连续 ${span} 天`
+    }
+    return RULE_LINES.monthly
   }
   if (displayType === 'quarterly') {
     const span = quarterlyPassDays(card)
@@ -466,11 +507,47 @@ function formatCard(card) {
   }
 }
 
+function periodDetailLines(card) {
+  const displayType = resolveCardType(card)
+  if (displayType === 'weekly') {
+    return [
+      '兑换即开卡，效期见卡面日期',
+      periodPassRuleText(card, 'weekly') || RULE_LINES.weekly,
+    ]
+  }
+  if (displayType === 'monthly') {
+    return [
+      '兑换即开卡，效期见卡面日期',
+      periodPassRuleText(card, 'monthly') || RULE_LINES.monthly,
+    ]
+  }
+  if (displayType === 'quarterly') {
+    return [
+      '兑换即开卡，效期见卡面日期',
+      periodPassRuleText(card, 'quarterly') || RULE_LINES.quarterly,
+    ]
+  }
+  if (displayType === 'night_monthly') {
+    const span = officeNightPassDays(card)
+    return [
+      OFFICE_NIGHT_USAGE_RULE,
+      span
+        ? `预约时选「夜读」，须一次约满连续 ${span} 天`
+        : RULE_LINES.night_monthly,
+    ]
+  }
+  return []
+}
+
 function buildCardDetail(card) {
   const displayType = resolveCardType(card)
   const lines = displayType === 'hourly'
     ? [...hourlyDetailLines(card)]
-    : (displayType === 'daily' ? [...dailyDetailLines(card)] : [...(CARD_DETAIL_LINES[displayType] || CARD_DETAIL_LINES[card.card_type] || [])])
+    : displayType === 'daily'
+      ? [...dailyDetailLines(card)]
+      : ['weekly', 'monthly', 'quarterly', 'night_monthly'].includes(displayType)
+        ? [...periodDetailLines(card)]
+        : [...(CARD_DETAIL_LINES[displayType] || CARD_DETAIL_LINES[card.card_type] || [])]
   if (card.validityRangeText) {
     lines.unshift(`效期 ${card.validityRangeText}`)
   } else if (card.validityText) {
@@ -575,6 +652,8 @@ module.exports = {
   weeklyPassDays,
   quarterlyPassDays,
   periodPassSpan,
+  faceValidityDays,
+  periodPassRuleText,
   formatPassDurationLabel,
   cardValidUntil,
   withinCardValidity,

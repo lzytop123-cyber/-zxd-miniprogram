@@ -13,6 +13,7 @@ from app.schemas.common import ResponseModel
 from app.schemas.report import DailyStatItem, LeaderboardItem, ReportSummary, RechargeRequest, WalletInfo
 from app.services.booking import add_wallet_log, fulfill_recharge_order
 from app.services.card_service import (
+    card_face_validity_days,
     card_validity_api_fields,
     daily_pass_days,
     is_office_night_monthly_card,
@@ -241,6 +242,7 @@ def get_cards(user: User = Depends(get_current_user), db: Session = Depends(get_
                 "remaining_sessions": c.remaining_sessions,
                 "total_sessions": c.total_sessions,
                 "period_pass_days": period_pass_days(c) or None,
+                "face_validity_days": card_face_validity_days(c),
                 "start_date": str(c.start_date) if c.start_date else None,
                 "end_date": str(c.end_date) if c.end_date else None,
                 **card_validity_api_fields(c, today),

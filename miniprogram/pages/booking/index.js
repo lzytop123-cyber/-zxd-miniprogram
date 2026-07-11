@@ -14,6 +14,7 @@ const {
   quarterlyPassDays,
   periodPassSpan,
   formatPassDurationLabel,
+  periodPassRuleText,
   formatCard,
   cardValidityHint,
   OFFICE_NIGHT_USAGE_RULE,
@@ -397,16 +398,8 @@ Page({
   },
 
   _periodCardSuffix(billType, card) {
-    const span = this._periodRequiredSpan(billType, card)
-    if (span > 0) {
-      const durationLabel = formatPassDurationLabel(span)
-      if (billType === 'monthly') {
-        return durationLabel
-          ? `卡面效期 180 天，${durationLabel}须一次约满`
-          : `卡面效期 180 天，须连续 ${span} 天`
-      }
-      return durationLabel ? `${durationLabel}须一次约满` : `须连续 ${span} 天`
-    }
+    const text = periodPassRuleText(card, billType)
+    if (text) return text
     if (billType === 'quarterly') return '效期内预约一次即核销'
     return ''
   },

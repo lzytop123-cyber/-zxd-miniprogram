@@ -271,6 +271,24 @@ def test_repair_misissued_summer_bimonthly_validity():
     assert card.end_date == date(2026, 12, 27)
 
 
+def test_monthly_pass_days_prefers_mapping_value():
+    from datetime import date
+
+    from app.models import CardType, PeriodCard
+    from app.services.card_service import monthly_pass_days
+
+    card = PeriodCard(
+        user_id=1,
+        card_name="9月卡",
+        card_type=CardType.monthly,
+        status=1,
+        start_date=date(2026, 7, 1),
+        end_date=date(2026, 12, 27),
+        total_sessions=200,
+    )
+    assert monthly_pass_days(card) == 200
+
+
 def test_summer_bimonthly_consecutive_in_180_day_validity():
     """暑期双月卡：180 天效期内须预约连续 60 天。"""
     from datetime import date

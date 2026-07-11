@@ -4,6 +4,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.models import MeituanDealMapping, PendingDealMapping, RewardType
+from app.services.pass_days_parser import parse_pass_days_from_name
 from app.services.card_service import get_mapping_by_deal_id
 
 
@@ -11,22 +12,19 @@ def guess_reward_from_name(name: str) -> tuple[RewardType, int]:
     """根据团购名称推断权益类型（供后台待配置项参考）。"""
     if not name:
         return RewardType.hours, 4
+    pass_days = parse_pass_days_from_name(name)
     if "季卡" in name:
-        return RewardType.quarter_pass, 90
-    if re.search(r"双月|两个月|2个月", name):
-        return RewardType.month_pass, 60
-    if re.search(r"四个月|4个月", name):
-        return RewardType.month_pass, 120
-    if re.search(r"三个月|3个月", name):
-        return RewardType.month_pass, 90
+        return RewardType.quarter_pass, pass_days or 90
     if "上班族" in name and "月" in name:
-        return RewardType.night_monthly, 30
+        return RewardType.night_monthly, pass_days or 30
     if "晚自习" in name or ("夜" in name and "月" in name):
-        return RewardType.night_monthly, 30
-    if "月卡" in name:
-        return RewardType.month_pass, 30
-    if "周卡" in name:
-        return RewardType.week_pass, 7
+        return RewardType.night_monthly, pass_days or 30
+    if "周卡" in name or (pass_days and "周" in name):
+        return RewardType.week_pass, pass_days or 7
+    if pass_days and re.search(r"月", name):
+        return RewardType.month_pass, pass_days
+    if "月卡" in name or re.search(r"\d+月", name):
+        return RewardType.month_pass, pass_days or 30
     if "三天" in name or "3天" in name:
         return RewardType.day_pass, 3
     if "日卡" in name:

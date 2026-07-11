@@ -1,6 +1,5 @@
 from datetime import date, datetime, time, timedelta
 from decimal import Decimal
-import re
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -13,6 +12,7 @@ from app.models import (
     PeriodCard,
     RewardType,
 )
+from app.services.pass_days_parser import parse_pass_days_from_name
 from app.services.store_hours import (
     OFFICE_NIGHT_BOOKING_HINT,
     OFFICE_NIGHT_USAGE_RULE,
@@ -100,26 +100,27 @@ def _normalize_card_name(name: str | None) -> str:
 
 
 def infer_pass_days_from_card_name(name: str | None) -> int | None:
-    """从卡名识别双月/多月规格（兼容映射填错为 30 的旧卡）。"""
-    text = _normalize_card_name(name)
-    if not text:
-        return None
-    if re.search(r"双月|两个月|2个月", text):
-        return 60
-    if re.search(r"四个月|4个月", text):
-        return 120
-    if re.search(r"三个月|3个月", text):
-        return 90
+    """从卡名解析连续天数（兜底；优先使用团购映射写入的 total_sessions）。"""
+    return parse_pass_days_from_name(name)
+
+
+def card_face_validity_days(card: PeriodCard) -> int | None:
+    """卡面效期自然日数（含首尾）。"""
+    if card.start_date and card.end_date:
+        return (card.end_date - card.start_date).days + 1
     return None
 
 
 def repair_monthly_pass_days_from_name(card: PeriodCard) -> bool:
     if card.card_type != CardType.monthly or is_office_night_monthly_card(card):
         return False
-    inferred = infer_pass_days_from_card_name(card.card_name)
-    if not inferred or card.total_sessions == inferred:
+    parsed = infer_pass_days_from_card_name(card.card_name)
+    if not parsed or card.total_sessions == parsed:
         return False
-    card.total_sessions = inferred
+    # 映射已明确配置非默认规格时，以映射为准
+    if card.total_sessions and card.total_sessions > MONTHLY_PASS_CONSECUTIVE_DAYS:
+        return False
+    card.total_sessions = parsed
     return True
 
 
@@ -281,11 +282,11 @@ def office_night_pass_days(card: PeriodCard) -> int:
 def monthly_pass_days(card: PeriodCard) -> int:
     if card.card_type != CardType.monthly:
         return 0
+    if card.total_sessions and card.total_sessions > 1:
+        return card.total_sessions
     inferred = infer_pass_days_from_card_name(card.card_name)
     if inferred:
         return inferred
-    if card.total_sessions and card.total_sessions > 1:
-        return card.total_sessions
     return MONTHLY_PASS_CONSECUTIVE_DAYS
 
 
@@ -294,7 +295,21 @@ def quarterly_pass_days(card: PeriodCard) -> int:
         return 0
     if card.total_sessions and card.total_sessions > 1:
         return card.total_sessions
+    inferred = infer_pass_days_from_card_name(card.card_name)
+    if inferred:
+        return inferred
     return 90
+
+
+def weekly_pass_days(card: PeriodCard) -> int:
+    if card.card_type != CardType.weekly:
+        return 0
+    if card.total_sessions and card.total_sessions > 1:
+        return card.total_sessions
+    inferred = infer_pass_days_from_card_name(card.card_name)
+    if inferred:
+        return inferred
+    return WEEKLY_PASS_CONSECUTIVE_DAYS
 
 
 def period_pass_days(card: PeriodCard) -> int:
@@ -308,14 +323,6 @@ def period_pass_days(card: PeriodCard) -> int:
     if card.card_type == CardType.quarterly:
         return quarterly_pass_days(card)
     return 0
-
-
-def weekly_pass_days(card: PeriodCard) -> int:
-    if card.card_type != CardType.weekly:
-        return 0
-    if card.total_sessions and card.total_sessions > 1:
-        return card.total_sessions
-    return WEEKLY_PASS_CONSECUTIVE_DAYS
 
 
 def _validate_consecutive_pass_in_validity(
