@@ -201,9 +201,26 @@ function officeNightPassDays(card) {
   return 30
 }
 
+function inferPassDaysFromCardName(name) {
+  const text = String(name || '').replace(/\s/g, '').replace(/　/g, '')
+  if (/双月|两个月|2个月/.test(text)) return 60
+  if (/四个月|4个月/.test(text)) return 120
+  if (/三个月|3个月/.test(text)) return 90
+  return 0
+}
+
+function formatPassDurationLabel(span) {
+  const days = Number(span) || 0
+  if (days >= 30 && days % 30 === 0) return `${days / 30}个月`
+  if (days > 0) return `连续${days}天`
+  return ''
+}
+
 function monthlyPassDays(card) {
   if (!card || card.card_type !== 'monthly') return 0
   if (isOfficeNightMonthlyCard(card)) return 0
+  const inferred = inferPassDaysFromCardName(card.card_name)
+  if (inferred) return inferred
   if (card.period_pass_days != null && Number(card.period_pass_days) > 0) {
     return Number(card.period_pass_days)
   }
@@ -558,6 +575,7 @@ module.exports = {
   weeklyPassDays,
   quarterlyPassDays,
   periodPassSpan,
+  formatPassDurationLabel,
   cardValidUntil,
   withinCardValidity,
   monthlyCardUseDeadline,

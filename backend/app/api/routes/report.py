@@ -20,6 +20,7 @@ from app.services.card_service import (
     OFFICE_NIGHT_USAGE_RULE,
     period_pass_days,
     repair_misissued_card_validity,
+    repair_monthly_pass_days_from_name,
 )
 from app.services.wechat_pay import WechatPayService
 
@@ -222,6 +223,8 @@ def get_cards(user: User = Depends(get_current_user), db: Session = Depends(get_
             c.status = 0
             continue
         if repair_misissued_card_validity(c):
+            repaired = True
+        if repair_monthly_pass_days_from_name(c):
             repaired = True
         active.append(c)
     if repaired or len(active) < len(cards):

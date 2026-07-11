@@ -13,6 +13,7 @@ const {
   weeklyPassDays,
   quarterlyPassDays,
   periodPassSpan,
+  formatPassDurationLabel,
   formatCard,
   cardValidityHint,
   OFFICE_NIGHT_USAGE_RULE,
@@ -157,6 +158,9 @@ Page({
     userCards: [],
     activePeriodCard: null,
     periodCardHint: '',
+    periodCardChoices: [],
+    periodCardChoiceIndex: 0,
+    selectedPeriodCardId: null,
     periodDateMin: '',
     periodUseDeadline: '',
     periodEndMax: '',
@@ -279,10 +283,14 @@ Page({
         } else if (this.data.billType === 'night') {
           Object.assign(patch, this._applyNightPeriod(this.data.startDate, officeNight || this.data.activeNightCard))
         } else if (PERIOD_TYPES.includes(this.data.billType)) {
-          const periodCard = this._findPeriodCard(list, this.data.billType)
           Object.assign(
             patch,
-            this._applyPeriodDates(this.data.startDate, this.data.billType, periodCard),
+            this._periodCardPatch(
+              this.data.billType,
+              list,
+              this.data.selectedPeriodCardId,
+              this.data.startDate,
+            ),
           )
         }
         Object.assign(patch, this._typeUiPatch(patch.billType || this.data.billType, !!officeNight))
@@ -300,31 +308,68 @@ Page({
     return end
   },
 
-  _findPeriodCard(cards, billType) {
-    if (!PERIOD_TYPES.includes(billType)) return null
+  _findPeriodCards(cards, billType) {
+    if (!PERIOD_TYPES.includes(billType)) return []
     const storeId = Number(this.data.storeId)
-    return (
-      (cards || []).find((c) => {
-        if (c.card_type !== billType) return false
-        if (isOfficeNightMonthlyCard(c)) return false
-        if (!isCardUsable(c)) return false
-        if (c.store_id && Number(c.store_id) !== storeId) return false
-        return true
-      }) || null
-    )
+    return (cards || []).filter((c) => {
+      if (c.card_type !== billType) return false
+      if (isOfficeNightMonthlyCard(c)) return false
+      if (!isCardUsable(c)) return false
+      if (c.store_id && Number(c.store_id) !== storeId) return false
+      return true
+    })
+  },
+
+  _findPeriodCard(cards, billType, cardId) {
+    const list = this._findPeriodCards(cards, billType)
+    if (!list.length) return null
+    if (cardId) {
+      return list.find((c) => c.id === cardId) || list[0]
+    }
+    return list[0]
+  },
+
+  _formatPeriodCardChoice(card, billType) {
+    const span = periodPassSpan(billType, card)
+    const name = (card.card_name || '').trim() || BILL_TYPE_LABELS[billType] || '期限卡'
+    const durationLabel = formatPassDurationLabel(span)
+    const label = durationLabel ? `${name} · ${durationLabel}` : name
+    return { id: card.id, label, span, name, durationLabel }
+  },
+
+  _resolvePeriodCardState(billType, cards, preferredId) {
+    const list = this._findPeriodCards(cards, billType)
+    const choices = list.map((c) => this._formatPeriodCardChoice(c, billType))
+    let selectedId = preferredId
+    if (!selectedId || !list.some((c) => c.id === selectedId)) {
+      selectedId = list[0] ? list[0].id : null
+    }
+    const card = selectedId ? list.find((c) => c.id === selectedId) || null : null
+    const choiceIndex = Math.max(0, choices.findIndex((c) => c.id === selectedId))
+    return {
+      card,
+      choices,
+      selectedId,
+      choiceIndex,
+    }
   },
 
   _buildPeriodOptions(cards) {
     return PERIOD_OPTIONS.map((opt) => {
-      const card = this._findPeriodCard(cards || this.data.userCards, opt.type)
-      const span = periodPassSpan(opt.type, card)
-      const label = card && card.card_name && card.card_type === opt.type
-        ? card.card_name
-        : opt.label
+      const list = this._findPeriodCards(cards || this.data.userCards, opt.type)
+      let days = opt.days
+      if (list.length === 1) {
+        const span = periodPassSpan(opt.type, list[0])
+        const durationLabel = formatPassDurationLabel(span)
+        if (durationLabel) days = durationLabel
+        else if (span > 0) days = `连续${span}天`
+      } else if (list.length > 1) {
+        days = '多规格'
+      }
       return {
         ...opt,
-        label,
-        days: span ? `连续${span}天` : opt.days,
+        label: opt.label,
+        days,
       }
     })
   },
@@ -397,6 +442,29 @@ Page({
       activePeriodCard: card,
       periodCardHint,
     }
+  },
+
+  _periodCardPatch(billType, cards, preferredId, startDate) {
+    const resolved = this._resolvePeriodCardState(billType, cards, preferredId)
+    return {
+      ...this._applyPeriodDates(startDate || this.data.startDate, billType, resolved.card),
+      periodCardChoices: resolved.choices,
+      periodCardChoiceIndex: resolved.choiceIndex,
+      selectedPeriodCardId: resolved.selectedId,
+    }
+  },
+
+  onPeriodCardPick(e) {
+    const index = Number(e.detail.value)
+    const choice = (this.data.periodCardChoices || [])[index]
+    if (!choice) return
+    const card = this._findPeriodCard(this.data.userCards, this.data.billType, choice.id)
+    const patch = {
+      periodCardChoiceIndex: index,
+      selectedPeriodCardId: choice.id,
+      ...this._applyPeriodDates(this.data.startDate, this.data.billType, card),
+    }
+    this.setData(patch, () => this.refreshPreview())
   },
 
   _applyNightPeriod(startDate, card) {
@@ -514,8 +582,8 @@ Page({
         quickSessionDays: null,
       })
     } else if (PERIOD_TYPES.includes(billType)) {
-      const card = this._findPeriodCard(this.data.userCards, billType)
-      Object.assign(patch, this._applyPeriodDates(startDate, billType, card))
+      const preferredId = billType === this.data.billType ? this.data.selectedPeriodCardId : null
+      Object.assign(patch, this._periodCardPatch(billType, this.data.userCards, preferredId, startDate))
     } else if (billType === 'night') {
       Object.assign(patch, this._applyNightPeriod(startDate, this.data.activeNightCard))
     }
@@ -538,8 +606,15 @@ Page({
       patch.endDate = startDate
       patch.quickSessionDays = 1
     } else if (PERIOD_TYPES.includes(this.data.billType)) {
-      const card = this._findPeriodCard(this.data.userCards, this.data.billType)
-      Object.assign(patch, this._applyPeriodDates(startDate, this.data.billType, card))
+      Object.assign(
+        patch,
+        this._periodCardPatch(
+          this.data.billType,
+          this.data.userCards,
+          this.data.selectedPeriodCardId,
+          startDate,
+        ),
+      )
     } else if (this.data.billType === 'night') {
       Object.assign(patch, this._applyNightPeriod(startDate, this.data.activeNightCard))
     }

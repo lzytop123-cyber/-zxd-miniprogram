@@ -124,6 +124,19 @@
 
     <!-- 周卡 / 月卡 / 季卡 -->
     <block wx:if="{{billType==='weekly' || billType==='monthly' || billType==='quarterly'}}">
+      <picker
+        wx:if="{{periodCardChoices.length > 0}}"
+        mode="selector"
+        range="{{periodCardChoices}}"
+        range-key="label"
+        value="{{periodCardChoiceIndex}}"
+        bindchange="onPeriodCardPick"
+      >
+        <view class="field">
+          <text class="field-key">使用期限卡</text>
+          <text class="field-val">{{periodCardChoices[periodCardChoiceIndex].label}} ›</text>
+        </view>
+      </picker>
       <picker mode="date" value="{{startDate}}" start="{{periodDateMin || today}}" end="{{periodUseDeadline || ''}}" bindchange="onStartDateChange">
         <view class="field"><text class="field-key">开始日期</text><text class="field-val">{{startDate}} ›</text></view>
       </picker>

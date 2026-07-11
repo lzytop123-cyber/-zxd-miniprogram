@@ -1,5 +1,6 @@
 from datetime import date, datetime, time, timedelta
 from decimal import Decimal
+import re
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -96,6 +97,30 @@ def validate_office_night_reservation(start_time: datetime, end_time: datetime) 
 
 def _normalize_card_name(name: str | None) -> str:
     return (name or "").replace(" ", "").replace("　", "")
+
+
+def infer_pass_days_from_card_name(name: str | None) -> int | None:
+    """从卡名识别双月/多月规格（兼容映射填错为 30 的旧卡）。"""
+    text = _normalize_card_name(name)
+    if not text:
+        return None
+    if re.search(r"双月|两个月|2个月", text):
+        return 60
+    if re.search(r"四个月|4个月", text):
+        return 120
+    if re.search(r"三个月|3个月", text):
+        return 90
+    return None
+
+
+def repair_monthly_pass_days_from_name(card: PeriodCard) -> bool:
+    if card.card_type != CardType.monthly or is_office_night_monthly_card(card):
+        return False
+    inferred = infer_pass_days_from_card_name(card.card_name)
+    if not inferred or card.total_sessions == inferred:
+        return False
+    card.total_sessions = inferred
+    return True
 
 
 def is_office_night_monthly_card(card: PeriodCard) -> bool:
@@ -256,6 +281,9 @@ def office_night_pass_days(card: PeriodCard) -> int:
 def monthly_pass_days(card: PeriodCard) -> int:
     if card.card_type != CardType.monthly:
         return 0
+    inferred = infer_pass_days_from_card_name(card.card_name)
+    if inferred:
+        return inferred
     if card.total_sessions and card.total_sessions > 1:
         return card.total_sessions
     return MONTHLY_PASS_CONSECUTIVE_DAYS
