@@ -172,7 +172,7 @@ def repair_misissued_card_validity(card: PeriodCard) -> bool:
         need_span = OFFICE_NIGHT_MAX_DAYS
     elif card.card_type == CardType.monthly:
         expected = MONTHLY_PASS_VALIDITY_DAYS
-        need_span = MONTHLY_PASS_CONSECUTIVE_DAYS
+        need_span = monthly_pass_days(card) or MONTHLY_PASS_CONSECUTIVE_DAYS
     elif card.card_type == CardType.weekly:
         expected = WEEKLY_PASS_VALIDITY_DAYS
         need_span = WEEKLY_PASS_CONSECUTIVE_DAYS

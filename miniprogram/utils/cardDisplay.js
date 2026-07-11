@@ -211,7 +211,7 @@ function inferPassDaysFromCardName(name) {
 
 function formatPassDurationLabel(span) {
   const days = Number(span) || 0
-  if (days >= 30 && days % 30 === 0) return `${days / 30}个月`
+  if (days >= 30 && days % 30 === 0) return `连续${days / 30}个月`
   if (days > 0) return `连续${days}天`
   return ''
 }

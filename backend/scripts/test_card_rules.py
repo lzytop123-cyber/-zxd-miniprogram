@@ -252,6 +252,45 @@ def test_repair_misissued_monthly_validity():
     assert card.end_date == date(2026, 12, 27)
 
 
+def test_repair_misissued_summer_bimonthly_validity():
+    """暑期双月卡误把连续 60 天当成效期时，纠正为 180 天。"""
+    from datetime import date
+
+    from app.services.card_service import repair_misissued_card_validity
+
+    card = PeriodCard(
+        user_id=1,
+        card_name="暑期双月卡",
+        card_type=CardType.monthly,
+        status=1,
+        start_date=date(2026, 7, 1),
+        end_date=date(2026, 8, 29),
+        total_sessions=60,
+    )
+    assert repair_misissued_card_validity(card)
+    assert card.end_date == date(2026, 12, 27)
+
+
+def test_summer_bimonthly_consecutive_in_180_day_validity():
+    """暑期双月卡：180 天效期内须预约连续 60 天。"""
+    from datetime import date
+
+    card = PeriodCard(
+        user_id=1,
+        card_name="暑期双月卡",
+        card_type=CardType.monthly,
+        status=1,
+        start_date=date(2026, 7, 1),
+        end_date=date(2026, 12, 27),
+        total_sessions=60,
+    )
+    start = datetime(2026, 7, 5, 7, 30, 0)
+    end = datetime(2026, 9, 2, 23, 30, 0)
+    validate_period_card_for_reservation(None, card, BillType.monthly, start, end, 1)
+    consume_period_card(None, card, BillType.monthly, start, end, 1)
+    assert card.status == 0
+
+
 def test_office_night_monthly_period():
     card = PeriodCard(
         user_id=1,
