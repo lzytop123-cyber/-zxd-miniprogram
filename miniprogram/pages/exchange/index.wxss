@@ -6,6 +6,31 @@
   margin-top: 32rpx;
 }
 
+.platform-tabs {
+  display: flex;
+  gap: 16rpx;
+  margin-bottom: 28rpx;
+  padding: 8rpx;
+  border-radius: 20rpx;
+  background: #F4FAF6;
+}
+
+.platform-tab {
+  flex: 1;
+  text-align: center;
+  padding: 18rpx 0;
+  border-radius: 16rpx;
+  font-size: 28rpx;
+  font-weight: 600;
+  color: #52B788;
+}
+
+.platform-tab.active {
+  background: #fff;
+  color: #2D6A4F;
+  box-shadow: 0 4rpx 16rpx rgba(45, 106, 79, 0.08);
+}
+
 .exchange-header {
   display: flex;
   align-items: center;

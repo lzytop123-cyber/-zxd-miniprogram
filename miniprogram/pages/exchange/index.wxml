@@ -1,5 +1,17 @@
 <view class="page-exchange page-safe-bottom">
   <view class="card exchange-card">
+    <view class="platform-tabs">
+      <view
+        class="platform-tab {{platform === 'meituan' ? 'active' : ''}}"
+        data-platform="meituan"
+        bindtap="onPlatformTap"
+      >美团</view>
+      <view
+        class="platform-tab {{platform === 'douyin' ? 'active' : ''}}"
+        data-platform="douyin"
+        bindtap="onPlatformTap"
+      >抖音</view>
+    </view>
     <view class="exchange-header">
       <view class="exchange-icon">🎟</view>
       <view class="exchange-title">{{platformLabel}}团购兑换</view>

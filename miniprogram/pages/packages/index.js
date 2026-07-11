@@ -206,7 +206,7 @@ Page({
   noop() {},
 
   goExchange() {
-    wx.navigateTo({ url: `${routes.exchangeIndex}?platform=meituan` })
+    wx.navigateTo({ url: routes.exchangeIndex })
   },
 
   goLogin() {

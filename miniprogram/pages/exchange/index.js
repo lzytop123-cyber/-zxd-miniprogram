@@ -12,12 +12,22 @@ Page({
   },
 
   onLoad(options) {
-    const platform = options.platform || 'meituan'
+    this._applyPlatform(options.platform || 'meituan', options.storeId || null)
+  },
+
+  onPlatformTap(e) {
+    const platform = e.currentTarget.dataset.platform
+    if (!platform || platform === this.data.platform) return
+    this._applyPlatform(platform, this.data.storeId)
+  },
+
+  _applyPlatform(platform, storeId) {
     const platformLabel = platform === 'douyin' ? '抖音' : '美团'
     this.setData({
       platform,
       platformLabel,
-      storeId: options.storeId || null,
+      storeId: storeId || null,
+      code: '',
     })
     wx.setNavigationBarTitle({ title: `${platformLabel}团购兑换` })
   },

@@ -23,9 +23,22 @@ from app.services.deal_mapping_service import (
     mark_pending_resolved_by_deal_id,
     record_pending_deal,
 )
+from app.services.douyin import DouyinService, parse_douyin_voucher_expire_date, use_douyin_official
 from app.services.yunlaoban import YunlaobanService, parse_voucher_expire_date
 
 router = APIRouter(prefix="/exchange", tags=["兑换"])
+
+
+async def _prepare_and_consume(platform: int, code: str) -> tuple[dict, str]:
+    if platform == 2 and use_douyin_official():
+        return await DouyinService.prepare_and_verify(code)
+    return await YunlaobanService.prepare_and_consume(platform, code)
+
+
+def _parse_voucher_expire(ticket_data: dict | None, platform: int):
+    if platform == 2 and use_douyin_official():
+        return parse_douyin_voucher_expire_date(ticket_data)
+    return parse_voucher_expire_date(ticket_data)
 
 
 class ExchangeRequest(BaseModel):
@@ -88,7 +101,7 @@ async def _exchange(
 
     # 占位成功后再核销；核销失败则释放占位以便用户重试
     try:
-        prepared, consume_result = await YunlaobanService.prepare_and_consume(platform, code)
+        prepared, consume_result = await _prepare_and_consume(platform, code)
     except ValueError as e:
         db.delete(order)
         db.commit()
@@ -128,7 +141,7 @@ async def _exchange(
         db.refresh(mapping)
 
     ticket_data = prepared.get("ticketData") or {}
-    voucher_expire = parse_voucher_expire_date(ticket_data)
+    voucher_expire = _parse_voucher_expire(ticket_data, platform)
 
     card = issue_period_card(
         db,

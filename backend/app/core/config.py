@@ -68,6 +68,23 @@ class Settings(BaseSettings):
         validation_alias=AliasChoices("COUPON_PROVIDER"),
     )
 
+    douyin_client_key: str = Field(
+        default="",
+        validation_alias=AliasChoices("DOUYIN_CLIENT_KEY", "DOUYIN_APP_ID"),
+    )
+    douyin_client_secret: str = Field(
+        default="",
+        validation_alias=AliasChoices("DOUYIN_CLIENT_SECRET", "DOUYIN_APP_SECRET"),
+    )
+    douyin_poi_id: str = Field(
+        default="",
+        validation_alias=AliasChoices("DOUYIN_POI_ID"),
+    )
+    douyin_coupon_provider: str = Field(
+        default="auto",
+        validation_alias=AliasChoices("DOUYIN_COUPON_PROVIDER"),
+    )
+
     admin_username: str = "admin"
     admin_password: str = "admin123"
 
