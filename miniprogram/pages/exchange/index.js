@@ -44,7 +44,11 @@ Page({
       return false
     }
     this.setData({ code: parsed.code })
-    wx.showToast({ title: '券码已填入', icon: 'success' })
+    const tip =
+      this.data.platform === 'douyin' && parsed.code.includes('douyin.com')
+        ? '已识别抖音券链接'
+        : '券码已填入'
+    wx.showToast({ title: tip, icon: 'success' })
     return true
   },
 

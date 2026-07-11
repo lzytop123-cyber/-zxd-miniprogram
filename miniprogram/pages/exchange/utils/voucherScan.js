@@ -11,6 +11,11 @@ function getJsQR() {
   return jsQRModule
 }
 
+function isDouyinCouponNumber(raw) {
+  const compact = String(raw || '').replace(/\s/g, '')
+  return /^\d{12,20}$/.test(compact)
+}
+
 function isDouyinScanPayload(raw) {
   const text = String(raw || '').trim().toLowerCase()
   return (
@@ -21,14 +26,27 @@ function isDouyinScanPayload(raw) {
   )
 }
 
+function isDouyinShortLinkSlug(raw) {
+  const text = String(raw || '').trim()
+  // 抖音短链扫码常只返回 v.douyin.com 路径片段，如 iCkM1ma6
+  return /^[A-Za-z0-9]{6,16}$/.test(text) && !/^\d+$/.test(text)
+}
+
 function parseScannedVoucherCode(raw, options = {}) {
   if (raw == null) return ''
   let text = String(raw).trim()
   if (!text) return ''
 
-  // 抖音二维码是短链，不能把路径片段（如 iCkM1ma6）当成券码
-  if (options.platform === 'douyin' && isDouyinScanPayload(text)) {
-    return text.includes('://') ? text : `https://${text.replace(/^\/+/, '')}`
+  if (options.platform === 'douyin') {
+    if (isDouyinCouponNumber(text)) {
+      return text.replace(/\s/g, '')
+    }
+    if (isDouyinScanPayload(text)) {
+      return text.includes('://') ? text : `https://${text.replace(/^\/+/, '')}`
+    }
+    if (isDouyinShortLinkSlug(text)) {
+      return `https://v.douyin.com/${text}/`
+    }
   }
 
   if (/^[A-Za-z0-9-]{6,32}$/.test(text)) return text
