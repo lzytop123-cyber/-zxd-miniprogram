@@ -6,6 +6,8 @@ Page({
     platform: 'meituan',
     platformLabel: '美团',
     code: '',
+    redeemPayload: '',
+    scanReady: false,
     storeId: null,
     loading: false,
     scanning: false,
@@ -28,12 +30,18 @@ Page({
       platformLabel,
       storeId: storeId || null,
       code: '',
+      redeemPayload: '',
+      scanReady: false,
     })
     wx.setNavigationBarTitle({ title: `${platformLabel}团购兑换` })
   },
 
   onInput(e) {
-    this.setData({ code: e.detail.value.trim() })
+    this.setData({
+      code: e.detail.value.trim(),
+      redeemPayload: '',
+      scanReady: false,
+    })
   },
 
   _applyScanResult(res) {
@@ -43,12 +51,21 @@ Page({
       wx.showToast({ title: parsed.message, icon: 'none', duration: 2500 })
       return false
     }
-    this.setData({ code: parsed.code })
-    const tip =
-      this.data.platform === 'douyin' && parsed.code.includes('douyin.com')
-        ? '已识别抖音券链接'
-        : '券码已填入'
-    wx.showToast({ title: tip, icon: 'success' })
+    if (parsed.isDouyinScan) {
+      this.setData({
+        redeemPayload: parsed.code,
+        code: '已扫码，点击立即兑换',
+        scanReady: true,
+      })
+      wx.showToast({ title: '抖音券已识别', icon: 'success' })
+      return true
+    }
+    this.setData({
+      code: parsed.code,
+      redeemPayload: '',
+      scanReady: false,
+    })
+    wx.showToast({ title: '券码已填入', icon: 'success' })
     return true
   },
 
@@ -57,28 +74,15 @@ Page({
     this.setData({ scanning: true })
     let loadingShown = false
     try {
-      const { pickAndScanVoucher } = require('./utils/voucherScan')
-      const res = await pickAndScanVoucher({
-        onAlbumStart: () => {
-          loadingShown = true
-          wx.showLoading({ title: '识别券码…', mask: true })
-        },
-      })
+      const { scanFromCamera } = require('./utils/voucherScan')
+      wx.showLoading({ title: '正在扫码…', mask: true })
+      loadingShown = true
+      const res = await scanFromCamera()
       this._applyScanResult(res)
     } catch (e) {
       const msg = e.errMsg || e.message || ''
       if (msg.includes('cancel') || msg.includes('fail cancel')) return
-      if (msg.includes('未识别') || msg.includes('条形码')) {
-        wx.showModal({
-          title: '识别失败',
-          content: msg.includes('条形码')
-            ? msg
-            : '未识别到有效券码，请重试或使用相机扫码',
-          showCancel: false,
-        })
-        return
-      }
-      wx.showToast({ title: '扫码失败', icon: 'none' })
+      wx.showToast({ title: '扫码失败，请对准抖音券二维码', icon: 'none', duration: 2500 })
     } finally {
       if (loadingShown) wx.hideLoading()
       this.setData({ scanning: false })
@@ -115,20 +119,40 @@ Page({
     this.submit()
   },
 
+  _resolveSubmitCode(forcedCode) {
+    if (typeof forcedCode === 'string' && forcedCode.trim()) return forcedCode.trim()
+    if (this.data.redeemPayload) return this.data.redeemPayload.trim()
+    const manual = (this.data.code || '').trim()
+    if (manual === '已扫码，点击立即兑换') return this.data.redeemPayload.trim()
+    return manual
+  },
+
   async submit(forcedCode) {
-    const code = typeof forcedCode === 'string' ? forcedCode.trim() : (this.data.code || '').trim()
+    const code = this._resolveSubmitCode(forcedCode)
     if (!code || code.length < 6) {
-      wx.showToast({ title: '请输入有效券码', icon: 'none' })
+      wx.showToast({
+        title: this.data.platform === 'douyin' ? '请先扫码或输入券号' : '请输入有效券码',
+        icon: 'none',
+      })
       return
     }
     const { platform, storeId } = this.data
-    this.setData({ loading: true, code })
+    this.setData({ loading: true })
     wx.showLoading({ title: '连接核销中…', mask: true })
     try {
-      const path = platform === 'douyin' ? '/exchange/douyin' : '/exchange/meituan'
-      let reqUrl = `${path}/${encodeURIComponent(code)}`
-      if (storeId) reqUrl += `?store_id=${Number(storeId)}`
-      const result = await request({ url: reqUrl, method: 'POST', silent: true })
+      let result
+      if (platform === 'douyin') {
+        result = await request({
+          url: '/exchange/douyin',
+          method: 'POST',
+          data: { code, store_id: storeId || undefined },
+          silent: true,
+        })
+      } else {
+        let reqUrl = `/exchange/meituan/${encodeURIComponent(code)}`
+        if (storeId) reqUrl += `?store_id=${Number(storeId)}`
+        result = await request({ url: reqUrl, method: 'POST', silent: true })
+      }
       wx.hideLoading()
       const lines = [result.card_name || '期限卡']
       if (result.validity_range) {

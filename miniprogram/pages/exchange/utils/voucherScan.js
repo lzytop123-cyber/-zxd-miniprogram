@@ -216,7 +216,10 @@ function fillCodeFromScanResult(res, options = {}) {
   if (!code || code.length < 6) {
     return { ok: false, message: '未识别有效券码' }
   }
-  return { ok: true, code }
+  const isDouyinScan =
+    options.platform === 'douyin' &&
+    (isDouyinScanPayload(code) || code.includes('v.douyin.com'))
+  return { ok: true, code, isDouyinScan }
 }
 
 module.exports = {

@@ -42,7 +42,7 @@ def _parse_voucher_expire(ticket_data: dict | None, platform: int):
 
 
 class ExchangeRequest(BaseModel):
-    code: str = Field(min_length=6, max_length=32)
+    code: str = Field(min_length=6, max_length=2048)
     store_id: int | None = None
 
 
@@ -68,6 +68,16 @@ async def exchange_douyin(
     return await _exchange(
         ExchangeRequest(code=code, store_id=store_id), user, db, platform=2, source=CardSource.douyin
     )
+
+
+@router.post("/douyin", response_model=ResponseModel)
+async def exchange_douyin_body(
+    body: ExchangeRequest,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """抖音扫码链接较长，推荐走 JSON body。"""
+    return await _exchange(body, user, db, platform=2, source=CardSource.douyin)
 
 
 async def _exchange(
