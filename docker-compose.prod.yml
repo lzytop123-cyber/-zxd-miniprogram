@@ -53,6 +53,7 @@ services:
         condition: service_healthy
     volumes:
       - ./backend/certs:/app/certs:ro
+      - ./backend/data:/app/data
 
 volumes:
   mysql_data:

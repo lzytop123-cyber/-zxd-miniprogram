@@ -32,6 +32,28 @@ function isDouyinShortLinkSlug(raw) {
   return /^[A-Za-z0-9]{6,16}$/.test(text) && !/^\d+$/.test(text)
 }
 
+function extractDouyinShortSlug(raw) {
+  const text = String(raw || '').trim()
+  if (isDouyinShortLinkSlug(text)) return text
+  const match = text.match(/v\.douyin\.com\/([A-Za-z0-9]{6,16})\/?/i)
+  return match ? match[1] : ''
+}
+
+/** 提交核销时把展示用短码还原成抖音可识别的链接/券号 */
+function toDouyinSubmitCode(code) {
+  const text = String(code || '').trim()
+  if (!text) return ''
+  const compact = text.replace(/\s/g, '')
+  if (isDouyinCouponNumber(compact)) return compact
+  if (isDouyinShortLinkSlug(text)) return `https://v.douyin.com/${text}/`
+  if (isDouyinScanPayload(text)) {
+    const slug = extractDouyinShortSlug(text)
+    if (slug) return `https://v.douyin.com/${slug}/`
+    return text.includes('://') ? text : `https://${text.replace(/^\/+/, '')}`
+  }
+  return text
+}
+
 function parseScannedVoucherCode(raw, options = {}) {
   if (raw == null) return ''
   let text = String(raw).trim()
@@ -41,11 +63,10 @@ function parseScannedVoucherCode(raw, options = {}) {
     if (isDouyinCouponNumber(text)) {
       return text.replace(/\s/g, '')
     }
-    if (isDouyinScanPayload(text)) {
+    if (isDouyinScanPayload(text) || isDouyinShortLinkSlug(text)) {
+      const slug = extractDouyinShortSlug(text)
+      if (slug) return slug
       return text.includes('://') ? text : `https://${text.replace(/^\/+/, '')}`
-    }
-    if (isDouyinShortLinkSlug(text)) {
-      return `https://v.douyin.com/${text}/`
     }
   }
 
@@ -222,6 +243,7 @@ function fillCodeFromScanResult(res, options = {}) {
 module.exports = {
   isDouyinScanPayload,
   parseScannedVoucherCode,
+  toDouyinSubmitCode,
   scanFromCamera,
   pickFromAlbumAndDecode,
   pickAndScanVoucher,

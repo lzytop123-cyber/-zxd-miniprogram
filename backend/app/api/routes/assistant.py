@@ -66,7 +66,12 @@ def chat(
     _enforce_chat_rate_limit(user.id)
     # TODO（上线合规）：可在此对 body.messages 末条用户输入调用微信 msgSecCheck 做安全检测
     user_context = assistant_service.build_user_context(db, user)
-    system_prompt = assistant_service.build_system_prompt(user_context)
     history = [{"role": m.role, "content": m.content} for m in body.messages]
+    last_user_query = ""
+    for item in reversed(history):
+        if item.get("role") == "user" and (item.get("content") or "").strip():
+            last_user_query = item["content"].strip()
+            break
+    system_prompt = assistant_service.build_system_prompt(user_context, query=last_user_query)
     reply = assistant_service.chat(system_prompt, history)
     return ResponseModel(data=ChatResponse(reply=reply))

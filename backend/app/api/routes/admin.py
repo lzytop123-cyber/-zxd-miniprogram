@@ -42,6 +42,7 @@ from app.schemas.common import PageParams, PageResult, ResponseModel
 from app.schemas.reservation import ReservationItem
 from app.schemas.user import STUDY_GOAL_LABELS
 from app.services import assistant as assistant_service
+from app.services import knowledge_rag
 from app.services.admin_ops import (
     admin_force_checkout,
     admin_remote_unlock,
@@ -1412,11 +1413,14 @@ class KnowledgeUpdateRequest(BaseModel):
 @router.get("/knowledge", response_model=ResponseModel)
 def get_knowledge_admin(_: object = Depends(get_current_admin)):
     content = assistant_service.load_knowledge()
+    knowledge_rag.migrate_legacy_markdown_if_needed(assistant_service.load_knowledge)
     return ResponseModel(
         data={
             "content": content,
             "path": "backend/app/knowledge/zhixingdao_kb.md",
             "chars": len(content),
+            "documents": knowledge_rag.list_documents(),
+            "rag": knowledge_rag.rag_stats(),
         }
     )
 
@@ -1427,10 +1431,88 @@ def update_knowledge_admin(
     _: object = Depends(get_current_admin),
 ):
     assistant_service.save_knowledge(body.content)
+    if knowledge_rag.rag_available():
+        knowledge_rag.sync_manual_document(body.content)
     content = assistant_service.load_knowledge()
     return ResponseModel(
         message="知识库已保存，AI 助手将使用最新内容",
-        data={"chars": len(content)},
+        data={
+            "chars": len(content),
+            "documents": knowledge_rag.list_documents(),
+            "rag": knowledge_rag.rag_stats(),
+        },
+    )
+
+
+@router.post("/knowledge/upload", response_model=ResponseModel)
+async def upload_knowledge_admin(
+    file: UploadFile = File(...),
+    mode: str = Query("replace", pattern="^(replace|append)$"),
+    _: object = Depends(get_current_admin),
+):
+    """上传文档：RAG 模式下每份文档独立入库；关闭 RAG 时沿用覆盖/追加 Markdown。"""
+    filename = (file.filename or "").strip()
+    ext = Path(filename).suffix.lower()
+    if ext not in assistant_service.KNOWLEDGE_ALLOWED_EXTENSIONS:
+        raise HTTPException(status_code=400, detail="仅支持 .md / .txt / .docx 文档")
+
+    raw = await file.read()
+    if len(raw) > assistant_service.KNOWLEDGE_MAX_BYTES:
+        raise HTTPException(status_code=400, detail="文档不能超过 2MB")
+    if not raw.strip():
+        raise HTTPException(status_code=400, detail="文件为空")
+
+    try:
+        text = assistant_service.parse_knowledge_upload(raw, ext=ext)
+        if knowledge_rag.rag_available():
+            record = knowledge_rag.ingest_uploaded_file(
+                filename=filename or f"document{ext}",
+                ext=ext,
+                raw=raw,
+                text=text,
+            )
+            message = f"文档已入库（{record['chunks']} 个片段）"
+            content = assistant_service.load_knowledge()
+            data = {
+                "chars": len(content),
+                "content": content,
+                "document": record,
+                "documents": knowledge_rag.list_documents(),
+                "rag": knowledge_rag.rag_stats(),
+                "filename": filename,
+            }
+        else:
+            merged = assistant_service.apply_knowledge_upload(text, mode=mode)
+            assistant_service.save_knowledge(merged)
+            content = assistant_service.load_knowledge()
+            message = "知识库已从文档更新"
+            data = {
+                "content": content,
+                "chars": len(content),
+                "mode": mode,
+                "filename": filename,
+            }
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+
+    return ResponseModel(message=message, data=data)
+
+
+@router.delete("/knowledge/documents/{doc_id}", response_model=ResponseModel)
+def delete_knowledge_document_admin(
+    doc_id: str,
+    _: object = Depends(get_current_admin),
+):
+    if not knowledge_rag.delete_document(doc_id):
+        raise HTTPException(status_code=404, detail="文档不存在")
+    if doc_id == knowledge_rag.MANUAL_DOC_ID:
+        assistant_service.save_knowledge("")
+    return ResponseModel(
+        message="文档已删除",
+        data={
+            "documents": knowledge_rag.list_documents(),
+            "rag": knowledge_rag.rag_stats(),
+        },
     )
 
 
@@ -1449,6 +1531,7 @@ def system_status_admin(_: object = Depends(get_current_admin), db: Session = De
 
     pay_cert = Path(settings.wx_pay_key_path)
     kb_content = assistant_service.load_knowledge()
+    rag_stats = knowledge_rag.rag_stats()
     yunlaoban_ok = bool(
         settings.yunlaoban_client_id and settings.yunlaoban_secret and settings.yunlaoban_shop_id
     )
@@ -1505,8 +1588,10 @@ def system_status_admin(_: object = Depends(get_current_admin), db: Session = De
         {
             "key": "knowledge",
             "name": "AI 知识库",
-            "ok": len(kb_content) > 100,
-            "detail": f"{len(kb_content)} 字",
+            "ok": rag_stats.get("chunks", 0) > 0 or len(kb_content) > 100,
+            "detail": f"RAG {rag_stats.get('documents', 0)} 文档 / {rag_stats.get('chunks', 0)} 片段"
+            if rag_stats.get("enabled")
+            else f"{len(kb_content)} 字",
         },
         {
             "key": "database",

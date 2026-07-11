@@ -7,6 +7,7 @@
 import logging
 from datetime import date, timedelta
 from functools import lru_cache
+from io import BytesIO
 from pathlib import Path
 
 import httpx
@@ -19,6 +20,8 @@ from app.models import StudyStat, User
 logger = logging.getLogger(__name__)
 
 KNOWLEDGE_PATH = Path(__file__).resolve().parent.parent / "knowledge" / "zhixingdao_kb.md"
+KNOWLEDGE_ALLOWED_EXTENSIONS = {".md", ".markdown", ".txt", ".docx"}
+KNOWLEDGE_MAX_BYTES = 2_000_000
 
 # 历史消息限制，控制 token 成本
 MAX_HISTORY_MESSAGES = 12
@@ -45,6 +48,72 @@ def save_knowledge(content: str) -> None:
     KNOWLEDGE_PATH.parent.mkdir(parents=True, exist_ok=True)
     KNOWLEDGE_PATH.write_text(content.strip() + "\n", encoding="utf-8")
     load_knowledge.cache_clear()
+
+
+def decode_text_upload(raw: bytes) -> str:
+    """解析上传的文本文档（UTF-8 / GBK）。"""
+    if not raw:
+        raise ValueError("文档内容为空")
+    for encoding in ("utf-8-sig", "utf-8", "gb18030", "gbk"):
+        try:
+            text = raw.decode(encoding).strip()
+            if text:
+                return text
+        except UnicodeDecodeError:
+            continue
+    raise ValueError("无法识别文件编码，请使用 UTF-8 或 GBK 的 .md / .txt 文件")
+
+
+def decode_docx_upload(raw: bytes) -> str:
+    """从 Word (.docx) 提取纯文本。"""
+    try:
+        from docx import Document
+    except ImportError as e:
+        raise ValueError("服务器未安装 Word 解析依赖，请联系管理员") from e
+
+    try:
+        doc = Document(BytesIO(raw))
+    except Exception as e:
+        raise ValueError("无法解析 Word 文档，请使用 .docx（不支持旧版 .doc）") from e
+
+    lines: list[str] = []
+    for para in doc.paragraphs:
+        text = para.text.strip()
+        if text:
+            lines.append(text)
+
+    for table in doc.tables:
+        for row in table.rows:
+            cells = [cell.text.strip() for cell in row.cells if cell.text.strip()]
+            if cells:
+                lines.append(" | ".join(cells))
+
+    content = "\n".join(lines).strip()
+    if not content:
+        raise ValueError("Word 文档中没有可提取的文字")
+    return content
+
+
+def parse_knowledge_upload(raw: bytes, *, ext: str) -> str:
+    """按扩展名解析上传文档。"""
+    suffix = (ext or "").lower()
+    if suffix == ".docx":
+        return decode_docx_upload(raw)
+    if suffix in {".md", ".markdown", ".txt"}:
+        return decode_text_upload(raw)
+    raise ValueError("不支持的文件格式")
+
+
+def apply_knowledge_upload(text: str, *, mode: str = "replace") -> str:
+    """将上传文档合并进知识库内容。"""
+    text = (text or "").strip()
+    if not text:
+        raise ValueError("文档内容为空")
+    if mode == "append":
+        existing = load_knowledge().strip()
+        if existing:
+            return f"{existing}\n\n---\n\n{text}"
+    return text
 
 
 def build_user_context(db: Session, user: User) -> str:
@@ -85,8 +154,30 @@ def build_user_context(db: Session, user: User) -> str:
     return "\n".join(lines)
 
 
-def build_system_prompt(user_context: str) -> str:
-    knowledge = load_knowledge()
+def build_system_prompt(user_context: str, *, query: str = "") -> str:
+    from app.services import knowledge_rag
+
+    knowledge_rag.migrate_legacy_markdown_if_needed(load_knowledge)
+
+    rag_context = ""
+    if knowledge_rag.rag_available() and (query or "").strip():
+        rag_context = knowledge_rag.retrieve_context(query)
+
+    if rag_context:
+        knowledge_block = rag_context
+        knowledge_title = "门店知识库（检索到的相关片段）"
+        knowledge_rule = (
+            "门店相关问题只能依据下方【门店知识库】片段回答；片段中没有的，不要编造，"
+            "应坦诚告知并建议「在小程序对应页面查看实际信息或联系店长」。"
+        )
+    else:
+        knowledge_block = load_knowledge() or "（暂无知识库内容）"
+        knowledge_title = "门店知识库"
+        knowledge_rule = (
+            "门店相关问题只能依据下方【门店知识库】回答；知识库中没有或标注「待补充」的，不要编造，"
+            "应坦诚告知并建议「在小程序对应页面查看实际信息或联系店长」。"
+        )
+
     return f"""你是「知行岛自习室」的 AI 学习助手，名字叫小岛。你的职责：
 1. 解答门店相关问题（价格、营业时间、预约、入座、团购核销、会员积分等）；
 2. 结合用户的学习数据，给出专注、时间管理、复习规划等学习建议；
@@ -94,13 +185,12 @@ def build_system_prompt(user_context: str) -> str:
 
 回答要求：
 - 用中文，语气友好、简洁，多用分点；不要长篇大论。
-- 门店相关问题只能依据下方【门店知识库】回答；知识库中没有或标注「待补充」的，不要编造，
-  应坦诚告知并建议「在小程序对应页面查看实际信息或联系店长」。
+- {knowledge_rule}
 - 给学习建议时可引用下方【用户学习概况】，但不要泄露与对话无关的隐私。
 - 不提供医疗、心理、法律等专业诊断；涉及健康问题建议咨询专业人士。
 
-【门店知识库】
-{knowledge or "（暂无知识库内容）"}
+【{knowledge_title}】
+{knowledge_block}
 
 【用户学习概况】
 {user_context}

@@ -86,13 +86,18 @@ Page({
   },
 
   async submit(forcedCode) {
-    const code = typeof forcedCode === 'string' ? forcedCode.trim() : (this.data.code || '').trim()
-    if (!code || code.length < 6) {
+    const inputCode = typeof forcedCode === 'string' ? forcedCode.trim() : (this.data.code || '').trim()
+    if (!inputCode || inputCode.length < 6) {
       wx.showToast({ title: '请输入有效券码', icon: 'none' })
       return
     }
     const { platform, storeId } = this.data
-    this.setData({ loading: true, code })
+    let code = inputCode
+    if (platform === 'douyin') {
+      const { toDouyinSubmitCode } = require('./utils/voucherScan')
+      code = toDouyinSubmitCode(inputCode)
+    }
+    this.setData({ loading: true, code: inputCode })
     wx.showLoading({ title: '连接核销中…', mask: true })
     try {
       let result

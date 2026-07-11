@@ -96,7 +96,14 @@ class Settings(BaseSettings):
     deepseek_api_key: str = ""
     deepseek_base_url: str = "https://api.deepseek.com"
     deepseek_model: str = "deepseek-chat"
+    deepseek_embedding_model: str = "deepseek-embedding"
     deepseek_timeout_sec: float = 30.0
+
+    # AI 知识库 RAG（ChromaDB + DeepSeek Embedding）
+    knowledge_rag_enabled: bool = True
+    knowledge_rag_top_k: int = 5
+    knowledge_chunk_size: int = 600
+    knowledge_chunk_overlap: int = 80
 
     @property
     def assistant_configured(self) -> bool:
