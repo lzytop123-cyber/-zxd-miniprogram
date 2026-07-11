@@ -92,38 +92,6 @@
   line-height: 1;
 }
 
-.code-input--scan {
-  color: #2D6A4F;
-  font-weight: 600;
-}
-
-.scan-ready {
-  display: none;
-  margin: -8rpx 0 20rpx;
-  padding: 16rpx 20rpx;
-  border-radius: 12rpx;
-  background: #E8F8EE;
-  color: #2D6A4F;
-  font-size: 26rpx;
-  font-weight: 600;
-}
-
-.scan-ready.visible {
-  display: block;
-}
-
-.album-link {
-  margin: -8rpx 0 28rpx;
-  text-align: center;
-  font-size: 24rpx;
-  color: #52B788;
-  font-weight: 600;
-}
-
-.album-link.disabled {
-  opacity: 0.45;
-}
-
 .link-records {
   text-align: center;
   color: #52B788;
