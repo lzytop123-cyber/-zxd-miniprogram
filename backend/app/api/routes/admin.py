@@ -1516,6 +1516,21 @@ def delete_knowledge_document_admin(
     )
 
 
+@router.get("/knowledge/documents/{doc_id}", response_model=ResponseModel)
+def get_knowledge_document_preview_admin(
+    doc_id: str,
+    _: object = Depends(get_current_admin),
+):
+    try:
+        data = knowledge_rag.get_document_preview(
+            doc_id,
+            manual_loader=assistant_service.load_knowledge,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e)) from e
+    return ResponseModel(data=data)
+
+
 @router.post("/system/migrate", response_model=ResponseModel)
 def admin_run_schema_migrate(
     _: object = Depends(get_current_admin),

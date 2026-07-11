@@ -231,6 +231,67 @@ def list_documents() -> list[dict[str, Any]]:
     return list(_load_registry().get("documents", []))
 
 
+def get_document_record(doc_id: str) -> dict[str, Any] | None:
+    return next((d for d in list_documents() if d.get("id") == doc_id), None)
+
+
+def _preview_text_from_chunks(doc_id: str) -> str:
+    try:
+        collection = _get_collection()
+        result = collection.get(where={"doc_id": doc_id}, include=["documents", "metadatas"])
+    except Exception as exc:
+        logger.warning("读取文档片段失败: %s", exc)
+        return ""
+
+    docs = result.get("documents") or []
+    metas = result.get("metadatas") or []
+    if not docs:
+        return ""
+
+    pairs = sorted(
+        zip(docs, metas),
+        key=lambda item: int((item[1] or {}).get("chunk_index") or 0),
+    )
+    return "\n\n".join(text for text, _ in pairs if text).strip()
+
+
+def get_document_preview(doc_id: str, *, manual_loader) -> dict[str, Any]:
+    """返回文档全文预览（优先原始文件，其次向量片段拼接）。"""
+    record = get_document_record(doc_id)
+    if not record:
+        raise ValueError("文档不存在")
+
+    content = ""
+    preview_source = "chunks"
+
+    if doc_id == MANUAL_DOC_ID or record.get("source") in ("manual", "legacy"):
+        content = (manual_loader() or "").strip()
+        preview_source = "manual"
+    else:
+        ext = record.get("ext") or ""
+        raw_path = DOCS_DIR / f"{doc_id}{ext}"
+        if raw_path.is_file():
+            from app.services import assistant as assistant_service
+
+            raw = raw_path.read_bytes()
+            content = assistant_service.parse_knowledge_upload(raw, ext=ext).strip()
+            preview_source = "file"
+
+    if not content:
+        content = _preview_text_from_chunks(doc_id)
+        preview_source = "chunks"
+
+    if not content:
+        raise ValueError("文档没有可预览的内容")
+
+    return {
+        "document": record,
+        "content": content,
+        "chars": len(content),
+        "preview_source": preview_source,
+    }
+
+
 def rag_stats() -> dict[str, Any]:
     try:
         collection = _get_collection()

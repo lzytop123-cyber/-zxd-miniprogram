@@ -30,11 +30,17 @@
       >
         <el-button type="primary" :loading="uploading">上传文档入库</el-button>
       </el-upload>
-      <span class="upload-tip">支持 .md / .txt / .docx，单文件 ≤ 2MB，自动切块并向量化</span>
+      <span class="upload-tip">支持 .md / .txt / .docx，单文件 ≤ 2MB；点击文档名可预览</span>
     </div>
 
     <el-table v-if="documents.length" :data="documents" size="small" class="doc-table">
-      <el-table-column prop="filename" label="文档" min-width="180" />
+      <el-table-column prop="filename" label="文档" min-width="180">
+        <template #default="{ row }">
+          <el-button link type="primary" :loading="previewingId === row.id" @click="openPreview(row)">
+            {{ row.filename }}
+          </el-button>
+        </template>
+      </el-table-column>
       <el-table-column prop="source" label="来源" width="90">
         <template #default="{ row }">
           {{ sourceLabel(row.source) }}
@@ -65,6 +71,15 @@
       placeholder="可在此补充门店 FAQ、临时公告等；保存后会同步进向量库..."
       class="editor"
     />
+
+    <el-dialog v-model="previewVisible" :title="previewTitle" width="720px" destroy-on-close>
+      <div class="preview-meta" v-if="previewMeta">
+        {{ previewMeta }}
+      </div>
+      <el-scrollbar max-height="480px">
+        <pre class="preview-content">{{ previewContent }}</pre>
+      </el-scrollbar>
+    </el-dialog>
   </el-card>
 </template>
 
@@ -95,6 +110,11 @@ const chars = ref(0)
 const saving = ref(false)
 const uploading = ref(false)
 const deletingId = ref('')
+const previewingId = ref('')
+const previewVisible = ref(false)
+const previewTitle = ref('文档预览')
+const previewContent = ref('')
+const previewMeta = ref('')
 const documents = ref<KnowledgeDoc[]>([])
 const rag = ref<RagStats>({ enabled: false, documents: 0, chunks: 0 })
 
@@ -155,6 +175,22 @@ async function uploadDocument(options: UploadRequestOptions) {
   }
 }
 
+async function openPreview(row: KnowledgeDoc) {
+  previewingId.value = row.id
+  try {
+    const res = await http.get(`/admin/knowledge/documents/${row.id}`)
+    previewTitle.value = res.data.document?.filename || row.filename
+    previewContent.value = res.data.content || ''
+    const doc = res.data.document || row
+    previewMeta.value = `${doc.chunks || 0} 个片段 · ${res.data.chars || 0} 字`
+    previewVisible.value = true
+  } catch (e: any) {
+    ElMessage.error(e?.message || '预览失败')
+  } finally {
+    previewingId.value = ''
+  }
+}
+
 async function removeDoc(row: KnowledgeDoc) {
   try {
     await ElMessageBox.confirm(`确定删除「${row.filename}」？相关向量片段会一并移除。`, '删除文档', {
@@ -197,4 +233,14 @@ onMounted(load)
   margin-bottom: 8px;
 }
 .editor :deep(textarea) { font-family: Consolas, monospace; font-size: 13px; line-height: 1.6; }
+.preview-meta { color: #888; font-size: 12px; margin-bottom: 12px; }
+.preview-content {
+  margin: 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-family: Consolas, monospace;
+  font-size: 13px;
+  line-height: 1.7;
+  color: #303133;
+}
 </style>
