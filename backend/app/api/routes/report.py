@@ -18,6 +18,7 @@ from app.services.card_service import (
     is_office_night_monthly_card,
     is_period_card_active,
     OFFICE_NIGHT_USAGE_RULE,
+    period_pass_days,
     repair_misissued_card_validity,
 )
 from app.services.wechat_pay import WechatPayService
@@ -235,6 +236,8 @@ def get_cards(user: User = Depends(get_current_user), db: Session = Depends(get_
                 "remaining_hours": float(c.remaining_hours) if c.remaining_hours else None,
                 "total_hours": float(c.total_hours) if c.total_hours else None,
                 "remaining_sessions": c.remaining_sessions,
+                "total_sessions": c.total_sessions,
+                "period_pass_days": period_pass_days(c) or None,
                 "start_date": str(c.start_date) if c.start_date else None,
                 "end_date": str(c.end_date) if c.end_date else None,
                 **card_validity_api_fields(c, today),

@@ -127,7 +127,7 @@
       <picker mode="date" value="{{startDate}}" start="{{periodDateMin || today}}" end="{{periodUseDeadline || ''}}" bindchange="onStartDateChange">
         <view class="field"><text class="field-key">开始日期</text><text class="field-val">{{startDate}} ›</text></view>
       </picker>
-      <picker mode="date" value="{{endDate}}" start="{{startDate}}" bindchange="onEndDateChange">
+      <picker mode="date" value="{{endDate}}" start="{{startDate}}" end="{{periodEndMax || periodUseDeadline || ''}}" bindchange="onEndDateChange">
         <view class="field"><text class="field-key">结束日期</text><text class="field-val">{{endDate}} ›</text></view>
       </picker>
       <view class="hint" wx:if="{{activePeriodCard && periodCardHint}}">{{periodCardHint}}</view>

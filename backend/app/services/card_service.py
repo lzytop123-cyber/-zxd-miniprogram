@@ -219,6 +219,8 @@ def issue_period_card(
             card.total_sessions = value or WEEKLY_PASS_CONSECUTIVE_DAYS
         elif mapping.reward_type == RewardType.month_pass:
             card.total_sessions = value or MONTHLY_PASS_CONSECUTIVE_DAYS
+        elif mapping.reward_type == RewardType.quarter_pass:
+            card.total_sessions = value or 90
     else:
         _set_card_validity(card, today, 30)
 
@@ -257,6 +259,27 @@ def monthly_pass_days(card: PeriodCard) -> int:
     if card.total_sessions and card.total_sessions > 1:
         return card.total_sessions
     return MONTHLY_PASS_CONSECUTIVE_DAYS
+
+
+def quarterly_pass_days(card: PeriodCard) -> int:
+    if card.card_type != CardType.quarterly:
+        return 0
+    if card.total_sessions and card.total_sessions > 1:
+        return card.total_sessions
+    return 90
+
+
+def period_pass_days(card: PeriodCard) -> int:
+    """周期卡须一次约满的连续自然日数（随团购映射 reward_value 变化）。"""
+    if is_office_night_monthly_card(card) or card.card_type == CardType.night_monthly:
+        return office_night_pass_days(card)
+    if card.card_type == CardType.weekly:
+        return weekly_pass_days(card)
+    if card.card_type == CardType.monthly:
+        return monthly_pass_days(card)
+    if card.card_type == CardType.quarterly:
+        return quarterly_pass_days(card)
+    return 0
 
 
 def weekly_pass_days(card: PeriodCard) -> int:
@@ -469,7 +492,14 @@ def validate_period_card_for_reservation(
             raise ValueError("该月卡请使用「夜读」预约方式选座")
         raise ValueError("期限卡类型与预约方式不匹配")
     if card.card_type == CardType.quarterly:
-        _validate_booking_starts_within_validity(card, start_time)
+        if reservation_bill_type != BillType.quarterly:
+            raise ValueError("季卡请使用「季卡」预约方式")
+        span = quarterly_pass_days(card)
+        if span > 1:
+            _validate_consecutive_pass_in_validity(card, start_time, end_time, span)
+        else:
+            _validate_booking_starts_within_validity(card, start_time)
+        return
 
 
 def consume_period_card(

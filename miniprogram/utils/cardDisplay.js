@@ -204,10 +204,40 @@ function officeNightPassDays(card) {
 function monthlyPassDays(card) {
   if (!card || card.card_type !== 'monthly') return 0
   if (isOfficeNightMonthlyCard(card)) return 0
+  if (card.period_pass_days != null && Number(card.period_pass_days) > 0) {
+    return Number(card.period_pass_days)
+  }
   if (card.total_sessions != null && Number(card.total_sessions) > 1) {
     return Number(card.total_sessions)
   }
   return 30
+}
+
+function quarterlyPassDays(card) {
+  if (!card || card.card_type !== 'quarterly') return 0
+  if (card.period_pass_days != null && Number(card.period_pass_days) > 0) {
+    return Number(card.period_pass_days)
+  }
+  if (card.total_sessions != null && Number(card.total_sessions) > 1) {
+    return Number(card.total_sessions)
+  }
+  return 90
+}
+
+function periodPassSpan(billType, card) {
+  if (card) {
+    if (card.period_pass_days != null && Number(card.period_pass_days) > 0) {
+      return Number(card.period_pass_days)
+    }
+    if (billType === 'weekly') return weeklyPassDays(card)
+    if (billType === 'monthly') return monthlyPassDays(card)
+    if (billType === 'quarterly') return quarterlyPassDays(card)
+    if (billType === 'night') return officeNightPassDays(card)
+  }
+  if (billType === 'weekly') return 7
+  if (billType === 'monthly') return 30
+  if (billType === 'quarterly') return 90
+  return 0
 }
 
 function weeklyPassDays(card) {
@@ -302,6 +332,22 @@ function cardRuleText(card) {
   const displayType = resolveCardType(card)
   if (displayType === 'hourly') return hourlyRuleText(card)
   if (displayType === 'daily') return dailyRuleText(card)
+  if (displayType === 'weekly') {
+    const span = weeklyPassDays(card)
+    return span ? `效期内须一次预约连续 ${span} 天` : RULE_LINES.weekly
+  }
+  if (displayType === 'monthly') {
+    const span = monthlyPassDays(card)
+    return span ? `效期内须一次预约连续 ${span} 天` : RULE_LINES.monthly
+  }
+  if (displayType === 'quarterly') {
+    const span = quarterlyPassDays(card)
+    return span > 1 ? `效期内须一次预约连续 ${span} 天` : RULE_LINES.quarterly
+  }
+  if (displayType === 'night_monthly') {
+    const span = officeNightPassDays(card)
+    return span ? `效期内须一次预约连续 ${span} 天` : RULE_LINES.night_monthly
+  }
   return RULE_LINES[displayType] || ''
 }
 
@@ -510,6 +556,8 @@ module.exports = {
   officeNightPassDays,
   monthlyPassDays,
   weeklyPassDays,
+  quarterlyPassDays,
+  periodPassSpan,
   cardValidUntil,
   withinCardValidity,
   monthlyCardUseDeadline,

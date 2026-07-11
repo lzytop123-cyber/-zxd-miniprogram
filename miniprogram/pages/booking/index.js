@@ -11,6 +11,8 @@ const {
   officeNightPassDays,
   monthlyPassDays,
   weeklyPassDays,
+  quarterlyPassDays,
+  periodPassSpan,
   formatCard,
   cardValidityHint,
   OFFICE_NIGHT_USAGE_RULE,
@@ -157,6 +159,7 @@ Page({
     periodCardHint: '',
     periodDateMin: '',
     periodUseDeadline: '',
+    periodEndMax: '',
     hasMultiDayDailyCard: false,
     dailyUseMode: 'single',
     multiDayDailyCard: null,
@@ -283,6 +286,7 @@ Page({
           )
         }
         Object.assign(patch, this._typeUiPatch(patch.billType || this.data.billType, !!officeNight))
+        patch.periodOptions = this._buildPeriodOptions(list)
         this.setData(patch, () => {
           if (patch.billType === 'night') this.refreshPreview({ immediate: true })
         })
@@ -310,22 +314,36 @@ Page({
     )
   },
 
+  _buildPeriodOptions(cards) {
+    return PERIOD_OPTIONS.map((opt) => {
+      const card = this._findPeriodCard(cards || this.data.userCards, opt.type)
+      const span = periodPassSpan(opt.type, card)
+      const label = card && card.card_name && card.card_type === opt.type
+        ? card.card_name
+        : opt.label
+      return {
+        ...opt,
+        label,
+        days: span ? `连续${span}天` : opt.days,
+      }
+    })
+  },
+
+  _periodRequiredSpan(billType, card) {
+    return periodPassSpan(billType, card)
+  },
+
   _periodMaxEnd(startDate, billType, card) {
-    const offset = BILL_DEFAULTS[billType]?.endOffset ?? 0
+    const span = this._periodRequiredSpan(billType, card)
+    const offset = span > 0 ? span - 1 : (BILL_DEFAULTS[billType]?.endOffset ?? 0)
     let end = addDays(startDate, offset)
     if (card && card.end_date && end > card.end_date) end = card.end_date
     return end
   },
 
-  _periodRequiredSpan(billType) {
-    if (billType === 'monthly') return monthlyPassDays({ card_type: 'monthly', total_sessions: 30 })
-    if (billType === 'weekly') return 7
-    return 0
-  },
-
   _latestPeriodStart(card, billType) {
     if (!card || !card.end_date) return null
-    const span = this._periodRequiredSpan(billType)
+    const span = this._periodRequiredSpan(billType, card)
     if (!span) return null
     const latest = addDays(card.end_date, -(span - 1))
     const today = todayStr()
@@ -333,9 +351,10 @@ Page({
     return latest < min ? null : latest
   },
 
-  _periodCardSuffix(billType) {
-    if (billType === 'monthly') return '须连续 30 天'
-    if (billType === 'weekly') return '须连续 7 天'
+  _periodCardSuffix(billType, card) {
+    const span = this._periodRequiredSpan(billType, card)
+    if (span > 0) return `须连续 ${span} 天`
+    if (billType === 'quarterly') return '效期内预约一次即核销'
     return ''
   },
 
@@ -352,10 +371,18 @@ Page({
       if (start < min) start = min
       if (start > useDeadline) start = min
     }
+    const span = this._periodRequiredSpan(billType, card)
     let end = this._periodMaxEnd(start, billType, card)
-    const span = this._periodRequiredSpan(billType)
-    let periodCardHint = card ? cardValidityHint(card, this._periodCardSuffix(billType)) : ''
-    if (card && span && daysBetweenDates(start, end) !== span) {
+    if (span > 0) {
+      end = addDays(start, span - 1)
+      if (card && card.end_date && end > card.end_date) {
+        end = card.end_date
+        const latestStart = this._latestPeriodStart(card, billType)
+        if (latestStart) start = latestStart
+      }
+    }
+    let periodCardHint = card ? cardValidityHint(card, this._periodCardSuffix(billType, card)) : ''
+    if (card && span > 0 && daysBetweenDates(start, end) !== span) {
       periodCardHint = cardValidityHint(
         card,
         `须连续 ${span} 天，请将开始日期调至 ${this._latestPeriodStart(card, billType) || min} 前`,
@@ -366,6 +393,7 @@ Page({
       endDate: end,
       periodDateMin: min,
       periodUseDeadline: useDeadline,
+      periodEndMax: end,
       activePeriodCard: card,
       periodCardHint,
     }
@@ -558,6 +586,7 @@ Page({
     }
     if (PERIOD_TYPES.includes(this.data.billType)) {
       const card = this.data.activePeriodCard
+      const span = this._periodRequiredSpan(this.data.billType, card)
       const maxEnd = this._periodMaxEnd(this.data.startDate, this.data.billType, card)
       if (endDate > maxEnd) {
         wx.showToast({ title: `结束日期不能晚于 ${maxEnd}`, icon: 'none' })
@@ -566,6 +595,13 @@ Page({
       if (endDate < this.data.startDate) {
         wx.showToast({ title: '结束日期不能早于开始日期', icon: 'none' })
         return
+      }
+      if (span > 0) {
+        const days = daysBetweenDates(this.data.startDate, endDate)
+        if (days !== span) {
+          patch.endDate = addDays(this.data.startDate, span - 1)
+          wx.showToast({ title: `须连续 ${span} 天，已自动调整`, icon: 'none' })
+        }
       }
     }
     if (this.data.billType === 'session') {

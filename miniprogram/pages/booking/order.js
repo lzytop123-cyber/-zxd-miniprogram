@@ -1,6 +1,6 @@
 const { request, formatRequestError, invalidateCache } = require('../../utils/request')
 const { getLayout } = require('../../utils/seat-layout')
-const { dailyPassDays, isOfficeNightMonthlyCard, OFFICE_NIGHT_BOOKING_HINT, cardValidUntil, withinCardValidity, weeklyPassDays, monthlyPassDays, officeNightPassDays } = require('../../utils/cardDisplay')
+const { dailyPassDays, isOfficeNightMonthlyCard, OFFICE_NIGHT_BOOKING_HINT, cardValidUntil, withinCardValidity, weeklyPassDays, monthlyPassDays, quarterlyPassDays, officeNightPassDays } = require('../../utils/cardDisplay')
 const { completeWechatPay, ensureReservationPaid } = require('../../utils/pay')
 
 const BILL_LABELS = { hourly: '按小时', daily: '天卡', weekly: '周卡', session: '次卡', monthly: '月卡', quarterly: '季卡', night: '夜读' }
@@ -90,7 +90,12 @@ function explainCardMismatch(cards, ctx) {
       )
     }
     if (c.card_type === 'quarterly') {
-      return withinCardValidity(c, startTime)
+      const span = quarterlyPassDays(c)
+      return (
+        billType === 'quarterly'
+        && (span <= 1 || bookingSpanDays(startTime, endTime) === span)
+        && withinCardPeriod(c, startTime, endTime)
+      )
     }
     return withinCardPeriod(c, startTime, endTime)
   })
@@ -136,6 +141,15 @@ function explainCardMismatch(cards, ctx) {
     return '当前无法使用该月卡，请返回调整'
   }
   if (card.card_type === 'quarterly') {
+    const span = quarterlyPassDays(card)
+    if (span > 1 && bookingSpanDays(startTime, endTime) !== span) {
+      return `须预约连续 ${span} 天，请返回调整`
+    }
+    if (!withinCardPeriod(card, startTime, endTime)) {
+      if (card.end_date && end > card.end_date) {
+        return `预约须落在效期内（至 ${card.end_date}），请返回调整`
+      }
+    }
     if (card.start_date && start < card.start_date) {
       return `预约开始日早于卡生效日（${card.start_date}），请返回调整`
     }
@@ -221,7 +235,12 @@ function isUsableCard(card, ctx) {
     )
   }
   if (card.card_type === 'quarterly') {
-    return billType === 'quarterly' && withinCardValidity(card, startTime)
+    if (billType !== 'quarterly') return false
+    const span = quarterlyPassDays(card)
+    return (
+      (span <= 1 || bookingSpanDays(startTime, endTime) === span)
+      && withinCardPeriod(card, startTime, endTime)
+    )
   }
 
   return false
