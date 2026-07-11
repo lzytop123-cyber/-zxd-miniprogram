@@ -16,15 +16,15 @@
       <view class="exchange-icon">🎟</view>
       <view class="exchange-title">{{platformLabel}}团购兑换</view>
     </view>
-    <view class="hint">扫码或相册识别券码</view>
+    <view class="hint">{{platform === 'douyin' ? '扫码识别抖音券，或输入下方12位券号' : '扫码或相册识别券码'}}</view>
 
     <view class="code-field">
       <input
         class="code-input"
-        placeholder="请输入券码"
+        placeholder="{{platform === 'douyin' ? '请输入12位券号' : '请输入券码'}}"
         value="{{code}}"
         bindinput="onInput"
-        maxlength="32"
+        maxlength="{{platform === 'douyin' ? 256 : 32}}"
         confirm-type="done"
         bindconfirm="onSubmitTap"
       />

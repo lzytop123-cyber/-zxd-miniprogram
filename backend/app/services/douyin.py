@@ -47,7 +47,7 @@ def _looks_like_encrypted_data(raw: str) -> bool:
 
 def _extract_encrypted_data(raw: str) -> str:
     text = (raw or "").strip()
-    if "object_id=" in text:
+    if "object_id=" in text or "encrypted_data=" in text:
         from urllib.parse import parse_qs, urlparse
 
         parsed = urlparse(text)
@@ -59,9 +59,40 @@ def _extract_encrypted_data(raw: str) -> str:
     return text
 
 
+async def _resolve_encrypted_data(client: httpx.AsyncClient, raw: str) -> str:
+    """抖音短链需跟随跳转，从最终 URL 的 object_id 取 encrypted_data。"""
+    text = (raw or "").strip()
+    if not _looks_like_encrypted_data(text):
+        return text
+
+    if text.startswith("http://") or text.startswith("https://"):
+        url = text
+    elif "douyin.com" in text or "iesdouyin.com" in text:
+        url = f"https://{text.lstrip('/')}"
+    else:
+        return _extract_encrypted_data(text)
+
+    try:
+        resp = await client.get(url, follow_redirects=True)
+        return _extract_encrypted_data(str(resp.url))
+    except httpx.HTTPError as e:
+        logger.warning("resolve douyin short url failed: %s", e)
+        return _extract_encrypted_data(url)
+
+
 def _api_error(payload: dict, *, fallback: str = "抖音接口错误") -> str:
     data = payload.get("data") if isinstance(payload.get("data"), dict) else {}
     extra = payload.get("extra") if isinstance(payload.get("extra"), dict) else {}
+    code = data.get("error_code") or extra.get("error_code")
+    known = {
+        2190004: "应用未开通对应能力，请在开放平台申请团购核销/门店管理",
+        2190005: "应用未获商家授权，请在抖音来客授权「知行岛团购核销」",
+        2119005: "应用未获商家授权，请在抖音来客授权「知行岛团购核销」",
+        3000002: "所选门店不在该团购的适用门店列表，请在来客检查团购商品的适用门店",
+        3000001: "券码无效或已使用，请换一张未核销的券重试",
+    }
+    if code in known:
+        return known[code]
     for block in (data, extra, payload):
         if not isinstance(block, dict):
             continue
@@ -112,7 +143,8 @@ class DouyinService:
         params: dict[str, str] = {"poi_id": str(settings.douyin_poi_id)}
         raw = (code or "").strip()
         if _looks_like_encrypted_data(raw):
-            params["encrypted_data"] = quote(_extract_encrypted_data(raw), safe="")
+            encrypted = await _resolve_encrypted_data(client, raw)
+            params["encrypted_data"] = quote(encrypted, safe="")
         else:
             params["code"] = normalize_coupon_input(raw)
 

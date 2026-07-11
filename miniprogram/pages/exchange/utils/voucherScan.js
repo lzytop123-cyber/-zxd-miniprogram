@@ -11,10 +11,25 @@ function getJsQR() {
   return jsQRModule
 }
 
-function parseScannedVoucherCode(raw) {
+function isDouyinScanPayload(raw) {
+  const text = String(raw || '').trim().toLowerCase()
+  return (
+    text.includes('douyin.com') ||
+    text.includes('iesdouyin.com') ||
+    text.includes('object_id=') ||
+    text.includes('encrypted_data=')
+  )
+}
+
+function parseScannedVoucherCode(raw, options = {}) {
   if (raw == null) return ''
   let text = String(raw).trim()
   if (!text) return ''
+
+  // 抖音二维码是短链，不能把路径片段（如 iCkM1ma6）当成券码
+  if (options.platform === 'douyin' && isDouyinScanPayload(text)) {
+    return text.includes('://') ? text : `https://${text.replace(/^\/+/, '')}`
+  }
 
   if (/^[A-Za-z0-9-]{6,32}$/.test(text)) return text
 
@@ -178,8 +193,8 @@ async function pickAndScanVoucher(hooks = {}) {
   return pickFromAlbumAndDecode()
 }
 
-function fillCodeFromScanResult(res) {
-  const code = parseScannedVoucherCode(res && res.result)
+function fillCodeFromScanResult(res, options = {}) {
+  const code = parseScannedVoucherCode(res && res.result, options)
   if (!code || code.length < 6) {
     return { ok: false, message: '未识别有效券码' }
   }
@@ -187,6 +202,7 @@ function fillCodeFromScanResult(res) {
 }
 
 module.exports = {
+  isDouyinScanPayload,
   parseScannedVoucherCode,
   scanFromCamera,
   pickFromAlbumAndDecode,

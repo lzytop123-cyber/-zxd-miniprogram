@@ -60,7 +60,7 @@ async def exchange_meituan(
 
 @router.post("/douyin/{code}", response_model=ResponseModel)
 async def exchange_douyin(
-    code: str = Path(..., min_length=6, max_length=32, description="团购券码"),
+    code: str = Path(..., min_length=6, max_length=2048, description="团购券码或抖音扫码链接"),
     store_id: int | None = Query(None),
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),

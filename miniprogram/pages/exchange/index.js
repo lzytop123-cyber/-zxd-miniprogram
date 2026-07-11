@@ -38,7 +38,7 @@ Page({
 
   _applyScanResult(res) {
     const { fillCodeFromScanResult } = require('./utils/voucherScan')
-    const parsed = fillCodeFromScanResult(res)
+    const parsed = fillCodeFromScanResult(res, { platform: this.data.platform })
     if (!parsed.ok) {
       wx.showToast({ title: parsed.message, icon: 'none', duration: 2500 })
       return false
