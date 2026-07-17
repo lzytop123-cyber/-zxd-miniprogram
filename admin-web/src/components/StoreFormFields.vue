@@ -45,7 +45,7 @@
           v-if="(form.cover_images?.length || 0) < 5"
           :show-file-list="false"
           accept="image/jpeg,image/png,image/webp,image/gif"
-          :http-request="(opt) => $emit('upload', opt, form)"
+          :http-request="(opt: any) => $emit('upload', opt, form)"
           :disabled="uploading"
         >
           <el-button type="primary" plain :loading="uploading">上传封面</el-button>

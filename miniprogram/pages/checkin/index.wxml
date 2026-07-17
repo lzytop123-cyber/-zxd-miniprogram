@@ -32,11 +32,15 @@
 
       <view class="hero-grid">
         <view class="hero-meta-item">
+          <view class="hero-meta-label">开始时间</view>
+          <view class="hero-meta-value">{{startDisplay}}</view>
+        </view>
+        <view class="hero-meta-item">
           <view class="hero-meta-label">结束时间</view>
           <view class="hero-meta-value">{{endDisplay}}</view>
         </view>
         <view class="hero-meta-item hero-meta-item--accent">
-          <view class="hero-meta-label">剩余时长</view>
+          <view class="hero-meta-label">{{durationLabel}}</view>
           <view class="hero-meta-value hero-meta-value--accent">{{countdown}}</view>
         </view>
       </view>

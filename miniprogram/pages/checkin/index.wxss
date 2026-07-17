@@ -138,6 +138,7 @@ page {
 
 .hero-meta-item--accent {
   background: #ECF9F0;
+  grid-column: 1 / -1;
 }
 
 .hero-meta-label {

@@ -39,12 +39,8 @@ function formatDate(iso) {
   return `${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`
 }
 
-function parseTime(iso) {
-  return new Date(String(iso).replace(' ', 'T'))
-}
-
-function formatCountdown(diff) {
-  const totalMinutes = Math.max(0, Math.floor(diff / 60000))
+function formatDuration(diffMs) {
+  const totalMinutes = Math.max(0, Math.floor(diffMs / 60000))
   const days = Math.floor(totalMinutes / (24 * 60))
   const hours = Math.floor((totalMinutes % (24 * 60)) / 60)
   const minutes = totalMinutes % 60
@@ -52,7 +48,25 @@ function formatCountdown(diff) {
   if (days > 0) parts.push(`${days}天`)
   if (days > 0 || hours > 0) parts.push(`${hours}小时`)
   parts.push(`${minutes}分`)
-  return `剩余 ${parts.join('')}`
+  return parts.join('')
+}
+
+/** 未开始：展示预约总时长；已开始：展示距结束剩余。 */
+function formatReservationDuration(reservation, now = new Date()) {
+  const start = parseTime(reservation.start_time)
+  const end = parseTime(reservation.end_time)
+  if (end <= now) {
+    return { label: '剩余时长', text: '已结束' }
+  }
+  if (start > now) {
+    const spanMs = end - start
+    return { label: '预约时长', text: `共 ${formatDuration(spanMs)}` }
+  }
+  return { label: '剩余时长', text: `剩余 ${formatDuration(end - now)}` }
+}
+
+function parseTime(iso) {
+  return new Date(String(iso).replace(' ', 'T'))
 }
 
 function canChangeSeatFor(reservation, now = new Date()) {
@@ -69,9 +83,11 @@ Page({
     selectedId: null,
     reservation: null,
     endDisplay: '',
+    startDisplay: '',
     checkInDisplay: '',
     statusLabel: '',
     statusHint: '',
+    durationLabel: '剩余时长',
     countdown: '',
     canOpen: false,
     canChangeSeat: false,
@@ -179,6 +195,7 @@ Page({
     const openWindowHint = getOpenWindowHint(reservation)
     this.setData({
       reservation,
+      startDisplay: formatDate(reservation.start_time),
       endDisplay: formatDate(reservation.end_time),
       checkInDisplay: reservation.check_in_time ? formatDate(reservation.check_in_time) : '',
       statusLabel: reservation.status_label || '',
@@ -214,11 +231,12 @@ Page({
     const tick = () => {
       const now = new Date()
       const end = parseTime(reservation.end_time)
-      const diff = end - now
+      const duration = formatReservationDuration(reservation, now)
       const canOpen = computeCanOpen(reservation, now)
       const openWindowHint = getOpenWindowHint(reservation, now)
-      if (diff <= 0) {
+      if (end <= now) {
         this.setData({
+          durationLabel: '剩余时长',
           countdown: '已结束',
           canOpen: false,
           canChangeSeat: false,
@@ -231,7 +249,8 @@ Page({
         return
       }
       this.setData({
-        countdown: formatCountdown(diff),
+        durationLabel: duration.label,
+        countdown: duration.text,
         canOpen,
         canChangeSeat: canChangeSeatFor(reservation, now),
         openWindowHint,
