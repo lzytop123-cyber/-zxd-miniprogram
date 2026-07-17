@@ -1,7 +1,7 @@
 const auth = require('../../utils/auth')
 const { request, invalidateCache } = require('../../utils/request')
 const routes = require('../../utils/routes')
-const { completeWechatPay } = require('../../utils/pay')
+const { completeWechatPay, ensureCardPurchasePaid } = require('../../utils/pay')
 const { handleTabScroll } = require('../../utils/tabbar')
 const {
   PKG_CATEGORY_TABS,
@@ -245,12 +245,13 @@ Page({
       await completeWechatPay(wp, () =>
         request({ url: `/card/purchase/${res.order_no}/mock`, method: 'POST' })
       )
+      const confirmed = await ensureCardPurchasePaid(res.order_no, wp)
 
       wx.hideLoading()
       invalidateCache('/user/cards')
       wx.showModal({
         title: '购买成功',
-        content: `已购买：${res.label || '期限卡'}`,
+        content: `已购买：${(confirmed && confirmed.card_name) || res.label || '期限卡'}`,
         showCancel: false,
         success: () => this.loadCards({ force: true }),
       })

@@ -74,4 +74,32 @@ function completeWechatPay(wechatPay, mockRequest) {
   })
 }
 
-module.exports = { isMockPrepay, completeWechatPay, ensureReservationPaid }
+/**
+ * 购卡：微信支付成功后主动确认发卡（不等待微信回调）。
+ */
+async function ensureCardPurchasePaid(orderNo, wechatPay) {
+  const { request } = require('./request')
+
+  if (isMockPrepay(wechatPay)) {
+    return
+  }
+
+  const attempts = 24
+  for (let i = 0; i < attempts; i += 1) {
+    try {
+      return await request({
+        url: `/card/purchase/${orderNo}/confirm-pay`,
+        method: 'POST',
+        silent: true,
+      })
+    } catch (e) {
+      if (i === attempts - 1) {
+        throw new Error('支付确认中，请稍后下拉刷新「我的期限卡」')
+      }
+      await sleep(500)
+    }
+  }
+  throw new Error('支付确认超时')
+}
+
+module.exports = { isMockPrepay, completeWechatPay, ensureReservationPaid, ensureCardPurchasePaid }

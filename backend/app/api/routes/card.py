@@ -196,3 +196,51 @@ def mock_purchase_card(
         message="购买成功",
         data={"card_id": card.id, "card_name": card.card_name},
     )
+
+
+@router.post("/purchase/{order_no}/confirm-pay", response_model=ResponseModel)
+def confirm_purchase_card(
+    order_no: str,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """微信支付客户端成功后主动确认发卡（回调延迟/失败时兜底）。"""
+    order = db.scalar(
+        select(CardPurchaseOrder).where(
+            CardPurchaseOrder.order_no == order_no,
+            CardPurchaseOrder.user_id == user.id,
+        )
+    )
+    if not order:
+        raise HTTPException(status_code=404, detail="订单不存在")
+    if order.pay_status == 1 and order.period_card_id:
+        card = db.get(PeriodCard, order.period_card_id)
+        return ResponseModel(
+            message="已购买",
+            data={
+                "order_no": order.order_no,
+                "card_id": order.period_card_id,
+                "card_name": card.card_name if card else None,
+            },
+        )
+
+    query = WechatPayService.query_order(order.order_no)
+    if not query or query.get("trade_state") != "SUCCESS":
+        raise HTTPException(status_code=400, detail="支付尚未到账，请稍后再试")
+
+    paid_fen = query.get("amount_total")
+    if paid_fen is not None:
+        expected = int((order.amount * 100).quantize(Decimal("1")))
+        if int(paid_fen) != expected:
+            raise HTTPException(status_code=400, detail="支付金额异常，请联系店长")
+
+    card = fulfill_card_purchase(db, order)
+    db.commit()
+    return ResponseModel(
+        message="购买成功",
+        data={
+            "order_no": order.order_no,
+            "card_id": card.id,
+            "card_name": card.card_name,
+        },
+    )
