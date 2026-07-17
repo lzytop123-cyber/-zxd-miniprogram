@@ -31,6 +31,9 @@ class Settings(BaseSettings):
     wx_pay_api_v3_key: str = ""
     wx_pay_cert_path: str = "./certs/apiclient_cert.pem"
     wx_pay_key_path: str = "./certs/apiclient_key.pem"
+    # 平台公钥模式（响应头为 PUB_KEY_ID_... 时必填）
+    wx_pay_public_key_path: str = "./cert/pub_key.pem"
+    wx_pay_public_key_id: str = ""
 
     ttlock_client_id: str = ""
     ttlock_client_secret: str = ""

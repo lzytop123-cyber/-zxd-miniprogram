@@ -145,13 +145,18 @@ def purchase_card(
     if body.pay_type != PayType.wechat:
         raise HTTPException(status_code=400, detail="暂不支持该支付方式")
 
-    pay_params = WechatPayService.create_jsapi_order(
-        order_no,
-        amount,
-        user.openid,
-        description,
-        attach=f"card_purchase={order.id}",
-    )
+    try:
+        pay_params = WechatPayService.create_jsapi_order(
+            order_no,
+            amount,
+            user.openid,
+            description,
+            attach=f"card_purchase={order.id}",
+        )
+    except RuntimeError as e:
+        db.rollback()
+        raise HTTPException(status_code=502, detail=str(e)) from e
+
     db.commit()
     return ResponseModel(
         data={
