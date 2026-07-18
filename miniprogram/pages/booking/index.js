@@ -987,7 +987,12 @@ Page({
     })
       .then((seats) => {
         const applied = this._layout.applySeats(seats)
-        const availableSeatCount = applied.filter((s) => s.status === 'available').length
+        // 只统计平面图 1–28（避免旧 A01 与新编号并存时虚高到 50+）
+        const availableSlots = new Set()
+        applied.forEach((s) => {
+          if (s.status === 'available' && s.map_slot) availableSlots.add(s.map_slot)
+        })
+        const availableSeatCount = availableSlots.size
         const patch = { seats: applied, availableSeatCount, seatsLoading: false }
         if (this.data.seatId) {
           const current = applied.find((s) => s.id === this.data.seatId)

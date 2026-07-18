@@ -53,9 +53,16 @@ def get_availability(
     end_time: datetime = Query(...),
     db: Session = Depends(get_db),
 ):
-    seats = db.scalars(
-        select(Seat).where(Seat.store_id == store_id, Seat.is_buffer == 0, Seat.status == 1)
-    ).all()
+    from app.services.seat_setup import expected_seat_codes
+
+    plan_codes = set(expected_seat_codes())
+    seats = [
+        s
+        for s in db.scalars(
+            select(Seat).where(Seat.store_id == store_id, Seat.is_buffer == 0, Seat.status == 1)
+        ).all()
+        if s.seat_code in plan_codes
+    ]
     busy_ids = find_busy_seat_ids(db, [s.id for s in seats], start_time, end_time)
     items = []
     for s in seats:
@@ -113,9 +120,16 @@ def get_store(store_id: int, db: Session = Depends(get_db)):
 
 @router.get("/{store_id}/seats", response_model=ResponseModel[list[SeatItem]])
 def get_seats(store_id: int, db: Session = Depends(get_db)):
-    seats = db.scalars(
-        select(Seat).where(Seat.store_id == store_id, Seat.is_buffer == 0, Seat.status == 1)
-    ).all()
+    from app.services.seat_setup import expected_seat_codes
+
+    plan_codes = set(expected_seat_codes())
+    seats = [
+        s
+        for s in db.scalars(
+            select(Seat).where(Seat.store_id == store_id, Seat.is_buffer == 0, Seat.status == 1)
+        ).all()
+        if s.seat_code in plan_codes
+    ]
     now = datetime.now()
     items = [
         SeatItem(

@@ -178,12 +178,9 @@ def change_reservation_seat(db: Session, reservation: Reservation, new_seat_id: 
 
 
 def seat_options_for_change(db: Session, reservation: Reservation) -> list[dict]:
-    from app.models import Zone
+    from app.services.seat_setup import expected_seat_codes, seat_code_to_slot, zone_name_by_slot
 
-    zones = {
-        z.id: z.name
-        for z in db.scalars(select(Zone).where(Zone.store_id == reservation.store_id)).all()
-    }
+    plan_codes = set(expected_seat_codes())
     seats = sorted(
         db.scalars(
             select(Seat)
@@ -194,12 +191,15 @@ def seat_options_for_change(db: Session, reservation: Reservation) -> list[dict]
 
     options: list[dict] = []
     for seat in seats:
+        if seat.seat_code not in plan_codes:
+            continue
+        zone_name = zone_name_by_slot(seat_code_to_slot(seat.seat_code)) or "-"
         if seat.id == reservation.seat_id:
             options.append(
                 {
                     "id": seat.id,
                     "seat_code": seat.seat_code,
-                    "zone_name": zones.get(seat.zone_id, "-"),
+                    "zone_name": zone_name,
                     "selectable": False,
                     "reason": "当前座位",
                 }
@@ -210,7 +210,7 @@ def seat_options_for_change(db: Session, reservation: Reservation) -> list[dict]
                 {
                     "id": seat.id,
                     "seat_code": seat.seat_code,
-                    "zone_name": zones.get(seat.zone_id, "-"),
+                    "zone_name": zone_name,
                     "selectable": False,
                     "reason": "座位已停用",
                 }
@@ -228,7 +228,7 @@ def seat_options_for_change(db: Session, reservation: Reservation) -> list[dict]
                 {
                     "id": seat.id,
                     "seat_code": seat.seat_code,
-                    "zone_name": zones.get(seat.zone_id, "-"),
+                    "zone_name": zone_name,
                     "selectable": False,
                     "reason": "时段冲突",
                 }
@@ -238,7 +238,7 @@ def seat_options_for_change(db: Session, reservation: Reservation) -> list[dict]
                 {
                     "id": seat.id,
                     "seat_code": seat.seat_code,
-                    "zone_name": zones.get(seat.zone_id, "-"),
+                    "zone_name": zone_name,
                     "selectable": True,
                     "reason": None,
                 }
@@ -540,13 +540,13 @@ def reservation_display_meta(db: Session, reservation: Reservation) -> dict:
 
     seat = db.get(Seat, reservation.seat_id)
     zone_name = None
-    if seat and seat.zone_id:
-        zone = db.get(Zone, seat.zone_id)
-        zone_name = zone.name if zone else None
-    if not zone_name and seat:
+    if seat:
         from app.services.seat_setup import seat_code_to_slot, zone_name_by_slot
 
         zone_name = zone_name_by_slot(seat_code_to_slot(seat.seat_code))
+        if not zone_name and seat.zone_id:
+            zone = db.get(Zone, seat.zone_id)
+            zone_name = zone.name if zone else None
 
     card_name = None
     card_type_label = None

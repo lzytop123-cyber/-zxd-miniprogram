@@ -26,7 +26,6 @@ function formatSeatNum(seatCode) {
 
 function zoneTone(zoneName) {
   if (zoneName === '沉浸区') return 'immersion'
-  if (zoneName === '工位区') return 'workspace'
   if (zoneName === '标准区') return 'standard'
   return 'default'
 }
@@ -59,7 +58,8 @@ function enrichOrder(item) {
   const canChangeSeat = canOpen
 
   const display = seatDisplay({ seat_code: item.seat_code || '' })
-  const zoneName = item.zone_name || display.zoneName || ''
+  // 以平面图区名为准（标准区/沉浸区），避免库里残留 A区/C区
+  const zoneName = display.zoneName || item.zone_name || ''
   const seatNum = formatSeatNum(item.seat_code)
   const seatLine = zoneName ? `${seatNum} · ${zoneName}` : seatNum
 

@@ -1,4 +1,4 @@
-"""门店标准座位布局：平面图 1–28 号，三区（标准 / 工位 / 沉浸）。"""
+"""门店标准座位布局：平面图 1–28 号（1 标准区 + 3 间沉浸区）。"""
 
 from __future__ import annotations
 
@@ -10,6 +10,7 @@ from app.models import Seat, Store, Zone
 PLAN_SEAT_COUNT = 28
 
 # slot, zone_name, seat_type, has_curtain, left%, top%（与 miniprogram/utils/seat-layout.js 一致）
+# 平面：标准区 1–13；沉浸区三间 14–18 / 19–24 / 25–28（展示名统一「沉浸区」）
 SEAT_LAYOUT: list[tuple[int, str, str, int, float, float]] = [
     (1, "标准区", "standard", 1, 81.51, 77.45),
     (2, "标准区", "standard", 1, 89.73, 77.45),
@@ -24,11 +25,11 @@ SEAT_LAYOUT: list[tuple[int, str, str, int, float, float]] = [
     (11, "标准区", "standard", 1, 64.85, 32.46),
     (12, "标准区", "standard", 1, 64.85, 58.35),
     (13, "标准区", "standard", 1, 64.85, 66.84),
-    (14, "工位区", "window", 0, 55.75, 23.97),
-    (15, "工位区", "window", 0, 55.75, 15.48),
-    (16, "工位区", "window", 0, 37.45, 15.48),
-    (17, "工位区", "window", 0, 37.45, 23.97),
-    (18, "工位区", "window", 0, 37.45, 32.46),
+    (14, "沉浸区", "standard", 0, 55.75, 23.97),
+    (15, "沉浸区", "standard", 0, 55.75, 15.48),
+    (16, "沉浸区", "standard", 0, 37.45, 15.48),
+    (17, "沉浸区", "standard", 0, 37.45, 23.97),
+    (18, "沉浸区", "standard", 0, 37.45, 32.46),
     (19, "沉浸区", "standard", 0, 28.68, 23.97),
     (20, "沉浸区", "standard", 0, 28.68, 15.48),
     (21, "沉浸区", "standard", 0, 10.26, 15.48),
@@ -41,7 +42,7 @@ SEAT_LAYOUT: list[tuple[int, str, str, int, float, float]] = [
     (28, "沉浸区", "standard", 1, 28.68, 85.5),
 ]
 
-ZONE_ORDER = {"标准区": 0, "工位区": 1, "沉浸区": 2}
+ZONE_ORDER = {"标准区": 0, "沉浸区": 1}
 
 SLOT_ZONE: dict[int, str] = {slot: zone_name for slot, zone_name, *_ in SEAT_LAYOUT}
 
@@ -93,7 +94,7 @@ def _sort_seats(seats: list[Seat]) -> list[Seat]:
 
 
 def ensure_store_seats(db: Session, store: Store) -> int:
-    """补全门店 1–28 号座位（已有则同步区域与坐标）。"""
+    """补全门店 1–28 号座位（已有则同步区域与坐标；停用旧 A01 等编号）。"""
     zones: dict[str, Zone] = {}
     for zone_name in ZONE_ORDER:
         zone = db.scalar(select(Zone).where(Zone.store_id == store.id, Zone.name == zone_name))
@@ -101,11 +102,14 @@ def ensure_store_seats(db: Session, store: Store) -> int:
             zone = Zone(
                 store_id=store.id,
                 name=zone_name,
-                type="window" if zone_name == "工位区" else "standard",
+                type="standard",
                 sort_order=ZONE_ORDER[zone_name],
             )
             db.add(zone)
             db.flush()
+        else:
+            zone.sort_order = ZONE_ORDER[zone_name]
+            zone.type = "standard"
         zones[zone_name] = zone
 
     existing = {
@@ -113,6 +117,7 @@ def ensure_store_seats(db: Session, store: Store) -> int:
         for s in db.scalars(select(Seat).where(Seat.store_id == store.id, Seat.is_buffer == 0)).all()
     }
     added = 0
+    expected = set(expected_seat_codes())
 
     for slot, zone_name, seat_type, has_curtain, left_pct, top_pct in SEAT_LAYOUT:
         code = str(slot)
@@ -141,21 +146,40 @@ def ensure_store_seats(db: Session, store: Store) -> int:
         )
         added += 1
 
+    # 旧编号（A01/B08 等）与 1–28 并存时会把「可订」虚高到约 50+，统一停用
+    for code, seat in existing.items():
+        if code not in expected:
+            seat.status = 0
+
     return added
 
 
+def is_plan_seat(seat: Seat) -> bool:
+    """是否为平面图正式座位（编号 1–28）。"""
+    return seat.seat_code in set(expected_seat_codes())
+
+
 def migrate_store_seat_codes(db: Session, store: Store) -> dict:
-    """将历史 A01/B08 等编号迁移为 1–28，并补全缺失座位。"""
+    """将历史 A01/B08 等编号迁移为 1–28，并补全缺失座位。
+
+    若目标编号已存在（旧码与新码并存），则停用旧码，避免唯一约束冲突。
+    """
     seats = list(
         db.scalars(select(Seat).where(Seat.store_id == store.id, Seat.is_buffer == 0)).all()
     )
+    codes = {s.seat_code for s in seats}
     pending: list[tuple[Seat, str]] = []
+    skipped_dup = 0
     for seat in seats:
         slot = seat_code_to_slot(seat.seat_code)
         if slot is None:
             continue
         target = str(slot)
         if seat.seat_code == target:
+            continue
+        if target in codes:
+            seat.status = 0
+            skipped_dup += 1
             continue
         pending.append((seat, target))
 
@@ -167,9 +191,10 @@ def migrate_store_seat_codes(db: Session, store: Store) -> dict:
     for seat, target in pending:
         seat.seat_code = target
         renamed += 1
+        codes.add(target)
 
     added = ensure_store_seats(db, store)
-    return {"renamed": renamed, "added": added}
+    return {"renamed": renamed, "added": added, "disabled_dup": skipped_dup}
 
 
 def store_seat_summary(db: Session, store_id: int) -> dict:
@@ -177,6 +202,8 @@ def store_seat_summary(db: Session, store_id: int) -> dict:
     if not store:
         raise ValueError("门店不存在")
 
+    expected = expected_seat_codes()
+    expected_set = set(expected)
     seats = _sort_seats(
         list(
             db.scalars(
@@ -184,17 +211,17 @@ def store_seat_summary(db: Session, store_id: int) -> dict:
             ).all()
         )
     )
-    codes = {s.seat_code for s in seats}
-    expected = expected_seat_codes()
+    plan_seats = [s for s in seats if s.seat_code in expected_set]
+    codes = {s.seat_code for s in plan_seats}
     missing = [c for c in expected if c not in codes]
-    enabled = sum(1 for s in seats if s.status == 1)
+    enabled = sum(1 for s in plan_seats if s.status == 1)
 
     return {
         "store_id": store_id,
         "store_name": store.name,
         "expected_count": EXPECTED_SEAT_COUNT,
-        "actual_count": len(seats),
+        "actual_count": len(plan_seats),
         "enabled_count": enabled,
         "missing_codes": missing,
-        "is_complete": len(missing) == 0,
+        "is_complete": len(missing) == 0 and enabled == EXPECTED_SEAT_COUNT,
     }
