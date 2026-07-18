@@ -1,4 +1,4 @@
-const { request, invalidateCache } = require('./request')
+const { request, invalidateCache, formatRequestError } = require('./request')
 const { normalizeUser } = require('./user')
 const routes = require('./routes')
 
@@ -107,10 +107,10 @@ function login(options = {}) {
             resolve(res)
           })
           .catch((err) => {
-            const msg = err.detail || err.message || '登录失败，请稍后重试'
+            const msg = formatRequestError(err) || '登录失败，请稍后重试'
             syncAppError(msg)
             if (!silent) wx.showToast({ title: msg, icon: 'none' })
-            reject(err)
+            reject(err instanceof Error ? err : new Error(msg))
           })
       },
       fail: () => {

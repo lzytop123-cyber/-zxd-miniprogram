@@ -1,5 +1,5 @@
 const auth = require('../../utils/auth')
-const { request, invalidateCache } = require('../../utils/request')
+const { request, invalidateCache, formatRequestError } = require('../../utils/request')
 const routes = require('../../utils/routes')
 const { completeWechatPay, ensureCardPurchasePaid } = require('../../utils/pay')
 const { handleTabScroll } = require('../../utils/tabbar')
@@ -257,7 +257,7 @@ Page({
       })
     } catch (err) {
       wx.hideLoading()
-      wx.showToast({ title: err.detail || err.message || '购买失败', icon: 'none' })
+      wx.showToast({ title: formatRequestError(err) || '购买失败', icon: 'none' })
     } finally {
       this.setData({ buying: false })
     }

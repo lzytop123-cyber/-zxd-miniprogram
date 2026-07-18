@@ -9,7 +9,26 @@ function getErrorMessage(res) {
     if (item.loc && item.loc.includes('code')) return '请输入券码'
     return item.msg || '请求参数错误'
   }
-  return data.message || `请求失败(${res.statusCode})`
+  if (data.detail && typeof data.detail === 'object') {
+    try {
+      return JSON.stringify(data.detail)
+    } catch (e) {
+      return '请求失败'
+    }
+  }
+  if (typeof data.message === 'string' && data.message) return data.message
+  return `请求失败(${res.statusCode})`
+}
+
+function toRequestError(payload, fallback) {
+  const msg = formatRequestError(payload) || fallback || '请求失败'
+  const err = new Error(msg)
+  if (payload && typeof payload === 'object') {
+    err.detail = typeof payload.detail === 'string' ? payload.detail : msg
+    err.statusCode = payload.statusCode
+    err.code = payload.code
+  }
+  return err
 }
 
 let _redirectingToLogin = false
@@ -89,24 +108,25 @@ function rawRequest({ url, method = 'GET', data, silent = false, retries }) {
         if (res.statusCode === 401) {
           handleUnauthorized()
           const msg = getErrorMessage(res)
-          reject({ ...(res.data || {}), detail: msg, statusCode: 401 })
+          reject(toRequestError({ ...(res.data || {}), detail: msg, statusCode: 401 }, msg))
           return
         }
         if (res.statusCode >= 400) {
           const msg = getErrorMessage(res)
           if (!silent) {
-            wx.showToast({ title: msg, icon: 'none', duration: 2500 })
+            wx.showToast({ title: String(msg).slice(0, 40), icon: 'none', duration: 2500 })
           }
-          reject({ ...(res.data || {}), detail: msg })
+          reject(toRequestError({ ...(res.data || {}), detail: msg, statusCode: res.statusCode }, msg))
           return
         }
-        if (res.data.code === 0) {
+        if (res.data && res.data.code === 0) {
           resolve(res.data.data)
         } else {
+          const msg = (res.data && res.data.message) || '请求失败'
           if (!silent) {
-            wx.showToast({ title: res.data.message || '请求失败', icon: 'none' })
+            wx.showToast({ title: String(msg).slice(0, 40), icon: 'none' })
           }
-          reject(res.data)
+          reject(toRequestError(res.data || { message: msg }, msg))
         }
       },
       fail(err) {
@@ -114,10 +134,11 @@ function rawRequest({ url, method = 'GET', data, silent = false, retries }) {
           resolve(rawRequest({ url, method, data, silent, retries: maxRetries - 1 }))
           return
         }
+        const msg = (err && (err.errMsg || err.message)) || '网络异常，请稍后重试'
         if (!silent) {
           wx.showToast({ title: '网络异常，请稍后重试', icon: 'none' })
         }
-        reject(err)
+        reject(toRequestError({ message: msg, errMsg: msg }, msg))
       },
     })
   })
@@ -146,8 +167,19 @@ function invalidateCache(match) {
 
 function formatRequestError(err) {
   if (!err) return '请求失败'
+  if (typeof err === 'string') return err
   if (typeof err.detail === 'string') return err.detail
-  if (typeof err.message === 'string' && err.message) return err.message
+  if (typeof err.message === 'string' && err.message && err.message !== '[object Object]') {
+    return err.message
+  }
+  if (typeof err.errMsg === 'string' && err.errMsg) return err.errMsg
+  if (err.detail && typeof err.detail === 'object') {
+    try {
+      return JSON.stringify(err.detail)
+    } catch (e) {
+      return '请求失败'
+    }
+  }
   return '请求失败'
 }
 
