@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 
-from sqlalchemy import inspect, text
+from sqlalchemy import inspect, select, text
 from sqlalchemy.orm import Session
 
 from app.db.session import engine
@@ -104,12 +104,35 @@ def run_schema_migrations(db: Session) -> dict:
             if not ("duplicate" in msg or "already exists" in msg or "exists" in msg):
                 errors.append(f"{idx_name}: {exc.__class__.__name__}")
 
+    seat_backfill = 0
+    try:
+        from app.models import Seat, Store
+        from app.services.seat_setup import ensure_store_seats
+
+        if inspector.has_table("stores") and inspector.has_table("seats"):
+            for store in db.scalars(select(Store)).all():
+                has_seat_28 = db.scalar(
+                    select(Seat.id).where(
+                        Seat.store_id == store.id,
+                        Seat.seat_code == "28",
+                        Seat.is_buffer == 0,
+                    )
+                )
+                if has_seat_28 is None:
+                    seat_backfill += ensure_store_seats(db, store)
+            if seat_backfill:
+                db.commit()
+    except Exception as exc:
+        db.rollback()
+        errors.append(f"backfill seats: {exc.__class__.__name__}")
+
     _last_result = {
         "status": "ok" if not errors else "partial",
         "dialect": dialect,
         "applied": applied,
         "backfill_hours": backfill_hours,
         "created_tables": created_tables,
+        "seat_backfill": seat_backfill,
         "errors": errors,
     }
     if applied or backfill_hours:

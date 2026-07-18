@@ -1,4 +1,4 @@
-"""门店标准座位布局：平面图 1–27 号，三区（标准 / 工位 / 沉浸）。"""
+"""门店标准座位布局：平面图 1–28 号，三区（标准 / 工位 / 沉浸）。"""
 
 from __future__ import annotations
 
@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 
 from app.models import Seat, Store, Zone
 
-PLAN_SEAT_COUNT = 27
+PLAN_SEAT_COUNT = 28
 
 # slot, zone_name, seat_type, has_curtain, left%, top%（与 miniprogram/utils/seat-layout.js 一致）
 SEAT_LAYOUT: list[tuple[int, str, str, int, float, float]] = [
@@ -38,6 +38,7 @@ SEAT_LAYOUT: list[tuple[int, str, str, int, float, float]] = [
     (25, "沉浸区", "standard", 1, 10.26, 85.5),
     (26, "沉浸区", "standard", 1, 10.26, 73.5),
     (27, "沉浸区", "standard", 1, 10.26, 61.5),
+    (28, "沉浸区", "standard", 1, 28.68, 85.5),
 ]
 
 ZONE_ORDER = {"标准区": 0, "工位区": 1, "沉浸区": 2}
@@ -92,7 +93,7 @@ def _sort_seats(seats: list[Seat]) -> list[Seat]:
 
 
 def ensure_store_seats(db: Session, store: Store) -> int:
-    """补全门店 1–27 号座位（已有则同步区域与坐标）。"""
+    """补全门店 1–28 号座位（已有则同步区域与坐标）。"""
     zones: dict[str, Zone] = {}
     for zone_name in ZONE_ORDER:
         zone = db.scalar(select(Zone).where(Zone.store_id == store.id, Zone.name == zone_name))
@@ -144,7 +145,7 @@ def ensure_store_seats(db: Session, store: Store) -> int:
 
 
 def migrate_store_seat_codes(db: Session, store: Store) -> dict:
-    """将历史 A01/B08 等编号迁移为 1–27，并补全缺失座位。"""
+    """将历史 A01/B08 等编号迁移为 1–28，并补全缺失座位。"""
     seats = list(
         db.scalars(select(Seat).where(Seat.store_id == store.id, Seat.is_buffer == 0)).all()
     )
