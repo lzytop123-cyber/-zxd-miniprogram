@@ -53,9 +53,7 @@
       </el-table-column>
       <el-table-column prop="total_points" label="积分" width="80" />
       <el-table-column prop="invite_code" label="邀请码" width="100" />
-      <el-table-column label="注册时间" width="170">
-        <template #default="{ row }">{{ formatDateTime(row.created_at) }}</template>
-      </el-table-column>
+      <el-table-column prop="created_at" label="注册时间" width="170" />
       <el-table-column label="操作" width="200" fixed="right">
         <template #default="{ row }">
           <el-button link type="primary" @click.stop="openDetail(row, 'balance')">编辑</el-button>
@@ -169,9 +167,7 @@
               <el-table-column prop="coupon_code" label="券码" width="120" />
               <el-table-column prop="deal_name" label="团购" min-width="140" />
               <el-table-column prop="status" label="状态" width="90" />
-              <el-table-column label="时间" min-width="140">
-                <template #default="{ row }">{{ formatDateTime(row.created_at) }}</template>
-              </el-table-column>
+              <el-table-column prop="created_at" label="时间" min-width="140" />
             </el-table>
           </el-tab-pane>
 
@@ -180,9 +176,7 @@
               <el-table-column prop="type" label="类型" width="80" />
               <el-table-column prop="amount" label="金额" width="80" />
               <el-table-column prop="remark" label="备注" min-width="140" />
-              <el-table-column label="时间" min-width="140">
-                <template #default="{ row }">{{ formatDateTime(row.created_at) }}</template>
-              </el-table-column>
+              <el-table-column prop="created_at" label="时间" min-width="140" />
             </el-table>
           </el-tab-pane>
         </el-tabs>
@@ -197,7 +191,6 @@ import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import http from '../api/http'
 import { parsePageResult } from '../utils/pageData'
-import { formatDateTime } from '../utils/datetime'
 
 const router = useRouter()
 

@@ -1,4 +1,5 @@
 import axios from 'axios'
+import { transformResponseTimes } from '../utils/datetime'
 
 const baseURL = import.meta.env.VITE_API_BASE || '/api'
 
@@ -21,13 +22,12 @@ http.interceptors.response.use(
     if (data.code !== 0) {
       return Promise.reject(new Error(data.message || '请求失败'))
     }
-    // 解包：返回 res.data（{code, message, data}），不是 AxiosResponse
-    return data as any
+    // 解包，并把时间统一成北京时间可读格式
+    return transformResponseTimes(data) as any
   },
   (err) => Promise.reject(err)
 )
 
-// 告知 TS：所有方法返回的是 UnwrappedResponse
 type UnwrappedResponse<T = any> = { code: number; message: string; data: T }
 
 const api = {

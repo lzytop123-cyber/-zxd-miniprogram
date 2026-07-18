@@ -88,6 +88,7 @@ import { onMounted, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import type { UploadRequestOptions } from 'element-plus'
 import http from '../api/http'
+import { formatDateTime } from '../utils/datetime'
 
 type KnowledgeDoc = {
   id: string
@@ -125,12 +126,7 @@ function sourceLabel(source: string) {
 }
 
 function formatTime(value?: string) {
-  if (!value) return '-'
-  try {
-    return new Date(value).toLocaleString()
-  } catch {
-    return value
-  }
+  return formatDateTime(value)
 }
 
 async function load() {
