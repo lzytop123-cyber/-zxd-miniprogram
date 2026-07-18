@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 from app.api.deps import get_optional_user
 from app.api.routes.store import _store_list_item
 from app.api.routes.user import _to_profile
+from app.core.config import settings
 from app.db.session import get_db
 from app.core.static_url import public_static_url
 from app.models import HomeBanner, HomeCarouselSetting, PeriodCard, Store, SystemAnnouncement, User
@@ -188,5 +189,8 @@ def get_home_bootstrap(
             "stores": _list_stores(db, latitude, longitude),
             "user": profile,
             "card_count": _active_card_count(db, user) if user else 0,
+            "features": {
+                "study_assistant": settings.feature_study_assistant,
+            },
         }
     )

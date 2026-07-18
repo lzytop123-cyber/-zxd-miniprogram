@@ -3,6 +3,7 @@ const auth = require('../../utils/auth')
 const { normalizeUser } = require('../../utils/user')
 const routes = require('../../utils/routes')
 const { handleTabScroll } = require('../../utils/tabbar')
+const { syncTabBar, setFeatures } = require('../../utils/features')
 const TAB_PAGES = [
   '/pages/home/index',
   '/pages/packages/index',
@@ -51,9 +52,7 @@ Page({
   },
 
   onShow() {
-    if (typeof this.getTabBar === 'function' && this.getTabBar()) {
-      this.getTabBar().setData({ selected: 0, collapsed: false })
-    }
+    syncTabBar(this, '/pages/home/index')
     this._tabbarLastTop = 0
     this.refreshHome({ silent: true })
   },
@@ -154,6 +153,11 @@ Page({
 
     const applyBootstrap = async (data, hint = '') => {
       if (token !== this._storeFetchToken) return
+
+      if (data.features) {
+        setFeatures(data.features)
+        syncTabBar(this, '/pages/home/index')
+      }
 
       this._applyAnnouncementPopup(data.announcements?.items || [])
 

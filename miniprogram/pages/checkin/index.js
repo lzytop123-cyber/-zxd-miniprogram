@@ -2,6 +2,7 @@ const { request } = require('../../utils/request')
 const auth = require('../../utils/auth')
 const routes = require('../../utils/routes')
 const { handleTabScroll } = require('../../utils/tabbar')
+const { syncTabBar } = require('../../utils/features')
 const {
   computeCanOpen,
   getOpenWindowHint,
@@ -102,9 +103,7 @@ Page({
   },
 
   onShow() {
-    if (typeof this.getTabBar === 'function' && this.getTabBar()) {
-      this.getTabBar().setData({ selected: 2, collapsed: false })
-    }
+    syncTabBar(this, '/pages/checkin/index')
     this._tabbarLastTop = 0
     const pluginState = detectPlugin()
     const runtimeAppId = getRuntimeAppId()

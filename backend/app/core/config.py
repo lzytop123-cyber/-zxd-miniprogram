@@ -17,7 +17,11 @@ class Settings(BaseSettings):
     base_url: str = "http://localhost:8000"
     # 小程序/商户审核中：生产环境仍允许 dev 登录与 mock 支付（未配置 WX 凭证时）
     pre_wechat_launch: bool = False
-
+    # 小程序「学习助手」Tab：审核期可置 false 隐藏，通过后改 true 并重启后端（不必重传小程序）
+    feature_study_assistant: bool = Field(
+        default=True,
+        validation_alias=AliasChoices("FEATURE_STUDY_ASSISTANT", "feature_study_assistant"),
+    )
     # 允许的跨域来源：逗号分隔；为 "*" 时开发环境放开（生产应配置白名单）
     cors_origins: str = "*"
 

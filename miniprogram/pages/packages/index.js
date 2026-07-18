@@ -3,6 +3,7 @@ const { request, invalidateCache, formatRequestError } = require('../../utils/re
 const routes = require('../../utils/routes')
 const { completeWechatPay, ensureCardPurchasePaid } = require('../../utils/pay')
 const { handleTabScroll } = require('../../utils/tabbar')
+const { syncTabBar } = require('../../utils/features')
 const {
   PKG_CATEGORY_TABS,
   formatCard,
@@ -36,9 +37,7 @@ Page({
   },
 
   onShow() {
-    if (typeof this.getTabBar === 'function' && this.getTabBar()) {
-      this.getTabBar().setData({ selected: 1, collapsed: false })
-    }
+    syncTabBar(this, '/pages/packages/index')
     this._tabbarLastTop = 0
     this.setData({ loggedIn: auth.isLoggedIn() })
     this.refreshPage({ silent: true })

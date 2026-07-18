@@ -3,6 +3,7 @@ const { request } = require('../../utils/request')
 const { normalizeUser, pickAvatarDisplay } = require('../../utils/user')
 const routes = require('../../utils/routes')
 const { handleTabScroll } = require('../../utils/tabbar')
+const { syncTabBar } = require('../../utils/features')
 
 const GOAL_OPTIONS = [
   { value: 'kaoyan', label: '考研' },
@@ -28,9 +29,7 @@ Page({
   },
 
   onShow() {
-    if (typeof this.getTabBar === 'function' && this.getTabBar()) {
-      this.getTabBar().setData({ selected: 4, collapsed: false })
-    }
+    syncTabBar(this, '/pages/profile/index')
     this._tabbarLastTop = 0
     this.bootstrap({ silent: true })
   },

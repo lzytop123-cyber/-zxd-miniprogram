@@ -2,13 +2,19 @@ Component({
   data: {
     selected: 0,
     collapsed: false,
-    list: [
-      { pagePath: '/pages/home/index', text: '首页', icon: '/assets/tab-home.png', selectedIcon: '/assets/tab-home-active.png' },
-      { pagePath: '/pages/packages/index', text: '套餐', icon: '/assets/tab-packages.png', selectedIcon: '/assets/tab-packages-active.png' },
-      { pagePath: '/pages/checkin/index', text: '入座', icon: '/assets/tab-checkin.png', selectedIcon: '/assets/tab-checkin-active.png' },
-      { pagePath: '/pages/report/index', text: '学习助手', icon: '/assets/tab-report.png', selectedIcon: '/assets/tab-report-active.png' },
-      { pagePath: '/pages/profile/index', text: '我的', icon: '/assets/tab-profile.png', selectedIcon: '/assets/tab-profile-active.png' },
-    ],
+    list: [],
+  },
+  lifetimes: {
+    attached() {
+      const { buildTabList } = require('../utils/features')
+      this.setData({ list: buildTabList() })
+    },
+  },
+  pageLifetimes: {
+    show() {
+      const { buildTabList } = require('../utils/features')
+      this.setData({ list: buildTabList() })
+    },
   },
   methods: {
     onTap(e) {

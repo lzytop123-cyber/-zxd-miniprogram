@@ -8,6 +8,7 @@ App({
     loginError: '',
     loginPromise: null,
     packagesTab: null,
+    features: null,
   },
 
   onLaunch() {

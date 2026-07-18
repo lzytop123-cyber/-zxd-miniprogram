@@ -1,5 +1,6 @@
 const { request } = require('../../utils/request')
 const { handleTabScroll } = require('../../utils/tabbar')
+const { syncTabBar, isStudyAssistantEnabled } = require('../../utils/features')
 
 Page({
   data: {
@@ -24,9 +25,8 @@ Page({
   },
 
   onShow() {
-    if (typeof this.getTabBar === 'function' && this.getTabBar()) {
-      this.getTabBar().setData({ selected: 3, collapsed: false })
-    }
+    syncTabBar(this, '/pages/report/index')
+    if (!isStudyAssistantEnabled()) return
     this._tabbarLastTop = 0
     this.load({ silent: true })
     if (this.data.tab === 'assistant' && !this.data.introLoaded) {
