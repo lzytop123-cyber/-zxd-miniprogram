@@ -3,6 +3,7 @@ const auth = require('../../utils/auth')
 const routes = require('../../utils/routes')
 const { handleTabScroll } = require('../../utils/tabbar')
 const { syncTabBar } = require('../../utils/features')
+const { enableShareMenu, shareAppMessage, shareTimeline } = require('../../utils/share')
 const {
   computeCanOpen,
   getOpenWindowHint,
@@ -102,7 +103,16 @@ Page({
     lastOpenError: '',
   },
 
+  onShareAppMessage() {
+    return shareAppMessage({ title: '知行岛自习空间 · 入座开门' })
+  },
+
+  onShareTimeline() {
+    return shareTimeline({ title: '知行岛自习空间 · 入座开门' })
+  },
+
   onShow() {
+    enableShareMenu()
     syncTabBar(this, '/pages/checkin/index')
     this._tabbarLastTop = 0
     const pluginState = detectPlugin()

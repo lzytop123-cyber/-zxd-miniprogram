@@ -1,4 +1,12 @@
 const { request } = require('../../../utils/request')
+const {
+  enableShareMenu,
+  shareAppMessage,
+  shareTimeline,
+  peekPendingInvite,
+  clearPendingInvite,
+  HOME_PATH,
+} = require('../../../utils/share')
 
 Page({
   data: {
@@ -7,11 +15,32 @@ Page({
   },
 
   onShow() {
+    enableShareMenu()
+    const pending = peekPendingInvite()
+    if (pending && !this.data.inputCode) {
+      this.setData({ inputCode: pending })
+    }
     this.loadInvite({ silent: true })
   },
 
   onPullDownRefresh() {
     this.loadInvite({ force: true }).finally(() => wx.stopPullDownRefresh())
+  },
+
+  onShareAppMessage() {
+    const code = this.data.inviteCode || ''
+    return shareAppMessage({
+      title: '送你知行岛自习室邀请福利',
+      path: code ? `${HOME_PATH}?invite=${encodeURIComponent(code)}` : HOME_PATH,
+    })
+  },
+
+  onShareTimeline() {
+    const code = this.data.inviteCode || ''
+    return shareTimeline({
+      title: '送你知行岛自习室邀请福利',
+      query: code ? `invite=${encodeURIComponent(code)}` : '',
+    })
   },
 
   loadInvite(options = {}) {
@@ -45,6 +74,7 @@ Page({
       method: 'POST',
       data: { invite_code: this.data.inputCode },
     }).then(() => {
+      clearPendingInvite()
       wx.showToast({ title: '领取成功' })
       this.setData({ inputCode: '' })
     })

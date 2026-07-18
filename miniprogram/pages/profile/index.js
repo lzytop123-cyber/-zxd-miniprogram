@@ -4,6 +4,7 @@ const { normalizeUser, pickAvatarDisplay } = require('../../utils/user')
 const routes = require('../../utils/routes')
 const { handleTabScroll } = require('../../utils/tabbar')
 const { syncTabBar } = require('../../utils/features')
+const { enableShareMenu, shareAppMessage, shareTimeline } = require('../../utils/share')
 
 const GOAL_OPTIONS = [
   { value: 'kaoyan', label: '考研' },
@@ -28,7 +29,16 @@ Page({
     },
   },
 
+  onShareAppMessage() {
+    return shareAppMessage({ title: '知行岛自习空间' })
+  },
+
+  onShareTimeline() {
+    return shareTimeline({ title: '知行岛自习空间' })
+  },
+
   onShow() {
+    enableShareMenu()
     syncTabBar(this, '/pages/profile/index')
     this._tabbarLastTop = 0
     this.bootstrap({ silent: true })

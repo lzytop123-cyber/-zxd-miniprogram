@@ -4,6 +4,12 @@ const { normalizeUser } = require('../../utils/user')
 const routes = require('../../utils/routes')
 const { handleTabScroll } = require('../../utils/tabbar')
 const { syncTabBar, setFeatures } = require('../../utils/features')
+const {
+  enableShareMenu,
+  savePendingInvite,
+  shareAppMessage,
+  shareTimeline,
+} = require('../../utils/share')
 const TAB_PAGES = [
   '/pages/home/index',
   '/pages/packages/index',
@@ -47,14 +53,30 @@ Page({
     swiperKey: 0,
   },
 
-  onLoad() {
+  onLoad(options) {
+    enableShareMenu()
+    if (options && options.invite) savePendingInvite(options.invite)
     this._hydrateBannerCache()
   },
 
   onShow() {
+    enableShareMenu()
     syncTabBar(this, '/pages/home/index')
     this._tabbarLastTop = 0
     this.refreshHome({ silent: true })
+  },
+
+  onShareAppMessage() {
+    return shareAppMessage({
+      title: '知行岛自习空间 · 专注学习每一天',
+      path: '/pages/home/index',
+    })
+  },
+
+  onShareTimeline() {
+    return shareTimeline({
+      title: '知行岛自习空间 · 专注学习每一天',
+    })
   },
 
   onPageScroll(e) {

@@ -6,6 +6,7 @@
       <view class="copy-btn" bindtap="copyCode">复制</view>
     </view>
     <view class="hint">好友填写您的邀请码，您得 50 积分，好友得 20 积分</view>
+    <button class="btn-primary share-btn" open-type="share" disabled="{{!inviteCode}}">发给好友</button>
   </view>
 
   <view class="card">

@@ -1,1 +1,14 @@
 @import './cards.wxss';
+
+.share-btn {
+  margin-top: 24rpx;
+  width: 100%;
+  line-height: 88rpx;
+  border-radius: 16rpx;
+  font-size: 30rpx;
+  border: none;
+}
+
+.share-btn::after {
+  border: none;
+}

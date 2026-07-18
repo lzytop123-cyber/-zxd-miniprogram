@@ -1,6 +1,7 @@
 const { request } = require('../../utils/request')
 const { handleTabScroll } = require('../../utils/tabbar')
 const { syncTabBar, isStudyAssistantEnabled } = require('../../utils/features')
+const { enableShareMenu, shareAppMessage, shareTimeline } = require('../../utils/share')
 
 Page({
   data: {
@@ -24,7 +25,16 @@ Page({
     introLoaded: false,
   },
 
+  onShareAppMessage() {
+    return shareAppMessage({ title: '知行岛自习空间 · 学习助手' })
+  },
+
+  onShareTimeline() {
+    return shareTimeline({ title: '知行岛自习空间 · 学习助手' })
+  },
+
   onShow() {
+    enableShareMenu()
     syncTabBar(this, '/pages/report/index')
     if (!isStudyAssistantEnabled()) return
     this._tabbarLastTop = 0

@@ -4,6 +4,7 @@ const routes = require('../../utils/routes')
 const { completeWechatPay, ensureCardPurchasePaid } = require('../../utils/pay')
 const { handleTabScroll } = require('../../utils/tabbar')
 const { syncTabBar } = require('../../utils/features')
+const { enableShareMenu, shareAppMessage, shareTimeline } = require('../../utils/share')
 const {
   PKG_CATEGORY_TABS,
   formatCard,
@@ -36,7 +37,16 @@ Page({
     buyLoaded: false,
   },
 
+  onShareAppMessage() {
+    return shareAppMessage({ title: '知行岛自习空间 · 套餐选购' })
+  },
+
+  onShareTimeline() {
+    return shareTimeline({ title: '知行岛自习空间 · 套餐选购' })
+  },
+
   onShow() {
+    enableShareMenu()
     syncTabBar(this, '/pages/packages/index')
     this._tabbarLastTop = 0
     this.setData({ loggedIn: auth.isLoggedIn() })
