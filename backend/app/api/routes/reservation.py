@@ -11,7 +11,7 @@ from app.api.deps import get_current_user
 from app.core.prod import block_mock_in_production
 from app.core.redis_client import RedisLock
 from app.db.session import get_db
-from app.models import BillType, Coupon, PayType, PeriodCard, Reservation, Seat, Store, User
+from app.models import BillType, Coupon, PayType, PeriodCard, PricingRule, Reservation, Seat, Store, User
 from app.schemas.common import ResponseModel
 from app.schemas.reservation import (
     ReservationCreateRequest,
@@ -64,12 +64,25 @@ def _seat_lock(seat_id: int) -> RedisLock:
 
 
 def _prepare_booking(db: Session, body, require_seat: bool = False):
-    """统一计算预约时段、价格、座位。"""
+    """统一计算预约时段、价格、座位。
+
+    夜读（bill_type=night）不售单次票，仅持晚自习月卡预约：无 night 价格规则时
+    预览/下单价格为 0，支付阶段须用期限卡。
+    """
     rule = None
     try:
         _, rule = calc_price(db, body.store_id, body.bill_type, Decimal("1"))
     except ValueError:
-        pass
+        if body.bill_type == BillType.night:
+            rule = db.scalar(
+                select(PricingRule).where(
+                    PricingRule.store_id == body.store_id,
+                    PricingRule.bill_type == BillType.night_monthly,
+                    PricingRule.is_active == 1,
+                )
+            )
+        else:
+            pass
     try:
         start, end = resolve_booking_window(body.bill_type, body.start_time, body.end_time, rule)
     except ValueError as e:
@@ -97,7 +110,11 @@ def _prepare_booking(db: Session, body, require_seat: bool = False):
     try:
         price, _ = calc_price(db, body.store_id, body.bill_type, duration)
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        if body.bill_type == BillType.night:
+            # 无单次夜读售价：持卡预约，金额在支付时用期限卡抵扣
+            price = Decimal("0.00")
+        else:
+            raise HTTPException(status_code=400, detail=str(e))
     return start, end, duration, seat, price
 
 
@@ -317,6 +334,18 @@ async def pay(
         raise HTTPException(status_code=400, detail="订单已支付")
 
     _assert_seat_available_for_pay(db, reservation)
+
+    # 夜读不售单次票：无 night 价格时只能用晚自习月卡支付
+    if reservation.bill_type == BillType.night and body.pay_type != PayType.period_card:
+        has_night_price = db.scalar(
+            select(PricingRule.id).where(
+                PricingRule.store_id == reservation.store_id,
+                PricingRule.bill_type == BillType.night,
+                PricingRule.is_active == 1,
+            )
+        )
+        if not has_night_price:
+            raise HTTPException(status_code=400, detail="夜读请使用晚自习月卡预约支付")
 
     if body.pay_type == PayType.period_card:
         if not body.period_card_id:

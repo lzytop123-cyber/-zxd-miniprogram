@@ -158,11 +158,7 @@ def seed():
             db.add(store)
             db.flush()
 
-            zone_a = Zone(store_id=store.id, name="A区", type="standard", sort_order=0)
-            zone_b = Zone(store_id=store.id, name="B区", type="window", sort_order=1)
-            db.add_all([zone_a, zone_b])
-            db.flush()
-
+            # 区域与 1–28 座位由 ensure_store_seats 统一创建（标准区/沉浸区）
             ensure_store_seats(db, store)
 
             pricing = [
@@ -205,23 +201,13 @@ def seed():
                 ),
                 PricingRule(
                     store_id=store.id,
-                    bill_type=BillType.night,
-                    seat_type="standard",
-                    price=Decimal("39.00"),
-                    night_start=time(18, 0),
-                    night_end=time(0, 0),
-                    remark="单次夜读票",
-                    sort_order=4,
-                ),
-                PricingRule(
-                    store_id=store.id,
                     bill_type=BillType.night_monthly,
                     seat_type="standard",
                     price=Decimal("198.00"),
                     night_start=time(18, 0),
-                    night_end=time(23, 59, 59),
+                    night_end=time(23, 30),
                     valid_days=30,
-                    remark="晚自习月卡",
+                    remark="晚自习月卡·工作日18:00-23:30·周六日全天",
                     sort_order=5,
                 ),
             ]
@@ -261,6 +247,28 @@ def seed():
                 print("Added session pricing rule.")
             if _ensure_quarterly_pricing(db, store):
                 print("Added quarterly pricing rule.")
+
+            # 不售单次夜读票：停用遗留 night 规则
+            for row in db.scalars(
+                select(PricingRule).where(
+                    PricingRule.store_id == store.id,
+                    PricingRule.bill_type == BillType.night,
+                )
+            ).all():
+                row.is_active = 0
+
+            # 夜读月卡说明与时段对齐
+            nm = db.scalar(
+                select(PricingRule).where(
+                    PricingRule.store_id == store.id,
+                    PricingRule.bill_type == BillType.night_monthly,
+                )
+            )
+            if nm:
+                nm.night_start = time(18, 0)
+                nm.night_end = time(23, 30)
+                if not nm.remark or "晚自习" in (nm.remark or ""):
+                    nm.remark = "晚自习月卡·工作日18:00-23:30·周六日全天"
 
         if store and not db.scalar(select(MeituanDealMapping).limit(1)):
             mappings = [

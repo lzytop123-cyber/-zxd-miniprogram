@@ -112,10 +112,18 @@ def ensure_store_seats(db: Session, store: Store) -> int:
             zone.type = "standard"
         zones[zone_name] = zone
 
-    existing = {
-        s.seat_code: s
-        for s in db.scalars(select(Seat).where(Seat.store_id == store.id, Seat.is_buffer == 0)).all()
-    }
+    all_seats = list(
+        db.scalars(select(Seat).where(Seat.store_id == store.id, Seat.is_buffer == 0)).all()
+    )
+    # 同号多条时只保留 id 最小的一条，其余停用（避免可订数翻倍）
+    existing: dict[str, Seat] = {}
+    for seat in sorted(all_seats, key=lambda s: s.id or 0):
+        code = seat.seat_code
+        if code in existing:
+            seat.status = 0
+            continue
+        existing[code] = seat
+
     added = 0
     expected = set(expected_seat_codes())
 
