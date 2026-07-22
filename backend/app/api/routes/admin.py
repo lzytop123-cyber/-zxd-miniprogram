@@ -48,6 +48,7 @@ from app.services import knowledge_rag
 from app.services.admin_ops import (
     admin_force_checkout,
     admin_remote_unlock,
+    delete_user_cascade,
     issue_admin_period_card,
     period_card_admin_dict,
     update_admin_period_card,
@@ -1177,6 +1178,25 @@ def update_user_study_goal(
     db.commit()
     db.refresh(user)
     return ResponseModel(message="备考方向已更新", data=_user_admin_item(user))
+
+
+@router.delete("/users/{user_id}", response_model=ResponseModel)
+def delete_user_admin(
+    user_id: int,
+    _: object = Depends(get_current_admin),
+    db: Session = Depends(get_db),
+):
+    """永久删除用户及预约/卡券/流水等关联数据（团购核销记录保留，仅解绑用户）。"""
+    try:
+        summary = delete_user_cascade(db, user_id)
+        db.commit()
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e)) from e
+    except Exception:
+        db.rollback()
+        logging.getLogger(__name__).exception("delete user %s failed", user_id)
+        raise HTTPException(status_code=500, detail="删除用户失败，请稍后重试") from None
+    return ResponseModel(message="用户已删除", data=summary)
 
 
 @router.get("/period-cards", response_model=ResponseModel)

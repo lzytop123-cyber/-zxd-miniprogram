@@ -54,11 +54,12 @@
       <el-table-column prop="total_points" label="积分" width="80" />
       <el-table-column prop="invite_code" label="邀请码" width="100" />
       <el-table-column prop="created_at" label="注册时间" width="170" />
-      <el-table-column label="操作" width="200" fixed="right">
+      <el-table-column label="操作" width="240" fixed="right">
         <template #default="{ row }">
           <el-button link type="primary" @click.stop="openDetail(row, 'balance')">编辑</el-button>
           <el-button link type="success" @click.stop="openDetail(row, 'balance')">余额</el-button>
           <el-button link @click.stop="openDetail(row, 'orders')">详情</el-button>
+          <el-button link type="danger" @click.stop="removeUser(row)">删除</el-button>
         </template>
       </el-table-column>
     </el-table>
@@ -122,6 +123,12 @@
               <el-option label="其他" value="other" />
             </el-select>
             <el-button type="primary" link style="margin-left:8px" @click="saveStudyGoal">保存</el-button>
+
+            <div class="danger-zone">
+              <div class="section-title">危险操作</div>
+              <p class="hint">删除后不可恢复，将一并清除该用户的预约、期限卡、余额/积分流水等。</p>
+              <el-button type="danger" :loading="deleting" @click="removeUser(detail)">删除该用户</el-button>
+            </div>
           </el-tab-pane>
 
           <el-tab-pane label="订单" name="orders">
@@ -188,7 +195,7 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import http from '../api/http'
 import { parsePageResult } from '../utils/pageData'
 
@@ -196,6 +203,7 @@ const router = useRouter()
 
 const list = ref<any[]>([])
 const loading = ref(false)
+const deleting = ref(false)
 const page = ref(1)
 const total = ref(0)
 const keyword = ref('')
@@ -319,6 +327,34 @@ async function adjustPoints() {
   load()
 }
 
+async function removeUser(row: any) {
+  if (!row?.id || deleting.value) return
+  try {
+    await ElMessageBox.confirm(
+      `确定永久删除用户「${row.nickname || row.id}」（学号 #${row.id}）吗？\n将同时删除其预约、期限卡、余额/积分流水等，不可恢复。`,
+      '删除用户',
+      { type: 'warning', confirmButtonText: '确认删除', cancelButtonText: '取消' },
+    )
+  } catch {
+    return
+  }
+  deleting.value = true
+  try {
+    await http.delete(`/admin/users/${row.id}`)
+    ElMessage.success('用户已删除')
+    if (detail.value?.id === row.id) {
+      showDetail.value = false
+      detail.value = null
+    }
+    await loadStats()
+    await load()
+  } catch (e: any) {
+    ElMessage.error(e?.message || '删除失败')
+  } finally {
+    deleting.value = false
+  }
+}
+
 onMounted(async () => {
   await loadStats()
   await load()
@@ -345,4 +381,9 @@ onMounted(async () => {
 .detail-tabs { margin-top: 16px; }
 .tab-actions { margin-bottom: 12px; }
 .hint { font-size: 12px; color: #999; margin-top: 8px; }
+.danger-zone {
+  margin-top: 28px;
+  padding-top: 8px;
+  border-top: 1px dashed #f0a0a0;
+}
 </style>

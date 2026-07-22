@@ -7,23 +7,29 @@ from datetime import date, datetime, timedelta
 from decimal import Decimal
 from types import SimpleNamespace
 
-from sqlalchemy import select
+from sqlalchemy import delete, select, update
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.models import (
     BleKey,
     BleLock,
+    CardPurchaseOrder,
     CardSource,
     CardType,
+    Coupon,
     DoorLog,
     MeituanOrder,
     OpenType,
     PeriodCard,
+    PointLog,
+    RechargeOrder,
     Reservation,
     RewardType,
+    StudyStat,
     User,
     WalletLog,
+    WechatSubscription,
 )
 from app.services.booking import auto_checkin_reservation, record_study_on_checkout, reservation_unlock_allowed
 from app.services.business import TTLockService
@@ -281,3 +287,61 @@ def user_overview(db: Session, user_id: int) -> dict:
         ],
         "ttlock_configured": bool(settings.ttlock_client_id and settings.ttlock_client_secret),
     }
+
+
+def delete_user_cascade(db: Session, user_id: int) -> dict:
+    """永久删除用户及其关联业务数据。返回被删用户摘要。"""
+    user = db.get(User, user_id)
+    if not user:
+        raise ValueError("用户不存在")
+
+    summary = {
+        "id": user.id,
+        "nickname": user.nickname,
+        "phone": user.phone,
+        "openid": user.openid,
+    }
+
+    reservation_ids = list(
+        db.scalars(select(Reservation.id).where(Reservation.user_id == user_id)).all()
+    )
+
+    # 解除其他用户「被此人邀请」的引用
+    db.execute(update(User).where(User.invited_by == user_id).values(invited_by=None))
+
+    if reservation_ids:
+        db.execute(delete(BleKey).where(BleKey.reservation_id.in_(reservation_ids)))
+        db.execute(
+            update(DoorLog)
+            .where(DoorLog.reservation_id.in_(reservation_ids))
+            .values(reservation_id=None, user_id=None)
+        )
+
+    db.execute(delete(BleKey).where(BleKey.user_id == user_id))
+    db.execute(update(DoorLog).where(DoorLog.user_id == user_id).values(user_id=None))
+
+    # 预约可能引用期限卡，先断开再删预约
+    db.execute(
+        update(Reservation).where(Reservation.user_id == user_id).values(period_card_id=None)
+    )
+    db.execute(delete(Reservation).where(Reservation.user_id == user_id))
+
+    # 购卡订单可能引用期限卡
+    db.execute(
+        update(CardPurchaseOrder)
+        .where(CardPurchaseOrder.user_id == user_id)
+        .values(period_card_id=None)
+    )
+    db.execute(delete(CardPurchaseOrder).where(CardPurchaseOrder.user_id == user_id))
+    db.execute(delete(PeriodCard).where(PeriodCard.user_id == user_id))
+
+    db.execute(delete(RechargeOrder).where(RechargeOrder.user_id == user_id))
+    db.execute(delete(Coupon).where(Coupon.user_id == user_id))
+    db.execute(delete(WalletLog).where(WalletLog.user_id == user_id))
+    db.execute(delete(PointLog).where(PointLog.user_id == user_id))
+    db.execute(delete(StudyStat).where(StudyStat.user_id == user_id))
+    db.execute(delete(WechatSubscription).where(WechatSubscription.user_id == user_id))
+    db.execute(update(MeituanOrder).where(MeituanOrder.user_id == user_id).values(user_id=None))
+
+    db.delete(user)
+    return summary
