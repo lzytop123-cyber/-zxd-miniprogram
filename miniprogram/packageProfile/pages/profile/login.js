@@ -130,11 +130,6 @@ Page({
     this.setData({ step: 'welcome', phoneLogging: false, loginError: '' })
   },
 
-  onSkipSetup() {
-    // 资料可稍后完善，不得卡住审核员/用户
-    auth.finishLoginRedirect(this.data.redirect)
-  },
-
   async onPhoneLogin(e) {
     if (!this.data.agreed) {
       this.onNeedAgree()
@@ -223,32 +218,10 @@ Page({
   async onChooseAvatar(e) {
     const avatarUrl = e?.detail?.avatarUrl
     if (!avatarUrl) {
-      wx.showToast({ title: '未获取到头像，请用相册上传', icon: 'none' })
+      wx.showToast({ title: '未获取到头像，请重试', icon: 'none' })
       return
     }
     await this._uploadAvatarFile(avatarUrl)
-  },
-
-  pickAvatarFromAlbum() {
-    if (this.data.avatarUploading) return
-    wx.chooseMedia({
-      count: 1,
-      mediaType: ['image'],
-      sourceType: ['album', 'camera'],
-      success: (res) => {
-        const path = res.tempFiles && res.tempFiles[0] && res.tempFiles[0].tempFilePath
-        if (!path) {
-          wx.showToast({ title: '未选择图片', icon: 'none' })
-          return
-        }
-        this._uploadAvatarFile(path)
-      },
-      fail: (err) => {
-        const msg = String(err?.errMsg || '')
-        if (msg.includes('cancel') || msg.includes('deny')) return
-        wx.showToast({ title: '选择图片失败', icon: 'none' })
-      },
-    })
   },
 
   async _uploadAvatarFile(avatarUrl) {
@@ -266,7 +239,6 @@ Page({
       })
       wx.showToast({ title: '头像已同步', icon: 'success' })
     } catch (err) {
-      // 上传失败仍保留本地预览，保存资料时会再传
       this.setData({ avatarDisplay: avatarUrl })
       wx.showToast({
         title: err.detail || err.message || '头像稍后随资料保存',

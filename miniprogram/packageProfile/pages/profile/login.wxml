@@ -82,9 +82,7 @@
       />
       <view wx:else class="avatar avatar-placeholder avatar-placeholder--add">+</view>
     </button>
-    <view class="avatar-tip" wx:if="{{avatarUploading}}">同步中…</view>
-    <view class="avatar-tip" wx:else bindtap="pickAvatarFromAlbum">点击上方选择微信头像，或从相册选择</view>
-    <view class="avatar-album-btn" bindtap="pickAvatarFromAlbum">从相册上传头像</view>
+    <view class="avatar-tip">{{avatarUploading ? '同步中…' : '点击选择微信头像'}}</view>
 
     <view class="nickname-field">
       <view class="field-label">昵称</view>
@@ -112,7 +110,6 @@
     </view>
 
     <view class="btn-primary setup-save" bindtap="saveProfile">开始使用</view>
-    <view class="setup-skip" bindtap="onSkipSetup">稍后再说，先逛逛</view>
     <view class="setup-note">学号 #{{user.id}}</view>
   </view>
 </view>

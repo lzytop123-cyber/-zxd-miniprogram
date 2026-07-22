@@ -23,7 +23,6 @@
         />
         <view wx:else class="avatar avatar-placeholder">岛</view>
       </button>
-      <view class="avatar-album-link" bindtap="pickAvatarFromAlbum">相册上传头像</view>
       <view class="nickname">{{user.nickname}}</view>
       <view class="title-badge">{{user.title || '小白'}}</view>
 

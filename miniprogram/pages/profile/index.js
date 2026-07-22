@@ -101,32 +101,10 @@ Page({
   async onChooseAvatar(e) {
     const avatarUrl = e?.detail?.avatarUrl
     if (!avatarUrl) {
-      wx.showToast({ title: '未获取到头像，可试相册上传', icon: 'none' })
+      wx.showToast({ title: '未获取到头像，请重试', icon: 'none' })
       return
     }
     await this._uploadAvatarFile(avatarUrl)
-  },
-
-  pickAvatarFromAlbum() {
-    if (this.data.avatarUploading) return
-    wx.chooseMedia({
-      count: 1,
-      mediaType: ['image'],
-      sourceType: ['album', 'camera'],
-      success: (res) => {
-        const path = res.tempFiles && res.tempFiles[0] && res.tempFiles[0].tempFilePath
-        if (!path) {
-          wx.showToast({ title: '未选择图片', icon: 'none' })
-          return
-        }
-        this._uploadAvatarFile(path)
-      },
-      fail: (err) => {
-        const msg = String(err?.errMsg || '')
-        if (msg.includes('cancel') || msg.includes('deny')) return
-        wx.showToast({ title: '选择图片失败', icon: 'none' })
-      },
-    })
   },
 
   async _uploadAvatarFile(avatarUrl) {
