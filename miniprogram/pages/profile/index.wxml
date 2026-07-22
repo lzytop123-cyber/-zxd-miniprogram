@@ -90,10 +90,6 @@
       <view class="menu-icon">🎁</view>
       <text>邀请有礼</text>
     </view>
-    <!-- <view class="menu-item" bindtap="go" data-url="/pages/profile/face">
-      <view class="menu-icon">👤</view>
-      <text>人脸录入</text>
-    </view> -->
     <view class="menu-item" bindtap="go" data-url="{{menuUrls.contact}}">
       <view class="menu-icon">💬</view>
       <text>联系店长</text>
