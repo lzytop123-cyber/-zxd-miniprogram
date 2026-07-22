@@ -299,6 +299,19 @@
   margin-top: 12rpx;
   font-size: 24rpx;
   color: #52B788;
+  text-align: center;
+  padding: 0 24rpx;
+  line-height: 1.5;
+}
+
+.avatar-album-btn {
+  margin: 16rpx auto 0;
+  padding: 16rpx 36rpx;
+  font-size: 26rpx;
+  color: #2D6A4F;
+  background: #E8F5E9;
+  border-radius: 999rpx;
+  display: inline-block;
 }
 
 .nickname-field,
@@ -345,8 +358,22 @@
   margin-top: 32rpx;
 }
 
+.setup-skip {
+  margin-top: 24rpx;
+  text-align: center;
+  font-size: 28rpx;
+  color: #8C9BA5;
+  padding: 16rpx;
+}
+
 .setup-note {
-  margin-top: 20rpx;
+  margin-top: 12rpx;
   font-size: 22rpx;
   color: #8C9BA5;
+}
+
+.loading-cancel {
+  margin-top: 40rpx;
+  display: block;
+  text-align: center;
 }

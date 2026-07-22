@@ -36,7 +36,10 @@ Page({
   onShow() {
     enableShareMenu()
     syncTabBar(this, '/pages/report/index')
-    if (!isStudyAssistantEnabled()) return
+    if (!isStudyAssistantEnabled()) {
+      wx.switchTab({ url: '/pages/home/index' })
+      return
+    }
     this._tabbarLastTop = 0
     this.load({ silent: true })
     if (this.data.tab === 'assistant' && !this.data.introLoaded) {

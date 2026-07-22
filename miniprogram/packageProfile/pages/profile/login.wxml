@@ -35,7 +35,7 @@
       <view wx:else class="welcome-secondary disabled" bindtap="onNeedAgree">一键快捷登录/注册</view>
 
       <view class="welcome-links">
-        <text class="welcome-skip" bindtap="onSkipLogin">暂不登录</text>
+        <text class="welcome-skip" bindtap="onSkipLogin">取消 / 暂不登录</text>
       </view>
     </view>
 
@@ -52,6 +52,7 @@
   <view class="login-loading" wx:elif="{{step === 'loading'}}">
     <view class="login-logo">岛</view>
     <view class="loading-text">正在登录...</view>
+    <view class="welcome-skip loading-cancel" bindtap="onCancelLoading">取消</view>
   </view>
 
   <view class="login-panel card" wx:elif="{{step === 'error'}}">
@@ -59,14 +60,20 @@
     <view class="login-title">登录失败</view>
     <view class="login-error" wx:if="{{loginError}}">{{loginError}}</view>
     <view class="btn-primary login-btn" bindtap="retryLogin">重试</view>
-    <view class="welcome-skip" bindtap="onSkipLogin">暂不登录</view>
+    <view class="welcome-skip" bindtap="onSkipLogin">取消 / 暂不登录</view>
   </view>
 
   <view class="setup-card card" wx:elif="{{step === 'setup' && user}}">
     <view class="setup-title">设置学员资料</view>
     <view class="setup-desc">选择头像和昵称，即可预约自习</view>
 
-    <button class="avatar-picker" hover-class="none" open-type="chooseAvatar" bindchooseavatar="onChooseAvatar">
+    <button
+      class="avatar-picker"
+      hover-class="none"
+      open-type="chooseAvatar"
+      bindchooseavatar="onChooseAvatar"
+      disabled="{{avatarUploading}}"
+    >
       <image
         wx:if="{{avatarDisplay}}"
         class="avatar"
@@ -74,8 +81,10 @@
         mode="aspectFill"
       />
       <view wx:else class="avatar avatar-placeholder avatar-placeholder--add">+</view>
-      <view class="avatar-tip">{{avatarUploading ? '同步中…' : '点击选择微信头像'}}</view>
     </button>
+    <view class="avatar-tip" wx:if="{{avatarUploading}}">同步中…</view>
+    <view class="avatar-tip" wx:else bindtap="pickAvatarFromAlbum">点击上方选择微信头像，或从相册选择</view>
+    <view class="avatar-album-btn" bindtap="pickAvatarFromAlbum">从相册上传头像</view>
 
     <view class="nickname-field">
       <view class="field-label">昵称</view>
@@ -103,6 +112,7 @@
     </view>
 
     <view class="btn-primary setup-save" bindtap="saveProfile">开始使用</view>
+    <view class="setup-skip" bindtap="onSkipSetup">稍后再说，先逛逛</view>
     <view class="setup-note">学号 #{{user.id}}</view>
   </view>
 </view>

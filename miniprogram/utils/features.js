@@ -76,12 +76,13 @@ function indexOfPath(path, list) {
 /** 页面 onShow：同步 tab 列表与选中项 */
 function syncTabBar(page, pagePath) {
   const tabBar = typeof page.getTabBar === 'function' ? page.getTabBar() : null
-  if (!tabBar) return
-
   const list = buildTabList()
   const selected = Math.max(0, indexOfPath(pagePath, list))
-  tabBar.setData({ list, selected, collapsed: false })
+  if (tabBar) {
+    tabBar.setData({ list, selected, collapsed: false })
+  }
 
+  // 关闭学习助手时：即使从首页入口/路径进入也强制回首页
   if (pagePath === '/pages/report/index' && !isStudyAssistantEnabled()) {
     wx.switchTab({ url: '/pages/home/index' })
   }

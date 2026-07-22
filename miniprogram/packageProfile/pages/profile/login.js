@@ -118,10 +118,21 @@ Page({
 
   onSkipLogin() {
     if (getCurrentPages().length > 1) {
-      wx.navigateBack({ fail: () => wx.switchTab({ url: '/pages/home/index' }) })
+      wx.navigateBack({
+        fail: () => wx.switchTab({ url: '/pages/home/index' }),
+      })
       return
     }
     wx.switchTab({ url: '/pages/home/index' })
+  },
+
+  onCancelLoading() {
+    this.setData({ step: 'welcome', phoneLogging: false, loginError: '' })
+  },
+
+  onSkipSetup() {
+    // 资料可稍后完善，不得卡住审核员/用户
+    auth.finishLoginRedirect(this.data.redirect)
   },
 
   async onPhoneLogin(e) {
@@ -132,9 +143,23 @@ Page({
     const detail = e.detail || {}
     const code = detail.code
     if (!code) {
-      const msg = detail.errMsg || ''
-      if (msg.includes('deny') || msg.includes('cancel') || detail.errno === 1400001) {
-        wx.showToast({ title: '需要授权手机号才能登录', icon: 'none' })
+      const msg = String(detail.errMsg || '')
+      const denied =
+        msg.includes('deny') ||
+        msg.includes('cancel') ||
+        msg.includes('fail') ||
+        detail.errno === 1400001
+      if (denied) {
+        // 登录规范：取消授权后须可退出，不得反复强制授权
+        wx.showModal({
+          title: '已取消授权',
+          content: '你可以先浏览门店与套餐，需要预约时再回来登录。',
+          confirmText: '先逛逛',
+          cancelText: '留在此页',
+          success: (res) => {
+            if (res.confirm) this.onSkipLogin()
+          },
+        })
         return
       }
       wx.showToast({ title: '未获取到手机号，请重试', icon: 'none' })
@@ -196,11 +221,41 @@ Page({
   },
 
   async onChooseAvatar(e) {
-    const { avatarUrl } = e.detail
+    const avatarUrl = e?.detail?.avatarUrl
+    if (!avatarUrl) {
+      wx.showToast({ title: '未获取到头像，请用相册上传', icon: 'none' })
+      return
+    }
+    await this._uploadAvatarFile(avatarUrl)
+  },
+
+  pickAvatarFromAlbum() {
+    if (this.data.avatarUploading) return
+    wx.chooseMedia({
+      count: 1,
+      mediaType: ['image'],
+      sourceType: ['album', 'camera'],
+      success: (res) => {
+        const path = res.tempFiles && res.tempFiles[0] && res.tempFiles[0].tempFilePath
+        if (!path) {
+          wx.showToast({ title: '未选择图片', icon: 'none' })
+          return
+        }
+        this._uploadAvatarFile(path)
+      },
+      fail: (err) => {
+        const msg = String(err?.errMsg || '')
+        if (msg.includes('cancel') || msg.includes('deny')) return
+        wx.showToast({ title: '选择图片失败', icon: 'none' })
+      },
+    })
+  },
+
+  async _uploadAvatarFile(avatarUrl) {
     if (!avatarUrl || this.data.avatarUploading) return
 
     this.setData({ avatarDisplay: avatarUrl, avatarUploading: true })
-    wx.showLoading({ title: '同步头像...' })
+    wx.showLoading({ title: '同步头像...', mask: true })
     try {
       const profile = await auth.uploadAvatar(avatarUrl)
       auth.syncAppUser(profile)
@@ -211,7 +266,12 @@ Page({
       })
       wx.showToast({ title: '头像已同步', icon: 'success' })
     } catch (err) {
-      wx.showToast({ title: err.detail || err.message || '头像同步失败', icon: 'none' })
+      // 上传失败仍保留本地预览，保存资料时会再传
+      this.setData({ avatarDisplay: avatarUrl })
+      wx.showToast({
+        title: err.detail || err.message || '头像稍后随资料保存',
+        icon: 'none',
+      })
     } finally {
       wx.hideLoading()
       this.setData({ avatarUploading: false })

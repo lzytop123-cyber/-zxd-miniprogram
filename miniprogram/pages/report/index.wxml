@@ -68,6 +68,7 @@
 
   <!-- ============ AI 助手 ============ -->
   <block wx:else>
+    <view class="ai-disclaimer">内容由人工智能生成，仅供参考</view>
     <scroll-view
       class="chat-scroll"
       scroll-y
@@ -78,7 +79,10 @@
       <view class="chat-inner">
         <view class="msg-row left" wx:if="{{greeting}}">
           <view class="avatar bot">岛</view>
-          <view class="bubble bot">{{greeting}}</view>
+          <view class="bubble bot">
+            <view class="ai-tag">AI生成</view>
+            <text>{{greeting}}</text>
+          </view>
         </view>
 
         <view class="suggestions" wx:if="{{suggestions.length && !messages.length}}">
@@ -97,7 +101,10 @@
           class="msg-row {{item.role === 'user' ? 'right' : 'left'}}"
         >
           <view wx:if="{{item.role !== 'user'}}" class="avatar bot">岛</view>
-          <view class="bubble {{item.role === 'user' ? 'user' : 'bot'}}">{{item.content}}</view>
+          <view class="bubble {{item.role === 'user' ? 'user' : 'bot'}}">
+            <view class="ai-tag" wx:if="{{item.role !== 'user'}}">AI生成</view>
+            <text>{{item.content}}</text>
+          </view>
         </view>
 
         <view class="msg-row left" wx:if="{{loading}}">

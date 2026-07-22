@@ -72,12 +72,8 @@ Page({
       const user = await request({ url: '/user/profile', silent: true, force })
       auth.syncAppUser(user)
       if (user.needs_profile_setup) {
-        const synced = auth.getAppSafe()?.globalData?.user
-        if (synced && !synced.needs_profile_setup) {
-          await this.applyUser(synced)
-          return
-        }
-        auth.goLogin('/pages/profile/index', { replace: true })
+        // 资料未完善：仍展示「我的」，由用户主动去完善；不得 replace 回登录页卡死返回键
+        await this.applyUser(user)
         return
       }
       await this.applyUser(user)
@@ -103,7 +99,37 @@ Page({
   },
 
   async onChooseAvatar(e) {
-    const { avatarUrl } = e.detail
+    const avatarUrl = e?.detail?.avatarUrl
+    if (!avatarUrl) {
+      wx.showToast({ title: '未获取到头像，可试相册上传', icon: 'none' })
+      return
+    }
+    await this._uploadAvatarFile(avatarUrl)
+  },
+
+  pickAvatarFromAlbum() {
+    if (this.data.avatarUploading) return
+    wx.chooseMedia({
+      count: 1,
+      mediaType: ['image'],
+      sourceType: ['album', 'camera'],
+      success: (res) => {
+        const path = res.tempFiles && res.tempFiles[0] && res.tempFiles[0].tempFilePath
+        if (!path) {
+          wx.showToast({ title: '未选择图片', icon: 'none' })
+          return
+        }
+        this._uploadAvatarFile(path)
+      },
+      fail: (err) => {
+        const msg = String(err?.errMsg || '')
+        if (msg.includes('cancel') || msg.includes('deny')) return
+        wx.showToast({ title: '选择图片失败', icon: 'none' })
+      },
+    })
+  },
+
+  async _uploadAvatarFile(avatarUrl) {
     if (!avatarUrl || this.data.avatarUploading) return
 
     this.setData({ avatarDisplay: avatarUrl, avatarUploading: true })

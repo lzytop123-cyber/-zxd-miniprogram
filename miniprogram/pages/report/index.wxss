@@ -47,6 +47,31 @@
   box-shadow: 0 4rpx 14rpx rgba(28, 43, 32, 0.1);
 }
 
+.ai-disclaimer {
+  flex-shrink: 0;
+  margin: 0 24rpx 8rpx;
+  padding: 12rpx 20rpx;
+  text-align: center;
+  font-size: 22rpx;
+  font-weight: 600;
+  color: #8A6D3B;
+  background: #FFF8E8;
+  border-radius: 12rpx;
+  border: 1rpx solid #F0E0B8;
+}
+
+.ai-tag {
+  display: inline-block;
+  margin: 0 0 8rpx;
+  padding: 2rpx 12rpx;
+  font-size: 20rpx;
+  font-weight: 600;
+  color: #2D6A4F;
+  background: rgba(45, 106, 79, 0.12);
+  border-radius: 8rpx;
+  line-height: 1.4;
+}
+
 /* ============ 学习报告 ============ */
 .report-card {
   margin-bottom: 24rpx;
