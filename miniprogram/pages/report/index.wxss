@@ -2,6 +2,13 @@
   min-height: 100vh;
 }
 
+.blocked-tip {
+  padding: 120rpx 48rpx;
+  text-align: center;
+  font-size: 28rpx;
+  color: #8C9BA5;
+}
+
 /* 报告模式：底部避让悬浮 tabBar */
 .report-body {
   padding-bottom: calc(160rpx + env(safe-area-inset-bottom));

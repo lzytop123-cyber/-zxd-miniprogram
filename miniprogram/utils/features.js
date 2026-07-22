@@ -73,18 +73,31 @@ function indexOfPath(path, list) {
   return tabs.findIndex((t) => t.pagePath === normalized)
 }
 
+/** 关闭学习助手时强制离开该页（switchTab 失败则 reLaunch） */
+function leaveStudyAssistantIfDisabled() {
+  if (isStudyAssistantEnabled()) return false
+  wx.switchTab({
+    url: '/pages/home/index',
+    fail: () => {
+      wx.reLaunch({ url: '/pages/home/index' })
+    },
+  })
+  return true
+}
+
 /** 页面 onShow：同步 tab 列表与选中项 */
 function syncTabBar(page, pagePath) {
   const tabBar = typeof page.getTabBar === 'function' ? page.getTabBar() : null
   const list = buildTabList()
-  const selected = Math.max(0, indexOfPath(pagePath, list))
+  // 当前页若不在可见 Tab 中，不要误标成「首页选中」造成假象
+  const idx = indexOfPath(pagePath, list)
+  const selected = idx >= 0 ? idx : 0
   if (tabBar) {
     tabBar.setData({ list, selected, collapsed: false })
   }
 
-  // 关闭学习助手时：即使从首页入口/路径进入也强制回首页
-  if (pagePath === '/pages/report/index' && !isStudyAssistantEnabled()) {
-    wx.switchTab({ url: '/pages/home/index' })
+  if (pagePath === '/pages/report/index') {
+    leaveStudyAssistantIfDisabled()
   }
 }
 
@@ -96,4 +109,5 @@ module.exports = {
   buildTabList,
   indexOfPath,
   syncTabBar,
+  leaveStudyAssistantIfDisabled,
 }

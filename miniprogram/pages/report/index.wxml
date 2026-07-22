@@ -1,4 +1,6 @@
 <view class="page-report {{tab==='assistant' ? 'chat-mode' : ''}}">
+  <view wx:if="{{blocked}}" class="blocked-tip">功能暂未开放，正在返回首页…</view>
+  <block wx:else>
   <!-- 顶部分段切换 -->
   <view class="seg-wrap">
     <view class="seg">
@@ -132,5 +134,6 @@
       />
       <view class="chat-send {{(draft && !loading) ? '' : 'disabled'}}" bindtap="onSend">发送</view>
     </view>
+  </block>
   </block>
 </view>

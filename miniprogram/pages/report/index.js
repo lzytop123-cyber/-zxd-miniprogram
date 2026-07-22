@@ -1,11 +1,12 @@
 const { request } = require('../../utils/request')
 const { handleTabScroll } = require('../../utils/tabbar')
-const { syncTabBar, isStudyAssistantEnabled } = require('../../utils/features')
+const { syncTabBar, isStudyAssistantEnabled, leaveStudyAssistantIfDisabled } = require('../../utils/features')
 const { enableShareMenu, shareAppMessage, shareTimeline } = require('../../utils/share')
 
 Page({
   data: {
     tab: 'assistant',
+    blocked: false,
 
     // 学习报告
     summary: null,
@@ -33,13 +34,22 @@ Page({
     return shareTimeline({ title: '知行岛自习空间 · 学习助手' })
   },
 
+  onLoad() {
+    if (!isStudyAssistantEnabled()) {
+      this.setData({ blocked: true })
+      leaveStudyAssistantIfDisabled()
+    }
+  },
+
   onShow() {
     enableShareMenu()
     syncTabBar(this, '/pages/report/index')
     if (!isStudyAssistantEnabled()) {
-      wx.switchTab({ url: '/pages/home/index' })
+      this.setData({ blocked: true })
+      leaveStudyAssistantIfDisabled()
       return
     }
+    this.setData({ blocked: false })
     this._tabbarLastTop = 0
     this.load({ silent: true })
     if (this.data.tab === 'assistant' && !this.data.introLoaded) {
