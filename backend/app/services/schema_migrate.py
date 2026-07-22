@@ -25,6 +25,7 @@ MIGRATION_STATEMENTS = [
     "ALTER TABLE reservations ADD COLUMN refund_remark VARCHAR(200)",
     "ALTER TABLE reservations ADD COLUMN refunded_at DATETIME",
     "ALTER TABLE reservations ADD COLUMN period_card_id INTEGER",
+    "ALTER TABLE period_cards ADD COLUMN expire_reminded_at DATETIME",
 ]
 
 # 性能索引（存量库补建；已存在时忽略）
@@ -79,9 +80,21 @@ def run_schema_migrations(db: Session) -> dict:
 
     created_tables: list[str] = []
     try:
-        from app.models import AdminOperationLog, RechargeOrder, StoreCalendarDay, SystemAnnouncement
+        from app.models import (
+            AdminOperationLog,
+            RechargeOrder,
+            SiteContactSetting,
+            StoreCalendarDay,
+            SystemAnnouncement,
+        )
 
-        for model in (AdminOperationLog, SystemAnnouncement, StoreCalendarDay, RechargeOrder):
+        for model in (
+            AdminOperationLog,
+            SystemAnnouncement,
+            StoreCalendarDay,
+            RechargeOrder,
+            SiteContactSetting,
+        ):
             model.__table__.create(bind=engine, checkfirst=True)
             if inspector.has_table(model.__tablename__):
                 created_tables.append(model.__tablename__)

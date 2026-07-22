@@ -38,6 +38,14 @@ class Settings(BaseSettings):
     # 平台公钥模式（响应头为 PUB_KEY_ID_... 时必填）
     wx_pay_public_key_path: str = "./cert/pub_key.pem"
     wx_pay_public_key_id: str = ""
+    # 期限卡到期订阅消息模板 ID（小程序后台申请后填入）
+    wx_subscribe_card_expire_tmpl_id: str = Field(
+        default="",
+        validation_alias=AliasChoices(
+            "WX_SUBSCRIBE_CARD_EXPIRE_TMPL_ID",
+            "wx_subscribe_card_expire_tmpl_id",
+        ),
+    )
 
     ttlock_client_id: str = ""
     ttlock_client_secret: str = ""

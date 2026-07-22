@@ -115,26 +115,39 @@
   </view>
 
 
-  <!-- 会员信息卡 -->
-  <view class="member" bindtap="goProfile">
-    <view class="member-top">
+  <!-- 会员信息卡：上排摘要 + 下排快捷入口 -->
+  <view class="member">
+    <view class="member-top" bindtap="goProfile">
       <image wx:if="{{user.avatar_url}}" class="member-avatar" src="{{user.avatar_url}}" mode="aspectFill" />
       <view wx:else class="member-avatar member-avatar-ph">岛</view>
       <view class="member-info">
         <view class="member-hi">{{user ? (user.nickname) : '欢迎来到知行岛'}}</view>
-        <view class="member-badge">{{user.title || '新同学'}}</view>
+        <view class="member-meta">
+          <text class="member-badge">{{user.title || '新同学'}}</text>
+          <text class="member-meta-dot">·</text>
+          <text class="member-summary-item" catchtap="goPoints">积分 {{user.total_points || 0}}</text>
+          <text class="member-meta-dot">·</text>
+          <text class="member-summary-item" catchtap="goPackages">期限卡 {{user ? cardCount : 0}}张</text>
+        </view>
       </view>
       <view class="member-arrow">›</view>
     </view>
-    <view class="member-stats">
-      <view class="mstat" catchtap="goPoints">
-        <view class="mstat-val">{{user.total_points || 0}}</view>
-        <view class="mstat-key">积分</view>
+    <view class="member-actions">
+      <view class="member-action" bindtap="goAssistant">
+        <view class="member-action-icon">📚</view>
+        <text>学习助手</text>
       </view>
-      <view class="mstat-line"></view>
-      <view class="mstat" catchtap="goPackages">
-        <view class="mstat-val">{{user ? cardCount : 0}}</view>
-        <view class="mstat-key">期限卡</view>
+      <view class="member-action" bindtap="goContact">
+        <view class="member-action-icon">🎧</view>
+        <text>联系店长</text>
+      </view>
+      <view class="member-action" bindtap="goOrders">
+        <view class="member-action-icon">📋</view>
+        <text>我的订单</text>
+      </view>
+      <view class="member-action" bindtap="showWifi">
+        <view class="member-action-icon">📶</view>
+        <text>WIFI连接</text>
       </view>
     </view>
   </view>

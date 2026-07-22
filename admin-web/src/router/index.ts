@@ -24,6 +24,7 @@ const router = createRouter({
         { path: 'system-status', component: () => import('../views/SystemStatus.vue') },
         { path: 'banners', component: () => import('../views/Banners.vue') },
         { path: 'announcements', component: () => import('../views/Announcements.vue') },
+        { path: 'contact-setting', component: () => import('../views/ContactSetting.vue') },
         { path: 'store-calendar', component: () => import('../views/StoreCalendar.vue') },
         { path: 'operation-logs', component: () => import('../views/OperationLogs.vue') },
         { path: 'point-logs', component: () => import('../views/PointLogs.vue') },

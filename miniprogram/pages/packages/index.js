@@ -5,6 +5,7 @@ const { completeWechatPay, ensureCardPurchasePaid } = require('../../utils/pay')
 const { handleTabScroll } = require('../../utils/tabbar')
 const { syncTabBar } = require('../../utils/features')
 const { enableShareMenu, shareAppMessage, shareTimeline } = require('../../utils/share')
+const { requestCardExpireSubscribe } = require('../../utils/subscribe')
 const {
   PKG_CATEGORY_TABS,
   formatCard,
@@ -51,6 +52,10 @@ Page({
     this._tabbarLastTop = 0
     this.setData({ loggedIn: auth.isLoggedIn() })
     this.refreshPage({ silent: true })
+    if (auth.isLoggedIn()) {
+      // 进入套餐页时尝试续期订阅授权（无模板 ID 时静默跳过）
+      requestCardExpireSubscribe()
+    }
   },
 
   onPageScroll(e) {
@@ -258,6 +263,7 @@ Page({
 
       wx.hideLoading()
       invalidateCache('/user/cards')
+      await requestCardExpireSubscribe({ force: true })
       wx.showModal({
         title: '购买成功',
         content: `已购买：${(confirmed && confirmed.card_name) || res.label || '期限卡'}`,

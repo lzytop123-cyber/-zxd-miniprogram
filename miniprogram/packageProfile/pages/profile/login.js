@@ -8,15 +8,31 @@ const GOAL_OPTIONS = [
   { value: 'other', label: '其他' },
 ]
 
+const AGREE_KEY = 'login_agreed_v1'
+const LAST_PHONE_KEY = 'login_last_phone_v1'
+
 function isLocalAvatarPath(path) {
   if (!path) return false
   const s = String(path)
   return s.startsWith('wxfile://') || /^https?:\/\/tmp\//.test(s)
 }
 
+function maskPhone(phone) {
+  const s = String(phone || '').replace(/\D/g, '')
+  if (s.length < 7) return ''
+  return `${s.slice(0, 3)}****${s.slice(-4)}`
+}
+
+function phoneButtonText(phone) {
+  const masked = maskPhone(phone)
+  return masked ? `手机号${masked}快速登录` : '手机号快捷登录'
+}
+
 Page({
   data: {
-    step: 'loading',
+    step: 'welcome',
+    agreed: false,
+    phoneBtnText: '手机号快捷登录',
     loginError: '',
     redirect: '',
     user: null,
@@ -25,29 +41,133 @@ Page({
     avatarDisplay: '',
     avatarUploading: false,
     saving: false,
+    phoneLogging: false,
     goalOptions: GOAL_OPTIONS,
   },
 
   onLoad(options) {
-    this.setData({ redirect: options.redirect ? decodeURIComponent(options.redirect) : '' })
-    this.bootstrap()
+    let agreed = false
+    let lastPhone = ''
+    try {
+      agreed = !!wx.getStorageSync(AGREE_KEY)
+      lastPhone = wx.getStorageSync(LAST_PHONE_KEY) || ''
+    } catch (e) {
+      // ignore
+    }
+    this.setData({
+      redirect: options.redirect ? decodeURIComponent(options.redirect) : '',
+      agreed,
+      phoneBtnText: phoneButtonText(lastPhone),
+      step: 'welcome',
+    })
+
+    if (auth.isLoggedIn()) {
+      this.resumeIfLoggedIn()
+    }
   },
 
-  async bootstrap() {
+  _rememberPhone(phone) {
+    if (!phone) return
+    try {
+      wx.setStorageSync(LAST_PHONE_KEY, String(phone))
+    } catch (e) {
+      // ignore
+    }
+    this.setData({ phoneBtnText: phoneButtonText(phone) })
+  },
+
+  async resumeIfLoggedIn() {
     this.setData({ step: 'loading', loginError: '' })
+    try {
+      const user = await request({ url: '/user/profile', silent: true, force: true })
+      auth.syncAppUser(user)
+      await this.applyUser(user)
+    } catch (err) {
+      this.setData({ step: 'welcome', loginError: '' })
+    }
+  },
+
+  toggleAgree() {
+    const agreed = !this.data.agreed
+    this.setData({ agreed })
+    try {
+      wx.setStorageSync(AGREE_KEY, agreed)
+    } catch (e) {
+      // ignore
+    }
+  },
+
+  openAgreement(e) {
+    const type = e.currentTarget.dataset.type
+    const title = type === 'privacy' ? '隐私协议' : '用户协议'
+    const content =
+      type === 'privacy'
+        ? '我们将依法保护你的个人信息，仅用于账号登录、预约自习、开门与客服沟通等必要场景。未经同意不会向无关第三方出售你的个人信息。'
+        : '欢迎使用知行岛自习室小程序。注册/登录即表示你同意遵守门店秩序，合理使用座位与期限卡权益，不得转让账号从事违法违规活动。'
+    wx.showModal({
+      title,
+      content,
+      showCancel: false,
+      confirmText: '知道了',
+    })
+  },
+
+  onNeedAgree() {
+    wx.showToast({ title: '请先同意用户协议', icon: 'none' })
+  },
+
+  onSkipLogin() {
+    if (getCurrentPages().length > 1) {
+      wx.navigateBack({ fail: () => wx.switchTab({ url: '/pages/home/index' }) })
+      return
+    }
+    wx.switchTab({ url: '/pages/home/index' })
+  },
+
+  async onPhoneLogin(e) {
+    if (!this.data.agreed) {
+      this.onNeedAgree()
+      return
+    }
+    const detail = e.detail || {}
+    const code = detail.code
+    if (!code) {
+      const msg = detail.errMsg || ''
+      if (msg.includes('deny') || msg.includes('cancel') || detail.errno === 1400001) {
+        wx.showToast({ title: '需要授权手机号才能登录', icon: 'none' })
+        return
+      }
+      wx.showToast({ title: '未获取到手机号，请重试', icon: 'none' })
+      return
+    }
+
+    this.setData({ step: 'loading', loginError: '', phoneLogging: true })
     try {
       if (!auth.isLoggedIn()) {
         await auth.login({ silent: false, force: true })
       }
-      const user = await request({ url: '/user/profile', silent: true, force: true })
+      const user = await request({
+        url: '/user/bind-phone',
+        method: 'POST',
+        data: { code },
+        force: true,
+      })
       auth.syncAppUser(user)
+      this._rememberPhone(user.phone)
       await this.applyUser(user)
     } catch (err) {
       this.setData({
         step: 'error',
         loginError: err.detail || err.message || '登录失败，请重试',
       })
+    } finally {
+      this.setData({ phoneLogging: false })
     }
+  },
+
+  async bootstrap() {
+    // 兼容错误页「重试」：回到欢迎页走手机号授权
+    this.setData({ step: 'welcome', loginError: '' })
   },
 
   async applyUser(user, localAvatar) {
@@ -68,7 +188,11 @@ Page({
   },
 
   retryLogin() {
-    this.bootstrap()
+    if (!this.data.agreed) {
+      this.setData({ step: 'welcome' })
+      return
+    }
+    this.setData({ step: 'welcome', loginError: '' })
   },
 
   async onChooseAvatar(e) {

@@ -520,20 +520,85 @@
   white-space: nowrap;
 }
 
+.member-meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8rpx;
+  margin-top: 10rpx;
+  min-width: 0;
+}
+
 .member-badge {
-  display: inline-block;
-  margin-top: 8rpx;
-  padding: 4rpx 16rpx;
+  display: inline-flex;
+  align-items: center;
+  padding: 2rpx 12rpx;
   font-size: 20rpx;
+  line-height: 1.4;
   color: #2D6A4F;
   background: #D8F3DC;
   border-radius: 20rpx;
+  flex-shrink: 0;
+}
+
+.member-meta-dot {
+  color: #C2CDD6;
+  font-size: 22rpx;
+  line-height: 1;
+}
+
+.member-summary-item {
+  font-size: 22rpx;
+  color: #6B7C71;
+  line-height: 1.4;
 }
 
 .member-arrow {
   color: #C2CDD6;
   font-size: 40rpx;
   font-weight: 700;
+}
+
+.member-actions {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-top: 26rpx;
+  padding-top: 24rpx;
+  border-top: 2rpx solid #F0F4F1;
+}
+
+.member-action {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10rpx;
+  padding: 0;
+  margin: 0;
+  background: transparent;
+  line-height: 1.2;
+  font-size: 22rpx;
+  color: #3D5245;
+}
+
+.member-action-btn {
+  border: none;
+}
+
+.member-action-btn::after {
+  border: none;
+}
+
+.member-action-icon {
+  width: 72rpx;
+  height: 72rpx;
+  border-radius: 22rpx;
+  background: #F3F8F5;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 32rpx;
 }
 
 .member-stats {

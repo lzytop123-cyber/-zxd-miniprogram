@@ -1,0 +1,18 @@
+<view class="page-contact page-safe-bottom">
+  <view class="hint">{{hint}}</view>
+  <view class="poster-wrap">
+    <image
+      class="poster"
+      src="{{posterUrl}}"
+      mode="widthFix"
+      show-menu-by-longpress="{{true}}"
+      lazy-load="{{false}}"
+      binderror="onPosterError"
+    />
+  </view>
+  <view class="tip" wx:if="{{isNetworkPoster}}">长按图片，选择「识别图中二维码」</view>
+  <view class="tip tip-warn" wx:else>
+    当前为本地预览图，微信不支持识别包内图片中的二维码。请到管理后台「联系店长」上传海报后，真机即可长按识别；也可先保存到相册再扫一扫。
+  </view>
+  <view class="save-btn" bindtap="savePoster">保存图片到相册</view>
+</view>

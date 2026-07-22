@@ -53,8 +53,21 @@ def _save_registry(registry: dict[str, Any]) -> None:
     REGISTRY_PATH.write_text(json.dumps(registry, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
 
+def _chromadb_importable() -> bool:
+    try:
+        import chromadb  # noqa: F401
+    except ImportError:
+        return False
+    return True
+
+
 def rag_available() -> bool:
-    return bool(settings.knowledge_rag_enabled and settings.assistant_configured)
+    """RAG 需：开关开启 + DeepSeek Key + chromadb 可导入。"""
+    return bool(
+        settings.knowledge_rag_enabled
+        and settings.assistant_configured
+        and _chromadb_importable()
+    )
 
 
 def _get_collection():
@@ -67,11 +80,14 @@ def _get_collection():
         raise RuntimeError("未安装 chromadb，请执行 pip install chromadb") from exc
 
     _ensure_dirs()
-    _chroma_client = chromadb.PersistentClient(path=str(CHROMA_DIR))
-    _collection = _chroma_client.get_or_create_collection(
-        name=COLLECTION_NAME,
-        metadata={"hnsw:space": "cosine"},
-    )
+    try:
+        _chroma_client = chromadb.PersistentClient(path=str(CHROMA_DIR))
+        _collection = _chroma_client.get_or_create_collection(
+            name=COLLECTION_NAME,
+            metadata={"hnsw:space": "cosine"},
+        )
+    except Exception as exc:
+        raise RuntimeError(f"ChromaDB 初始化失败: {exc}") from exc
     return _collection
 
 
@@ -138,16 +154,35 @@ def embed_texts(texts: list[str]) -> list[list[float]]:
         "model": settings.deepseek_embedding_model,
         "input": texts,
     }
+    # DeepSeek 兼容 OpenAI：同时尝试 /embeddings 与 /v1/embeddings
+    urls = [f"{base}/embeddings"]
+    if not base.rstrip("/").endswith("/v1"):
+        urls.append(f"{base.rstrip('/')}/v1/embeddings")
+
+    last_error = ""
     try:
         with httpx.Client(timeout=settings.deepseek_timeout_sec) as client:
-            resp = client.post(f"{base}/embeddings", headers=headers, json=payload)
-        if resp.status_code >= 400:
-            raise ValueError(f"Embedding 接口错误（{resp.status_code}）: {resp.text[:300]}")
-        data = resp.json()
-        rows = sorted(data.get("data") or [], key=lambda x: x.get("index", 0))
-        return [row["embedding"] for row in rows]
+            for url in urls:
+                resp = client.post(url, headers=headers, json=payload)
+                if resp.status_code >= 400:
+                    last_error = f"Embedding 接口错误（{resp.status_code}）: {resp.text[:300]}"
+                    continue
+                data = resp.json()
+                rows = sorted(data.get("data") or [], key=lambda x: x.get("index", 0))
+                if not rows:
+                    last_error = "Embedding 返回为空，请确认 DEEPSEEK_EMBEDDING_MODEL 是否可用"
+                    continue
+                try:
+                    return [row["embedding"] for row in rows]
+                except (KeyError, TypeError) as exc:
+                    raise ValueError(f"Embedding 返回格式异常: {exc}") from exc
     except httpx.HTTPError as exc:
         raise ValueError(f"Embedding 请求失败: {exc}") from exc
+
+    raise ValueError(
+        last_error
+        or "Embedding 失败。DeepSeek 若无向量接口，请关闭 KNOWLEDGE_RAG_ENABLED 或改用其它 Embedding"
+    )
 
 
 def _delete_doc_chunks(doc_id: str) -> None:

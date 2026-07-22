@@ -252,6 +252,7 @@ class PeriodCard(Base):
     meituan_receipt: Mapped[str | None] = mapped_column(String(100))
     status: Mapped[int] = mapped_column(Integer, default=1)
     remark: Mapped[str | None] = mapped_column(String(200))
+    expire_reminded_at: Mapped[datetime | None] = mapped_column(DateTime)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
 
@@ -496,6 +497,18 @@ class HomeCarouselSetting(Base):
     indicator_dots: Mapped[int] = mapped_column(Integer, default=1)
     hero_height: Mapped[int] = mapped_column(Integer, default=680)
     hero_mode: Mapped[str] = mapped_column(String(20), default="fullscreen")
+    updated_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), onupdate=func.now())
+
+
+class SiteContactSetting(Base):
+    """小程序「联系店长」海报（单行配置）。"""
+
+    __tablename__ = "site_contact_settings"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    poster_url: Mapped[str | None] = mapped_column(String(500))
+    title: Mapped[str | None] = mapped_column(String(50), default="联系店长")
+    hint: Mapped[str | None] = mapped_column(String(100), default="长按识别二维码，添加店长微信咨询")
     updated_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), onupdate=func.now())
 
 

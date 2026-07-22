@@ -1,0 +1,57 @@
+.page-contact {
+  min-height: 100vh;
+  padding: 32rpx 32rpx 64rpx;
+  box-sizing: border-box;
+  background: #F4FAF6;
+}
+
+.hint {
+  text-align: center;
+  font-size: 26rpx;
+  color: #3D5245;
+  line-height: 1.6;
+  margin-bottom: 28rpx;
+}
+
+.poster-wrap {
+  background: #FFFFFF;
+  border-radius: 24rpx;
+  overflow: hidden;
+  box-shadow: 0 8rpx 28rpx rgba(45, 106, 79, 0.08);
+}
+
+.poster {
+  display: block;
+  width: 100%;
+  vertical-align: top;
+}
+
+.tip {
+  margin-top: 24rpx;
+  text-align: center;
+  font-size: 24rpx;
+  color: #8C9BA5;
+  line-height: 1.6;
+  padding: 0 12rpx;
+}
+
+.tip-warn {
+  color: #8A6D3B;
+  background: #FFF8E8;
+  border-radius: 16rpx;
+  padding: 16rpx 20rpx;
+  text-align: left;
+}
+
+.save-btn {
+  margin: 28rpx auto 0;
+  width: 420rpx;
+  height: 80rpx;
+  line-height: 80rpx;
+  text-align: center;
+  font-size: 28rpx;
+  color: #2D6A4F;
+  background: #E8F5E9;
+  border-radius: 999rpx;
+  font-weight: 600;
+}

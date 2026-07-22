@@ -105,6 +105,20 @@ def health_alert_job():
         db.close()
 
 
+def remind_card_expire_job():
+    db = SessionLocal()
+    try:
+        from app.services.subscribe_notify import remind_expiring_period_cards
+
+        result = remind_expiring_period_cards(db)
+        if result.get("sent") or result.get("failed"):
+            logger.info("card expire remind: %s", result)
+    except Exception:
+        logger.exception("card expire remind job failed")
+    finally:
+        db.close()
+
+
 def _acquire_leadership() -> bool:
     """抢占调度领导权（分布式锁）。抢到的实例负责跑定时任务。"""
     client = get_redis()
@@ -140,6 +154,7 @@ def start_scheduler():
     scheduler.add_job(auto_checkin_due_orders, "interval", minutes=1)
     scheduler.add_job(check_ble_battery, "interval", hours=1)
     scheduler.add_job(health_alert_job, "interval", minutes=5)
+    scheduler.add_job(remind_card_expire_job, "cron", hour=10, minute=0)
     scheduler.start()
     _scheduler = scheduler
     logger.info("scheduler: 已启动定时任务")

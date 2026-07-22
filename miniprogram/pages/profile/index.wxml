@@ -94,10 +94,10 @@
       <view class="menu-icon">👤</view>
       <text>人脸录入</text>
     </view> -->
-    <button class="menu-item phone-btn" open-type="contact">
+    <view class="menu-item" bindtap="go" data-url="{{menuUrls.contact}}">
       <view class="menu-icon">💬</view>
       <text>联系店长</text>
-    </button>
+    </view>
     <button
       wx:if="{{loginState === 'ready' && user}}"
       class="menu-item phone-btn"

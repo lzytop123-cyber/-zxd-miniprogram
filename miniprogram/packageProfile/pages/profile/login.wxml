@@ -1,5 +1,55 @@
 <view class="page-login page-safe-bottom">
-  <view class="login-loading" wx:if="{{step === 'loading'}}">
+  <view class="welcome" wx:if="{{step === 'welcome'}}">
+    <view class="welcome-brand">
+      <view class="welcome-mark">
+        <view class="welcome-island"></view>
+        <view class="welcome-wave welcome-wave--1"></view>
+        <view class="welcome-wave welcome-wave--2"></view>
+        <view class="welcome-wave welcome-wave--3"></view>
+      </view>
+      <view class="welcome-name">知行岛·自习室</view>
+      <view class="welcome-en">ZHIXINGDAO · ZIXISHI</view>
+    </view>
+
+    <view class="welcome-actions">
+      <button
+        wx:if="{{agreed}}"
+        class="btn-primary welcome-main welcome-phone-btn"
+        open-type="getPhoneNumber"
+        bindgetphonenumber="onPhoneLogin"
+        hover-class="none"
+        loading="{{phoneLogging}}"
+        disabled="{{phoneLogging}}"
+      >{{phoneBtnText}}</button>
+      <view wx:else class="btn-primary welcome-main disabled" bindtap="onNeedAgree">{{phoneBtnText}}</view>
+
+      <button
+        wx:if="{{agreed}}"
+        class="welcome-secondary welcome-phone-btn welcome-secondary-btn"
+        open-type="getPhoneNumber"
+        bindgetphonenumber="onPhoneLogin"
+        hover-class="none"
+        loading="{{phoneLogging}}"
+        disabled="{{phoneLogging}}"
+      >一键快捷登录/注册</button>
+      <view wx:else class="welcome-secondary disabled" bindtap="onNeedAgree">一键快捷登录/注册</view>
+
+      <view class="welcome-links">
+        <text class="welcome-skip" bindtap="onSkipLogin">暂不登录</text>
+      </view>
+    </view>
+
+    <view class="welcome-agree" bindtap="toggleAgree">
+      <view class="agree-box {{agreed ? 'checked' : ''}}"></view>
+      <view class="agree-text">
+        我已阅读并同意
+        <text class="agree-link" catchtap="openAgreement" data-type="user">《用户协议》</text>
+        <text class="agree-link" catchtap="openAgreement" data-type="privacy">《隐私协议》</text>
+      </view>
+    </view>
+  </view>
+
+  <view class="login-loading" wx:elif="{{step === 'loading'}}">
     <view class="login-logo">岛</view>
     <view class="loading-text">正在登录...</view>
   </view>
@@ -9,6 +59,7 @@
     <view class="login-title">登录失败</view>
     <view class="login-error" wx:if="{{loginError}}">{{loginError}}</view>
     <view class="btn-primary login-btn" bindtap="retryLogin">重试</view>
+    <view class="welcome-skip" bindtap="onSkipLogin">暂不登录</view>
   </view>
 
   <view class="setup-card card" wx:elif="{{step === 'setup' && user}}">

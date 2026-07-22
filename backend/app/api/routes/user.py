@@ -212,19 +212,47 @@ def upload_face(
     return ResponseModel(message="人脸录入成功", data=_to_profile(db, user))
 
 
+@router.get("/subscribe-config", response_model=ResponseModel)
+def get_subscribe_config(user: User = Depends(get_current_user)):
+    tmpl = (settings.wx_subscribe_card_expire_tmpl_id or "").strip()
+    return ResponseModel(
+        data={
+            "card_expire_tmpl_id": tmpl or None,
+            "enabled": bool(tmpl),
+        }
+    )
+
+
 @router.post("/subscribe", response_model=ResponseModel)
 def save_subscriptions(
     body: SubscribeRequest,
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    from app.services.subscribe_notify import CARD_EXPIRE_SCENE
+
+    tmpl_expire = (settings.wx_subscribe_card_expire_tmpl_id or "").strip()
     for tmpl_id, status in body.subscriptions.items():
-        sub = WechatSubscription(
-            user_id=user.id,
-            tmpl_id=tmpl_id,
-            scene="booking",
-            status=1 if status == "accept" else 0,
+        scene = CARD_EXPIRE_SCENE if tmpl_id == tmpl_expire else "booking"
+        existing = db.scalar(
+            select(WechatSubscription)
+            .where(
+                WechatSubscription.user_id == user.id,
+                WechatSubscription.tmpl_id == tmpl_id,
+            )
+            .order_by(WechatSubscription.id.desc())
         )
-        db.add(sub)
+        if existing:
+            existing.status = 1 if status == "accept" else 0
+            existing.scene = scene
+        else:
+            db.add(
+                WechatSubscription(
+                    user_id=user.id,
+                    tmpl_id=tmpl_id,
+                    scene=scene,
+                    status=1 if status == "accept" else 0,
+                )
+            )
     db.commit()
     return ResponseModel(message="订阅状态已保存")

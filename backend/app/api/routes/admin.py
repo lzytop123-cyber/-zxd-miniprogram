@@ -1,5 +1,6 @@
 from datetime import date, datetime, time, timedelta
 from decimal import Decimal
+import logging
 import uuid
 
 from pathlib import Path
@@ -22,6 +23,7 @@ from app.models import (
     Coupon,
     HomeBanner,
     HomeCarouselSetting,
+    SiteContactSetting,
     MeituanDealMapping,
     MeituanOrder,
     PendingDealMapping,
@@ -66,9 +68,11 @@ from app.services.seat_setup import ensure_store_seats, migrate_store_seat_codes
 from app.services.wechat_pay import WechatPayService
 
 router = APIRouter(prefix="/admin", tags=["后台管理"])
+logger = logging.getLogger(__name__)
 
 BANNER_DIR = Path(__file__).resolve().parents[3] / "uploads" / "banners"
 STORE_COVER_DIR = Path(__file__).resolve().parents[3] / "uploads" / "stores"
+CONTACT_DIR = Path(__file__).resolve().parents[3] / "uploads" / "contact"
 BANNER_IMAGE_TYPES = {
     "image/jpeg": "jpg",
     "image/png": "png",
@@ -1464,38 +1468,68 @@ async def upload_knowledge_admin(
 
     try:
         text = assistant_service.parse_knowledge_upload(raw, ext=ext)
-        if knowledge_rag.rag_available():
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+
+    if knowledge_rag.rag_available():
+        try:
             record = knowledge_rag.ingest_uploaded_file(
                 filename=filename or f"document{ext}",
                 ext=ext,
                 raw=raw,
                 text=text,
             )
-            message = f"文档已入库（{record['chunks']} 个片段）"
             content = assistant_service.load_knowledge()
-            data = {
-                "chars": len(content),
-                "content": content,
-                "document": record,
-                "documents": knowledge_rag.list_documents(),
-                "rag": knowledge_rag.rag_stats(),
-                "filename": filename,
-            }
-        else:
-            merged = assistant_service.apply_knowledge_upload(text, mode=mode)
-            assistant_service.save_knowledge(merged)
-            content = assistant_service.load_knowledge()
-            message = "知识库已从文档更新"
-            data = {
-                "content": content,
-                "chars": len(content),
-                "mode": mode,
-                "filename": filename,
-            }
+            return ResponseModel(
+                message=f"文档已入库（{record['chunks']} 个片段）",
+                data={
+                    "chars": len(content),
+                    "content": content,
+                    "document": record,
+                    "documents": knowledge_rag.list_documents(),
+                    "rag": knowledge_rag.rag_stats(),
+                    "filename": filename,
+                },
+            )
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e)) from e
+        except Exception as e:
+            # RAG 失败时回退到 Markdown，避免后台只看到 500
+            logger.exception("知识库 RAG 入库失败，回退为普通保存: %s", e)
+            try:
+                merged = assistant_service.apply_knowledge_upload(text, mode=mode)
+                assistant_service.save_knowledge(merged)
+                content = assistant_service.load_knowledge()
+                return ResponseModel(
+                    message=f"向量入库失败，已改为普通知识库保存（{e}）",
+                    data={
+                        "content": content,
+                        "chars": len(content),
+                        "mode": mode,
+                        "filename": filename,
+                        "rag_fallback": True,
+                        "rag_error": str(e),
+                    },
+                )
+            except ValueError as ve:
+                raise HTTPException(status_code=400, detail=str(ve)) from ve
+
+    try:
+        merged = assistant_service.apply_knowledge_upload(text, mode=mode)
+        assistant_service.save_knowledge(merged)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
 
-    return ResponseModel(message=message, data=data)
+    content = assistant_service.load_knowledge()
+    return ResponseModel(
+        message="知识库已从文档更新",
+        data={
+            "content": content,
+            "chars": len(content),
+            "mode": mode,
+            "filename": filename,
+        },
+    )
 
 
 @router.delete("/knowledge/documents/{doc_id}", response_model=ResponseModel)
@@ -2120,4 +2154,94 @@ def create_admin_user(
     return ResponseModel(
         message="管理员已创建",
         data={"id": admin.id, "username": admin.username, "name": admin.name},
+    )
+
+
+def _get_or_create_contact_setting(db: Session) -> SiteContactSetting:
+    row = db.get(SiteContactSetting, 1)
+    if row:
+        return row
+    row = SiteContactSetting(
+        id=1,
+        title="联系店长",
+        hint="长按识别二维码，添加店长微信咨询",
+    )
+    db.add(row)
+    db.commit()
+    db.refresh(row)
+    return row
+
+
+def _contact_setting_dict(row: SiteContactSetting) -> dict:
+    return {
+        "poster_url": public_static_url(row.poster_url) if row.poster_url else None,
+        "poster_path": row.poster_url,
+        "title": row.title or "联系店长",
+        "hint": row.hint or "长按识别二维码，添加店长微信咨询",
+        "updated_at": row.updated_at.isoformat() if row.updated_at else None,
+    }
+
+
+class AdminContactSettingRequest(BaseModel):
+    poster_url: str | None = None
+    title: str | None = None
+    hint: str | None = None
+
+
+@router.get("/contact-setting", response_model=ResponseModel)
+def get_contact_setting_admin(_: object = Depends(get_current_admin), db: Session = Depends(get_db)):
+    row = _get_or_create_contact_setting(db)
+    return ResponseModel(data=_contact_setting_dict(row))
+
+
+@router.put("/contact-setting", response_model=ResponseModel)
+def update_contact_setting_admin(
+    body: AdminContactSettingRequest,
+    _: object = Depends(get_current_admin),
+    db: Session = Depends(get_db),
+):
+    row = _get_or_create_contact_setting(db)
+    if body.poster_url is not None:
+        raw = body.poster_url.strip()
+        if raw == "":
+            row.poster_url = None
+        else:
+            row.poster_url = public_static_path(raw) or raw
+    if body.title is not None:
+        row.title = body.title.strip()[:50] or "联系店长"
+    if body.hint is not None:
+        row.hint = body.hint.strip()[:100] or "长按识别二维码，添加店长微信咨询"
+    db.commit()
+    db.refresh(row)
+    return ResponseModel(message="联系店长配置已保存", data=_contact_setting_dict(row))
+
+
+@router.post("/contact-setting/upload", response_model=ResponseModel)
+async def upload_contact_poster_admin(
+    file: UploadFile = File(...),
+    _: object = Depends(get_current_admin),
+    db: Session = Depends(get_db),
+):
+    content_type = (file.content_type or "").lower()
+    if content_type not in BANNER_IMAGE_TYPES:
+        raise HTTPException(status_code=400, detail="仅支持 jpg / png / webp / gif")
+
+    content = await file.read()
+    if len(content) > 2_000_000:
+        raise HTTPException(status_code=400, detail="图片不能超过 2MB")
+
+    ext = BANNER_IMAGE_TYPES[content_type]
+    CONTACT_DIR.mkdir(parents=True, exist_ok=True)
+    filename = f"{uuid.uuid4().hex}.{ext}"
+    (CONTACT_DIR / filename).write_bytes(content)
+    path = f"/static/contact/{filename}"
+
+    row = _get_or_create_contact_setting(db)
+    row.poster_url = path
+    db.commit()
+    db.refresh(row)
+
+    return ResponseModel(
+        message="海报已上传",
+        data=_contact_setting_dict(row),
     )

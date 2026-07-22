@@ -1,4 +1,5 @@
 import hashlib
+import logging
 import time
 from datetime import datetime, timedelta
 from decimal import Decimal
@@ -19,6 +20,9 @@ from app.models import (
     StudyStat,
     User,
 )
+
+
+logger = logging.getLogger(__name__)
 
 
 class WechatService:
@@ -80,6 +84,44 @@ class WechatService:
         if not phone:
             raise ValueError(data.get("errmsg", "获取手机号失败"))
         return phone
+
+    @staticmethod
+    async def send_subscribe_message(
+        *,
+        openid: str,
+        template_id: str,
+        data: dict,
+        page: str = "pages/packages/index",
+        miniprogram_state: str = "formal",
+    ) -> dict:
+        """发送小程序订阅消息。"""
+        if not openid or not template_id:
+            raise ValueError("缺少 openid 或模板 ID")
+        if settings.app_env == "development" and not settings.wx_login_configured:
+            logger.info(
+                "dev skip subscribe message openid=%s tmpl=%s data=%s",
+                openid,
+                template_id,
+                data,
+            )
+            return {"errcode": 0, "errmsg": "ok", "mock": True}
+
+        token = await WechatService.get_access_token()
+        url = f"https://api.weixin.qq.com/cgi-bin/message/subscribe/send?access_token={token}"
+        payload = {
+            "touser": openid,
+            "template_id": template_id,
+            "page": page,
+            "data": data,
+            "miniprogram_state": miniprogram_state,
+            "lang": "zh_CN",
+        }
+        async with httpx.AsyncClient(timeout=10) as client:
+            resp = await client.post(url, json=payload)
+            result = resp.json()
+        if result.get("errcode", 0) != 0:
+            raise ValueError(result.get("errmsg", "订阅消息发送失败"))
+        return result
 
 
 class TTLockService:

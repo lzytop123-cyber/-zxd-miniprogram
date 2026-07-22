@@ -94,7 +94,7 @@ const featureMap = [
   { mp: '我的 · 钱包', admin: '用户管理 · 钱包流水' },
   { mp: '优惠券 / 积分 / 邀请', admin: '优惠券 · 积分 · 邀请' },
   { mp: '学习助手 / 报告', admin: '学习数据 · AI 知识库' },
-  { mp: '联系店长（客服）', admin: '微信公众平台客服（非本后台）' },
+  { mp: '联系店长（海报二维码）', admin: '首页·运营 → 联系店长' },
 ]
 
 async function loadTodos() {

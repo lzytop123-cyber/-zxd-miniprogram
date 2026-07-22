@@ -10,7 +10,7 @@ from app.api.routes.user import _to_profile
 from app.core.config import settings
 from app.db.session import get_db
 from app.core.static_url import public_static_url
-from app.models import HomeBanner, HomeCarouselSetting, PeriodCard, Store, SystemAnnouncement, User
+from app.models import HomeBanner, HomeCarouselSetting, PeriodCard, SiteContactSetting, Store, SystemAnnouncement, User
 from app.schemas.common import ResponseModel
 from app.services.business import calc_distance
 from app.services.card_service import is_period_card_active
@@ -192,5 +192,19 @@ def get_home_bootstrap(
             "features": {
                 "study_assistant": settings.feature_study_assistant,
             },
+        }
+    )
+
+
+@router.get("/contact", response_model=ResponseModel)
+def get_home_contact(db: Session = Depends(get_db)):
+    """小程序「联系店长」海报配置。"""
+    row = db.get(SiteContactSetting, 1)
+    poster = public_static_url(row.poster_url) if row and row.poster_url else ""
+    return ResponseModel(
+        data={
+            "poster_url": poster or None,
+            "title": (row.title if row and row.title else None) or "联系店长",
+            "hint": (row.hint if row and row.hint else None) or "长按识别二维码，添加店长微信咨询",
         }
     )

@@ -536,4 +536,68 @@ Page({
   goProfile() {
     wx.switchTab({ url: '/pages/profile/index' })
   },
+
+  goAssistant() {
+    wx.switchTab({ url: '/pages/report/index' })
+  },
+
+  goOrders() {
+    if (!auth.isLoggedIn()) {
+      auth.goLogin('/pages/home/index')
+      return
+    }
+    wx.navigateTo({ url: routes.profileOrders })
+  },
+
+  goContact() {
+    wx.navigateTo({ url: routes.profileContact })
+  },
+
+  showWifi() {
+    const stores = this.data.stores || []
+    const store = stores[0]
+    if (!store || !store.id) {
+      wx.showToast({ title: '暂无门店信息', icon: 'none' })
+      return
+    }
+    wx.showLoading({ title: '加载中', mask: true })
+    request({ url: `/store/${store.id}`, silent: true })
+      .then((detail) => {
+        wx.hideLoading()
+        const wifiName = detail?.wifi_name
+        const wifiPassword = detail?.wifi_password
+        if (!wifiName) {
+          wx.showModal({
+            title: 'WIFI连接',
+            content: '该门店暂未配置 WiFi，请查看门店详情或联系店长',
+            confirmText: '去门店',
+            success: (res) => {
+              if (res.confirm) {
+                wx.navigateTo({ url: `${routes.storeDetail}?id=${store.id}` })
+              }
+            },
+          })
+          return
+        }
+        const pwd = wifiPassword || '（无密码）'
+        const content = `门店：${detail.name || store.name || '知行岛'}\nWiFi：${wifiName}\n密码：${pwd}`
+        wx.showModal({
+          title: 'WIFI连接',
+          content,
+          confirmText: '复制密码',
+          cancelText: '关闭',
+          success: (res) => {
+            if (!res.confirm) return
+            wx.setClipboardData({
+              data: String(wifiPassword || wifiName),
+              success: () => wx.showToast({ title: '已复制', icon: 'success' }),
+            })
+          },
+        })
+      })
+      .catch(() => {
+        wx.hideLoading()
+        wx.showToast({ title: '加载失败', icon: 'none' })
+      })
+  },
 })

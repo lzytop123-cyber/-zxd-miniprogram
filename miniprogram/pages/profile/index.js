@@ -26,6 +26,7 @@ Page({
       coupons: routes.profileCoupons,
       points: routes.profilePoints,
       invite: routes.profileInvite,
+      contact: routes.profileContact,
     },
   },
 
