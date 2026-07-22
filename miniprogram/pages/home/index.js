@@ -3,7 +3,7 @@ const auth = require('../../utils/auth')
 const { normalizeUser } = require('../../utils/user')
 const routes = require('../../utils/routes')
 const { handleTabScroll } = require('../../utils/tabbar')
-const { syncTabBar, setFeatures } = require('../../utils/features')
+const { syncTabBar, setFeatures, isStudyAssistantEnabled } = require('../../utils/features')
 const {
   enableShareMenu,
   savePendingInvite,
@@ -51,6 +51,7 @@ Page({
     showAnnouncementPopup: false,
     bannerReady: false,
     swiperKey: 0,
+    showStudyAssistant: isStudyAssistantEnabled(),
   },
 
   onLoad(options) {
@@ -61,6 +62,7 @@ Page({
 
   onShow() {
     enableShareMenu()
+    this.setData({ showStudyAssistant: isStudyAssistantEnabled() })
     syncTabBar(this, '/pages/home/index')
     this._tabbarLastTop = 0
     this.refreshHome({ silent: true })
@@ -178,6 +180,7 @@ Page({
 
       if (data.features) {
         setFeatures(data.features)
+        this.setData({ showStudyAssistant: isStudyAssistantEnabled() })
         syncTabBar(this, '/pages/home/index')
       }
 
@@ -538,6 +541,10 @@ Page({
   },
 
   goAssistant() {
+    if (!isStudyAssistantEnabled()) {
+      wx.showToast({ title: '功能暂未开放', icon: 'none' })
+      return
+    }
     wx.switchTab({ url: '/pages/report/index' })
   },
 

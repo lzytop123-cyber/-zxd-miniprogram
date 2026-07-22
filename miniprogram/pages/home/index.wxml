@@ -133,7 +133,7 @@
       <view class="member-arrow">›</view>
     </view>
     <view class="member-actions">
-      <view class="member-action" bindtap="goAssistant">
+      <view class="member-action" wx:if="{{showStudyAssistant}}" bindtap="goAssistant">
         <view class="member-action-icon">📚</view>
         <text>学习助手</text>
       </view>
