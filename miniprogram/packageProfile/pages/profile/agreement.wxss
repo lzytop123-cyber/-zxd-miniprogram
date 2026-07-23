@@ -1,0 +1,40 @@
+.page-agreement {
+  min-height: 100vh;
+  padding: 32rpx 36rpx 80rpx;
+  background: #F4FAF6;
+  box-sizing: border-box;
+}
+
+.doc-title {
+  font-size: 40rpx;
+  font-weight: 700;
+  color: #1C2B20;
+  text-align: center;
+  margin-bottom: 12rpx;
+}
+
+.doc-meta {
+  font-size: 24rpx;
+  color: #8C9BA5;
+  text-align: center;
+  margin-bottom: 40rpx;
+}
+
+.section {
+  margin-bottom: 36rpx;
+}
+
+.section-heading {
+  font-size: 30rpx;
+  font-weight: 700;
+  color: #2D6A4F;
+  margin-bottom: 16rpx;
+}
+
+.para {
+  font-size: 28rpx;
+  color: #3D4F44;
+  line-height: 1.75;
+  margin-bottom: 16rpx;
+  text-align: justify;
+}

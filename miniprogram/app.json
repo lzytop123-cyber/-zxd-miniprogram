@@ -43,7 +43,8 @@
         "pages/profile/coupons",
         "pages/profile/points",
         "pages/profile/invite",
-        "pages/profile/contact"
+        "pages/profile/contact",
+        "pages/profile/agreement"
       ]
     }
   ],

@@ -98,17 +98,9 @@ Page({
   },
 
   openAgreement(e) {
-    const type = e.currentTarget.dataset.type
-    const title = type === 'privacy' ? '隐私协议' : '用户协议'
-    const content =
-      type === 'privacy'
-        ? '我们将依法保护你的个人信息，仅用于账号登录、预约自习、开门与客服沟通等必要场景。未经同意不会向无关第三方出售你的个人信息。'
-        : '欢迎使用知行岛自习室小程序。注册/登录即表示你同意遵守门店秩序，合理使用座位与期限卡权益，不得转让账号从事违法违规活动。'
-    wx.showModal({
-      title,
-      content,
-      showCancel: false,
-      confirmText: '知道了',
+    const type = e.currentTarget.dataset.type === 'privacy' ? 'privacy' : 'user'
+    wx.navigateTo({
+      url: `/packageProfile/pages/profile/agreement?type=${type}`,
     })
   },
 

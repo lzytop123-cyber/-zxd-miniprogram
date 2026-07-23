@@ -1,0 +1,8 @@
+<view class="page-agreement page-safe-bottom">
+  <view class="doc-title">{{title}}</view>
+  <view class="doc-meta">更新日期：{{updatedAt}}</view>
+  <view class="section" wx:for="{{sections}}" wx:key="heading">
+    <view class="section-heading">{{item.heading}}</view>
+    <view class="para" wx:for="{{item.paras}}" wx:for-item="p" wx:key="*this">{{p}}</view>
+  </view>
+</view>

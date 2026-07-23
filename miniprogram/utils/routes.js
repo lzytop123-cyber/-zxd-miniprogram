@@ -16,4 +16,5 @@ module.exports = {
   profilePoints: '/packageProfile/pages/profile/points',
   profileInvite: '/packageProfile/pages/profile/invite',
   profileContact: '/packageProfile/pages/profile/contact',
+  profileAgreement: '/packageProfile/pages/profile/agreement',
 }

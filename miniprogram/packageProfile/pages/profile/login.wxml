@@ -43,8 +43,8 @@
       <view class="agree-box {{agreed ? 'checked' : ''}}"></view>
       <view class="agree-text">
         我已阅读并同意
-        <text class="agree-link" catchtap="openAgreement" data-type="user">《用户协议》</text>
-        <text class="agree-link" catchtap="openAgreement" data-type="privacy">《隐私协议》</text>
+        <text class="agree-link" catchtap="openAgreement" data-type="user">《用户服务协议》</text>
+        <text class="agree-link" catchtap="openAgreement" data-type="privacy">《隐私政策》</text>
       </view>
     </view>
   </view>
