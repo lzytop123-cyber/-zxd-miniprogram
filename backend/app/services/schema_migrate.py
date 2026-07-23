@@ -26,6 +26,7 @@ MIGRATION_STATEMENTS = [
     "ALTER TABLE reservations ADD COLUMN refunded_at DATETIME",
     "ALTER TABLE reservations ADD COLUMN period_card_id INTEGER",
     "ALTER TABLE period_cards ADD COLUMN expire_reminded_at DATETIME",
+    "ALTER TABLE meituan_deal_mapping ADD COLUMN limit_per_user INTEGER DEFAULT 0",
 ]
 
 # 性能索引（存量库补建；已存在时忽略）

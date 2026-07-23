@@ -53,9 +53,22 @@
       <el-table-column prop="deal_name" label="商品名称" />
       <el-table-column prop="reward_type" label="权益类型" width="120" />
       <el-table-column prop="reward_value" label="数值" width="80" />
+      <el-table-column label="限兑" width="100">
+        <template #default="{ row }">
+          <el-tag v-if="row.limit_per_user > 0" type="warning" size="small">每人{{ row.limit_per_user }}次</el-tag>
+          <span v-else class="muted">不限</span>
+        </template>
+      </el-table-column>
       <el-table-column prop="is_active" label="状态" width="80">
         <template #default="{ row }">
           <el-tag :type="row.is_active ? 'success' : 'info'">{{ row.is_active ? '启用' : '停用' }}</el-tag>
+        </template>
+      </el-table-column>
+      <el-table-column label="操作" width="120" fixed="right">
+        <template #default="{ row }">
+          <el-button link type="primary" @click="toggleLimit(row)">
+            {{ row.limit_per_user > 0 ? '取消限兑' : '设限兑1次' }}
+          </el-button>
         </template>
       </el-table-column>
     </el-table>
@@ -70,6 +83,9 @@
           </el-select>
         </el-form-item>
         <el-form-item label="数值"><el-input-number v-model="form.reward_value" :min="1" /></el-form-item>
+        <el-form-item label="每人限兑">
+          <el-switch v-model="form.limit_once" active-text="限1次" inactive-text="不限" />
+        </el-form-item>
       </el-form>
       <template #footer>
         <el-button @click="showAdd = false">取消</el-button>
@@ -100,10 +116,16 @@ const form = reactive({
   reward_value: 4,
   store_id: 1,
   platform: 1,
+  limit_once: false,
 })
 
 const dialogTitle = computed(() => (resolveId.value ? '配置待处理团购' : '新增团购映射'))
 const currentPlatform = computed(() => Number(platformTab.value))
+
+function nameLooksLimited(name: string) {
+  const n = name || ''
+  return n.includes('限购') || n.includes('新客') || (n.includes('暑期') && n.includes('双月'))
+}
 
 async function load() {
   loading.value = true
@@ -142,6 +164,7 @@ function openAdd() {
   form.deal_name = ''
   form.reward_type = 'hours'
   form.reward_value = 4
+  form.limit_once = false
   form.platform = currentPlatform.value
   showAdd.value = true
 }
@@ -152,25 +175,39 @@ function openResolve(row: any) {
   form.deal_name = row.deal_name || ''
   form.reward_type = row.suggested_reward_type || 'day_pass'
   form.reward_value = row.suggested_reward_value || 1
+  form.limit_once = nameLooksLimited(row.deal_name || '')
   form.platform = currentPlatform.value
   showAdd.value = true
 }
 
 async function submit() {
+  const limit_per_user = form.limit_once ? 1 : 0
   if (resolveId.value) {
     await http.post(`/admin/deal-mappings/pending/${resolveId.value}/resolve`, {
       store_id: storeId.value,
       deal_name: form.deal_name,
       reward_type: form.reward_type,
       reward_value: form.reward_value,
+      limit_per_user,
     })
     ElMessage.success('已配置，可让用户重新兑换')
   } else {
-    await http.post('/admin/deal-mappings', { ...form, platform: currentPlatform.value })
+    await http.post('/admin/deal-mappings', {
+      ...form,
+      platform: currentPlatform.value,
+      limit_per_user,
+    })
     ElMessage.success('已添加')
   }
   showAdd.value = false
   resolveId.value = null
+  load()
+}
+
+async function toggleLimit(row: any) {
+  const next = row.limit_per_user > 0 ? 0 : 1
+  await http.put(`/admin/deal-mappings/${row.id}/limit`, null, { params: { limit_per_user: next } })
+  ElMessage.success(next ? '已设为每人限兑1次' : '已取消限兑')
   load()
 }
 
@@ -193,4 +230,5 @@ onMounted(async () => {
 .actions { display: flex; align-items: center; flex-wrap: wrap; gap: 4px; }
 .pending-alert { margin-bottom: 16px; }
 .pending-table { margin-bottom: 8px; }
+.muted { color: #999; font-size: 13px; }
 </style>

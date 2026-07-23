@@ -437,6 +437,8 @@ class MeituanDealMapping(Base):
     night_end: Mapped[time | None] = mapped_column(Time)
     platform: Mapped[int] = mapped_column(Integer, default=1)
     is_active: Mapped[int] = mapped_column(Integer, default=1)
+    # 同一小程序用户对该 deal 成功核销上限；0=不限，1=限兑一次（新客/限购券）
+    limit_per_user: Mapped[int] = mapped_column(Integer, default=0)
 
 
 class PendingDealMapping(Base):

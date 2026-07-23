@@ -48,13 +48,11 @@ def _card_type_label(card: PeriodCard) -> str:
 
 
 def _build_template_data(card: PeriodCard) -> dict:
-    """字段名需与微信后台模板一致；默认 thing1/time2/thing3，可按模板改。"""
+    """字段与模板「订阅服务续费提醒」一致：thing6=服务名称，time3=到期时间。"""
     end = card.end_date.isoformat() if card.end_date else ""
-    tip = "还剩5天到期，续费可继续预约座位"
     return {
-        "thing1": {"value": _card_type_label(card)},
-        "time2": {"value": end},
-        "thing3": {"value": tip[:20]},
+        "thing6": {"value": _card_type_label(card)[:20]},
+        "time3": {"value": end},
     }
 
 

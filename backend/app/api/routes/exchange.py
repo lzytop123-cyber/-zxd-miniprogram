@@ -1,3 +1,4 @@
+import json
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Path, Query
@@ -19,9 +20,12 @@ from app.models import (
 from app.schemas.common import ResponseModel
 from app.services.card_service import card_validity_api_fields, get_mapping_by_deal_id, issue_period_card
 from app.services.deal_mapping_service import (
+    guess_limit_per_user_from_name,
     guess_reward_from_name,
+    mapping_limit_per_user,
     mark_pending_resolved_by_deal_id,
     record_pending_deal,
+    user_redeemed_deal_count,
 )
 from app.services.douyin import DouyinService, parse_douyin_voucher_expire_date, use_douyin_official
 from app.services.yunlaoban import YunlaobanService, parse_voucher_expire_date
@@ -29,10 +33,38 @@ from app.services.yunlaoban import YunlaobanService, parse_voucher_expire_date
 router = APIRouter(prefix="/exchange", tags=["兑换"])
 
 
-async def _prepare_and_consume(platform: int, code: str) -> tuple[dict, str]:
+async def _prepare(platform: int, code: str) -> tuple[dict, dict | None]:
+    """验券准备（不核销）。返回 (yunlaoban 形态 prepared, 抖音原始 prepared 或 None)。"""
     if platform == 2 and use_douyin_official():
-        return await DouyinService.prepare_and_verify(code)
-    return await YunlaobanService.prepare_and_consume(platform, code)
+        import httpx
+        from app.core.config import settings
+
+        timeout = settings.yunlaoban_timeout_sec
+        async with httpx.AsyncClient(timeout=timeout) as client:
+            raw = await DouyinService._prepare_with_client(client, code)
+        shape = {
+            "ticketInfo": raw.get("verify_token") or "",
+            "ticketName": raw.get("ticketName") or "",
+            "ticketData": raw.get("ticketData") or {},
+        }
+        return shape, raw
+    prepared = await YunlaobanService.prepare(platform, code)
+    return prepared, None
+
+
+async def _consume(platform: int, code: str, prepared: dict, douyin_raw: dict | None) -> str:
+    """正式核销。"""
+    if platform == 2 and use_douyin_official():
+        import httpx
+        from app.core.config import settings
+
+        if not douyin_raw:
+            raise ValueError("抖音验券状态丢失，请重试")
+        timeout = settings.yunlaoban_timeout_sec
+        async with httpx.AsyncClient(timeout=timeout) as client:
+            verified = await DouyinService._verify_with_client(client, douyin_raw)
+        return json.dumps(verified, ensure_ascii=False)
+    return await YunlaobanService.consume(platform, code, prepared["ticketInfo"])
 
 
 def _parse_voucher_expire(ticket_data: dict | None, platform: int):
@@ -109,9 +141,9 @@ async def _exchange(
             raise HTTPException(status_code=400, detail="该券码已兑换")
         raise HTTPException(status_code=409, detail="该券码正在兑换中，请稍后重试")
 
-    # 占位成功后再核销；核销失败则释放占位以便用户重试
+    # 1) 仅 prepare，拿到 deal 信息后再决定是否正式核销（避免限兑用户把券核废）
     try:
-        prepared, consume_result = await _prepare_and_consume(platform, code)
+        prepared, douyin_raw = await _prepare(platform, code)
     except ValueError as e:
         db.delete(order)
         db.commit()
@@ -121,11 +153,10 @@ async def _exchange(
         db.commit()
         raise
 
-    deal_id = str(prepared["ticketData"].get("dealId", ""))
+    deal_id = str((prepared.get("ticketData") or {}).get("dealId", ""))
+    ticket_name = prepared.get("ticketName") or (prepared.get("ticketData") or {}).get("dealTitle", "")
     mapping = get_mapping_by_deal_id(db, deal_id)
     if not mapping:
-        ticket_name = prepared.get("ticketName") or prepared["ticketData"].get("dealTitle", "")
-        # 自动识别并创建映射，无需管理员手动配置
         reward_type, reward_value = guess_reward_from_name(ticket_name)
         mapping = MeituanDealMapping(
             store_id=body.store_id,
@@ -135,9 +166,9 @@ async def _exchange(
             reward_value=reward_value,
             platform=platform,
             is_active=1,
+            limit_per_user=guess_limit_per_user_from_name(ticket_name),
         )
         db.add(mapping)
-        # 同时记录到待配置列表，方便管理员后续查看/调整
         record_pending_deal(
             db,
             deal_id=deal_id,
@@ -147,8 +178,37 @@ async def _exchange(
             ticket_data=prepared.get("ticketData"),
         )
         mark_pending_resolved_by_deal_id(db, deal_id)
-        db.commit()
+        db.flush()
         db.refresh(mapping)
+    elif not getattr(mapping, "limit_per_user", 0) and guess_limit_per_user_from_name(
+        ticket_name or mapping.deal_name or ""
+    ):
+        # 存量映射补标限兑
+        mapping.limit_per_user = 1
+        db.flush()
+
+    limit_n = mapping_limit_per_user(mapping, ticket_name or mapping.deal_name or "")
+    if limit_n > 0 and deal_id:
+        redeemed = user_redeemed_deal_count(db, user.id, deal_id)
+        if redeemed >= limit_n:
+            db.delete(order)
+            db.commit()
+            raise HTTPException(
+                status_code=400,
+                detail="该优惠每人限兑 1 次，您已兑换过。换手机号购买的券也无法重复兑换到同一微信账号。",
+            )
+
+    # 2) 正式核销
+    try:
+        consume_result = await _consume(platform, code, prepared, douyin_raw)
+    except ValueError as e:
+        db.delete(order)
+        db.commit()
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception:
+        db.delete(order)
+        db.commit()
+        raise
 
     ticket_data = prepared.get("ticketData") or {}
     voucher_expire = _parse_voucher_expire(ticket_data, platform)

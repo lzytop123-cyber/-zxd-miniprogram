@@ -42,6 +42,45 @@ def guess_reward_from_name(name: str) -> tuple[RewardType, int]:
     return RewardType.day_pass, 1
 
 
+def guess_limit_per_user_from_name(name: str) -> int:
+    """根据商品名判断是否「每微信用户限兑1次」（新客/限购/暑期双月等）。"""
+    n = name or ""
+    if "限购" in n:
+        return 1
+    if "新客专享" in n or "新客" in n:
+        return 1
+    if "暑期" in n and "双月" in n:
+        return 1
+    return 0
+
+
+def mapping_limit_per_user(mapping: MeituanDealMapping | None, deal_name: str = "") -> int:
+    """映射表优先；未配置时用商品名启发式。"""
+    if mapping is not None:
+        flagged = int(getattr(mapping, "limit_per_user", 0) or 0)
+        if flagged > 0:
+            return flagged
+    return guess_limit_per_user_from_name(deal_name or (mapping.deal_name if mapping else "") or "")
+
+
+def user_redeemed_deal_count(db: Session, user_id: int, deal_id: str) -> int:
+    """该用户对该 deal_id 已成功核销次数。"""
+    if not deal_id:
+        return 0
+    from app.models import MeituanOrder, MeituanOrderStatus
+    from sqlalchemy import func
+
+    return (
+        db.scalar(
+            select(func.count()).where(
+                MeituanOrder.user_id == user_id,
+                MeituanOrder.meituan_deal_id == deal_id,
+                MeituanOrder.status == MeituanOrderStatus.verified,
+            )
+        )
+        or 0
+    )
+
 def record_pending_deal(
     db: Session,
     *,
@@ -115,6 +154,7 @@ def resolve_pending_deal(
         reward_value=reward_value,
         platform=pending.platform or 1,
         is_active=1,
+        limit_per_user=guess_limit_per_user_from_name(deal_name or pending.deal_name or ""),
     )
     db.add(mapping)
     pending.status = "resolved"

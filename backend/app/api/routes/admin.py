@@ -249,6 +249,7 @@ class DealMappingCreateRequest(BaseModel):
     reward_value: int | None = None
     platform: int = 1
     is_active: int = 1
+    limit_per_user: int = 0
 
 
 class PendingDealResolveRequest(BaseModel):
@@ -256,6 +257,7 @@ class PendingDealResolveRequest(BaseModel):
     deal_name: str | None = None
     reward_type: RewardType | None = None
     reward_value: int | None = None
+    limit_per_user: int | None = None
 
 
 class CouponCreateRequest(BaseModel):
@@ -415,6 +417,7 @@ def list_deal_mappings(
                 "reward_value": r.reward_value,
                 "platform": getattr(r, "platform", 1) or 1,
                 "is_active": r.is_active,
+                "limit_per_user": int(getattr(r, "limit_per_user", 0) or 0),
             }
             for r in rows
         ]
@@ -427,6 +430,11 @@ def create_deal_mapping(
     _: object = Depends(get_current_admin),
     db: Session = Depends(get_db),
 ):
+    from app.services.deal_mapping_service import guess_limit_per_user_from_name
+
+    limit = body.limit_per_user
+    if not limit and body.deal_name:
+        limit = guess_limit_per_user_from_name(body.deal_name)
     row = MeituanDealMapping(
         store_id=body.store_id,
         deal_id=body.deal_id,
@@ -435,12 +443,31 @@ def create_deal_mapping(
         reward_value=body.reward_value,
         platform=body.platform,
         is_active=body.is_active,
+        limit_per_user=limit,
     )
     db.add(row)
     db.commit()
     db.refresh(row)
     mark_pending_resolved_by_deal_id(db, body.deal_id)
     return ResponseModel(message="已添加", data={"id": row.id})
+
+
+@router.put("/deal-mappings/{mapping_id}/limit", response_model=ResponseModel)
+def update_deal_mapping_limit(
+    mapping_id: int,
+    limit_per_user: int = Query(1, ge=0, le=10),
+    _: object = Depends(get_current_admin),
+    db: Session = Depends(get_db),
+):
+    row = db.get(MeituanDealMapping, mapping_id)
+    if not row:
+        raise HTTPException(status_code=404, detail="映射不存在")
+    row.limit_per_user = limit_per_user
+    db.commit()
+    return ResponseModel(
+        message="已更新限兑",
+        data={"id": row.id, "limit_per_user": row.limit_per_user},
+    )
 
 
 @router.get("/deal-mappings/pending", response_model=ResponseModel)
@@ -483,14 +510,23 @@ def resolve_pending_deal_mapping(
     if not pending or pending.status != "pending":
         raise HTTPException(status_code=404, detail="待配置项不存在")
     try:
+        from app.services.deal_mapping_service import guess_limit_per_user_from_name, resolve_pending_deal
+
+        name = body.deal_name or pending.deal_name
+        limit = body.limit_per_user
+        if limit is None:
+            limit = guess_limit_per_user_from_name(name or "")
         mapping = resolve_pending_deal(
             db,
             pending_id,
             store_id=body.store_id,
             reward_type=body.reward_type or pending.suggested_reward_type or RewardType.day_pass,
             reward_value=body.reward_value if body.reward_value is not None else pending.suggested_reward_value,
-            deal_name=body.deal_name or pending.deal_name,
+            deal_name=name,
         )
+        if limit is not None and int(getattr(mapping, "limit_per_user", 0) or 0) != int(limit):
+            mapping.limit_per_user = int(limit)
+            db.commit()
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     return ResponseModel(
@@ -501,6 +537,7 @@ def resolve_pending_deal_mapping(
             "deal_name": mapping.deal_name,
             "reward_type": mapping.reward_type.value,
             "reward_value": mapping.reward_value,
+            "limit_per_user": int(getattr(mapping, "limit_per_user", 0) or 0),
         },
     )
 
