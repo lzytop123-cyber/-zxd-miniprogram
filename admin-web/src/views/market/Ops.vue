@@ -112,39 +112,65 @@ async function load() {
     reports.value = parsePageResult(r).items
     words.value = Array.isArray(w.data) ? w.data : []
     categories.value = Array.isArray(c.data) ? c.data : []
+  } catch (e: any) {
+    ElMessage.error(e?.response?.data?.detail || e?.message || '加载失败')
   } finally {
     loading.value = false
   }
 }
 
 async function handle(row: any, accept: boolean) {
-  await http.post(`/admin/market/reports/${row.id}/handle`, {
-    accept,
-    take_down: accept,
-    handle_note: accept ? '举报成立' : '不成立',
-  })
-  ElMessage.success('已处理')
-  load()
+  try {
+    await http.post(`/admin/market/reports/${row.id}/handle`, {
+      accept,
+      take_down: accept,
+      handle_note: accept ? '举报成立' : '不成立',
+    })
+    ElMessage.success('已处理')
+    await load()
+  } catch (e: any) {
+    ElMessage.error(e?.response?.data?.detail || e?.message || '处理失败')
+  }
 }
 
 async function addWord() {
-  if (!word.value.trim()) return
-  await http.post('/admin/market/sensitive-words', { word: word.value.trim(), level: level.value })
-  word.value = ''
-  ElMessage.success('已添加')
-  load()
+  const text = (word.value || '').trim()
+  if (!text) {
+    ElMessage.warning('请先输入敏感词')
+    return
+  }
+  try {
+    await http.post('/admin/market/sensitive-words', {
+      word: text,
+      level: level.value || 'block',
+      status: 1,
+    })
+    word.value = ''
+    ElMessage.success('已添加')
+    await load()
+  } catch (e: any) {
+    ElMessage.error(e?.response?.data?.detail || e?.message || '添加失败')
+  }
 }
 
 async function delWord(id: number) {
-  await http.delete(`/admin/market/sensitive-words/${id}`)
-  ElMessage.success('已删除')
-  load()
+  try {
+    await http.delete(`/admin/market/sensitive-words/${id}`)
+    ElMessage.success('已删除')
+    await load()
+  } catch (e: any) {
+    ElMessage.error(e?.response?.data?.detail || e?.message || '删除失败')
+  }
 }
 
 async function toggleCategory(row: any) {
-  await http.put(`/admin/market/categories/${row.id}`, { status: row.status ? 0 : 1 })
-  ElMessage.success('已更新')
-  load()
+  try {
+    await http.put(`/admin/market/categories/${row.id}`, { status: row.status ? 0 : 1 })
+    ElMessage.success('已更新')
+    await load()
+  } catch (e: any) {
+    ElMessage.error(e?.response?.data?.detail || e?.message || '更新失败')
+  }
 }
 
 async function setBan(banned: boolean) {
@@ -152,11 +178,15 @@ async function setBan(banned: boolean) {
     ElMessage.warning('请填写用户ID')
     return
   }
-  await http.post(`/admin/market/users/${banUserId.value}/ban`, {
-    banned,
-    reason: banReason.value || undefined,
-  })
-  ElMessage.success('已更新')
+  try {
+    await http.post(`/admin/market/users/${banUserId.value}/ban`, {
+      banned,
+      reason: banReason.value || undefined,
+    })
+    ElMessage.success('已更新')
+  } catch (e: any) {
+    ElMessage.error(e?.response?.data?.detail || e?.message || '操作失败')
+  }
 }
 
 onMounted(load)
