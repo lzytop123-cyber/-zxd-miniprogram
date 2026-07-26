@@ -46,6 +46,7 @@ function getFeatures() {
 function setFeatures(features) {
   const next = {
     study_assistant: !(features && features.study_assistant === false),
+    marketplace: !(features && features.marketplace === false),
   }
   const app = getApp()
   if (app && app.globalData) {
@@ -57,6 +58,10 @@ function setFeatures(features) {
 
 function isStudyAssistantEnabled() {
   return getFeatures().study_assistant !== false
+}
+
+function isMarketplaceEnabled() {
+  return getFeatures().marketplace !== false
 }
 
 function buildTabList(features) {
@@ -106,6 +111,7 @@ module.exports = {
   getFeatures,
   setFeatures,
   isStudyAssistantEnabled,
+  isMarketplaceEnabled,
   buildTabList,
   indexOfPath,
   syncTabBar,

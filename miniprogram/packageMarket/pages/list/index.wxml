@@ -1,0 +1,29 @@
+<view class="page">
+  <view class="filters">
+    <picker mode="selector" range="{{examCategories}}" range-key="name" data-field="exam_category_id" bindchange="onExamPick">
+      <view class="filter">考试</view>
+    </picker>
+    <picker mode="selector" range="{{materialCategories}}" range-key="name" data-field="material_category_id" bindchange="onMaterialPick">
+      <view class="filter">类型</view>
+    </picker>
+    <picker mode="selector" range="{{stores}}" range-key="name" data-field="store_id" bindchange="onStorePick">
+      <view class="filter">门店</view>
+    </picker>
+    <view class="filter {{is_free===true?'on':''}}" bindtap="toggleFree">免费</view>
+  </view>
+
+  <view class="list">
+    <view class="card" wx:for="{{items}}" wx:key="id" data-id="{{item.id}}" bindtap="goDetail">
+      <image class="cover" src="{{item.cover}}" mode="aspectFill" wx:if="{{item.cover}}" />
+      <view class="cover ph" wx:else>暂无图</view>
+      <view class="body">
+        <view class="title">{{item.title}}</view>
+        <view class="meta">{{item.store_name}} · {{item.exam_category_name}} · {{item.material_category_name}}</view>
+        <view class="price">{{item.priceText}}</view>
+      </view>
+    </view>
+  </view>
+  <view class="empty" wx:if="{{!loading && !items.length}}">暂无符合条件的资料</view>
+  <view class="tip" wx:if="{{loading}}">加载中...</view>
+  <view class="tip" wx:elif="{{finished && items.length}}">没有更多了</view>
+</view>

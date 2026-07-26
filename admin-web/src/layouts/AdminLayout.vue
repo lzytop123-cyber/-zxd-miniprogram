@@ -46,6 +46,12 @@
           <el-menu-item index="/knowledge">AI 知识库</el-menu-item>
         </el-sub-menu>
 
+        <el-sub-menu index="market">
+          <template #title>上岸集市</template>
+          <el-menu-item index="/market-listings">内容审核</el-menu-item>
+          <el-menu-item index="/market-ops">举报·分类·限制</el-menu-item>
+        </el-sub-menu>
+
         <el-sub-menu index="system">
           <template #title>系统</template>
           <el-menu-item index="/system-status">系统状态</el-menu-item>

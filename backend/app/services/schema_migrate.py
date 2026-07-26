@@ -15,6 +15,12 @@ MIGRATION_STATEMENTS = [
     "ALTER TABLE users ADD COLUMN invite_code VARCHAR(20)",
     "ALTER TABLE users ADD COLUMN invited_by INTEGER",
     "ALTER TABLE users ADD COLUMN study_goal VARCHAR(20)",
+    "ALTER TABLE users ADD COLUMN market_banned INTEGER DEFAULT 0",
+    "ALTER TABLE users ADD COLUMN market_ban_reason VARCHAR(200)",
+    "ALTER TABLE users ADD COLUMN market_ban_until DATETIME",
+    "ALTER TABLE users ADD COLUMN market_violation_count INTEGER DEFAULT 0",
+    "ALTER TABLE users ADD COLUMN market_wechat_id VARCHAR(64)",
+    "ALTER TABLE users ADD COLUMN preferred_store_id INTEGER",
     "ALTER TABLE home_banners ADD COLUMN layout_type VARCHAR(20) DEFAULT 'text'",
     "ALTER TABLE home_banners ADD COLUMN image_url VARCHAR(500)",
     "ALTER TABLE home_banners ADD COLUMN link_path VARCHAR(200)",
@@ -83,6 +89,13 @@ def run_schema_migrations(db: Session) -> dict:
     try:
         from app.models import (
             AdminOperationLog,
+            MarketCategory,
+            MarketContactRequest,
+            MarketFavorite,
+            MarketListing,
+            MarketModerationLog,
+            MarketReport,
+            MarketSensitiveWord,
             RechargeOrder,
             SiteBookingSetting,
             SiteContactSetting,
@@ -97,10 +110,24 @@ def run_schema_migrations(db: Session) -> dict:
             RechargeOrder,
             SiteContactSetting,
             SiteBookingSetting,
+            MarketCategory,
+            MarketListing,
+            MarketFavorite,
+            MarketContactRequest,
+            MarketReport,
+            MarketSensitiveWord,
+            MarketModerationLog,
         ):
             model.__table__.create(bind=engine, checkfirst=True)
             if inspector.has_table(model.__tablename__):
                 created_tables.append(model.__tablename__)
+
+        try:
+            from app.services.market_seed import ensure_market_categories
+
+            ensure_market_categories(db)
+        except Exception as exc:
+            errors.append(f"seed market categories: {exc.__class__.__name__}")
     except Exception as exc:
         errors.append(f"create tables: {exc.__class__.__name__}")
 

@@ -22,6 +22,19 @@ class Settings(BaseSettings):
         default=True,
         validation_alias=AliasChoices("FEATURE_STUDY_ASSISTANT", "feature_study_assistant"),
     )
+    # 上岸集市：灰度/紧急关闭；关闭后隐藏入口。勿用于向微信审核隐瞒真实业务。
+    feature_marketplace: bool = Field(
+        default=True,
+        validation_alias=AliasChoices("FEATURE_MARKETPLACE", "feature_marketplace"),
+    )
+    # 微信内容安全接口：未开通时跳过机审，仍强制人工审核后公开
+    wx_content_security_enabled: bool = Field(
+        default=False,
+        validation_alias=AliasChoices(
+            "WX_CONTENT_SECURITY_ENABLED",
+            "wx_content_security_enabled",
+        ),
+    )
     # 允许的跨域来源：逗号分隔；为 "*" 时开发环境放开（生产应配置白名单）
     cors_origins: str = "*"
 
@@ -110,7 +123,7 @@ class Settings(BaseSettings):
     # DeepSeek AI 学习助手（OpenAI 兼容接口）
     deepseek_api_key: str = ""
     deepseek_base_url: str = "https://api.deepseek.com"
-    deepseek_model: str = "deepseek-chat"
+    deepseek_model: str = "deepseek-v4-flash"
     deepseek_embedding_model: str = "deepseek-embedding"
     deepseek_timeout_sec: float = 30.0
 

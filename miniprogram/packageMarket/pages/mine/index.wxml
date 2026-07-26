@@ -1,0 +1,37 @@
+<view class="page">
+  <view class="top-actions">
+    <view class="btn" bindtap="goPublish">发布资料</view>
+    <view class="btn ghost" bindtap="goContacts">联系申请</view>
+  </view>
+
+  <view class="tabs">
+    <view class="tab {{tab==='listings'?'on':''}}" data-tab="listings" bindtap="switchTab">我的发布</view>
+    <view class="tab {{tab==='favorites'?'on':''}}" data-tab="favorites" bindtap="switchTab">收藏</view>
+    <view class="tab {{tab==='reports'?'on':''}}" data-tab="reports" bindtap="switchTab">举报</view>
+  </view>
+
+  <block wx:if="{{tab==='listings'}}">
+    <view class="card" wx:for="{{listings}}" wx:key="id" data-id="{{item.id}}" bindtap="goDetail">
+      <view class="title">{{item.title}}</view>
+      <view class="meta">{{item.statusLabel}} · {{item.priceText}}</view>
+    </view>
+    <view class="empty" wx:if="{{!listings.length}}">暂无发布</view>
+  </block>
+
+  <block wx:if="{{tab==='favorites'}}">
+    <view class="card" wx:for="{{favorites}}" wx:key="id" data-id="{{item.id}}" bindtap="goDetail">
+      <view class="title">{{item.title}}</view>
+      <view class="meta">{{item.priceText}}</view>
+    </view>
+    <view class="empty" wx:if="{{!favorites.length}}">暂无收藏</view>
+  </block>
+
+  <block wx:if="{{tab==='reports'}}">
+    <view class="card" wx:for="{{reports}}" wx:key="id">
+      <view class="title">资料 #{{item.listing_id}}</view>
+      <view class="meta">{{item.reason_code}} · {{item.status}}</view>
+      <view class="meta" wx:if="{{item.handle_note}}">处理：{{item.handle_note}}</view>
+    </view>
+    <view class="empty" wx:if="{{!reports.length}}">暂无举报记录</view>
+  </block>
+</view>

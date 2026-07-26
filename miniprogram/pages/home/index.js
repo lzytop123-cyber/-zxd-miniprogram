@@ -3,7 +3,7 @@ const auth = require('../../utils/auth')
 const { normalizeUser } = require('../../utils/user')
 const routes = require('../../utils/routes')
 const { handleTabScroll } = require('../../utils/tabbar')
-const { syncTabBar, setFeatures, isStudyAssistantEnabled } = require('../../utils/features')
+const { syncTabBar, setFeatures, isMarketplaceEnabled } = require('../../utils/features')
 const {
   enableShareMenu,
   savePendingInvite,
@@ -51,7 +51,7 @@ Page({
     showAnnouncementPopup: false,
     bannerReady: false,
     swiperKey: 0,
-    showStudyAssistant: isStudyAssistantEnabled(),
+    showMarketplace: isMarketplaceEnabled(),
   },
 
   onLoad(options) {
@@ -62,7 +62,9 @@ Page({
 
   onShow() {
     enableShareMenu()
-    this.setData({ showStudyAssistant: isStudyAssistantEnabled() })
+    this.setData({
+      showMarketplace: isMarketplaceEnabled(),
+    })
     syncTabBar(this, '/pages/home/index')
     this._tabbarLastTop = 0
     this.refreshHome({ silent: true })
@@ -180,7 +182,9 @@ Page({
 
       if (data.features) {
         setFeatures(data.features)
-        this.setData({ showStudyAssistant: isStudyAssistantEnabled() })
+        this.setData({
+          showMarketplace: isMarketplaceEnabled(),
+        })
         syncTabBar(this, '/pages/home/index')
       }
 
@@ -516,6 +520,14 @@ Page({
     wx.navigateTo({ url: routes.exchangeIndex })
   },
 
+  goMarket() {
+    if (!isMarketplaceEnabled()) {
+      wx.showToast({ title: '功能暂未开放', icon: 'none' })
+      return
+    }
+    wx.navigateTo({ url: routes.marketHome })
+  },
+
   goPackages() {
     wx.switchTab({ url: '/pages/packages/index' })
   },
@@ -538,14 +550,6 @@ Page({
 
   goProfile() {
     wx.switchTab({ url: '/pages/profile/index' })
-  },
-
-  goAssistant() {
-    if (!isStudyAssistantEnabled()) {
-      wx.showToast({ title: '功能暂未开放', icon: 'none' })
-      return
-    }
-    wx.switchTab({ url: '/pages/report/index' })
   },
 
   goOrders() {

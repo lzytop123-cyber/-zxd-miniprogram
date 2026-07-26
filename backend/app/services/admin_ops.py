@@ -19,6 +19,11 @@ from app.models import (
     CardType,
     Coupon,
     DoorLog,
+    MarketContactRequest,
+    MarketFavorite,
+    MarketListing,
+    MarketModerationLog,
+    MarketReport,
     MeituanOrder,
     OpenType,
     PeriodCard,
@@ -342,6 +347,24 @@ def delete_user_cascade(db: Session, user_id: int) -> dict:
     db.execute(delete(StudyStat).where(StudyStat.user_id == user_id))
     db.execute(delete(WechatSubscription).where(WechatSubscription.user_id == user_id))
     db.execute(update(MeituanOrder).where(MeituanOrder.user_id == user_id).values(user_id=None))
+
+    # 上岸集市
+    listing_ids = list(
+        db.scalars(select(MarketListing.id).where(MarketListing.user_id == user_id)).all()
+    )
+    if listing_ids:
+        db.execute(delete(MarketFavorite).where(MarketFavorite.listing_id.in_(listing_ids)))
+        db.execute(delete(MarketContactRequest).where(MarketContactRequest.listing_id.in_(listing_ids)))
+        db.execute(delete(MarketReport).where(MarketReport.listing_id.in_(listing_ids)))
+        db.execute(delete(MarketListing).where(MarketListing.id.in_(listing_ids)))
+    db.execute(delete(MarketFavorite).where(MarketFavorite.user_id == user_id))
+    db.execute(
+        delete(MarketContactRequest).where(
+            (MarketContactRequest.buyer_id == user_id) | (MarketContactRequest.seller_id == user_id)
+        )
+    )
+    db.execute(delete(MarketReport).where(MarketReport.reporter_id == user_id))
+    db.execute(delete(MarketModerationLog).where(MarketModerationLog.user_id == user_id))
 
     db.delete(user)
     return summary

@@ -1,0 +1,17 @@
+.page { padding-bottom: 48rpx; }
+.top-actions { display: flex; gap: 16rpx; margin: 24rpx; }
+.btn {
+  flex: 1; text-align: center; height: 80rpx; line-height: 80rpx;
+  background: #52B788; color: #fff; border-radius: 20rpx; font-weight: 600;
+}
+.btn.ghost { background: #D8F3DC; color: #2D6A4F; }
+.tabs { display: flex; margin: 0 24rpx 16rpx; background: #fff; border-radius: 20rpx; overflow: hidden; }
+.tab { flex: 1; text-align: center; padding: 20rpx 0; color: #8C9BA5; }
+.tab.on { color: #2D6A4F; font-weight: 700; background: #D8F3DC; }
+.card {
+  margin: 0 24rpx 16rpx; background: #fff; border-radius: 24rpx; padding: 24rpx;
+  box-shadow: 0 4rpx 24rpx rgba(28,43,32,.06);
+}
+.title { font-weight: 600; }
+.meta { margin-top: 8rpx; color: #8C9BA5; font-size: 24rpx; }
+.empty { text-align: center; color: #8C9BA5; padding: 80rpx 24rpx; }

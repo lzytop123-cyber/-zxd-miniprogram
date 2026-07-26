@@ -17,4 +17,10 @@ module.exports = {
   profileInvite: '/packageProfile/pages/profile/invite',
   profileContact: '/packageProfile/pages/profile/contact',
   profileAgreement: '/packageProfile/pages/profile/agreement',
+  marketHome: '/packageMarket/pages/home/index',
+  marketList: '/packageMarket/pages/list/index',
+  marketDetail: '/packageMarket/pages/detail/index',
+  marketPublish: '/packageMarket/pages/publish/index',
+  marketMine: '/packageMarket/pages/mine/index',
+  marketContacts: '/packageMarket/pages/contacts/index',
 }

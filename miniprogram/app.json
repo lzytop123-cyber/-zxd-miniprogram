@@ -46,6 +46,18 @@
         "pages/profile/contact",
         "pages/profile/agreement"
       ]
+    },
+    {
+      "root": "packageMarket",
+      "name": "market",
+      "pages": [
+        "pages/home/index",
+        "pages/list/index",
+        "pages/detail/index",
+        "pages/publish/index",
+        "pages/mine/index",
+        "pages/contacts/index"
+      ]
     }
   ],
   "lazyCodeLoading": "requiredComponents",

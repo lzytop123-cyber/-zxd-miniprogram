@@ -191,6 +191,7 @@ def get_home_bootstrap(
             "card_count": _active_card_count(db, user) if user else 0,
             "features": {
                 "study_assistant": settings.feature_study_assistant,
+                "marketplace": settings.feature_marketplace,
             },
         }
     )

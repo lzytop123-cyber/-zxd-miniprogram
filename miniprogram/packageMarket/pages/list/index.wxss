@@ -1,0 +1,18 @@
+.page { padding-bottom: 48rpx; }
+.filters { display: flex; gap: 12rpx; padding: 20rpx 24rpx; flex-wrap: wrap; }
+.filter {
+  background: #fff; padding: 12rpx 24rpx; border-radius: 40rpx; font-size: 24rpx; color: #2D6A4F;
+}
+.filter.on { background: #D8F3DC; font-weight: 600; }
+.list { padding: 0 24rpx; }
+.card {
+  display: flex; gap: 20rpx; background: #fff; border-radius: 28rpx;
+  padding: 20rpx; margin-bottom: 20rpx; box-shadow: 0 4rpx 24rpx rgba(28,43,32,.06);
+}
+.cover { width: 160rpx; height: 160rpx; border-radius: 20rpx; background: #E8ECEA; flex-shrink: 0; }
+.cover.ph { display:flex;align-items:center;justify-content:center;color:#8C9BA5;font-size:22rpx; }
+.body { flex: 1; min-width: 0; }
+.title { font-size: 28rpx; font-weight: 600; }
+.meta { margin-top: 8rpx; color: #8C9BA5; font-size: 22rpx; }
+.price { margin-top: 16rpx; color: #2D6A4F; font-weight: 700; font-size: 30rpx; }
+.empty, .tip { text-align: center; color: #8C9BA5; padding: 40rpx; }

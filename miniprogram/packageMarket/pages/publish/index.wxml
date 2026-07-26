@@ -1,0 +1,48 @@
+<view class="page">
+  <view class="card">
+    <view class="label">门店</view>
+    <picker mode="selector" range="{{stores}}" range-key="name" value="{{storeIndex}}" bindchange="onStore">
+      <view class="picker">{{stores[storeIndex].name || '请选择'}}</view>
+    </picker>
+
+    <view class="label">考试分类</view>
+    <picker mode="selector" range="{{examCategories}}" range-key="name" value="{{examIndex}}" bindchange="onExam">
+      <view class="picker">{{examCategories[examIndex].name || '请选择'}}</view>
+    </picker>
+
+    <view class="label">资料类型</view>
+    <picker mode="selector" range="{{materialCategories}}" range-key="name" value="{{materialIndex}}" bindchange="onMaterial">
+      <view class="picker">{{materialCategories[materialIndex].name || '请选择'}}</view>
+    </picker>
+
+    <view class="label">标题</view>
+    <input class="input" value="{{title}}" maxlength="100" bindinput="onTitle" placeholder="简要描述资料" />
+
+    <view class="label">介绍</view>
+    <textarea class="textarea" value="{{description}}" maxlength="2000" bindinput="onDesc" placeholder="成色、适用考试、交易说明等" />
+
+    <view class="label">价格（元，0 为免费）</view>
+    <input class="input" type="digit" value="{{price}}" bindinput="onPrice" placeholder="0" />
+
+    <view class="label">图片（最多9张）</view>
+    <view class="images">
+      <view class="img-wrap" wx:for="{{imageViews}}" wx:key="*this">
+        <image class="img" src="{{item}}" mode="aspectFill" />
+        <view class="del" data-index="{{index}}" bindtap="removeImage">×</view>
+      </view>
+      <view class="add" bindtap="chooseImage" wx:if="{{images.length < 9}}">+</view>
+    </view>
+
+    <checkbox-group bindchange="onCopyright">
+      <label class="check">
+        <checkbox value="1" checked="{{copyright_declared}}" color="#52B788" />
+        <text>{{copyright_text}}</text>
+      </label>
+    </checkbox-group>
+  </view>
+
+  <view class="btns">
+    <view class="btn ghost" bindtap="saveDraft">保存草稿</view>
+    <view class="btn primary" bindtap="submit">提交审核</view>
+  </view>
+</view>

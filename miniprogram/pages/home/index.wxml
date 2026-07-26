@@ -133,9 +133,9 @@
       <view class="member-arrow">›</view>
     </view>
     <view class="member-actions">
-      <view class="member-action" wx:if="{{showStudyAssistant}}" bindtap="goAssistant">
+      <view class="member-action" wx:if="{{showMarketplace}}" bindtap="goMarket">
         <view class="member-action-icon">📚</view>
-        <text>学习助手</text>
+        <text>上岸集市</text>
       </view>
       <view class="member-action" bindtap="goContact">
         <view class="member-action-icon">🎧</view>

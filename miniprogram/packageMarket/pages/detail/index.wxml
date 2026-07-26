@@ -1,0 +1,46 @@
+<view class="page" wx:if="{{listing}}">
+  <swiper class="swiper" indicator-dots="{{images.length>1}}" wx:if="{{images.length}}">
+    <swiper-item wx:for="{{images}}" wx:key="*this">
+      <image class="slide" src="{{item}}" mode="aspectFill" />
+    </swiper-item>
+  </swiper>
+  <view class="card">
+    <view class="title">{{listing.title}}</view>
+    <view class="price">{{listing.priceText}}</view>
+    <view class="meta">{{listing.exam_category_name}} · {{listing.material_category_name}} · {{listing.store_name}}</view>
+    <view class="meta" wx:if="{{listing.is_owner}}">状态：{{listing.statusLabel}}</view>
+    <view class="desc">{{listing.description}}</view>
+  </view>
+
+  <view class="card">
+    <view class="seller-row">
+      <image class="avatar" src="{{listing.seller.avatar_url}}" wx:if="{{listing.seller.avatar_url}}" />
+      <view class="avatar ph" wx:else>岛</view>
+      <view>
+        <view class="seller-name">{{listing.seller.nickname || '学员'}}</view>
+        <view class="meta">{{listing.seller.title || '岛民'}} · 违规 {{listing.seller.violation_count || 0}}</view>
+      </view>
+    </view>
+    <view class="hint">联系方式不公开展示，需申请并由卖家同意后可见</view>
+  </view>
+
+  <view class="section-title" wx:if="{{similar.length}}">相似资料</view>
+  <view class="similar" wx:if="{{similar.length}}">
+    <view class="sim-card" wx:for="{{similar}}" wx:key="id" data-id="{{item.id}}" bindtap="goSimilar">
+      <image class="sim-cover" src="{{item.cover}}" mode="aspectFill" wx:if="{{item.cover}}" />
+      <view class="sim-title">{{item.title}}</view>
+      <view class="sim-price">{{item.priceText}}</view>
+    </view>
+  </view>
+
+  <view class="bottom">
+    <view class="btn ghost" bindtap="toggleFavorite">{{listing.favorited ? '已收藏' : '收藏'}}</view>
+    <view class="btn ghost" bindtap="report">举报</view>
+    <block wx:if="{{listing.is_owner}}">
+      <view class="btn ghost" bindtap="goEdit" wx:if="{{listing.status!=='published' && listing.status!=='pending'}}">编辑</view>
+      <view class="btn ghost" bindtap="ownerOff" wx:if="{{listing.status==='published' || listing.status==='sold'}}">下架</view>
+      <view class="btn primary" bindtap="ownerSold" wx:if="{{listing.status==='published' || listing.status==='off'}}">已出</view>
+    </block>
+    <view class="btn primary" bindtap="contactSeller" wx:else>联系卖家</view>
+  </view>
+</view>

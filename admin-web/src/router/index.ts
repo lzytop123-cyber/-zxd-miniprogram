@@ -34,6 +34,8 @@ const router = createRouter({
         { path: 'locks', component: () => import('../views/Locks.vue') },
         { path: 'deal-mappings', component: () => import('../views/DealMappings.vue') },
         { path: 'coupons', component: () => import('../views/Coupons.vue') },
+        { path: 'market-listings', component: () => import('../views/market/Listings.vue') },
+        { path: 'market-ops', component: () => import('../views/market/Ops.vue') },
       ],
     },
   ],

@@ -110,6 +110,13 @@ class User(Base):
     total_points: Mapped[int] = mapped_column(Integer, default=0)
     invite_code: Mapped[str | None] = mapped_column(String(20), unique=True)
     invited_by: Mapped[int | None] = mapped_column(Integer, ForeignKey("users.id"))
+    # 上岸集市（不影响预约；可空以兼容旧库）
+    market_banned: Mapped[int] = mapped_column(Integer, default=0)
+    market_ban_reason: Mapped[str | None] = mapped_column(String(200))
+    market_ban_until: Mapped[datetime | None] = mapped_column(DateTime)
+    market_violation_count: Mapped[int] = mapped_column(Integer, default=0)
+    market_wechat_id: Mapped[str | None] = mapped_column(String(64))
+    preferred_store_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("stores.id"))
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
         DateTime, server_default=func.now(), onupdate=func.now()
@@ -567,3 +574,20 @@ class StoreCalendarDay(Base):
     close_time: Mapped[time | None] = mapped_column(Time)
     remark: Mapped[str | None] = mapped_column(String(200))
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+
+# 上岸集市模型（独立模块）
+from app.models.market import (  # noqa: E402
+    MarketCategory,
+    MarketCategoryType,
+    MarketContactRequest,
+    MarketContactStatus,
+    MarketFavorite,
+    MarketListing,
+    MarketListingStatus,
+    MarketModerationLog,
+    MarketReport,
+    MarketReportStatus,
+    MarketRevealType,
+    MarketSensitiveWord,
+)

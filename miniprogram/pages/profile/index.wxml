@@ -94,6 +94,10 @@
       <view class="menu-icon">💬</view>
       <text>联系店长</text>
     </view>
+    <view class="menu-item" wx:if="{{showMarketplace}}" bindtap="goMarket">
+      <view class="menu-icon">📚</view>
+      <text>上岸集市</text>
+    </view>
     <button
       wx:if="{{loginState === 'ready' && user}}"
       class="menu-item phone-btn"

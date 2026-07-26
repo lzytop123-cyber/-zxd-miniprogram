@@ -3,7 +3,7 @@ const { request } = require('../../utils/request')
 const { normalizeUser, pickAvatarDisplay } = require('../../utils/user')
 const routes = require('../../utils/routes')
 const { handleTabScroll } = require('../../utils/tabbar')
-const { syncTabBar } = require('../../utils/features')
+const { syncTabBar, isMarketplaceEnabled } = require('../../utils/features')
 const { enableShareMenu, shareAppMessage, shareTimeline } = require('../../utils/share')
 
 const GOAL_OPTIONS = [
@@ -20,6 +20,7 @@ Page({
     avatarUploading: false,
     saving: false,
     goalOptions: GOAL_OPTIONS,
+    showMarketplace: isMarketplaceEnabled(),
     menuUrls: {
       wallet: routes.profileWallet,
       orders: routes.profileOrders,
@@ -40,6 +41,7 @@ Page({
 
   onShow() {
     enableShareMenu()
+    this.setData({ showMarketplace: isMarketplaceEnabled() })
     syncTabBar(this, '/pages/profile/index')
     this._tabbarLastTop = 0
     this.bootstrap({ silent: true })
@@ -186,5 +188,13 @@ Page({
 
   goPackages() {
     wx.switchTab({ url: '/pages/packages/index' })
+  },
+
+  goMarket() {
+    if (!isMarketplaceEnabled()) {
+      wx.showToast({ title: '功能暂未开放', icon: 'none' })
+      return
+    }
+    wx.navigateTo({ url: routes.marketMine })
   },
 })

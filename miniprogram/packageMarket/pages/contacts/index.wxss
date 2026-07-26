@@ -1,0 +1,14 @@
+.page { padding: 24rpx; }
+.card {
+  background: #fff; border-radius: 24rpx; padding: 24rpx; margin-bottom: 16rpx;
+  box-shadow: 0 4rpx 24rpx rgba(28,43,32,.06);
+}
+.title { font-weight: 600; }
+.meta { margin-top: 8rpx; color: #8C9BA5; font-size: 24rpx; }
+.ops { display: flex; gap: 12rpx; margin-top: 16rpx; }
+.btn {
+  flex: 1; text-align: center; height: 72rpx; line-height: 72rpx;
+  background: #52B788; color: #fff; border-radius: 16rpx; font-weight: 600;
+}
+.btn.ghost { background: #D8F3DC; color: #2D6A4F; }
+.empty { text-align: center; color: #8C9BA5; padding: 80rpx 24rpx; }

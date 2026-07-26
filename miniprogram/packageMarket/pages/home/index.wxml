@@ -1,0 +1,39 @@
+<view class="page">
+  <view class="search-bar">
+    <input class="search-input" placeholder="搜索资料标题" value="{{keyword}}" bindinput="onSearchInput" confirm-type="search" bindconfirm="goSearch" />
+    <view class="search-btn" bindtap="goSearch">搜索</view>
+  </view>
+
+  <view class="actions">
+    <view class="action" bindtap="goPublish">发布资料</view>
+    <view class="action ghost" bindtap="goMine">我的集市</view>
+  </view>
+
+  <view class="section-title">考试分类</view>
+  <view class="chips">
+    <view class="chip" wx:for="{{examCategories}}" wx:key="id" data-id="{{item.id}}" bindtap="goExam">{{item.name}}</view>
+  </view>
+
+  <view class="section-title">资料类型</view>
+  <view class="chips">
+    <view class="chip" wx:for="{{materialCategories}}" wx:key="id" data-id="{{item.id}}" bindtap="goMaterial">{{item.name}}</view>
+  </view>
+
+  <view class="section-row">
+    <view class="section-title">最新发布</view>
+    <text class="more" bindtap="goList">全部 ›</text>
+  </view>
+
+  <view class="list" wx:if="{{latest.length}}">
+    <view class="card" wx:for="{{latest}}" wx:key="id" data-id="{{item.id}}" bindtap="goDetail">
+      <image class="cover" src="{{item.cover}}" mode="aspectFill" wx:if="{{item.cover}}" />
+      <view class="cover ph" wx:else>暂无图</view>
+      <view class="body">
+        <view class="title">{{item.title}}</view>
+        <view class="meta">{{item.exam_category_name}} · {{item.material_category_name}}</view>
+        <view class="price">{{item.priceText}}</view>
+      </view>
+    </view>
+  </view>
+  <view class="empty" wx:elif="{{!loading}}">暂无发布，来发布第一条吧</view>
+</view>
