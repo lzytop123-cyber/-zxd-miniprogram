@@ -41,6 +41,7 @@ from app.services.booking import (
     resolve_booking_window,
     seat_conflict_excluding,
     seat_options_for_change,
+    validate_booking_start_advance,
     validate_seat_for_booking,
 )
 from app.services.card_service import (
@@ -85,6 +86,7 @@ def _prepare_booking(db: Session, body, require_seat: bool = False):
             pass
     try:
         start, end = resolve_booking_window(body.bill_type, body.start_time, body.end_time, rule)
+        validate_booking_start_advance(start)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     if body.bill_type == BillType.session:

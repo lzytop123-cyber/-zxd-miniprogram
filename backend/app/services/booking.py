@@ -34,6 +34,18 @@ from app.services.store_hours import (
 
 logger = logging.getLogger(__name__)
 
+# 预约开始日最多可提前天数（防远期占座）
+BOOKING_START_MAX_ADVANCE_DAYS = 3
+
+
+def validate_booking_start_advance(start: datetime, today: date | None = None) -> None:
+    """开始日须在今天起 BOOKING_START_MAX_ADVANCE_DAYS 天内。"""
+    today = today or date.today()
+    start_day = start.date()
+    latest = today + timedelta(days=BOOKING_START_MAX_ADVANCE_DAYS)
+    if start_day > latest:
+        raise ValueError("开始日最多提前3天，请重新选择日期")
+
 
 def resolve_booking_window(
     bill_type: BillType,
