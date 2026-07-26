@@ -9,7 +9,7 @@ from fastapi import HTTPException
 from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
-from app.core.static_url import public_static_path
+from app.core.static_url import public_static_path, public_static_url
 from app.models import (
     AdminUser,
     MarketCategory,
@@ -144,13 +144,20 @@ def listing_to_dict(
             )
             is not None
         )
+    raw_images = listing.images or []
+    # 管理端需要可直接打开的完整 URL；小程序端用相对 /static 路径再拼域名
+    if include_private:
+        images = [public_static_url(i) or public_static_path(i) for i in raw_images]
+    else:
+        images = [public_static_path(i) for i in raw_images]
     data = {
         "id": listing.id,
         "title": listing.title,
         "description": listing.description,
         "price": float(listing.price or 0),
         "is_free": bool(listing.is_free),
-        "images": [public_static_path(i) for i in (listing.images or [])],
+        "images": images,
+        "cover": images[0] if images else None,
         "status": listing.status,
         "store_id": listing.store_id,
         "store_name": store.name if store else None,
