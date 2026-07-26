@@ -169,6 +169,38 @@ def run_schema_migrations(db: Session) -> dict:
         db.rollback()
         errors.append(f"backfill seats: {exc.__class__.__name__}")
 
+    # 核销时间曾用本地 now 写入，后台按 UTC+8 展示会多出约 8 小时；纠偏与 created_at 差约 8h 的旧数据
+    verified_tz_fix = 0
+    try:
+        if inspector.has_table("meituan_orders"):
+            if dialect == "sqlite":
+                result = db.execute(
+                    text(
+                        "UPDATE meituan_orders "
+                        "SET verified_at = datetime(verified_at, '-8 hours') "
+                        "WHERE verified_at IS NOT NULL AND created_at IS NOT NULL "
+                        "AND (strftime('%s', verified_at) - strftime('%s', created_at)) "
+                        "BETWEEN 25200 AND 32400"
+                    )
+                )
+            else:
+                result = db.execute(
+                    text(
+                        "UPDATE meituan_orders "
+                        "SET verified_at = DATE_SUB(verified_at, INTERVAL 8 HOUR) "
+                        "WHERE verified_at IS NOT NULL AND created_at IS NOT NULL "
+                        "AND TIMESTAMPDIFF(SECOND, created_at, verified_at) "
+                        "BETWEEN 25200 AND 32400"
+                    )
+                )
+            verified_tz_fix = result.rowcount or 0
+            if verified_tz_fix:
+                db.commit()
+                applied.append(f"fix_verified_at_tz:{verified_tz_fix}")
+    except Exception as exc:
+        db.rollback()
+        errors.append(f"fix verified_at tz: {exc.__class__.__name__}")
+
     _last_result = {
         "status": "ok" if not errors else "partial",
         "dialect": dialect,
@@ -176,6 +208,7 @@ def run_schema_migrations(db: Session) -> dict:
         "backfill_hours": backfill_hours,
         "created_tables": created_tables,
         "seat_backfill": seat_backfill,
+        "verified_tz_fix": verified_tz_fix,
         "errors": errors,
     }
     if applied or backfill_hours:
