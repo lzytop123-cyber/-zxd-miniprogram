@@ -1,5 +1,5 @@
 <template>
-  <el-card>
+  <el-card class="page-card" shadow="never">
     <template #header>
       <div class="header-row">
         <span>预约订单</span>
@@ -7,27 +7,27 @@
       </div>
     </template>
 
-    <el-form inline class="filters">
+    <el-form inline class="filters" @submit.prevent>
       <el-form-item label="订单号">
-        <el-input v-model="filters.order_no" placeholder="模糊搜索" clearable style="width:160px" />
+        <el-input v-model="filters.order_no" placeholder="模糊搜索" clearable style="width:150px" />
       </el-form-item>
       <el-form-item label="用户ID">
-        <el-input-number v-model="filters.user_id" :min="1" controls-position="right" style="width:120px" />
+        <el-input-number v-model="filters.user_id" :min="1" controls-position="right" style="width:110px" />
       </el-form-item>
       <el-form-item label="门店">
-        <el-select v-model="filters.store_id" clearable placeholder="全部" style="width:140px">
+        <el-select v-model="filters.store_id" clearable placeholder="全部" style="width:130px">
           <el-option v-for="s in stores" :key="s.id" :label="s.name" :value="s.id" />
         </el-select>
       </el-form-item>
       <el-form-item label="支付">
-        <el-select v-model="filters.pay_status" clearable placeholder="全部" style="width:110px">
+        <el-select v-model="filters.pay_status" clearable placeholder="全部" style="width:100px">
           <el-option label="待付款" :value="0" />
           <el-option label="已付款" :value="1" />
           <el-option label="已退款" :value="2" />
         </el-select>
       </el-form-item>
       <el-form-item label="状态">
-        <el-select v-model="filters.status" clearable placeholder="全部" style="width:110px">
+        <el-select v-model="filters.status" clearable placeholder="全部" style="width:100px">
           <el-option label="已预约" :value="0" />
           <el-option label="使用中" :value="1" />
           <el-option label="已完成" :value="2" />
@@ -43,63 +43,71 @@
 
     <el-alert
       type="info"
-      :closable="false"
+      :closable="true"
       show-icon
-      title="预约时段内系统自动入座；用户到店开门也会自动标记为使用中。已付款订单可在本页「换座」调整座位。"
-      style="margin-bottom: 12px"
+      title="预约时段内自动入座；到店开门也会标为使用中。已付款订单可在本页换座。"
+      class="tip"
     />
 
-    <el-table :data="list" v-loading="loading" stripe>
-      <el-table-column prop="order_no" label="订单号" width="170" />
-      <el-table-column label="用户" width="120">
+    <el-table
+      :data="list"
+      v-loading="loading"
+      stripe
+      size="small"
+      border
+      :max-height="tableMaxHeight"
+      class="order-table"
+    >
+      <el-table-column prop="order_no" label="订单号" width="158" fixed />
+      <el-table-column label="用户" width="108">
         <template #default="{ row }">
-          <div>{{ row.user_nickname || '-' }}</div>
+          <div class="cell-main">{{ row.user_nickname || '-' }}</div>
           <div class="sub">ID {{ row.user_id }}</div>
         </template>
       </el-table-column>
-      <el-table-column prop="store_name" label="门店" width="110" />
-      <el-table-column label="座位/区域" width="100">
+      <el-table-column prop="store_name" label="门店" width="100" show-overflow-tooltip />
+      <el-table-column label="座位" width="88">
         <template #default="{ row }">
-          <div>{{ row.seat_code || '-' }}</div>
+          <div class="cell-main">{{ row.seat_code || '-' }}</div>
           <div v-if="row.zone_name" class="sub">{{ row.zone_name }}</div>
         </template>
       </el-table-column>
-      <el-table-column label="套餐" min-width="120" show-overflow-tooltip>
+      <el-table-column label="套餐" min-width="100" show-overflow-tooltip>
         <template #default="{ row }">{{ row.usage_label || row.bill_type_label || billLabel(row.bill_type) }}</template>
       </el-table-column>
-      <el-table-column label="来源" width="110" show-overflow-tooltip>
+      <el-table-column label="来源" width="96" show-overflow-tooltip>
         <template #default="{ row }">{{ row.pay_source_label || payTypeLabel(row.pay_type) }}</template>
       </el-table-column>
-      <el-table-column label="金额" width="90">
+      <el-table-column label="金额" width="86">
         <template #default="{ row }">{{ priceText(row) }}</template>
       </el-table-column>
-      <el-table-column prop="pay_status" label="支付状态" width="90">
+      <el-table-column label="支付" width="78">
         <template #default="{ row }">
           <el-tag :type="row.pay_status === 1 ? 'success' : row.pay_status === 2 ? 'info' : 'warning'" size="small">
-            {{ ['待付款', '已付款', '已退款'][row.pay_status] || row.pay_status }}
+            {{ ['待付', '已付', '退款'][row.pay_status] || row.pay_status }}
           </el-tag>
         </template>
       </el-table-column>
-      <el-table-column label="订单状态" width="100">
+      <el-table-column label="状态" width="78">
         <template #default="{ row }">
           <el-tag :type="statusTagType(row.status)" size="small">
             {{ row.status_label || statusLabel(row.status) }}
           </el-tag>
         </template>
       </el-table-column>
-      <el-table-column label="说明" min-width="160" show-overflow-tooltip>
-        <template #default="{ row }">{{ row.status_hint || '-' }}</template>
-      </el-table-column>
-      <el-table-column label="入座时间" width="160">
-        <template #default="{ row }">{{ formatTime(row.check_in_time) }}</template>
-      </el-table-column>
-      <el-table-column label="预约时段" width="200">
+      <el-table-column label="预约时段" width="148">
         <template #default="{ row }">
           <div>{{ formatTime(row.start_time) }}</div>
           <div class="sub">至 {{ formatTime(row.end_time) }}</div>
         </template>
       </el-table-column>
-      <el-table-column label="操作" width="220" fixed="right">
+      <el-table-column label="入座" width="132" show-overflow-tooltip>
+        <template #default="{ row }">{{ formatTime(row.check_in_time) }}</template>
+      </el-table-column>
+      <el-table-column label="说明" min-width="120" show-overflow-tooltip>
+        <template #default="{ row }">{{ row.status_hint || '-' }}</template>
+      </el-table-column>
+      <el-table-column label="操作" width="200" fixed="right">
         <template #default="{ row }">
           <el-button
             v-if="canChangeSeat(row)"
@@ -178,15 +186,17 @@
         v-model:current-page="page"
         v-model:page-size="pageSize"
         :total="total"
-        layout="total, prev, pager, next"
+        :page-sizes="[10, 20, 50]"
+        layout="total, sizes, prev, pager, next"
         @current-change="load"
+        @size-change="onPageSizeChange"
       />
     </div>
   </el-card>
 </template>
 
 <script setup lang="ts">
-import { onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, onUnmounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import http from '../api/http'
 
@@ -243,6 +253,13 @@ const loading = ref(false)
 const page = ref(1)
 const pageSize = ref(20)
 const total = ref(0)
+const viewportH = ref(typeof window !== 'undefined' ? window.innerHeight : 900)
+const tableMaxHeight = computed(() => Math.max(320, viewportH.value - 310))
+
+function onResize() {
+  viewportH.value = window.innerHeight
+}
+
 const filters = reactive<{ order_no: string; user_id: number | null; store_id: number | null; pay_status: number | null; status: number | null }>({
   order_no: '',
   user_id: null,
@@ -274,6 +291,11 @@ async function load() {
 }
 
 function search() {
+  page.value = 1
+  load()
+}
+
+function onPageSizeChange() {
   page.value = 1
   load()
 }
@@ -421,16 +443,26 @@ async function submitRefund() {
 }
 
 onMounted(async () => {
+  window.addEventListener('resize', onResize)
   const res = await http.get('/admin/stores')
   stores.value = res.data || []
   load()
 })
+
+onUnmounted(() => {
+  window.removeEventListener('resize', onResize)
+})
 </script>
 
 <style scoped>
+.page-card :deep(.el-card__body) { padding-top: 12px; }
 .header-row { display: flex; justify-content: space-between; align-items: center; }
-.filters { margin-bottom: 12px; }
-.sub { font-size: 12px; color: #999; }
+.filters { margin-bottom: 4px; }
+.filters :deep(.el-form-item) { margin-bottom: 8px; margin-right: 12px; }
+.tip { margin-bottom: 10px; }
+.order-table { width: 100%; }
+.cell-main { line-height: 1.3; }
+.sub { font-size: 12px; color: #999; line-height: 1.3; }
 .change-seat-meta { line-height: 1.8; }
-.pager { margin-top: 16px; display: flex; justify-content: flex-end; }
+.pager { margin-top: 12px; display: flex; justify-content: flex-end; }
 </style>

@@ -60,12 +60,12 @@
         </el-sub-menu>
       </el-menu>
     </el-aside>
-    <el-container>
-      <el-header class="header">
+    <el-container class="content">
+      <el-header class="header" height="56px">
         <span>自习室运营管理系统</span>
         <el-button type="danger" link @click="logout">退出</el-button>
       </el-header>
-      <el-main><router-view /></el-main>
+      <el-main class="main"><router-view /></el-main>
     </el-container>
   </el-container>
 </template>
@@ -83,9 +83,24 @@ function logout() {
 </script>
 
 <style scoped>
-.layout { min-height: 100vh; }
-.aside { background: #1a1a1a; }
+.layout { height: 100%; overflow: hidden; }
+.aside {
+  background: #1a1a1a;
+  height: 100%;
+  overflow-y: auto;
+}
+.content { height: 100%; overflow: hidden; }
 .logo { color: #FFD000; font-size: 18px; font-weight: bold; padding: 20px; text-align: center; }
-.header { display: flex; justify-content: space-between; align-items: center; background: #fff; border-bottom: 1px solid #eee; }
+.header {
+  display: flex; justify-content: space-between; align-items: center;
+  background: #fff; border-bottom: 1px solid #eee; flex-shrink: 0;
+}
+.main {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  background: #f5f5f5;
+  padding: 16px;
+}
 :deep(.el-sub-menu__title) { color: #ccc !important; }
 </style>

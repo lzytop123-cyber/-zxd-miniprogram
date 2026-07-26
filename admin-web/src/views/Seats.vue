@@ -16,21 +16,30 @@
     </template>
 
     <el-alert
-      v-if="summary && !summary.is_complete"
+      v-if="summary && missingCount > 0"
       type="warning"
       :closable="false"
       show-icon
       class="summary-alert"
       :title="`座位不完整：当前 ${summary.actual_count}/${summary.expected_count}，缺少 ${summary.missing_codes.join('、')}`"
-      description="点击右上角「补全标准座位」可一键创建平面图 1–27 号共 27 个座位。"
+      description="点击右上角「补全标准座位」可一键创建平面图 1–28 号座位。"
     />
     <el-alert
-      v-else-if="summary && summary.is_complete"
+      v-else-if="summary && disabledCount > 0"
+      type="warning"
+      :closable="false"
+      show-icon
+      class="summary-alert"
+      :title="`编号齐全（${summary.actual_count}/${summary.expected_count}），但有 ${disabledCount} 个停用`"
+      description="停用座位不可预约。可在下方列表中启用，或点「补全标准座位」按标准布局全部启用并同步坐标。"
+    />
+    <el-alert
+      v-else-if="summary"
       type="success"
       :closable="false"
       show-icon
       class="summary-alert"
-      :title="`座位齐全：${summary.enabled_count}/${summary.actual_count} 个启用`"
+      :title="`座位齐全：${summary.enabled_count}/${summary.expected_count} 个启用`"
     />
 
     <el-card v-if="layoutSeats.length" shadow="never" class="map-card">
@@ -41,8 +50,8 @@
           :key="seat.id"
           class="map-seat"
           :class="{ disabled: seat.status !== 1 }"
-          :style="{ left: (seat.pos_x || 0) + 'px', top: (seat.pos_y || 0) + 'px' }"
-          :title="seat.seat_code"
+          :style="mapSeatStyle(seat)"
+          :title="`${seat.seat_code}${seat.status !== 1 ? '（停用）' : ''}`"
         >
           {{ seat.seat_code }}
         </div>
@@ -116,7 +125,7 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import http from '../api/http'
 
@@ -141,9 +150,27 @@ const form = reactive({
   status: 1,
 })
 
+const missingCount = computed(() => summary.value?.missing_codes?.length || 0)
+const disabledCount = computed(() => {
+  if (!summary.value) return 0
+  return Math.max(0, (summary.value.actual_count || 0) - (summary.value.enabled_count || 0))
+})
+
 const seatTypeLabels: Record<string, string> = { standard: '标准', window: '靠窗' }
 function seatTypeLabel(t: string) {
   return seatTypeLabels[t] || t
+}
+
+/** 后台坐标可能是百分比，也可能是按 900×700 换算的像素 */
+function mapSeatStyle(seat: { pos_x?: number; pos_y?: number }) {
+  const x = Number(seat.pos_x) || 0
+  const y = Number(seat.pos_y) || 0
+  const left = x <= 100 ? x : x / 9
+  const top = y <= 100 ? y : y / 7
+  return {
+    left: `${left}%`,
+    top: `${top}%`,
+  }
 }
 
 async function loadSummary() {
@@ -177,7 +204,7 @@ async function onStoreChange() {
 
 async function ensureSeats() {
   if (!storeId.value) return
-  await ElMessageBox.confirm('将按标准布局补全 A/B/C/D 区座位（已有编号不会重复创建）。', '补全标准座位', { type: 'info' })
+  await ElMessageBox.confirm('将按平面图补全 1–28 号座位（已有编号会同步区域/坐标并启用，不会重复创建）。', '补全标准座位', { type: 'info' })
   ensuring.value = true
   try {
     const res = await http.post(`/admin/stores/${storeId.value}/ensure-seats`)
@@ -270,16 +297,20 @@ onMounted(async () => {
 .map-card { margin-bottom: 16px; }
 .floor-map {
   position: relative;
-  min-height: 620px;
+  width: 100%;
+  max-width: 900px;
+  aspect-ratio: 900 / 700;
   background: #fafafa;
   border: 1px dashed #ddd;
   border-radius: 8px;
-  overflow: auto;
+  overflow: hidden;
 }
 .map-seat {
   position: absolute;
-  width: 44px;
-  height: 44px;
+  width: 36px;
+  height: 36px;
+  margin-left: -18px;
+  margin-top: -18px;
   border-radius: 8px;
   background: #409eff;
   color: #fff;
@@ -288,6 +319,7 @@ onMounted(async () => {
   align-items: center;
   justify-content: center;
   box-shadow: 0 2px 6px rgba(0,0,0,0.12);
+  transform: translate(0, 0);
 }
 .map-seat.disabled { background: #c0c4cc; }
 </style>
