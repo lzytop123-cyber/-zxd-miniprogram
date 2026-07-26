@@ -67,7 +67,6 @@ async def wechat_msg_sec_check(*, openid: str, content: str) -> SafetyResult:
                     hit_level="block" if result == "risky" else "review",
                 )
             return SafetyResult(ok=True)
-        # 87014 内容含违法违规
         if errcode == 87014:
             return SafetyResult(ok=False, reason="内容未通过安全检测", hit_level="block")
         logger.warning("msg_sec_check unexpected: errcode=%s", errcode)
@@ -75,6 +74,35 @@ async def wechat_msg_sec_check(*, openid: str, content: str) -> SafetyResult:
     except Exception as exc:
         logger.warning("msg_sec_check failed: %s", exc.__class__.__name__)
         return SafetyResult(ok=True, reason="sec_check_error")
+
+
+async def wechat_img_sec_check(*, image_bytes: bytes, filename: str = "image.jpg") -> SafetyResult:
+    """调用微信 imgSecCheck（同步）；未启用时跳过。单图建议 ≤1MB。"""
+    if not settings.wx_content_security_enabled:
+        return SafetyResult(ok=True, reason="content_security_disabled")
+    if not image_bytes:
+        return SafetyResult(ok=True)
+    # 接口限制约 1MB；超限仍上传但跳过机审，依赖人工审核
+    if len(image_bytes) > 1_000_000:
+        logger.info("img_sec_check skipped: image too large for sync api")
+        return SafetyResult(ok=True, reason="img_too_large_skip")
+    try:
+        token = await WechatService.get_access_token()
+        url = f"https://api.weixin.qq.com/wxa/img_sec_check?access_token={token}"
+        files = {"media": (filename, image_bytes, "application/octet-stream")}
+        async with httpx.AsyncClient(timeout=15.0) as client:
+            resp = await client.post(url, files=files)
+            data = resp.json()
+        errcode = data.get("errcode", -1)
+        if errcode == 0:
+            return SafetyResult(ok=True)
+        if errcode == 87014:
+            return SafetyResult(ok=False, reason="图片未通过安全检测", hit_level="block")
+        logger.warning("img_sec_check unexpected: errcode=%s", errcode)
+        return SafetyResult(ok=True, reason=f"img_sec_skip:{errcode}")
+    except Exception as exc:
+        logger.warning("img_sec_check failed: %s", exc.__class__.__name__)
+        return SafetyResult(ok=True, reason="img_sec_error")
 
 
 async def check_listing_text(

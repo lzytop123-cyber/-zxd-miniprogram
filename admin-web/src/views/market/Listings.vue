@@ -32,6 +32,12 @@
         <el-table-column prop="material_category_name" label="类型" width="90" />
         <el-table-column prop="price" label="价格" width="80" />
         <el-table-column prop="status" label="状态" width="100" />
+        <el-table-column prop="reject_reason" label="驳回原因" min-width="140" show-overflow-tooltip>
+          <template #default="{ row }">
+            <span v-if="row.status==='rejected' && row.reject_reason" class="reject-text">{{ row.reject_reason }}</span>
+            <span v-else class="muted">—</span>
+          </template>
+        </el-table-column>
         <el-table-column label="操作" width="300" fixed="right">
           <template #default="{ row }">
             <el-button size="small" @click="openDetail(row)">详情</el-button>
@@ -60,6 +66,14 @@
           {{ current.store_name }} · {{ current.exam_category_name }} · {{ current.material_category_name }}
           · ¥{{ current.price }} · {{ current.status }}
         </div>
+        <el-alert
+          v-if="current.status==='rejected' && current.reject_reason"
+          type="warning"
+          :closable="false"
+          show-icon
+          :title="'驳回原因：' + current.reject_reason"
+          style="margin-bottom: 12px"
+        />
         <div class="detail-desc">{{ current.description }}</div>
         <div class="detail-images" v-if="current.images && current.images.length">
           <el-image
@@ -150,6 +164,8 @@ onMounted(load)
 .pager { margin-top: 16px; display: flex; justify-content: flex-end; }
 .thumb { width: 64px; height: 64px; border-radius: 8px; background: #f2f4f3; }
 .no-img { color: #999; font-size: 12px; }
+.reject-text { color: #c95c5c; }
+.muted { color: #bbb; }
 .detail-title { font-size: 18px; font-weight: 700; margin-bottom: 8px; }
 .detail-meta { color: #888; font-size: 13px; margin-bottom: 16px; }
 .detail-desc { white-space: pre-wrap; line-height: 1.6; margin-bottom: 16px; }

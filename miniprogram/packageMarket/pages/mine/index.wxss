@@ -14,4 +14,5 @@
 }
 .title { font-weight: 600; }
 .meta { margin-top: 8rpx; color: #8C9BA5; font-size: 24rpx; }
+.reject { margin-top: 10rpx; color: #C95C5C; font-size: 24rpx; line-height: 1.4; }
 .empty { text-align: center; color: #8C9BA5; padding: 80rpx 24rpx; }

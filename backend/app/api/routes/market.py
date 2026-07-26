@@ -18,7 +18,7 @@ from app.db.session import get_db
 from app.models import MarketFavorite, MarketListing, MarketListingStatus, Store, User
 from app.schemas.common import ResponseModel
 from app.services import market_service as svc
-from app.services.content_safety import check_listing_text
+from app.services.content_safety import check_listing_text, wechat_img_sec_check
 from app.services.market_seed import ensure_market_categories
 
 router = APIRouter(prefix="/market", tags=["上岸集市"])
@@ -210,6 +210,12 @@ async def upload_market_image(
     content = await file.read()
     if len(content) > 2_000_000:
         raise HTTPException(status_code=400, detail="图片不能超过 2MB")
+    safety = await wechat_img_sec_check(
+        image_bytes=content,
+        filename=file.filename or f"upload.{IMAGE_TYPES[content_type]}",
+    )
+    if not safety.ok:
+        raise HTTPException(status_code=400, detail=safety.reason or "图片未通过安全检测")
     UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
     filename = f"{uuid.uuid4().hex}.{IMAGE_TYPES[content_type]}"
     (UPLOAD_DIR / filename).write_bytes(content)

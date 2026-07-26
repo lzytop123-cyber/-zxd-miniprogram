@@ -14,6 +14,7 @@
     <view class="card" wx:for="{{listings}}" wx:key="id" data-id="{{item.id}}" bindtap="goDetail">
       <view class="title">{{item.title}}</view>
       <view class="meta">{{item.statusLabel}} · {{item.priceText}}</view>
+      <view class="reject" wx:if="{{item.status==='rejected' && item.reject_reason}}">驳回：{{item.reject_reason}}</view>
     </view>
     <view class="empty" wx:if="{{!listings.length}}">暂无发布</view>
   </block>

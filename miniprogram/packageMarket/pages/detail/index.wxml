@@ -9,6 +9,9 @@
     <view class="price">{{listing.priceText}}</view>
     <view class="meta">{{listing.exam_category_name}} · {{listing.material_category_name}} · {{listing.store_name}}</view>
     <view class="meta" wx:if="{{listing.is_owner}}">状态：{{listing.statusLabel}}</view>
+    <view class="reject" wx:if="{{listing.is_owner && listing.status==='rejected' && listing.reject_reason}}">
+      驳回原因：{{listing.reject_reason}}
+    </view>
     <view class="desc">{{listing.description}}</view>
   </view>
 
