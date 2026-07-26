@@ -18,6 +18,15 @@
 .avatar.ph { display:flex;align-items:center;justify-content:center;color:#2D6A4F;font-weight:700; }
 .seller-name { font-weight: 600; }
 .hint { margin-top: 16rpx; color: #8C9BA5; font-size: 22rpx; }
+.contact-box {
+  margin-top: 16rpx; padding: 20rpx; background: #F4FAF6; border-radius: 16rpx;
+}
+.contact-label { color: #8C9BA5; font-size: 22rpx; }
+.contact-value {
+  margin: 8rpx 0 12rpx; font-size: 34rpx; font-weight: 700; color: #2D6A4F;
+  word-break: break-all;
+}
+.contact-copy { height: 64rpx; line-height: 64rpx; font-size: 26rpx; }
 .section-title { padding: 8rpx 32rpx; font-weight: 600; color: #2D6A4F; }
 .similar { display: flex; gap: 16rpx; overflow-x: auto; padding: 8rpx 24rpx 24rpx; }
 .sim-card { width: 220rpx; background: #fff; border-radius: 20rpx; padding: 12rpx; flex-shrink: 0; }

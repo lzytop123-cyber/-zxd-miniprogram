@@ -181,10 +181,44 @@ def listing_to_dict(
             "banned": is_market_banned(seller) if seller else False,
         },
         "is_owner": bool(viewer and viewer.id == listing.user_id),
+        "my_contact": None,
     }
     if include_private or (viewer and viewer.id == listing.user_id):
         data["reject_reason"] = listing.reject_reason
         data["copyright_declared"] = bool(listing.copyright_declared)
+    if viewer and viewer.id != listing.user_id:
+        data["my_contact"] = _viewer_contact_summary(db, listing.id, viewer.id)
+    return data
+
+
+def _viewer_contact_summary(
+    db: Session, listing_id: int, buyer_id: int
+) -> dict | None:
+    rows = list(
+        db.scalars(
+            select(MarketContactRequest)
+            .where(
+                MarketContactRequest.listing_id == listing_id,
+                MarketContactRequest.buyer_id == buyer_id,
+            )
+            .order_by(MarketContactRequest.id.desc())
+        ).all()
+    )
+    if not rows:
+        return None
+    chosen = next(
+        (r for r in rows if r.status == MarketContactStatus.approved.value),
+        None,
+    )
+    if not chosen:
+        chosen = next(
+            (r for r in rows if r.status == MarketContactStatus.pending.value),
+            rows[0],
+        )
+    data = {"id": chosen.id, "status": chosen.status}
+    if chosen.status == MarketContactStatus.approved.value:
+        data["reveal_type"] = chosen.reveal_type
+        data["reveal_value"] = chosen.reveal_value
     return data
 
 
@@ -490,14 +524,23 @@ def create_contact_request(
     if daily >= CONTACT_DAILY_LIMIT:
         raise HTTPException(status_code=400, detail="今日联系申请已达上限")
 
-    pending = db.scalar(
-        select(MarketContactRequest).where(
-            MarketContactRequest.listing_id == listing_id,
-            MarketContactRequest.buyer_id == buyer.id,
-            MarketContactRequest.status == MarketContactStatus.pending.value,
-        )
+    existing = list(
+        db.scalars(
+            select(MarketContactRequest).where(
+                MarketContactRequest.listing_id == listing_id,
+                MarketContactRequest.buyer_id == buyer.id,
+                MarketContactRequest.status.in_(
+                    [
+                        MarketContactStatus.pending.value,
+                        MarketContactStatus.approved.value,
+                    ]
+                ),
+            )
+        ).all()
     )
-    if pending:
+    if any(r.status == MarketContactStatus.approved.value for r in existing):
+        raise HTTPException(status_code=400, detail="对方已同意，请在详情页查看联系方式")
+    if any(r.status == MarketContactStatus.pending.value for r in existing):
         raise HTTPException(status_code=400, detail="已有待处理的联系申请")
 
     row = MarketContactRequest(

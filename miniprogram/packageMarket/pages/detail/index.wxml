@@ -31,7 +31,20 @@
         <view class="meta">{{listing.seller.title || '岛民'}} · 违规 {{listing.seller.violation_count || 0}}</view>
       </view>
     </view>
-    <view class="hint">联系方式不公开展示，需申请并由卖家同意后可见</view>
+    <block wx:if="{{!listing.is_owner}}">
+      <view class="contact-box" wx:if="{{listing.my_contact && listing.my_contact.status==='approved'}}">
+        <view class="contact-label">{{listing.my_contact.reveal_type === 'phone' ? '手机号' : '微信号'}}</view>
+        <view class="contact-value">{{listing.my_contact.reveal_value}}</view>
+        <view class="btn ghost contact-copy" bindtap="copyContact">复制</view>
+      </view>
+      <view class="hint" wx:elif="{{listing.my_contact && listing.my_contact.status==='pending'}}">
+        已申请，等待卖家同意后即可查看联系方式
+      </view>
+      <view class="hint" wx:elif="{{listing.my_contact && listing.my_contact.status==='rejected'}}">
+        卖家已拒绝本次申请，可重新发起
+      </view>
+      <view class="hint" wx:else>联系方式不公开展示，需申请并由卖家同意后可见</view>
+    </block>
   </view>
 
   <view class="section-title" wx:if="{{similar.length}}">相似资料</view>
@@ -52,7 +65,17 @@
     <block wx:else>
       <view class="btn ghost" bindtap="toggleFavorite">{{listing.favorited ? '已收藏' : '收藏'}}</view>
       <view class="btn ghost" bindtap="report">举报</view>
-      <view class="btn primary" bindtap="contactSeller">联系卖家</view>
+      <view
+        class="btn primary"
+        wx:if="{{listing.my_contact && listing.my_contact.status==='approved'}}"
+        bindtap="copyContact"
+      >复制联系方式</view>
+      <view
+        class="btn primary"
+        wx:elif="{{listing.my_contact && listing.my_contact.status==='pending'}}"
+        bindtap="goContacts"
+      >查看申请</view>
+      <view class="btn primary" wx:else bindtap="contactSeller">联系卖家</view>
     </block>
   </view>
 </view>

@@ -80,11 +80,25 @@ Page({
             data: { listing_id: this.data.id, message: res.content || '' },
           })
           wx.showToast({ title: '已发起申请', icon: 'success' })
+          this.load()
         } catch (e) {
           wx.showToast({ title: e.message || '申请失败', icon: 'none' })
         }
       },
     })
+  },
+
+  copyContact() {
+    const row = this.data.listing && this.data.listing.my_contact
+    if (!row || !row.reveal_value) return
+    wx.setClipboardData({
+      data: String(row.reveal_value),
+      success: () => wx.showToast({ title: '已复制', icon: 'success' }),
+    })
+  },
+
+  goContacts() {
+    wx.navigateTo({ url: routes.marketContacts })
   },
 
   async report() {
