@@ -1059,13 +1059,17 @@ Page({
     }
     // 选座后预览尚未带上该座位，自动刷新一次再跳转
     this.refreshPreview({ immediate: true }).then(() => {
-      const { preview: latest, seatId: sid } = this.data
+      const { preview: latest, seatId: sid, previewError } = this.data
       if (latest && latest.seat_id === sid) {
         wx.navigateTo({
           url: `${routes.bookingOrder}?storeId=${storeId}&start=${encodeURIComponent(latest.start_time)}&end=${encodeURIComponent(latest.end_time)}&seatId=${latest.seat_id}&price=${latest.final_price}&seatCode=${latest.seat_code}&billType=${billType}`,
         })
       } else {
-        wx.showToast({ title: '价格计算失败，请重试', icon: 'none' })
+        const tip = (previewError || '').trim()
+        wx.showToast({
+          title: tip || '请检查预约时间后重试',
+          icon: 'none',
+        })
       }
     })
   },

@@ -74,7 +74,7 @@ def validate_booking_start_advance(
     start_day = start.date()
     latest = today + timedelta(days=days)
     if start_day > latest:
-        raise ValueError(f"开始日最多提前{days}天，请重新选择日期")
+        raise ValueError(f"为公平占座，最多提前{days}天开始预约")
 
 
 def resolve_booking_window(
