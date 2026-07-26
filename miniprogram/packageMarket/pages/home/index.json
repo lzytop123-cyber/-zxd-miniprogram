@@ -1,4 +1,5 @@
 {
   "navigationBarTitleText": "上岸集市",
-  "enablePullDownRefresh": true
+  "enablePullDownRefresh": true,
+  "onReachBottomDistance": 80
 }

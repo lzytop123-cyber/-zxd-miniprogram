@@ -29,6 +29,7 @@
   background: #fff; color: #2D6A4F; padding: 12rpx 28rpx; border-radius: 40rpx;
   font-size: 24rpx; box-shadow: 0 4rpx 16rpx rgba(28,43,32,.05);
 }
+.chip.active { background: #52B788; color: #fff; }
 .list { padding: 0 24rpx; }
 .card {
   display: flex; gap: 20rpx; background: #fff; border-radius: 28rpx;
@@ -45,3 +46,4 @@
   display: inline-block; margin-top: 24rpx; padding: 16rpx 40rpx;
   background: #52B788; color: #fff; border-radius: 40rpx; font-weight: 600;
 }
+.footer-tip { text-align: center; color: #8C9BA5; font-size: 22rpx; padding: 16rpx 0 8rpx; }

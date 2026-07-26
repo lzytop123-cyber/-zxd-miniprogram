@@ -3,35 +3,79 @@ const { request, routes, absUrl, guardMarketplace } = require('../../utils/marke
 Page({
   data: {
     keyword: '',
+    exam_category_id: '',
+    material_category_id: '',
     examCategories: [],
     materialCategories: [],
     latest: [],
-    loading: true,
+    loading: false,
+    page: 1,
+    finished: false,
+    filtered: false,
   },
 
   onShow() {
     if (!guardMarketplace(this)) return
-    this.load()
+    this.ensureMeta().then(() => this.reload())
   },
 
   onPullDownRefresh() {
-    this.load().finally(() => wx.stopPullDownRefresh())
+    this.reload().finally(() => wx.stopPullDownRefresh())
   },
 
-  async load() {
+  onReachBottom() {
+    if (!this.data.finished && !this.data.loading) this.loadMore()
+  },
+
+  async ensureMeta() {
+    if (this.data.examCategories.length && this.data.materialCategories.length) return
+    const data = await request({ url: '/market/meta', silent: true })
+    this.setData({
+      examCategories: data.exam_categories || [],
+      materialCategories: data.material_categories || [],
+    })
+  },
+
+  buildQuery(page) {
+    const d = this.data
+    const parts = [`page=${page}`, 'page_size=20']
+    const q = (d.keyword || '').trim()
+    if (q) parts.push(`q=${encodeURIComponent(q)}`)
+    if (d.exam_category_id) parts.push(`exam_category_id=${d.exam_category_id}`)
+    if (d.material_category_id) parts.push(`material_category_id=${d.material_category_id}`)
+    return parts.join('&')
+  },
+
+  async reload() {
+    const filtered = !!(
+      (this.data.keyword || '').trim() ||
+      this.data.exam_category_id ||
+      this.data.material_category_id
+    )
+    this.setData({ page: 1, finished: false, latest: [], filtered })
+    await this.loadMore(true)
+  },
+
+  async loadMore(reset) {
+    if (this.data.loading) return
     this.setData({ loading: true })
     try {
-      const data = await request({ url: '/market/home', silent: true })
-      const mapItems = (items) =>
-        (items || []).map((it) => ({
-          ...it,
-          cover: absUrl((it.images && it.images[0]) || ''),
-          priceText: it.is_free ? '免费' : `¥${it.price}`,
-        }))
+      const page = reset ? 1 : this.data.page
+      const data = await request({
+        url: `/market/listings?${this.buildQuery(page)}`,
+        silent: true,
+      })
+      const mapped = (data.items || []).map((it) => ({
+        ...it,
+        cover: absUrl((it.images && it.images[0]) || ''),
+        priceText: it.is_free ? '免费' : `¥${it.price}`,
+      }))
+      const latest = reset ? mapped : this.data.latest.concat(mapped)
+      const finished = latest.length >= (data.total || 0)
       this.setData({
-        examCategories: data.exam_categories || [],
-        materialCategories: data.material_categories || [],
-        latest: mapItems(data.latest),
+        latest,
+        page: page + 1,
+        finished,
         loading: false,
       })
     } catch (e) {
@@ -45,24 +89,30 @@ Page({
   },
 
   goSearch() {
-    const q = (this.data.keyword || '').trim()
-    wx.navigateTo({
-      url: `${routes.marketList}${q ? `?q=${encodeURIComponent(q)}` : ''}`,
-    })
+    this.reload()
   },
 
   goExam(e) {
-    const id = e.currentTarget.dataset.id
-    wx.navigateTo({ url: `${routes.marketList}?exam_category_id=${id}` })
+    const id = String(e.currentTarget.dataset.id)
+    const next = String(this.data.exam_category_id) === id ? '' : id
+    this.setData({ exam_category_id: next }, () => this.reload())
   },
 
   goMaterial(e) {
-    const id = e.currentTarget.dataset.id
-    wx.navigateTo({ url: `${routes.marketList}?material_category_id=${id}` })
+    const id = String(e.currentTarget.dataset.id)
+    const next = String(this.data.material_category_id) === id ? '' : id
+    this.setData({ material_category_id: next }, () => this.reload())
   },
 
-  goList() {
-    wx.navigateTo({ url: routes.marketList })
+  clearFilters() {
+    this.setData(
+      {
+        keyword: '',
+        exam_category_id: '',
+        material_category_id: '',
+      },
+      () => this.reload()
+    )
   },
 
   goDetail(e) {

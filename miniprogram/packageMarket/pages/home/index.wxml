@@ -8,19 +8,31 @@
 
   <view class="section-title">考试分类</view>
   <view class="chips">
-    <view class="chip" wx:for="{{examCategories}}" wx:key="id" data-id="{{item.id}}" bindtap="goExam">{{item.name}}</view>
+    <view
+      class="chip {{exam_category_id==item.id ? 'active' : ''}}"
+      wx:for="{{examCategories}}"
+      wx:key="id"
+      data-id="{{item.id}}"
+      bindtap="goExam"
+    >{{item.name}}</view>
   </view>
 
   <view class="section-title">资料类型</view>
   <view class="chips">
-    <view class="chip" wx:for="{{materialCategories}}" wx:key="id" data-id="{{item.id}}" bindtap="goMaterial">{{item.name}}</view>
+    <view
+      class="chip {{material_category_id==item.id ? 'active' : ''}}"
+      wx:for="{{materialCategories}}"
+      wx:key="id"
+      data-id="{{item.id}}"
+      bindtap="goMaterial"
+    >{{item.name}}</view>
   </view>
 
   <view class="section-row">
-    <view class="section-title">最新发布</view>
+    <view class="section-title">{{filtered ? '筛选结果' : '最新发布'}}</view>
     <view class="section-links">
       <text class="link" bindtap="goPublish">发布</text>
-      <text class="more" bindtap="goList">全部 ›</text>
+      <text class="more" wx:if="{{filtered}}" bindtap="clearFilters">清除筛选</text>
     </view>
   </view>
 
@@ -36,7 +48,10 @@
     </view>
   </view>
   <view class="empty" wx:elif="{{!loading}}">
-    <view>暂无发布</view>
-    <view class="empty-btn" bindtap="goPublish">去发布第一条</view>
+    <view>{{filtered ? '没有符合条件的发布' : '暂无发布'}}</view>
+    <view class="empty-btn" wx:if="{{filtered}}" bindtap="clearFilters">清除筛选</view>
+    <view class="empty-btn" wx:else bindtap="goPublish">去发布第一条</view>
   </view>
+  <view class="footer-tip" wx:if="{{loading}}">加载中…</view>
+  <view class="footer-tip" wx:elif="{{finished && latest.length}}">没有更多了</view>
 </view>
