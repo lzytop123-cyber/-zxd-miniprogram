@@ -1,16 +1,24 @@
 <view class="page">
   <view class="card" wx:for="{{items}}" wx:key="id">
     <view class="title" data-listing-id="{{item.listing_id}}" bindtap="goDetail">{{item.listing_title || ('资料#' + item.listing_id)}}</view>
-    <view class="meta">角色：{{item.role === 'seller' ? '我是卖家' : '我是买家'}} · {{item.status}}</view>
+    <view class="meta">角色：{{item.role === 'seller' ? '我是卖家' : '我是买家'}} · {{statusText[item.status] || item.status}}</view>
     <view class="meta" wx:if="{{item.message}}">留言：{{item.message}}</view>
 
     <view class="ops" wx:if="{{item.role==='seller' && item.status==='pending'}}">
       <view class="btn" data-id="{{item.id}}" bindtap="approve">同意</view>
       <view class="btn ghost" data-id="{{item.id}}" bindtap="reject">拒绝</view>
     </view>
-    <view class="ops" wx:if="{{item.status==='approved'}}">
-      <view class="btn" data-id="{{item.id}}" bindtap="reveal">查看联系方式</view>
-    </view>
+
+    <block wx:if="{{item.status==='approved'}}">
+      <view class="contact-box" wx:if="{{revealed[item.id]}}">
+        <view class="contact-label">{{revealed[item.id].reveal_type === 'phone' ? '手机号' : '微信号'}}</view>
+        <view class="contact-value">{{revealed[item.id].reveal_value}}</view>
+        <view class="btn" data-id="{{item.id}}" bindtap="copyContact">复制</view>
+      </view>
+      <view class="ops" wx:else>
+        <view class="btn" data-id="{{item.id}}" bindtap="reveal">查看联系方式</view>
+      </view>
+    </block>
   </view>
   <view class="empty" wx:if="{{!items.length}}">暂无联系申请</view>
 </view>

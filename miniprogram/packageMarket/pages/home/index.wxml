@@ -4,10 +4,7 @@
     <view class="search-btn" bindtap="goSearch">搜索</view>
   </view>
 
-  <view class="actions">
-    <view class="action" bindtap="goPublish">发布资料</view>
-    <view class="action ghost" bindtap="goMine">我的集市</view>
-  </view>
+  <view class="mine-link" bindtap="goMine">我的集市 ›</view>
 
   <view class="section-title">考试分类</view>
   <view class="chips">
@@ -21,7 +18,10 @@
 
   <view class="section-row">
     <view class="section-title">最新发布</view>
-    <text class="more" bindtap="goList">全部 ›</text>
+    <view class="section-links">
+      <text class="link" bindtap="goPublish">发布</text>
+      <text class="more" bindtap="goList">全部 ›</text>
+    </view>
   </view>
 
   <view class="list" wx:if="{{latest.length}}">
@@ -35,5 +35,8 @@
       </view>
     </view>
   </view>
-  <view class="empty" wx:elif="{{!loading}}">暂无发布，来发布第一条吧</view>
+  <view class="empty" wx:elif="{{!loading}}">
+    <view>暂无发布</view>
+    <view class="empty-btn" bindtap="goPublish">去发布第一条</view>
+  </view>
 </view>

@@ -44,13 +44,15 @@
   </view>
 
   <view class="bottom">
-    <view class="btn ghost" bindtap="toggleFavorite">{{listing.favorited ? '已收藏' : '收藏'}}</view>
-    <view class="btn ghost" bindtap="report">举报</view>
     <block wx:if="{{listing.is_owner}}">
       <view class="btn ghost" bindtap="goEdit" wx:if="{{listing.status!=='published' && listing.status!=='pending'}}">编辑</view>
       <view class="btn ghost" bindtap="ownerOff" wx:if="{{listing.status==='published' || listing.status==='sold'}}">下架</view>
       <view class="btn primary" bindtap="ownerSold" wx:if="{{listing.status==='published' || listing.status==='off'}}">已出</view>
     </block>
-    <view class="btn primary" bindtap="contactSeller" wx:else>联系卖家</view>
+    <block wx:else>
+      <view class="btn ghost" bindtap="toggleFavorite">{{listing.favorited ? '已收藏' : '收藏'}}</view>
+      <view class="btn ghost" bindtap="report">举报</view>
+      <view class="btn primary" bindtap="contactSeller">联系卖家</view>
+    </block>
   </view>
 </view>

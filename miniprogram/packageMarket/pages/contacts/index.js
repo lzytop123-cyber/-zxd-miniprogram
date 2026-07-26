@@ -1,7 +1,17 @@
 const { request, routes, guardMarketplace } = require('../../utils/market')
 
 Page({
-  data: { items: [], revealMap: {} },
+  data: {
+    items: [],
+    revealed: {},
+    statusText: {
+      pending: '待处理',
+      approved: '已同意',
+      rejected: '已拒绝',
+      cancelled: '已取消',
+      expired: '已过期',
+    },
+  },
 
   onShow() {
     if (!guardMarketplace()) return
@@ -15,9 +25,32 @@ Page({
   async load() {
     try {
       const data = await request({ url: '/market/contact-requests' })
-      this.setData({ items: data.items || [] })
+      const items = data.items || []
+      this.setData({ items })
+      // 已同意的自动拉取一次联系方式，方便买卖双方查看
+      for (const row of items) {
+        if (row.status === 'approved' && !this.data.revealed[row.id]) {
+          this.fetchReveal(row.id, true)
+        }
+      }
     } catch (e) {
       wx.showToast({ title: e.message || '加载失败', icon: 'none' })
+    }
+  },
+
+  async fetchReveal(id, silent) {
+    try {
+      const data = await request({
+        url: `/market/contact-requests/${id}/reveal`,
+        silent: !!silent,
+      })
+      this.setData({ [`revealed.${id}`]: data })
+      return data
+    } catch (err) {
+      if (!silent) {
+        wx.showToast({ title: err.message || '暂不可查看', icon: 'none' })
+      }
+      return null
     }
   },
 
@@ -48,7 +81,7 @@ Page({
             data: { approve: true, reveal_type, wechat_id },
           })
           wx.showToast({ title: '已同意', icon: 'success' })
-          this.setData({ [`revealMap.${id}`]: data })
+          this.setData({ [`revealed.${id}`]: data })
           this.load()
         } catch (err) {
           wx.showToast({ title: err.message || '失败', icon: 'none' })
@@ -74,17 +107,17 @@ Page({
 
   async reveal(e) {
     const id = e.currentTarget.dataset.id
-    try {
-      const data = await request({ url: `/market/contact-requests/${id}/reveal` })
-      this.setData({ [`revealMap.${id}`]: data })
-      wx.showModal({
-        title: data.reveal_type === 'phone' ? '对方手机号' : '对方微信号',
-        content: data.reveal_value || '',
-        showCancel: false,
-      })
-    } catch (err) {
-      wx.showToast({ title: err.message || '暂不可查看', icon: 'none' })
-    }
+    await this.fetchReveal(id, false)
+  },
+
+  copyContact(e) {
+    const id = e.currentTarget.dataset.id
+    const row = this.data.revealed[id]
+    if (!row || !row.reveal_value) return
+    wx.setClipboardData({
+      data: String(row.reveal_value),
+      success: () => wx.showToast({ title: '已复制', icon: 'success' }),
+    })
   },
 
   goDetail(e) {

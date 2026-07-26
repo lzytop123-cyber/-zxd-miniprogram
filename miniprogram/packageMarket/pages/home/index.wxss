@@ -13,14 +13,16 @@
   background: #52B788; color: #fff; border-radius: 20rpx;
   padding: 0 28rpx; line-height: 72rpx; font-weight: 600;
 }
-.actions { display: flex; gap: 16rpx; margin: 0 24rpx 8rpx; }
-.action {
-  flex: 1; text-align: center; height: 80rpx; line-height: 80rpx;
-  background: #2D6A4F; color: #fff; border-radius: 20rpx; font-weight: 600;
+.mine-link {
+  margin: 0 32rpx 8rpx; text-align: right; color: #2D6A4F;
+  font-size: 26rpx; font-weight: 600;
 }
-.action.ghost { background: #D8F3DC; color: #2D6A4F; }
 .section-title { padding: 24rpx 32rpx 8rpx; font-size: 30rpx; font-weight: 600; color: #2D6A4F; }
-.section-row { display: flex; justify-content: space-between; align-items: center; padding-right: 32rpx; }
+.section-row {
+  display: flex; justify-content: space-between; align-items: center; padding-right: 32rpx;
+}
+.section-links { display: flex; align-items: center; gap: 24rpx; }
+.link { color: #52B788; font-size: 24rpx; font-weight: 600; }
 .more { color: #8C9BA5; font-size: 24rpx; }
 .chips { display: flex; flex-wrap: wrap; gap: 16rpx; padding: 8rpx 24rpx 16rpx; }
 .chip {
@@ -39,3 +41,7 @@
 .meta { margin-top: 8rpx; color: #8C9BA5; font-size: 22rpx; }
 .price { margin-top: 16rpx; color: #2D6A4F; font-weight: 700; font-size: 30rpx; }
 .empty { text-align: center; color: #8C9BA5; padding: 80rpx 24rpx; }
+.empty-btn {
+  display: inline-block; margin-top: 24rpx; padding: 16rpx 40rpx;
+  background: #52B788; color: #fff; border-radius: 40rpx; font-weight: 600;
+}
