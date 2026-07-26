@@ -514,6 +514,17 @@ class SiteContactSetting(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), onupdate=func.now())
 
 
+class SiteBookingSetting(Base):
+    """预约规则（单行配置）。"""
+
+    __tablename__ = "site_booking_settings"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    # 预约开始日最多可提前天数：暑期可设 3，淡季可设 7
+    start_max_advance_days: Mapped[int] = mapped_column(Integer, default=3)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), onupdate=func.now())
+
+
 class AdminOperationLog(Base):
     __tablename__ = "admin_operation_logs"
 

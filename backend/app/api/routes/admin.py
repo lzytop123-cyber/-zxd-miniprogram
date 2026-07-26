@@ -23,6 +23,7 @@ from app.models import (
     Coupon,
     HomeBanner,
     HomeCarouselSetting,
+    SiteBookingSetting,
     SiteContactSetting,
     MeituanDealMapping,
     MeituanOrder,
@@ -57,7 +58,11 @@ from app.services.admin_ops import (
 from app.services.booking import (
     add_wallet_log,
     auto_checkin_reservation,
+    BOOKING_START_MAX_ADVANCE_DAYS_DEFAULT,
+    BOOKING_START_MAX_ADVANCE_DAYS_MAX,
+    BOOKING_START_MAX_ADVANCE_DAYS_MIN,
     change_reservation_seat,
+    clamp_booking_start_max_advance_days,
     finalize_expired_reservation,
     seat_options_for_change,
 )
@@ -2302,3 +2307,59 @@ async def upload_contact_poster_admin(
         message="海报已上传",
         data=_contact_setting_dict(row),
     )
+
+
+def _get_or_create_booking_setting(db: Session) -> SiteBookingSetting:
+    row = db.get(SiteBookingSetting, 1)
+    if row:
+        return row
+    row = SiteBookingSetting(
+        id=1,
+        start_max_advance_days=BOOKING_START_MAX_ADVANCE_DAYS_DEFAULT,
+    )
+    db.add(row)
+    db.commit()
+    db.refresh(row)
+    return row
+
+
+def _booking_setting_dict(row: SiteBookingSetting) -> dict:
+    return {
+        "start_max_advance_days": clamp_booking_start_max_advance_days(
+            row.start_max_advance_days
+            if row.start_max_advance_days is not None
+            else BOOKING_START_MAX_ADVANCE_DAYS_DEFAULT
+        ),
+        "min_days": BOOKING_START_MAX_ADVANCE_DAYS_MIN,
+        "max_days": BOOKING_START_MAX_ADVANCE_DAYS_MAX,
+        "updated_at": row.updated_at.isoformat() if row.updated_at else None,
+    }
+
+
+class AdminBookingSettingRequest(BaseModel):
+    start_max_advance_days: int
+
+
+@router.get("/booking-setting", response_model=ResponseModel)
+def get_booking_setting_admin(_: object = Depends(get_current_admin), db: Session = Depends(get_db)):
+    row = _get_or_create_booking_setting(db)
+    return ResponseModel(data=_booking_setting_dict(row))
+
+
+@router.put("/booking-setting", response_model=ResponseModel)
+def update_booking_setting_admin(
+    body: AdminBookingSettingRequest,
+    _: object = Depends(get_current_admin),
+    db: Session = Depends(get_db),
+):
+    days = int(body.start_max_advance_days)
+    if days < BOOKING_START_MAX_ADVANCE_DAYS_MIN or days > BOOKING_START_MAX_ADVANCE_DAYS_MAX:
+        raise HTTPException(
+            status_code=400,
+            detail=f"可提前天数须在 {BOOKING_START_MAX_ADVANCE_DAYS_MIN}～{BOOKING_START_MAX_ADVANCE_DAYS_MAX} 之间",
+        )
+    row = _get_or_create_booking_setting(db)
+    row.start_max_advance_days = days
+    db.commit()
+    db.refresh(row)
+    return ResponseModel(message="预约规则已保存", data=_booking_setting_dict(row))

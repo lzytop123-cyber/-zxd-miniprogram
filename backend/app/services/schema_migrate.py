@@ -84,6 +84,7 @@ def run_schema_migrations(db: Session) -> dict:
         from app.models import (
             AdminOperationLog,
             RechargeOrder,
+            SiteBookingSetting,
             SiteContactSetting,
             StoreCalendarDay,
             SystemAnnouncement,
@@ -95,6 +96,7 @@ def run_schema_migrations(db: Session) -> dict:
             StoreCalendarDay,
             RechargeOrder,
             SiteContactSetting,
+            SiteBookingSetting,
         ):
             model.__table__.create(bind=engine, checkfirst=True)
             if inspector.has_table(model.__tablename__):

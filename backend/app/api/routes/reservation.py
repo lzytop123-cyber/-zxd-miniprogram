@@ -33,6 +33,7 @@ from app.services.booking import (
     change_reservation_seat,
     finalize_expired_reservation,
     finalize_reservation_after_pay,
+    get_booking_start_max_advance_days,
     record_study_on_checkout,
     reservation_display_meta,
     reservation_status_display,
@@ -86,7 +87,7 @@ def _prepare_booking(db: Session, body, require_seat: bool = False):
             pass
     try:
         start, end = resolve_booking_window(body.bill_type, body.start_time, body.end_time, rule)
-        validate_booking_start_advance(start)
+        validate_booking_start_advance(start, get_booking_start_max_advance_days(db))
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     if body.bill_type == BillType.session:

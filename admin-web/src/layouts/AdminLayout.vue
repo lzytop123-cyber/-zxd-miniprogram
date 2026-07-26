@@ -17,6 +17,7 @@
         <el-sub-menu index="booking">
           <template #title>订座 · 入座</template>
           <el-menu-item index="/pricing">价格管理</el-menu-item>
+          <el-menu-item index="/booking-setting">预约规则</el-menu-item>
           <el-menu-item index="/seats">座位管理</el-menu-item>
           <el-menu-item index="/reservations">预约订单</el-menu-item>
           <el-menu-item index="/locks">蓝牙锁管理</el-menu-item>

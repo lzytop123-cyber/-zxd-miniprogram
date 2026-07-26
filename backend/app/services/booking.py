@@ -34,17 +34,47 @@ from app.services.store_hours import (
 
 logger = logging.getLogger(__name__)
 
-# 预约开始日最多可提前天数（防远期占座）
-BOOKING_START_MAX_ADVANCE_DAYS = 3
+# 未配置后台时的默认值；实际以 site_booking_settings.start_max_advance_days 为准
+BOOKING_START_MAX_ADVANCE_DAYS_DEFAULT = 3
+BOOKING_START_MAX_ADVANCE_DAYS_MIN = 0
+BOOKING_START_MAX_ADVANCE_DAYS_MAX = 365
 
 
-def validate_booking_start_advance(start: datetime, today: date | None = None) -> None:
-    """开始日须在今天起 BOOKING_START_MAX_ADVANCE_DAYS 天内。"""
+def clamp_booking_start_max_advance_days(days: int) -> int:
+    return max(
+        BOOKING_START_MAX_ADVANCE_DAYS_MIN,
+        min(BOOKING_START_MAX_ADVANCE_DAYS_MAX, int(days)),
+    )
+
+
+def get_booking_start_max_advance_days(db: Session | None = None) -> int:
+    """读取后台配置的「开始日最多提前天数」。"""
+    if db is None:
+        return BOOKING_START_MAX_ADVANCE_DAYS_DEFAULT
+    try:
+        from app.models import SiteBookingSetting
+
+        row = db.get(SiteBookingSetting, 1)
+        if row and row.start_max_advance_days is not None:
+            return clamp_booking_start_max_advance_days(row.start_max_advance_days)
+    except Exception:
+        pass
+    return BOOKING_START_MAX_ADVANCE_DAYS_DEFAULT
+
+
+def validate_booking_start_advance(
+    start: datetime,
+    max_advance_days: int | None = None,
+    today: date | None = None,
+) -> None:
+    """开始日须在今天起 max_advance_days 天内（含今天）。"""
+    days = BOOKING_START_MAX_ADVANCE_DAYS_DEFAULT if max_advance_days is None else max_advance_days
+    days = clamp_booking_start_max_advance_days(days)
     today = today or date.today()
     start_day = start.date()
-    latest = today + timedelta(days=BOOKING_START_MAX_ADVANCE_DAYS)
+    latest = today + timedelta(days=days)
     if start_day > latest:
-        raise ValueError("开始日最多提前3天，请重新选择日期")
+        raise ValueError(f"开始日最多提前{days}天，请重新选择日期")
 
 
 def resolve_booking_window(

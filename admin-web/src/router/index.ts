@@ -12,6 +12,7 @@ const router = createRouter({
         { path: 'dashboard', component: () => import('../views/Dashboard.vue') },
         { path: 'stores', component: () => import('../views/Stores.vue') },
         { path: 'pricing', component: () => import('../views/Pricing.vue') },
+        { path: 'booking-setting', component: () => import('../views/BookingSetting.vue') },
         { path: 'seats', component: () => import('../views/Seats.vue') },
         { path: 'reservations', component: () => import('../views/Reservations.vue') },
         { path: 'card-purchase-orders', component: () => import('../views/CardPurchaseOrders.vue') },
