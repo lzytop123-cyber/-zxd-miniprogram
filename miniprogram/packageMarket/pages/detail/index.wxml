@@ -1,7 +1,14 @@
 <view class="page" wx:if="{{listing}}">
   <swiper class="swiper" indicator-dots="{{images.length>1}}" wx:if="{{images.length}}">
     <swiper-item wx:for="{{images}}" wx:key="*this">
-      <image class="slide" src="{{item}}" mode="aspectFill" />
+      <image
+        class="slide"
+        src="{{item}}"
+        mode="aspectFill"
+        data-index="{{index}}"
+        bindtap="previewImage"
+        show-menu-by-longpress
+      />
     </swiper-item>
   </swiper>
   <view class="card">

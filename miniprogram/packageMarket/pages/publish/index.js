@@ -139,6 +139,16 @@ Page({
     this.setImages(images)
   },
 
+  previewImage(e) {
+    const urls = this.data.imageViews || []
+    if (!urls.length) return
+    const index = Number(e.currentTarget.dataset.index || 0)
+    wx.previewImage({
+      current: urls[index] || urls[0],
+      urls,
+    })
+  },
+
   buildBody(submit) {
     const store = this.data.stores[this.data.storeIndex]
     const exam = this.data.examCategories[this.data.examIndex]

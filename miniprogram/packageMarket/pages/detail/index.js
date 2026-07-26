@@ -38,6 +38,16 @@ Page({
     }
   },
 
+  previewImage(e) {
+    const urls = this.data.images || []
+    if (!urls.length) return
+    const index = Number(e.currentTarget.dataset.index || 0)
+    wx.previewImage({
+      current: urls[index] || urls[0],
+      urls,
+    })
+  },
+
   async toggleFavorite() {
     if (!auth.requireLogin(routes.marketDetail + `?id=${this.data.id}`)) return
     const fav = this.data.listing.favorited
