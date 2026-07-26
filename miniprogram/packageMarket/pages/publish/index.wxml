@@ -36,7 +36,10 @@
     <checkbox-group bindchange="onCopyright">
       <label class="check">
         <checkbox value="1" checked="{{copyright_declared}}" color="#52B788" />
-        <text>{{copyright_text}}</text>
+        <view class="check-text">
+          我已阅读并同意
+          <text class="agree-link" catchtap="openAgreement">《上岸集市发布规范》</text>
+        </view>
       </label>
     </checkbox-group>
   </view>

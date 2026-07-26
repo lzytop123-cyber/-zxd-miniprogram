@@ -22,7 +22,6 @@ Page({
     images: [],
     imageViews: [],
     copyright_declared: false,
-    copyright_text: '',
     phone_bound: false,
     submitting: false,
   },
@@ -52,7 +51,6 @@ Page({
         examCategories: meta.exam_categories || [],
         materialCategories: meta.material_categories || [],
         storeIndex,
-        copyright_text: meta.copyright_text || '',
         phone_bound: !!meta.phone_bound,
       })
       if (id) await this.loadListing(id)
@@ -107,6 +105,12 @@ Page({
   onDesc(e) { this.setData({ description: e.detail.value }) },
   onPrice(e) { this.setData({ price: e.detail.value }) },
   onCopyright(e) { this.setData({ copyright_declared: !!e.detail.value.length }) },
+
+  openAgreement() {
+    wx.navigateTo({
+      url: `${routes.profileAgreement}?type=market`,
+    })
+  },
 
   chooseImage() {
     const remain = 9 - this.data.images.length

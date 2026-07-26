@@ -24,7 +24,10 @@
   width: 160rpx; height: 160rpx; border-radius: 16rpx; background: #F7F8F4;
   color: #8C9BA5; font-size: 64rpx; display: flex; align-items: center; justify-content: center;
 }
-.check { display: flex; gap: 12rpx; margin-top: 24rpx; font-size: 22rpx; color: #6F7D73; line-height: 1.5; }
+.check { display: flex; gap: 12rpx; margin-top: 24rpx; font-size: 24rpx; color: #6F7D73; line-height: 1.65; align-items: flex-start; }
+.check checkbox { margin-top: 4rpx; flex-shrink: 0; }
+.check-text { flex: 1; }
+.agree-link { color: #2D6A4F; font-weight: 600; }
 .btns { display: flex; gap: 16rpx; margin: 24rpx; }
 .btn {
   flex: 1; text-align: center; height: 88rpx; line-height: 88rpx; border-radius: 24rpx; font-weight: 600;

@@ -8,7 +8,12 @@ Page({
   },
 
   onLoad(options) {
-    const type = options.type === 'privacy' ? 'privacy' : 'user'
+    const type =
+      options.type === 'privacy'
+        ? 'privacy'
+        : options.type === 'market'
+          ? 'market'
+          : 'user'
     const doc = getAgreement(type)
     this.setData({
       title: doc.title,
