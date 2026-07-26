@@ -53,7 +53,7 @@ def require_not_market_banned(user: User) -> None:
     until = user.market_ban_until
     if until and until < datetime.now():
         return
-    raise HTTPException(status_code=403, detail="账号集市功能已被限制")
+    raise HTTPException(status_code=403, detail="账号上岸集市功能已被限制")
 
 
 def is_market_banned(user: User) -> bool:

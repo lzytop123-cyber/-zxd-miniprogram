@@ -65,7 +65,7 @@
     </el-card>
 
     <el-card style="margin-top: 16px">
-      <template #header>集市用户限制</template>
+      <template #header>上岸集市用户限制</template>
       <div class="ban-row">
         <el-input-number v-model="banUserId" :min="1" placeholder="用户ID" />
         <el-input v-model="banReason" placeholder="原因" style="width: 240px; margin: 0 8px" />
