@@ -1,15 +1,15 @@
 from datetime import datetime, timedelta
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_admin, get_current_user
 from app.core.redis_client import cache_get
 from app.db.session import get_db
 from app.models import BleBatteryAlert, BleKey, BleLock, DoorLog, OpenType, Reservation, User
-from app.schemas.common import ResponseModel
+from app.schemas.common import PageResult, ResponseModel
 from app.core.config import settings
 from app.services.business import TTLockService
 from app.services.booking import auto_checkin_reservation, reservation_unlock_allowed, reservation_unlock_message
@@ -217,6 +217,77 @@ def admin_list_locks(
         query = query.where(BleLock.store_id == store_id)
     locks = db.scalars(query).all()
     return ResponseModel(data=[_lock_to_dict(lock) for lock in locks])
+
+
+_OPEN_TYPE_LABELS = {
+    "ble": "蓝牙",
+    "remote": "远程",
+    "admin": "管理员",
+    "auto": "自动",
+}
+
+
+@router.get("/admin/door-logs", response_model=ResponseModel)
+def admin_list_door_logs(
+    lock_id: int | None = None,
+    result: int | None = Query(None, description="1成功 0失败"),
+    date_from: str | None = Query(None, description="YYYY-MM-DD"),
+    date_to: str | None = Query(None, description="YYYY-MM-DD"),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
+    _: object = Depends(get_current_admin),
+    db: Session = Depends(get_db),
+):
+    query = select(DoorLog)
+    if lock_id is not None:
+        query = query.where(DoorLog.lock_id == lock_id)
+    if result is not None:
+        query = query.where(DoorLog.result == result)
+    if date_from:
+        try:
+            start = datetime.strptime(date_from, "%Y-%m-%d")
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail="date_from 格式应为 YYYY-MM-DD") from e
+        query = query.where(DoorLog.opened_at >= start)
+    if date_to:
+        try:
+            end = datetime.strptime(date_to, "%Y-%m-%d") + timedelta(days=1)
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail="date_to 格式应为 YYYY-MM-DD") from e
+        query = query.where(DoorLog.opened_at < end)
+
+    total = db.scalar(select(func.count()).select_from(query.subquery())) or 0
+    rows = db.scalars(
+        query.order_by(DoorLog.opened_at.desc()).offset((page - 1) * page_size).limit(page_size)
+    ).all()
+
+    items = []
+    for log in rows:
+        lock = db.get(BleLock, log.lock_id)
+        user = db.get(User, log.user_id) if log.user_id else None
+        reservation = db.get(Reservation, log.reservation_id) if log.reservation_id else None
+        open_type = log.open_type.value if log.open_type else None
+        items.append(
+            {
+                "id": log.id,
+                "opened_at": log.opened_at.isoformat(sep=" ", timespec="seconds") if log.opened_at else None,
+                "lock_id": log.lock_id,
+                "lock_name": lock.lock_name if lock else None,
+                "user_id": log.user_id,
+                "user_nickname": user.nickname if user else None,
+                "user_phone": user.phone if user else None,
+                "reservation_id": log.reservation_id,
+                "order_no": reservation.order_no if reservation else None,
+                "open_type": open_type,
+                "open_type_label": _OPEN_TYPE_LABELS.get(open_type or "", open_type),
+                "result": log.result,
+                "fail_reason": log.fail_reason,
+            }
+        )
+
+    return ResponseModel(
+        data=PageResult(items=items, total=total, page=page, page_size=page_size)
+    )
 
 
 @router.post("/admin/locks", response_model=ResponseModel)

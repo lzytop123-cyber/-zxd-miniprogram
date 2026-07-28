@@ -7,6 +7,7 @@
           <el-select v-model="storeFilter" clearable placeholder="全部门店" style="width:160px" @change="load">
             <el-option v-for="s in stores" :key="s.id" :label="s.name" :value="s.id" />
           </el-select>
+          <el-button @click="$router.push('/door-logs')">开门记录</el-button>
           <el-button type="primary" @click="openCreate">添加门锁</el-button>
         </div>
       </div>

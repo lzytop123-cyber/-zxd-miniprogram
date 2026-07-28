@@ -1,7 +1,7 @@
 const auth = require('../../utils/auth')
 const { request, invalidateCache, formatRequestError } = require('../../utils/request')
 const routes = require('../../utils/routes')
-const { completeWechatPay, ensureCardPurchasePaid } = require('../../utils/pay')
+const { completeWechatPay, ensureCardPurchasePaid, isPayCancelled } = require('../../utils/pay')
 const { handleTabScroll } = require('../../utils/tabbar')
 const { syncTabBar } = require('../../utils/features')
 const { enableShareMenu, shareAppMessage, shareTimeline } = require('../../utils/share')
@@ -272,6 +272,10 @@ Page({
       })
     } catch (err) {
       wx.hideLoading()
+      if (isPayCancelled(err)) {
+        wx.showToast({ title: '已取消支付', icon: 'none' })
+        return
+      }
       wx.showToast({ title: formatRequestError(err) || '购买失败', icon: 'none' })
     } finally {
       this.setData({ buying: false })

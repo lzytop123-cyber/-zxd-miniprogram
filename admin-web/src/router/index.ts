@@ -32,6 +32,7 @@ const router = createRouter({
         { path: 'invites', component: () => import('../views/Invites.vue') },
         { path: 'admins', component: () => import('../views/Admins.vue') },
         { path: 'locks', component: () => import('../views/Locks.vue') },
+        { path: 'door-logs', component: () => import('../views/DoorLogs.vue') },
         { path: 'deal-mappings', component: () => import('../views/DealMappings.vue') },
         { path: 'coupons', component: () => import('../views/Coupons.vue') },
         { path: 'market-listings', component: () => import('../views/market/Listings.vue') },

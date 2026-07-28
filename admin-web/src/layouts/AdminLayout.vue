@@ -21,6 +21,7 @@
           <el-menu-item index="/seats">座位管理</el-menu-item>
           <el-menu-item index="/reservations">预约订单</el-menu-item>
           <el-menu-item index="/locks">蓝牙锁管理</el-menu-item>
+          <el-menu-item index="/door-logs">开门记录</el-menu-item>
         </el-sub-menu>
 
         <el-sub-menu index="packages">

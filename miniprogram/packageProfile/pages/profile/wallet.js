@@ -1,5 +1,5 @@
 const { request } = require('../../../utils/request')
-const { completeWechatPay } = require('../../../utils/pay')
+const { completeWechatPay, isPayCancelled } = require('../../../utils/pay')
 
 Page({
   data: { balance: 0, logs: [], amount: 100 },
@@ -41,6 +41,10 @@ Page({
       await this.loadWallet({ force: true })
     } catch (e) {
       wx.hideLoading()
+      if (isPayCancelled(e)) {
+        wx.showToast({ title: '已取消支付', icon: 'none' })
+        return
+      }
       wx.showToast({ title: e.message || '充值失败', icon: 'none' })
     }
   },

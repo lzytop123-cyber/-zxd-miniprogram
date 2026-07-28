@@ -1,7 +1,7 @@
 const { request, formatRequestError, invalidateCache } = require('../../utils/request')
 const { getLayout } = require('../../utils/seat-layout')
 const { dailyPassDays, isOfficeNightMonthlyCard, OFFICE_NIGHT_BOOKING_HINT, cardValidUntil, withinCardValidity, weeklyPassDays, monthlyPassDays, quarterlyPassDays, officeNightPassDays } = require('../../utils/cardDisplay')
-const { completeWechatPay, ensureReservationPaid } = require('../../utils/pay')
+const { completeWechatPay, ensureReservationPaid, isPayCancelled } = require('../../utils/pay')
 
 const BILL_LABELS = { hourly: '按小时', daily: '天卡', weekly: '周卡', session: '次卡', monthly: '月卡', quarterly: '季卡', night: '夜读' }
 
@@ -566,10 +566,16 @@ Page({
             silent: true,
           }).catch(() => {})
           this.setData({ reservationId: null, orderNo: '' })
-          wx.showToast({ title: formatRequestError(e), icon: 'none' })
+          wx.showToast({
+            title: isPayCancelled(e) ? '已取消支付' : formatRequestError(e),
+            icon: 'none',
+          })
         }
       } else {
-        wx.showToast({ title: formatRequestError(e), icon: 'none' })
+        wx.showToast({
+          title: isPayCancelled(e) ? '已取消支付' : formatRequestError(e),
+          icon: 'none',
+        })
       }
     } finally {
       this._submitting = false

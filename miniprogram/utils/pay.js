@@ -4,6 +4,13 @@ function isMockPrepay(wechatPay) {
   return wechatPay && String(wechatPay.package || '').includes('mock_prepay')
 }
 
+function isPayCancelled(err) {
+  if (!err) return false
+  if (err.cancelled || err.code === 'PAY_CANCEL') return true
+  const msg = String(err.errMsg || err.message || '')
+  return /cancel/i.test(msg)
+}
+
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms))
 }
@@ -47,6 +54,7 @@ async function ensureReservationPaid(reservationId, wechatPay) {
 
 /**
  * 完成微信支付；mock 预支付仅在 develop 环境可用。
+ * 用户取消支付时抛出 cancelled=true 的错误，调用方勿展示原始 errMsg。
  */
 function completeWechatPay(wechatPay, mockRequest) {
   if (!wechatPay) return Promise.resolve()
@@ -69,7 +77,17 @@ function completeWechatPay(wechatPay, mockRequest) {
       signType: wechatPay.signType || 'RSA',
       paySign: wechatPay.paySign,
       success: resolve,
-      fail: (err) => reject(new Error(err.errMsg || '支付取消')),
+      fail: (err) => {
+        const msg = (err && err.errMsg) || ''
+        if (/cancel/i.test(msg)) {
+          const e = new Error('已取消支付')
+          e.code = 'PAY_CANCEL'
+          e.cancelled = true
+          reject(e)
+          return
+        }
+        reject(new Error(msg || '支付失败'))
+      },
     })
   })
 }
@@ -102,4 +120,10 @@ async function ensureCardPurchasePaid(orderNo, wechatPay) {
   throw new Error('支付确认超时')
 }
 
-module.exports = { isMockPrepay, completeWechatPay, ensureReservationPaid, ensureCardPurchasePaid }
+module.exports = {
+  isMockPrepay,
+  isPayCancelled,
+  completeWechatPay,
+  ensureReservationPaid,
+  ensureCardPurchasePaid,
+}
