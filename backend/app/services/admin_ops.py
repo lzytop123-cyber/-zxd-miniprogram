@@ -39,9 +39,12 @@ from app.models import (
 from app.services.booking import auto_checkin_reservation, record_study_on_checkout, reservation_unlock_allowed
 from app.services.business import TTLockService
 from app.services.card_service import (
+    _set_card_validity,
+    card_face_validity_days,
     card_validity_api_fields,
     is_office_night_monthly_card,
     issue_period_card,
+    period_pass_days,
 )
 from app.services.store_hours import OFFICE_NIGHT_USAGE_RULE
 
@@ -54,6 +57,17 @@ CARD_TYPE_LABELS = {
     CardType.session: "次卡",
     CardType.night_monthly: "夜读月卡",
 }
+
+# 门店发放/续费按「天数」理解的卡类型（数值=卡面天数=须一次约满连续天数）
+_ADMIN_DAY_BASED_TYPES = frozenset(
+    {
+        CardType.daily,
+        CardType.weekly,
+        CardType.monthly,
+        CardType.quarterly,
+        CardType.night_monthly,
+    }
+)
 
 CARD_TYPE_TO_REWARD: dict[CardType, RewardType] = {
     CardType.hourly: RewardType.hours,
@@ -70,6 +84,8 @@ def period_card_admin_dict(db: Session, card: PeriodCard, today: date | None = N
     today = today or date.today()
     user = db.get(User, card.user_id)
     validity = card_validity_api_fields(card, today)
+    span = period_pass_days(card) or None
+    face = card_face_validity_days(card)
     return {
         "id": card.id,
         "user_id": card.user_id,
@@ -85,6 +101,8 @@ def period_card_admin_dict(db: Session, card: PeriodCard, today: date | None = N
         "start_date": str(card.start_date) if card.start_date else None,
         "end_date": str(card.end_date) if card.end_date else None,
         **validity,
+        "face_validity_days": face,
+        "period_pass_days": span,
         "usage_rule": OFFICE_NIGHT_USAGE_RULE if is_office_night_monthly_card(card) else None,
         "source": card.source.value if card.source else None,
         "status": card.status,
@@ -129,6 +147,14 @@ def issue_admin_period_card(
     )
     if remark:
         card.remark = remark
+    # 门店发放：天/周/月/季卡的「数值」= 卡面天数，并作为须一次约满的连续天数
+    # （团购月卡仍走 issue_period_card 默认：长效期 + 固定连约天数，不受影响）
+    if card_type in _ADMIN_DAY_BASED_TYPES and reward_value > 0:
+        _set_card_validity(card, date.today(), reward_value)
+        if card_type == CardType.daily and reward_value == 1:
+            card.total_sessions = None
+        else:
+            card.total_sessions = reward_value
     return card
 
 
@@ -149,6 +175,13 @@ def update_admin_period_card(
     if end_date is not None:
         card.end_date = end_date
     elif extend_days is not None and extend_days > 0:
+        # 续费：卡面截止日期 +N；连约天数同步 +N（小程序「连续 X 天」）
+        if card.card_type in _ADMIN_DAY_BASED_TYPES:
+            if card.total_sessions and card.total_sessions > 1:
+                card.total_sessions = card.total_sessions + extend_days
+            elif card.card_type != CardType.daily and card.start_date and card.end_date:
+                face = (card.end_date - card.start_date).days + 1
+                card.total_sessions = face + extend_days
         base = card.end_date or date.today()
         card.end_date = base + timedelta(days=extend_days)
     if remaining_hours is not None:

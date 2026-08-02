@@ -35,9 +35,14 @@
           <span v-else>-</span>
         </template>
       </el-table-column>
-      <el-table-column label="有效期" min-width="240">
+      <el-table-column label="有效期" min-width="260">
         <template #default="{ row }">
           <div>{{ row.validity_range || formatValidityRange(row) }}</div>
+          <div v-if="row.face_validity_days || row.period_pass_days" class="sub">
+            <span v-if="row.face_validity_days">卡面 {{ row.face_validity_days }} 天</span>
+            <span v-if="row.face_validity_days && row.period_pass_days"> · </span>
+            <span v-if="row.period_pass_days">连约 {{ row.period_pass_days }} 天</span>
+          </div>
           <div v-if="row.usage_rule" class="sub">{{ row.usage_rule }}</div>
           <div v-else-if="validityHint(row)" class="sub">{{ validityHint(row) }}</div>
         </template>
@@ -76,7 +81,7 @@
         </el-form-item>
         <el-form-item label="数值">
           <el-input-number v-model="issueForm.reward_value" :min="1" style="width:100%" />
-          <div class="hint">小时卡=小时数；次卡=次数；天/周/月/季=有效天数</div>
+          <div class="hint">小时卡=小时数；次卡=次数；天/周/月/季/夜读=天数（卡面效期与须一次约满天数相同）</div>
         </el-form-item>
         <el-form-item label="卡名称"><el-input v-model="issueForm.card_name" placeholder="可选" /></el-form-item>
         <el-form-item label="备注"><el-input v-model="issueForm.remark" placeholder="可选" /></el-form-item>
@@ -90,7 +95,10 @@
     <el-dialog v-model="editVisible" title="期限卡运维" width="520px">
       <el-form :model="editForm" label-width="110px">
         <el-form-item label="卡名称"><el-input :model-value="editRow?.card_name" disabled /></el-form-item>
-        <el-form-item label="延长天数"><el-input-number v-model="editForm.extend_days" :min="0" style="width:100%" /></el-form-item>
+        <el-form-item label="延长天数">
+          <el-input-number v-model="editForm.extend_days" :min="0" style="width:100%" />
+          <div class="hint">续费用：卡面截止日期 +N；天/周/月/季卡的「连续约满天数」同步 +N</div>
+        </el-form-item>
         <el-form-item v-if="editRow?.card_type === 'hourly'" label="剩余小时">
           <el-input-number v-model="editForm.remaining_hours" :min="0" :step="0.5" :precision="1" style="width:100%" />
         </el-form-item>
