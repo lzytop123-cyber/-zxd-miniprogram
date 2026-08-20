@@ -78,6 +78,18 @@ function matchQuickSessionDays(days) {
   return days != null && QUICK_SESSION_DAYS.includes(days) ? days : null
 }
 
+// 与后端 LEGACY_FIXED_USAGE_WINDOW_MAX_DAYS 一致：窗口 > 7 天为弹性卡（自选连续 span 天），否则为旧版固定窗口（须约满整段）
+const LEGACY_FIXED_WINDOW_MAX = 7
+
+function dailyCardWindow(card) {
+  if (!card || !card.start_date || !card.end_date) return 0
+  return daysBetweenDates(card.start_date, card.end_date) || 0
+}
+
+function dailyCardIsFlexible(card) {
+  return dailyCardWindow(card) > LEGACY_FIXED_WINDOW_MAX
+}
+
 function matchDailyPreset(startClock, endClock) {
   if (startClock === STORE_OPEN.start && endClock === STORE_OPEN.end) return 'full'
   if (startClock === '08:00' && endClock === '18:00') return '8-18'
@@ -168,6 +180,10 @@ Page({
     hasMultiDayDailyCard: false,
     dailyUseMode: 'single',
     multiDayDailyCard: null,
+    dailyPassFlexible: false,
+    dailyPassSpan: 0,
+    dailyPassStartMin: '',
+    dailyPassStartMax: '',
   },
 
   onLoad(options) {
@@ -502,17 +518,47 @@ Page({
     return (this.data.seats || []).some((s) => s.id)
   },
 
+  // 计算多天天卡（三天卡）的预约区间与选择器边界。
+  // 弹性卡（有效期 > 7 天）：在有效期内自选连续 span 天；固定窗口卡：须约满整段。
+  _dailyPassPatch(card, preferredStart) {
+    const span = dailyPassDays(card)
+    if (dailyCardIsFlexible(card)) {
+      const today = todayStr()
+      let startMin = card.start_date && card.start_date > today ? card.start_date : today
+      const startMax = addDays(card.end_date, -(span - 1))
+      let start = preferredStart || startMin
+      if (start < startMin) start = startMin
+      if (start > startMax) start = startMax
+      return {
+        dailyUseMode: 'multi_pass',
+        multiDayDailyCard: card,
+        startDate: start,
+        endDate: addDays(start, span - 1),
+        dailyPassFlexible: true,
+        dailyPassSpan: span,
+        dailyPassStartMin: startMin,
+        dailyPassStartMax: startMax,
+      }
+    }
+    // 旧版固定窗口：须约满整段
+    return {
+      dailyUseMode: 'multi_pass',
+      multiDayDailyCard: card,
+      startDate: card.start_date,
+      endDate: card.end_date,
+      dailyPassFlexible: false,
+      dailyPassSpan: span,
+      dailyPassStartMin: card.start_date,
+      dailyPassStartMax: card.start_date,
+    }
+  },
+
   setDailyMode(e) {
     const mode = e.currentTarget.dataset.mode
     if (mode === 'multi_pass') {
       const card = this._findMultiDayDailyCard(this.data.userCards)
       if (!card) return
-      this.setData({
-        dailyUseMode: 'multi_pass',
-        multiDayDailyCard: card,
-        startDate: card.start_date,
-        endDate: card.end_date,
-      }, () => this.refreshPreview())
+      this.setData(this._dailyPassPatch(card, todayStr()), () => this.refreshPreview())
       return
     }
     const { startDate } = this.data
@@ -598,8 +644,13 @@ Page({
     const patch = { startDate }
     if (this.data.billType === 'daily') {
       if (this.data.dailyUseMode === 'multi_pass' && this.data.multiDayDailyCard) {
-        patch.startDate = this.data.multiDayDailyCard.start_date
-        patch.endDate = this.data.multiDayDailyCard.end_date
+        Object.assign(patch, this._dailyPassPatch(this.data.multiDayDailyCard, startDate))
+        if (patch.dailyPassFlexible && patch.startDate !== startDate) {
+          wx.showToast({
+            title: `开始日期须在 ${patch.dailyPassStartMin} ~ ${patch.dailyPassStartMax} 内`,
+            icon: 'none',
+          })
+        }
       } else {
         patch.endDate = startDate
       }
@@ -839,7 +890,13 @@ Page({
         ;({ start, end } = storeRangeDateTimes(startDate, endDate))
         const span = dailyPassDays(multi)
         const days = Math.floor((end - start) / 86400000) + 1
-        if (startDate !== multi.start_date || endDate !== multi.end_date || days !== span) {
+        if (dailyCardIsFlexible(multi)) {
+          const startMax = addDays(multi.end_date, -(span - 1))
+          if (days !== span) throw new Error(`该卡须预约连续 ${span} 天`)
+          if (startDate < multi.start_date || startDate > startMax) {
+            throw new Error(`开始日期须在 ${multi.start_date} ~ ${startMax} 内`)
+          }
+        } else if (startDate !== multi.start_date || endDate !== multi.end_date) {
           throw new Error(`该卡须连续预约 ${multi.start_date} 至 ${multi.end_date}`)
         }
       } else if (startDate === endDate) {

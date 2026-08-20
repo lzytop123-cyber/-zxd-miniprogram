@@ -429,7 +429,12 @@ def find_available_seat(
 
 
 def calc_price(
-    db: Session, store_id: int, bill_type: BillType, duration_hours: Decimal, seat_type: str = "standard"
+    db: Session,
+    store_id: int,
+    bill_type: BillType,
+    duration_hours: Decimal,
+    seat_type: str = "standard",
+    days: int | None = None,
 ) -> tuple[Decimal, PricingRule | None]:
     rule = db.scalar(
         select(PricingRule).where(
@@ -454,6 +459,10 @@ def calc_price(
             if rule.max_hours and duration_hours > rule.max_hours:
                 raise ValueError(f"最多预约 {rule.max_hours} 小时")
             price = rule.price * duration_hours
+    elif bill_type == BillType.daily:
+        # 天卡按自然日计价：跨天预约须按天数乘算，单日为 1 天
+        day_count = days if days and days > 0 else 1
+        price = rule.price * day_count
     else:
         price = rule.price
     return price, rule

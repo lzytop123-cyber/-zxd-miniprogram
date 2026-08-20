@@ -110,8 +110,9 @@ def _prepare_booking(db: Session, body, require_seat: bool = False):
     elif not require_seat:
         raise HTTPException(status_code=400, detail="暂无可用座位")
 
+    day_count = (end.date() - start.date()).days + 1
     try:
-        price, _ = calc_price(db, body.store_id, body.bill_type, duration)
+        price, _ = calc_price(db, body.store_id, body.bill_type, duration, days=day_count)
     except ValueError as e:
         if body.bill_type == BillType.night:
             # 无单次夜读售价：持卡预约，金额在支付时用期限卡抵扣

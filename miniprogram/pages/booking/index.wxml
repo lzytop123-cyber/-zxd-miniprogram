@@ -75,8 +75,17 @@
     <!-- 天卡 -->
     <block wx:if="{{billType==='daily'}}">
       <block wx:if="{{dailyUseMode==='multi_pass' && multiDayDailyCard}}">
-        <view class="field"><text class="field-key">连续使用</text><text class="field-val">{{startDate}} 至 {{endDate}}</text></view>
-        <view class="hint">须连续约满 {{multiDayDailyCard.daily_pass_days}} 天</view>
+        <block wx:if="{{dailyPassFlexible}}">
+          <picker mode="date" value="{{startDate}}" start="{{dailyPassStartMin}}" end="{{dailyPassStartMax}}" bindchange="onStartDateChange">
+            <view class="field"><text class="field-key">开始日期</text><text class="field-val">{{startDate}} ›</text></view>
+          </picker>
+          <view class="field"><text class="field-key">连续使用</text><text class="field-val">{{startDate}} 至 {{endDate}}</text></view>
+          <view class="hint">有效期 {{dailyPassStartMin}} ~ {{dailyPassStartMax}} 内选开始日，连续 {{dailyPassSpan}} 天</view>
+        </block>
+        <block wx:else>
+          <view class="field"><text class="field-key">连续使用</text><text class="field-val">{{startDate}} 至 {{endDate}}</text></view>
+          <view class="hint">须连续约满 {{dailyPassSpan}} 天</view>
+        </block>
       </block>
       <block wx:else>
         <picker mode="date" value="{{startDate}}" start="{{today}}" bindchange="onStartDateChange">
