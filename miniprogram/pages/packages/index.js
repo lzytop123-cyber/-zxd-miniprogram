@@ -1,7 +1,7 @@
 const auth = require('../../utils/auth')
 const { request, invalidateCache, formatRequestError } = require('../../utils/request')
 const routes = require('../../utils/routes')
-const { completeWechatPay, ensureCardPurchasePaid, isPayCancelled } = require('../../utils/pay')
+const { completeWechatPay, ensureCardPurchasePaid, isPayCancelled, isPayBanned } = require('../../utils/pay')
 const { handleTabScroll } = require('../../utils/tabbar')
 const { syncTabBar } = require('../../utils/features')
 const { enableShareMenu, shareAppMessage, shareTimeline } = require('../../utils/share')
@@ -274,6 +274,18 @@ Page({
       wx.hideLoading()
       if (isPayCancelled(err)) {
         wx.showToast({ title: '已取消支付', icon: 'none' })
+        return
+      }
+      if (isPayBanned(err)) {
+        wx.showModal({
+          title: '微信支付暂不可用',
+          content: '你的微信支付未能发起，通常是账号未实名认证、未成年或支付被限制。可改用「团购券兑换」领取套餐卡，或在微信完成实名认证后重试。',
+          confirmText: '去兑换',
+          cancelText: '知道了',
+          success: (r) => {
+            if (r.confirm) wx.navigateTo({ url: routes.exchangeIndex })
+          },
+        })
         return
       }
       wx.showToast({ title: formatRequestError(err) || '购买失败', icon: 'none' })

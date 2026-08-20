@@ -90,9 +90,11 @@ function getOpenWindowHint(reservation, now = new Date()) {
 }
 
 function mapBleOpenFailure({ errorCode, errorMsg, canOpen, reservation }) {
-  const msg = String(errorMsg || '').toLowerCase()
+  const raw = String(errorMsg || '')
+  const msg = raw.toLowerCase()
   const code = Number(errorCode)
 
+  // 不在可开门时间：优先提示时间窗/过期
   if (!canOpen && reservation) {
     const now = new Date()
     const end = parseTime(reservation.end_time)
@@ -102,37 +104,74 @@ function mapBleOpenFailure({ errorCode, errorMsg, canOpen, reservation }) {
     return { content: getOpenWindowHint(reservation, now) }
   }
 
+  // 门锁忙：上一次开门操作还没结束
+  if (raw.includes('正在操作中') || msg.includes('busy') || msg.includes('operating')) {
+    return { content: '门锁正在响应上一次操作，请等约 2 秒后再按一次' }
+  }
+
+  // 手机蓝牙未开启 / 适配器不可用
   if (
     msg.includes('bluetooth')
-    || msg.includes('蓝牙')
+    || raw.includes('蓝牙未开启')
+    || raw.includes('蓝牙未打开')
     || msg.includes('adapter')
+    || msg.includes('not available')
     || code === 10001
   ) {
-    return { content: '请开启蓝牙并靠近门锁' }
+    return { content: '手机蓝牙未开启，请下拉控制中心打开蓝牙后重试' }
   }
 
-  if (
-    msg.includes('timeout')
-    || msg.includes('超时')
-    || msg.includes('timed out')
-    || code === 10012
-  ) {
-    return { content: '请靠近门锁并重试' }
-  }
-
+  // 蓝牙权限未授权
   if (
     msg.includes('permission')
     || msg.includes('authorize')
-    || msg.includes('授权')
+    || msg.includes('unauthorized')
+    || raw.includes('授权')
+    || raw.includes('权限')
   ) {
-    return { content: '请在设置中允许蓝牙权限' }
+    return { content: '微信没有蓝牙权限，请到「设置 → 微信 → 蓝牙」开启后重试' }
   }
 
-  if (msg.includes('key') || msg.includes('钥匙') || msg.includes('lockdata')) {
-    return { content: '请刷新页面后重试', refresh: true }
+  // 连接超时
+  if (
+    msg.includes('timeout')
+    || msg.includes('timed out')
+    || raw.includes('超时')
+    || code === 10012
+  ) {
+    return { content: '连接门锁超时，请把手机靠近门锁（1 米内）再试' }
   }
 
-  return { content: errorMsg || '请靠近门锁重试' }
+  // 未连接 / 找不到门锁 / 连接断开
+  if (
+    msg.includes('connect')
+    || msg.includes('disconnect')
+    || msg.includes('not found')
+    || msg.includes('no device')
+    || raw.includes('连接失败')
+    || raw.includes('未找到')
+    || raw.includes('未连接')
+  ) {
+    return { content: '没有连接到门锁，请靠近门锁（1 米内）并保持蓝牙开启后重试' }
+  }
+
+  // 钥匙 / lockData 失效
+  if (msg.includes('key') || raw.includes('钥匙') || msg.includes('lockdata') || raw.includes('未生成')) {
+    return { content: '开门钥匙已失效，已为你刷新，请重新点击开门', refresh: true }
+  }
+
+  // 门锁电量过低
+  if (msg.includes('battery') || raw.includes('电量') || raw.includes('电池')) {
+    return { content: '门锁电量过低，暂时无法开门，请联系店长处理' }
+  }
+
+  // 兜底：把真实原因和错误码写出来，避免“不知道是什么失败”
+  const detail = raw.trim()
+  const codePart = Number.isFinite(code) && code !== 0 ? `（代码 ${code}）` : ''
+  if (detail) {
+    return { content: `开门失败：${detail}${codePart}` }
+  }
+  return { content: `开门失败${codePart}，请靠近门锁重试；多次失败请联系店长` }
 }
 
 module.exports = {

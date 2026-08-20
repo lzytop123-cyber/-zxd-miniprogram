@@ -3,6 +3,15 @@ const { handleTabScroll } = require('../../utils/tabbar')
 const { syncTabBar, isStudyAssistantEnabled, leaveStudyAssistantIfDisabled } = require('../../utils/features')
 const { enableShareMenu, shareAppMessage, shareTimeline } = require('../../utils/share')
 
+// 将累计分钟数格式化为易读的「X时Y分」（不足 1 小时显示「X分钟」）
+function formatStudyMinutes(minutes) {
+  const total = Math.max(0, Math.round(Number(minutes) || 0))
+  if (total < 60) return `${total}分钟`
+  const hours = Math.floor(total / 60)
+  const rem = total % 60
+  return rem > 0 ? `${hours}时${rem}分` : `${hours}时`
+}
+
 Page({
   data: {
     tab: 'assistant',
@@ -89,7 +98,11 @@ Page({
     const { force = false } = options
     const params = this.data.storeId ? `?store_id=${this.data.storeId}` : ''
     return request({ url: `/report/leaderboard${params}`, silent: true, force }).then((leaderboard) => {
-      this.setData({ leaderboard })
+      const list = (leaderboard || []).map((item) => ({
+        ...item,
+        time_label: formatStudyMinutes(item.total_minutes),
+      }))
+      this.setData({ leaderboard: list })
     }).catch(() => {})
   },
 

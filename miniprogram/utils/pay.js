@@ -11,6 +11,13 @@ function isPayCancelled(err) {
   return /cancel/i.test(msg)
 }
 
+// 微信支付能力被限制（多为账号未实名/未成年/被风控），非本小程序可修复
+function isPayBanned(err) {
+  if (!err) return false
+  const msg = String(err.errMsg || err.message || '')
+  return /banned/i.test(msg)
+}
+
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms))
 }
@@ -123,6 +130,7 @@ async function ensureCardPurchasePaid(orderNo, wechatPay) {
 module.exports = {
   isMockPrepay,
   isPayCancelled,
+  isPayBanned,
   completeWechatPay,
   ensureReservationPaid,
   ensureCardPurchasePaid,

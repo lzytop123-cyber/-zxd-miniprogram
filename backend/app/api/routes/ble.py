@@ -22,6 +22,8 @@ class DoorLogRequest(BaseModel):
     result: str
     error_code: str | None = None
     error_msg: str | None = None
+    # 门锁上报的真实电量（0-100）；有值时以此为准，替代模拟递减
+    battery_level: int | None = None
 
 
 class BleLockCreate(BaseModel):
@@ -167,6 +169,12 @@ def report_door_log(
     if not reservation or reservation.user_id != user.id:
         raise HTTPException(status_code=404, detail="订单不存在")
 
+    # 瞬时并发态（插件“蓝牙正在操作中”）不是真实开门失败，不写记录以免刷屏
+    if body.result != "success":
+        reason = body.error_msg or ""
+        if any(kw in reason for kw in ("正在操作中", "operating", "busy")):
+            return ResponseModel(message="已忽略瞬时重试")
+
     log = DoorLog(
         lock_id=ble_key.lock_id,
         user_id=user.id,
@@ -183,8 +191,14 @@ def report_door_log(
             raise HTTPException(status_code=400, detail=detail)
         ble_key.used_at = datetime.now()
         lock = db.get(BleLock, ble_key.lock_id)
-        if lock and lock.battery_level is not None and lock.battery_level > 0:
-            lock.battery_level = max(lock.battery_level - 1, 0)
+        if lock:
+            reported = body.battery_level
+            if reported is not None and 0 <= reported <= 100:
+                # 真实门锁上报电量为准
+                lock.battery_level = reported
+            elif str(lock.lock_id or "").startswith("mock_") and lock.battery_level:
+                # 仅模拟锁在无真实上报时递减，便于演示电量告警；真实锁不臆造电量
+                lock.battery_level = max(lock.battery_level - 1, 0)
         if reservation:
             auto_checkin_reservation(db, reservation)
     db.add(log)

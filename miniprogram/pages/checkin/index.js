@@ -12,6 +12,18 @@ const {
 
 const CHECKIN_SELECT_KEY = 'checkin_selected_id'
 
+// 从通通锁插件成功回包中尽力提取真实电量（字段名随插件版本而异），无有效值返回 null。
+// 有真实值时上报服务端记录，避免用模拟递减导致电量告警失真。
+function pickBatteryLevel(result) {
+  if (!result || typeof result !== 'object') return null
+  const candidates = [result.battery, result.electricQuantity, result.power, result.electric]
+  for (const v of candidates) {
+    const n = Number(v)
+    if (Number.isFinite(n) && n >= 0 && n <= 100) return Math.round(n)
+  }
+  return null
+}
+
 let plugin = null
 
 function detectPlugin() {
@@ -274,20 +286,25 @@ Page({
     if (this._timer) clearInterval(this._timer)
   },
 
-  afterOpenSuccess(reservation) {
+  afterOpenSuccess(reservation, result) {
     wx.hideLoading()
     wx.showToast({ title: '门已开启', icon: 'success' })
     wx.vibrateShort()
+    const data = { reservation_id: reservation.id, result: 'success' }
+    const battery = pickBatteryLevel(result)
+    if (battery !== null) data.battery_level = battery
     request({
       url: `/ble/checkin/${reservation.id}`,
       method: 'POST',
-      data: { reservation_id: reservation.id, result: 'success' },
+      data,
     }).finally(() => this.loadActive())
+    this._opening = false
     this.setData({ opening: false, lastOpenError: '' })
   },
 
   afterOpenFail(reservation, errorMsg, errorCode, mode = 'ble') {
     wx.hideLoading()
+    this._opening = false
     const failure = mapBleOpenFailure({
       errorCode,
       errorMsg,
@@ -315,7 +332,10 @@ Page({
   },
 
   async openDoorBle() {
-    if (!this.data.canOpen || this.data.opening) return
+    // 用同步实例标志堵住 await 间隙内的重复点击：
+    // 否则狂点时多个 tap 会在 opening 置位前一起通过守卫，并发调用插件触发
+    // “蓝牙正在操作中”并刷出多条失败开门记录。
+    if (!this.data.canOpen || this._opening || this.data.opening) return
     if (!this.data.pluginReady) {
       const hint = this.data.pluginHint || '通通锁插件未加载'
       this.setData({ lastOpenError: hint })
@@ -323,6 +343,9 @@ Page({
     }
     const { reservation } = this.data
     if (!reservation) return
+
+    this._opening = true
+    this.setData({ opening: true, lastOpenError: '' })
 
     try {
       await wx.openBluetoothAdapter()
@@ -333,16 +356,17 @@ Page({
         reservation,
         mode: 'ble',
       })
+      this._opening = false
       this.setData({ opening: false, lastOpenError: failure.content })
       return
     }
 
-    this.setData({ opening: true })
     wx.showLoading({ title: '蓝牙连接中...' })
     const lockData = wx.getStorageSync(`ble_key_${reservation.id}`) || this.data.lockData
 
     if (!plugin || typeof plugin.controlLock !== 'function') {
       wx.hideLoading()
+      this._opening = false
       this.setData({ opening: false, lastOpenError: '蓝牙插件未加载' })
       return
     }
@@ -355,6 +379,7 @@ Page({
         reservation,
         mode: 'ble',
       })
+      this._opening = false
       this.setData({ opening: false, lastOpenError: failure.content })
       this.loadBleKey(reservation.id)
       return
@@ -367,7 +392,7 @@ Page({
         lockData,
       })
       if (result && result.errorCode === 0) {
-        this.afterOpenSuccess(reservation)
+        this.afterOpenSuccess(reservation, result)
       } else {
         this.afterOpenFail(
           reservation,

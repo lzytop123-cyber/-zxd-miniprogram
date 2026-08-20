@@ -215,8 +215,11 @@
 
   <view class="fixed-bottom-spacer"></view>
 
-  <!-- 底部 CTA -->
+  <!-- 底部 CTA：禁用时文案说明缺什么 -->
   <view class="bk-bottom">
-    <view class="bk-cta full {{seatId && preview && !previewLoading && preview.seat_id === seatId ? '' : 'bk-cta--disabled'}}" bindtap="goOrder">{{previewLoading ? '计算中…' : '立即预定'}}</view>
+    <view
+      class="bk-cta full {{seatId && preview && !previewLoading && preview.seat_id === seatId ? '' : 'bk-cta--disabled'}}"
+      bindtap="goOrder"
+    >{{previewLoading ? '计算中…' : (previewError ? '请检查使用时间' : (!seatId ? '请选择座位' : ((preview && preview.seat_id === seatId) ? '立即预定' : '请稍候…')))}}</view>
   </view>
 </view>
