@@ -16,7 +16,6 @@ from sqlalchemy import (
     String,
     Text,
     UniqueConstraint,
-    func,
 )
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -66,9 +65,9 @@ class MarketCategory(Base):
     name: Mapped[str] = mapped_column(String(50), nullable=False)
     sort_order: Mapped[int] = mapped_column(Integer, default=0)
     status: Mapped[int] = mapped_column(Integer, default=1)
-    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime, server_default=func.now(), onupdate=func.now()
+        DateTime, default=datetime.now, onupdate=datetime.now
     )
 
     __table_args__ = (UniqueConstraint("type", "code", name="uq_market_category_type_code"),)
@@ -109,9 +108,9 @@ class MarketListing(Base):
     reviewed_by: Mapped[int | None] = mapped_column(Integer, ForeignKey("admin_users.id"))
     content_safe_text_ok: Mapped[int | None] = mapped_column(Integer)
     content_safe_image_ok: Mapped[int | None] = mapped_column(Integer)
-    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime, server_default=func.now(), onupdate=func.now()
+        DateTime, default=datetime.now, onupdate=datetime.now
     )
 
 
@@ -124,7 +123,7 @@ class MarketFavorite(Base):
     listing_id: Mapped[int] = mapped_column(
         Integer, ForeignKey("market_listings.id"), nullable=False
     )
-    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
 
 
 class MarketContactRequest(Base):
@@ -146,7 +145,7 @@ class MarketContactRequest(Base):
     reveal_value: Mapped[str | None] = mapped_column(String(100))
     decided_at: Mapped[datetime | None] = mapped_column(DateTime)
     expired_at: Mapped[datetime | None] = mapped_column(DateTime)
-    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
 
 
 class MarketReport(Base):
@@ -163,7 +162,7 @@ class MarketReport(Base):
     status: Mapped[str] = mapped_column(String(20), default=MarketReportStatus.pending.value)
     handler_admin_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("admin_users.id"))
     handle_note: Mapped[str | None] = mapped_column(String(200))
-    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
     handled_at: Mapped[datetime | None] = mapped_column(DateTime)
 
 
@@ -174,7 +173,7 @@ class MarketSensitiveWord(Base):
     word: Mapped[str] = mapped_column(String(50), nullable=False, unique=True)
     level: Mapped[str] = mapped_column(String(20), default="block")  # block | review
     status: Mapped[int] = mapped_column(Integer, default=1)
-    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
 
 
 class MarketModerationLog(Base):
@@ -187,4 +186,4 @@ class MarketModerationLog(Base):
     admin_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("admin_users.id"))
     user_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("users.id"))
     detail: Mapped[str | None] = mapped_column(Text)
-    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)

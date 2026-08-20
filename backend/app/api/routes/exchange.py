@@ -1,5 +1,5 @@
 import json
-from datetime import datetime, timezone
+from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Path, Query
 from pydantic import BaseModel, Field
@@ -227,7 +227,7 @@ async def _exchange(
     order.deal_type = mapping.reward_type.value
     order.store_id = body.store_id or mapping.store_id
     order.status = MeituanOrderStatus.verified
-    order.verified_at = datetime.now(timezone.utc).replace(tzinfo=None)
+    order.verified_at = datetime.now()
     order.meituan_raw = {
         "result": consume_result,
         "ticketData": ticket_data,

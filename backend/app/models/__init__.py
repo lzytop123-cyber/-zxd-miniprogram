@@ -15,7 +15,6 @@ from sqlalchemy import (
     Text,
     Time,
     UniqueConstraint,
-    func,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -117,9 +116,9 @@ class User(Base):
     market_violation_count: Mapped[int] = mapped_column(Integer, default=0)
     market_wechat_id: Mapped[str | None] = mapped_column(String(64))
     preferred_store_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("stores.id"))
-    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime, server_default=func.now(), onupdate=func.now()
+        DateTime, default=datetime.now, onupdate=datetime.now
     )
 
 
@@ -131,7 +130,7 @@ class AdminUser(Base):
     password_hash: Mapped[str] = mapped_column(String(200), nullable=False)
     name: Mapped[str | None] = mapped_column(String(50))
     status: Mapped[int] = mapped_column(Integer, default=1)
-    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
 
 
 class Store(Base):
@@ -151,7 +150,7 @@ class Store(Base):
     meituan_shop_id: Mapped[str | None] = mapped_column(String(100))
     meituan_auth_token: Mapped[str | None] = mapped_column(String(500))
     status: Mapped[int] = mapped_column(Integer, default=1)
-    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
 
     zones: Mapped[list["Zone"]] = relationship(back_populates="store")
     seats: Mapped[list["Seat"]] = relationship(back_populates="store")
@@ -236,7 +235,7 @@ class Reservation(Base):
     period_card_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("period_cards.id"))
     refund_remark: Mapped[str | None] = mapped_column(String(200))
     refunded_at: Mapped[datetime | None] = mapped_column(DateTime)
-    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
 
 
 class PeriodCard(Base):
@@ -260,7 +259,7 @@ class PeriodCard(Base):
     status: Mapped[int] = mapped_column(Integer, default=1)
     remark: Mapped[str | None] = mapped_column(String(200))
     expire_reminded_at: Mapped[datetime | None] = mapped_column(DateTime)
-    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
 
 
 class CardPurchaseOrder(Base):
@@ -278,7 +277,7 @@ class CardPurchaseOrder(Base):
     pay_type: Mapped[PayType] = mapped_column(Enum(PayType), nullable=False)
     pay_status: Mapped[int] = mapped_column(Integer, default=0)
     period_card_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("period_cards.id"))
-    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
 
 
 class RechargeOrder(Base):
@@ -293,7 +292,7 @@ class RechargeOrder(Base):
     pay_type: Mapped[PayType] = mapped_column(Enum(PayType), default=PayType.wechat)
     pay_status: Mapped[int] = mapped_column(Integer, default=0)
     paid_at: Mapped[datetime | None] = mapped_column(DateTime)
-    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
 
 
 class Coupon(Base):
@@ -320,7 +319,7 @@ class WalletLog(Base):
     balance_after: Mapped[Decimal | None] = mapped_column(Numeric(10, 2))
     remark: Mapped[str | None] = mapped_column(String(200))
     ref_order: Mapped[str | None] = mapped_column(String(32))
-    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
 
 
 class PointLog(Base):
@@ -332,7 +331,7 @@ class PointLog(Base):
     type: Mapped[str] = mapped_column(String(20), nullable=False)
     remark: Mapped[str | None] = mapped_column(String(200))
     ref_order: Mapped[str | None] = mapped_column(String(32))
-    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
 
 
 class BleBatteryAlert(Base):
@@ -343,7 +342,7 @@ class BleBatteryAlert(Base):
     battery_level: Mapped[int] = mapped_column(Integer, nullable=False)
     message: Mapped[str | None] = mapped_column(String(200))
     is_read: Mapped[int] = mapped_column(Integer, default=0)
-    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
 
 
 class StudyStat(Base):
@@ -372,7 +371,7 @@ class BleLock(Base):
     battery_level: Mapped[int | None] = mapped_column(Integer)
     status: Mapped[int] = mapped_column(Integer, default=1)
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime, server_default=func.now(), onupdate=func.now()
+        DateTime, default=datetime.now, onupdate=datetime.now
     )
 
 
@@ -390,7 +389,7 @@ class BleKey(Base):
     end_time: Mapped[datetime | None] = mapped_column(DateTime)
     used_at: Mapped[datetime | None] = mapped_column(DateTime)
     status: Mapped[int] = mapped_column(Integer, default=1)
-    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
 
 
 class DoorLog(Base):
@@ -403,7 +402,7 @@ class DoorLog(Base):
     open_type: Mapped[OpenType] = mapped_column(Enum(OpenType), default=OpenType.ble)
     result: Mapped[int] = mapped_column(Integer, default=1)
     fail_reason: Mapped[str | None] = mapped_column(String(200))
-    opened_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    opened_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
 
 
 class MeituanOrder(Base):
@@ -428,7 +427,7 @@ class MeituanOrder(Base):
     )
     verified_at: Mapped[datetime | None] = mapped_column(DateTime)
     meituan_raw: Mapped[dict | None] = mapped_column(JSON)
-    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
 
 
 class MeituanDealMapping(Base):
@@ -461,9 +460,9 @@ class PendingDealMapping(Base):
     suggested_reward_value: Mapped[int | None] = mapped_column(Integer)
     hit_count: Mapped[int] = mapped_column(Integer, default=1)
     status: Mapped[str] = mapped_column(String(20), default="pending")
-    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime, server_default=func.now(), onupdate=func.now()
+        DateTime, default=datetime.now, onupdate=datetime.now
     )
 
 
@@ -475,7 +474,7 @@ class WechatSubscription(Base):
     tmpl_id: Mapped[str | None] = mapped_column(String(100))
     scene: Mapped[str | None] = mapped_column(String(50))
     status: Mapped[int] = mapped_column(Integer, default=1)
-    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
 
 
 class HomeBanner(Base):
@@ -493,7 +492,7 @@ class HomeBanner(Base):
     link_path: Mapped[str | None] = mapped_column(String(200))
     is_active: Mapped[int] = mapped_column(Integer, default=1)
     sort_order: Mapped[int] = mapped_column(Integer, default=0)
-    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
 
 
 class HomeCarouselSetting(Base):
@@ -506,7 +505,7 @@ class HomeCarouselSetting(Base):
     indicator_dots: Mapped[int] = mapped_column(Integer, default=1)
     hero_height: Mapped[int] = mapped_column(Integer, default=680)
     hero_mode: Mapped[str] = mapped_column(String(20), default="fullscreen")
-    updated_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), onupdate=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now, onupdate=datetime.now)
 
 
 class SiteContactSetting(Base):
@@ -518,7 +517,7 @@ class SiteContactSetting(Base):
     poster_url: Mapped[str | None] = mapped_column(String(500))
     title: Mapped[str | None] = mapped_column(String(50), default="联系店长")
     hint: Mapped[str | None] = mapped_column(String(100), default="长按识别二维码，添加店长微信咨询")
-    updated_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), onupdate=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now, onupdate=datetime.now)
 
 
 class SiteBookingSetting(Base):
@@ -529,7 +528,7 @@ class SiteBookingSetting(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     # 预约开始日最多可提前天数：暑期可设 3，淡季可设 7
     start_max_advance_days: Mapped[int] = mapped_column(Integer, default=3)
-    updated_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), onupdate=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now, onupdate=datetime.now)
 
 
 class AdminOperationLog(Base):
@@ -542,7 +541,7 @@ class AdminOperationLog(Base):
     target_type: Mapped[str | None] = mapped_column(String(30))
     target_id: Mapped[str | None] = mapped_column(String(50))
     detail: Mapped[str | None] = mapped_column(Text)
-    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
 
 
 class SystemAnnouncement(Base):
@@ -558,8 +557,8 @@ class SystemAnnouncement(Base):
     is_active: Mapped[int] = mapped_column(Integer, default=1)
     start_at: Mapped[datetime | None] = mapped_column(DateTime)
     end_at: Mapped[datetime | None] = mapped_column(DateTime)
-    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
-    updated_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), onupdate=func.now())
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now, onupdate=datetime.now)
 
 
 class StoreCalendarDay(Base):
@@ -573,7 +572,7 @@ class StoreCalendarDay(Base):
     open_time: Mapped[time | None] = mapped_column(Time)
     close_time: Mapped[time | None] = mapped_column(Time)
     remark: Mapped[str | None] = mapped_column(String(200))
-    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
 
 
 # 上岸集市模型（独立模块）
