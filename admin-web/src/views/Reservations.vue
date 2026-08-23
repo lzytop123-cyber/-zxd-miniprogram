@@ -140,37 +140,64 @@
       </el-table-column>
     </el-table>
 
-    <el-dialog v-model="changeSeatVisible" title="换座" width="480px" destroy-on-close @closed="resetChangeSeat">
+    <el-dialog v-model="changeSeatVisible" title="换座" width="820px" destroy-on-close @closed="resetChangeSeat">
       <div v-if="changeSeatRow" class="change-seat-meta">
-        <div>订单 <strong>{{ changeSeatRow.order_no }}</strong></div>
+        <div>订单 <strong>{{ changeSeatRow.order_no }}</strong> · {{ changeSeatRow.user_nickname || '同学' }} ID {{ changeSeatRow.user_id }}</div>
         <div class="sub">
           当前座位 <strong>{{ seatOptions.current_seat_code || changeSeatRow.seat_code }}</strong>
           · {{ formatTime(seatOptions.start_time) }} 至 {{ formatTime(seatOptions.end_time) }}
         </div>
       </div>
-      <el-form label-width="88px" style="margin-top: 16px">
-        <el-form-item label="新座位">
-          <el-select
-            v-model="changeSeatTargetId"
-            filterable
-            placeholder="选择可用座位"
-            style="width: 100%"
-            :loading="seatOptionsLoading"
-          >
-            <el-option
-              v-for="s in seatOptions.seats"
-              :key="s.id"
-              :label="`${s.seat_code} · ${s.zone_name}${s.reason ? '（' + s.reason + '）' : ''}`"
-              :value="s.id"
-              :disabled="!s.selectable"
-            />
-          </el-select>
-        </el-form-item>
-      </el-form>
+      <div class="seat-legend">
+        <span><i class="dot current"></i>当前</span>
+        <span><i class="dot free"></i>空座</span>
+        <span><i class="dot swap"></i>可对调</span>
+        <span><i class="dot busy"></i>占用</span>
+        <span><i class="dot off"></i>停用</span>
+      </div>
+      <div v-loading="seatOptionsLoading" class="floor-map">
+        <div
+          v-for="s in mappedSeats"
+          :key="s.id"
+          class="map-seat"
+          :class="seatClass(s)"
+          :style="mapSeatStyle(s)"
+          :title="seatTitle(s)"
+          @click="pickSeat(s)"
+        >
+          {{ s.seat_code }}
+        </div>
+      </div>
+      <el-select
+        v-if="!seatOptionsLoading && !mappedSeats.length && seatOptions.seats.length"
+        v-model="changeSeatTargetId"
+        filterable
+        placeholder="选择座位"
+        style="width:100%;margin-top:8px"
+      >
+        <el-option
+          v-for="s in seatOptions.seats"
+          :key="s.id"
+          :label="`${s.seat_code} · ${s.zone_name}${s.reason ? '（' + s.reason + '）' : ''}`"
+          :value="s.id"
+          :disabled="!s.selectable && !s.can_swap"
+        />
+      </el-select>
+      <div v-if="selectedSeat" class="seat-picked">
+        <template v-if="selectedSeat.can_swap && selectedSeat.occupied_by">
+          将与 <strong>{{ selectedSeat.occupied_by.nickname }}</strong>
+          （ID {{ selectedSeat.occupied_by.user_id }} · {{ selectedSeat.seat_code }} · {{ selectedSeat.occupied_by.end_label }}）对调
+        </template>
+        <template v-else>
+          换到空座 <strong>{{ selectedSeat.seat_code }}</strong>
+          <span v-if="selectedSeat.zone_name"> · {{ selectedSeat.zone_name }}</span>
+        </template>
+      </div>
+      <div v-else class="sub" style="margin-top:10px">点击空座换座，或点击橙色座位与对方对调。</div>
       <template #footer>
         <el-button @click="changeSeatVisible = false">取消</el-button>
         <el-button type="primary" :loading="changeSeatSubmitting" :disabled="!changeSeatTargetId" @click="submitChangeSeat">
-          确认换座
+          {{ selectedSeat?.can_swap ? '确认对调' : '确认换座' }}
         </el-button>
       </template>
     </el-dialog>
@@ -553,17 +580,68 @@ const changeSeatRow = ref<any>(null)
 const changeSeatTargetId = ref<number | null>(null)
 const changeSeatSubmitting = ref(false)
 const seatOptionsLoading = ref(false)
+type SeatOption = {
+  id: number
+  seat_code: string
+  zone_name: string
+  pos_x?: number | null
+  pos_y?: number | null
+  selectable: boolean
+  can_swap?: boolean
+  reason: string | null
+  occupied_by?: { reservation_id: number; user_id: number; nickname: string; end_label: string } | null
+}
+
 const seatOptions = reactive<{
   current_seat_code: string | null
+  current_seat_id: number | null
   start_time: string
   end_time: string
-  seats: Array<{ id: number; seat_code: string; zone_name: string; selectable: boolean; reason: string | null }>
+  seats: SeatOption[]
 }>({
   current_seat_code: null,
+  current_seat_id: null,
   start_time: '',
   end_time: '',
   seats: [],
 })
+
+const selectedSeat = computed(() => seatOptions.seats.find((s) => s.id === changeSeatTargetId.value) || null)
+const mappedSeats = computed(() => seatOptions.seats.filter((s) => s.pos_x != null && s.pos_y != null))
+
+function mapSeatStyle(seat: { pos_x?: number | null; pos_y?: number | null }) {
+  const x = Number(seat.pos_x) || 0
+  const y = Number(seat.pos_y) || 0
+  const left = x <= 100 ? x : x / 9
+  const top = y <= 100 ? y : y / 7
+  return { left: `${left}%`, top: `${top}%` }
+}
+
+function seatClass(s: SeatOption) {
+  return {
+    current: s.id === seatOptions.current_seat_id,
+    free: s.selectable,
+    swap: !!s.can_swap,
+    busy: !s.selectable && !s.can_swap && s.reason !== '座位已停用' && s.id !== seatOptions.current_seat_id,
+    off: s.reason === '座位已停用',
+    on: s.id === changeSeatTargetId.value,
+  }
+}
+
+function seatTitle(s: SeatOption) {
+  if (s.id === seatOptions.current_seat_id) return `${s.seat_code} 当前座位`
+  if (s.selectable) return `${s.seat_code} 空座`
+  return `${s.seat_code} ${s.reason || ''}`
+}
+
+function pickSeat(s: SeatOption) {
+  if (s.id === seatOptions.current_seat_id) return
+  if (s.selectable || s.can_swap) {
+    changeSeatTargetId.value = s.id
+    return
+  }
+  ElMessage.warning(s.reason || '该座位不可选')
+}
 
 function canChangeSeat(row: any) {
   if (row.pay_status !== 1) return false
@@ -576,6 +654,7 @@ function resetChangeSeat() {
   changeSeatRow.value = null
   changeSeatTargetId.value = null
   seatOptions.current_seat_code = null
+  seatOptions.current_seat_id = null
   seatOptions.start_time = ''
   seatOptions.end_time = ''
   seatOptions.seats = []
@@ -589,11 +668,10 @@ async function openChangeSeat(row: any) {
   try {
     const res = await http.get(`/admin/reservations/${row.id}/seat-options`)
     seatOptions.current_seat_code = res.data.current_seat_code
+    seatOptions.current_seat_id = res.data.current_seat_id
     seatOptions.start_time = res.data.start_time
     seatOptions.end_time = res.data.end_time
     seatOptions.seats = res.data.seats || []
-    const first = seatOptions.seats.find((s) => s.selectable)
-    if (first) changeSeatTargetId.value = first.id
   } catch (e: any) {
     ElMessage.error(e?.response?.data?.detail || '加载座位失败')
     changeSeatVisible.value = false
@@ -604,17 +682,21 @@ async function openChangeSeat(row: any) {
 
 async function submitChangeSeat() {
   if (!changeSeatRow.value || !changeSeatTargetId.value) return
-  const target = seatOptions.seats.find((s) => s.id === changeSeatTargetId.value)
-  await ElMessageBox.confirm(
-    `确定将订单 ${changeSeatRow.value.order_no} 从 ${changeSeatRow.value.seat_code} 换到 ${target?.seat_code || changeSeatTargetId.value} 吗？`,
-    '确认换座',
-    { type: 'warning' },
-  )
+  const target = selectedSeat.value
+  const swapping = !!(target?.can_swap && target.occupied_by)
+  const tip = swapping
+    ? `确定将 ${changeSeatRow.value.seat_code} 与 ${target.seat_code}（${target.occupied_by?.nickname} ID ${target.occupied_by?.user_id}）对调吗？订单仍挂在原同学名下。`
+    : `确定将订单 ${changeSeatRow.value.order_no} 从 ${changeSeatRow.value.seat_code} 换到 ${target?.seat_code || changeSeatTargetId.value} 吗？`
+  await ElMessageBox.confirm(tip, swapping ? '确认对调' : '确认换座', { type: 'warning' })
   changeSeatSubmitting.value = true
   try {
-    const res = await http.post(`/admin/reservations/${changeSeatRow.value.id}/change-seat`, {
-      seat_id: changeSeatTargetId.value,
-    })
+    const res = swapping
+      ? await http.post(`/admin/reservations/${changeSeatRow.value.id}/swap-seats`, {
+          other_reservation_id: target.occupied_by.reservation_id,
+        })
+      : await http.post(`/admin/reservations/${changeSeatRow.value.id}/change-seat`, {
+          seat_id: changeSeatTargetId.value,
+        })
     ElMessage.success(res.message || '换座成功')
     changeSeatVisible.value = false
     load()
@@ -674,6 +756,47 @@ onUnmounted(() => {
 .cell-main { line-height: 1.3; }
 .sub { font-size: 12px; color: #999; line-height: 1.3; }
 .change-seat-meta { line-height: 1.8; }
+.seat-legend { display: flex; gap: 14px; margin: 10px 0 8px; font-size: 12px; color: #666; }
+.seat-legend .dot {
+  display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 4px; vertical-align: -1px;
+}
+.seat-legend .dot.current { background: #2D6A4F; }
+.seat-legend .dot.free { background: #409eff; }
+.seat-legend .dot.swap { background: #e6a23c; }
+.seat-legend .dot.busy { background: #f56c6c; }
+.seat-legend .dot.off { background: #c0c4cc; }
+.floor-map {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 900 / 700;
+  background: #fafafa;
+  border: 1px dashed #ddd;
+  border-radius: 8px;
+  overflow: hidden;
+}
+.map-seat {
+  position: absolute;
+  width: 36px;
+  height: 36px;
+  margin-left: -18px;
+  margin-top: -18px;
+  border-radius: 8px;
+  background: #409eff;
+  color: #fff;
+  font-size: 11px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.12);
+  cursor: pointer;
+  user-select: none;
+}
+.map-seat.current { background: #2D6A4F; cursor: default; }
+.map-seat.swap { background: #e6a23c; }
+.map-seat.busy { background: #f56c6c; cursor: default; }
+.map-seat.off { background: #c0c4cc; cursor: default; }
+.map-seat.on { outline: 3px solid #1C2B20; outline-offset: 1px; }
+.seat-picked { margin-top: 10px; font-size: 13px; color: #2D6A4F; }
 .create-user-row { display: flex; gap: 8px; width: 100%; }
 .create-user-picked { margin-top: 6px; color: #2D6A4F; font-size: 13px; }
 .pager { margin-top: 12px; display: flex; justify-content: flex-end; }

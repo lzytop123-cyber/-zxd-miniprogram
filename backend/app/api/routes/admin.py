@@ -64,6 +64,7 @@ from app.services.booking import (
     BOOKING_START_MAX_ADVANCE_DAYS_MIN,
     change_reservation_seat,
     clamp_booking_start_max_advance_days,
+    swap_reservation_seats,
     finalize_expired_reservation,
     finalize_reservation_after_pay,
     seat_conflict_excluding,
@@ -1120,6 +1121,10 @@ class AdminChangeSeatRequest(BaseModel):
     seat_id: int
 
 
+class AdminSwapSeatsRequest(BaseModel):
+    other_reservation_id: int
+
+
 @router.get("/reservations/{reservation_id}/seat-options", response_model=ResponseModel)
 def admin_reservation_seat_options(
     reservation_id: int,
@@ -1146,7 +1151,7 @@ def admin_reservation_seat_options(
             "current_seat_code": current.seat_code if current else None,
             "start_time": reservation.start_time.isoformat(),
             "end_time": reservation.end_time.isoformat(),
-            "seats": seat_options_for_change(db, reservation),
+            "seats": seat_options_for_change(db, reservation, for_admin=True),
         }
     )
 
@@ -1171,6 +1176,42 @@ def admin_change_reservation_seat(
     return ResponseModel(
         message=f"已换座：{old_seat.seat_code} → {new_seat.seat_code}",
         data=_reservation_admin_item(db, reservation),
+    )
+
+
+@router.post("/reservations/{reservation_id}/swap-seats", response_model=ResponseModel)
+def admin_swap_reservation_seats(
+    reservation_id: int,
+    body: AdminSwapSeatsRequest,
+    admin: AdminUser = Depends(get_current_admin),
+    db: Session = Depends(get_db),
+):
+    reservation = db.get(Reservation, reservation_id)
+    other = db.get(Reservation, body.other_reservation_id)
+    if not reservation or not other:
+        raise HTTPException(status_code=404, detail="订单不存在")
+    try:
+        seat_a, seat_b = swap_reservation_seats(db, reservation, other)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    log_admin_action(
+        db,
+        admin,
+        "swap_reservation_seats",
+        target_type="reservation",
+        target_id=reservation.id,
+        detail=f"{reservation.order_no}<->{other.order_no} {seat_a.seat_code}<->{seat_b.seat_code}",
+    )
+    db.commit()
+    db.refresh(reservation)
+    db.refresh(other)
+    return ResponseModel(
+        message=f"已对调：{seat_a.seat_code} ↔ {seat_b.seat_code}",
+        data={
+            "left": _reservation_admin_item(db, reservation),
+            "right": _reservation_admin_item(db, other),
+        },
     )
 
 

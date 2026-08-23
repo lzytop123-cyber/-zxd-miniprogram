@@ -185,13 +185,17 @@ def seat_conflict_excluding(
     return find_seat_conflict(db, seat_id, start, end, exclude_reservation_id)
 
 
-def change_reservation_seat(db: Session, reservation: Reservation, new_seat_id: int) -> tuple[Seat, Seat]:
+def _assert_reservation_can_change_seat(reservation: Reservation) -> None:
     if reservation.status not in (0, 1):
         raise ValueError("当前订单状态不可换座")
     if reservation.pay_status != 1:
         raise ValueError("仅已付款订单可换座")
     if reservation.end_time <= datetime.now():
         raise ValueError("预约已结束，不可换座")
+
+
+def change_reservation_seat(db: Session, reservation: Reservation, new_seat_id: int) -> tuple[Seat, Seat]:
+    _assert_reservation_can_change_seat(reservation)
 
     old_seat = db.get(Seat, reservation.seat_id)
     if not old_seat:
@@ -219,7 +223,61 @@ def change_reservation_seat(db: Session, reservation: Reservation, new_seat_id: 
     return new_seat, old_seat
 
 
-def seat_options_for_change(db: Session, reservation: Reservation) -> list[dict]:
+def _occupant_brief(db: Session, row: Reservation) -> dict:
+    user = db.get(User, row.user_id)
+    end_label = row.end_time.strftime("%m-%d %H:%M") if row.end_time else ""
+    nickname = (user.nickname if user else None) or "同学"
+    return {
+        "reservation_id": row.id,
+        "user_id": row.user_id,
+        "nickname": nickname,
+        "end_time": row.end_time.isoformat(sep=" ", timespec="minutes") if row.end_time else None,
+        "end_label": end_label,
+        "label": f"{nickname} · ID {row.user_id} · 用到 {end_label}",
+    }
+
+
+def can_swap_reservations(db: Session, left: Reservation, right: Reservation) -> bool:
+    try:
+        _assert_reservation_can_change_seat(left)
+        _assert_reservation_can_change_seat(right)
+    except ValueError:
+        return False
+    if left.id == right.id or left.store_id != right.store_id or left.seat_id == right.seat_id:
+        return False
+    if seat_conflict_excluding(db, right.seat_id, left.start_time, left.end_time, right.id):
+        return False
+    if seat_conflict_excluding(db, left.seat_id, right.start_time, right.end_time, left.id):
+        return False
+    return True
+
+
+def swap_reservation_seats(
+    db: Session, reservation_a: Reservation, reservation_b: Reservation
+) -> tuple[Seat, Seat]:
+    _assert_reservation_can_change_seat(reservation_a)
+    _assert_reservation_can_change_seat(reservation_b)
+    if reservation_a.id == reservation_b.id:
+        raise ValueError("请选择另一笔订单对调")
+    if reservation_a.store_id != reservation_b.store_id:
+        raise ValueError("只能对调同一门店的订单")
+    if reservation_a.seat_id == reservation_b.seat_id:
+        raise ValueError("两单已是同一座位")
+
+    seat_a = db.get(Seat, reservation_a.seat_id)
+    seat_b = db.get(Seat, reservation_b.seat_id)
+    if not seat_a or not seat_b:
+        raise ValueError("座位不存在")
+    if seat_conflict_excluding(db, seat_b.id, reservation_a.start_time, reservation_a.end_time, reservation_b.id):
+        raise ValueError(f"座位 {seat_b.seat_code} 在本单时段还有其他人")
+    if seat_conflict_excluding(db, seat_a.id, reservation_b.start_time, reservation_b.end_time, reservation_a.id):
+        raise ValueError(f"座位 {seat_a.seat_code} 在对方时段还有其他人")
+
+    reservation_a.seat_id, reservation_b.seat_id = seat_b.id, seat_a.id
+    return seat_a, seat_b
+
+
+def seat_options_for_change(db: Session, reservation: Reservation, *, for_admin: bool = False) -> list[dict]:
     from app.services.seat_setup import expected_seat_codes, seat_code_to_slot, zone_name_by_slot
 
     plan_codes = set(expected_seat_codes())
@@ -236,27 +294,24 @@ def seat_options_for_change(db: Session, reservation: Reservation) -> list[dict]
         if seat.seat_code not in plan_codes:
             continue
         zone_name = zone_name_by_slot(seat_code_to_slot(seat.seat_code)) or "-"
+        base = {
+            "id": seat.id,
+            "seat_code": seat.seat_code,
+            "zone_name": zone_name,
+            "pos_x": seat.pos_x,
+            "pos_y": seat.pos_y,
+            "selectable": False,
+            "can_swap": False,
+            "occupied_by": None,
+            "reason": None,
+        }
         if seat.id == reservation.seat_id:
-            options.append(
-                {
-                    "id": seat.id,
-                    "seat_code": seat.seat_code,
-                    "zone_name": zone_name,
-                    "selectable": False,
-                    "reason": "当前座位",
-                }
-            )
+            base["reason"] = "当前座位"
+            options.append(base)
             continue
         if seat.status != 1:
-            options.append(
-                {
-                    "id": seat.id,
-                    "seat_code": seat.seat_code,
-                    "zone_name": zone_name,
-                    "selectable": False,
-                    "reason": "座位已停用",
-                }
-            )
+            base["reason"] = "座位已停用"
+            options.append(base)
             continue
         conflict = seat_conflict_excluding(
             db,
@@ -266,25 +321,17 @@ def seat_options_for_change(db: Session, reservation: Reservation) -> list[dict]
             exclude_reservation_id=reservation.id,
         )
         if conflict:
-            options.append(
-                {
-                    "id": seat.id,
-                    "seat_code": seat.seat_code,
-                    "zone_name": zone_name,
-                    "selectable": False,
-                    "reason": "时段冲突",
-                }
-            )
+            if for_admin:
+                occupant = _occupant_brief(db, conflict)
+                base["occupied_by"] = occupant
+                base["can_swap"] = can_swap_reservations(db, reservation, conflict)
+                base["reason"] = occupant["label"]
+            else:
+                base["reason"] = "时段冲突"
+            options.append(base)
         else:
-            options.append(
-                {
-                    "id": seat.id,
-                    "seat_code": seat.seat_code,
-                    "zone_name": zone_name,
-                    "selectable": True,
-                    "reason": None,
-                }
-            )
+            base["selectable"] = True
+            options.append(base)
     return options
 
 
