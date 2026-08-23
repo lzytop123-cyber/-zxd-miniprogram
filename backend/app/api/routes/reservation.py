@@ -679,6 +679,9 @@ def cancel(
 
     if reservation.pay_status == 1:
         amount = reservation.final_price or Decimal("0")
+        if reservation.pay_type == PayType.admin:
+            db.commit()
+            return ResponseModel(message="已取消，前台收款订单不退款")
         if reservation.pay_type == PayType.wechat:
             if amount > 0:
                 WechatPayService.refund(reservation.order_no, amount, amount, "用户取消预约")

@@ -46,6 +46,7 @@ from app.schemas.reservation import ReservationItem
 from app.schemas.user import STUDY_GOAL_LABELS
 from app.services import assistant as assistant_service
 from app.services import knowledge_rag
+from app.services.admin_audit import log_admin_action
 from app.services.admin_ops import (
     admin_force_checkout,
     admin_remote_unlock,
@@ -64,8 +65,11 @@ from app.services.booking import (
     change_reservation_seat,
     clamp_booking_start_max_advance_days,
     finalize_expired_reservation,
+    finalize_reservation_after_pay,
+    seat_conflict_excluding,
     seat_options_for_change,
 )
+from app.services.business import find_busy_seat_ids, generate_order_no
 from app.services.card_service import refund_period_card_consume, repair_misissued_card_validity
 from app.services.card_service import BILL_TYPE_LABELS
 from app.services.deal_mapping_service import mark_pending_resolved_by_deal_id, resolve_pending_deal
@@ -164,6 +168,136 @@ def admin_reservations(
     return ResponseModel(
         data=PageResult(items=items, total=total or 0, page=page, page_size=page_size)
     )
+
+
+class AdminReservationPreviewBody(BaseModel):
+    store_id: int
+    bill_type: BillType = BillType.hourly
+    start_time: datetime
+    end_time: datetime | None = None
+    seat_id: int | None = None
+
+
+class AdminCreateReservationBody(BaseModel):
+    user_id: int
+    store_id: int
+    bill_type: BillType = BillType.hourly
+    start_time: datetime
+    end_time: datetime | None = None
+    seat_id: int
+    final_price: Decimal | None = None
+
+
+def _admin_available_seats(db: Session, store_id: int, start: datetime, end: datetime) -> list[dict]:
+    from app.services.seat_setup import expected_seat_codes
+
+    plan_codes = set(expected_seat_codes())
+    seats = [
+        s
+        for s in db.scalars(
+            select(Seat).where(Seat.store_id == store_id, Seat.is_buffer == 0, Seat.status == 1)
+        ).all()
+        if s.seat_code in plan_codes
+    ]
+    busy_ids = find_busy_seat_ids(db, [s.id for s in seats], start, end)
+    zones = {z.id: z.name for z in db.scalars(select(Zone).where(Zone.store_id == store_id)).all()}
+    items = []
+    for s in seats:
+        items.append(
+            {
+                "id": s.id,
+                "seat_code": s.seat_code,
+                "zone_name": zones.get(s.zone_id) or "",
+                "available": s.id not in busy_ids,
+            }
+        )
+    items.sort(key=lambda x: (not x["available"], x["seat_code"]))
+    return items
+
+
+@router.post("/reservations/preview", response_model=ResponseModel)
+def admin_preview_reservation(
+    body: AdminReservationPreviewBody,
+    _: AdminUser = Depends(get_current_admin),
+    db: Session = Depends(get_db),
+):
+    from app.api.routes.reservation import _prepare_booking
+
+    start, end, duration, seat, price = _prepare_booking(db, body, require_seat=False)
+    return ResponseModel(
+        data={
+            "store_id": body.store_id,
+            "seat_id": seat.id if seat else None,
+            "seat_code": seat.seat_code if seat else None,
+            "bill_type": body.bill_type.value,
+            "start_time": start,
+            "end_time": end,
+            "duration_hours": duration,
+            "original_price": price,
+            "final_price": price,
+            "seats": _admin_available_seats(db, body.store_id, start, end),
+        }
+    )
+
+
+@router.post("/reservations/create", response_model=ResponseModel)
+async def admin_create_reservation(
+    body: AdminCreateReservationBody,
+    admin: AdminUser = Depends(get_current_admin),
+    db: Session = Depends(get_db),
+):
+    from app.api.routes.reservation import _prepare_booking, _seat_lock
+
+    user = db.get(User, body.user_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="用户不存在，请先让同学在小程序登录")
+    start, end, duration, seat, price = _prepare_booking(db, body, require_seat=True)
+    if body.final_price is not None:
+        if body.final_price < 0:
+            raise HTTPException(status_code=400, detail="金额不能为负")
+        final_price = body.final_price.quantize(Decimal("0.01"))
+        discount = max(Decimal("0.00"), price - final_price)
+    else:
+        final_price = price
+        discount = Decimal("0.00")
+
+    with _seat_lock(seat.id) as lock:
+        if not lock.acquired:
+            raise HTTPException(status_code=409, detail="座位正在被预约，请重试")
+        if seat_conflict_excluding(db, seat.id, start, end):
+            raise HTTPException(status_code=409, detail="该座位时段已被预约，请重新选座")
+        reservation = Reservation(
+            order_no=generate_order_no(),
+            user_id=user.id,
+            store_id=body.store_id,
+            seat_id=seat.id,
+            bill_type=body.bill_type,
+            start_time=start,
+            end_time=end,
+            duration_hours=duration,
+            original_price=price,
+            discount_price=discount,
+            final_price=final_price,
+            pay_type=PayType.admin,
+            pay_status=1,
+            status=0,
+        )
+        db.add(reservation)
+        db.commit()
+        db.refresh(reservation)
+
+    await finalize_reservation_after_pay(db, reservation)
+    db.refresh(reservation)
+    log_admin_action(
+        db,
+        admin,
+        "create_reservation",
+        target_type="reservation",
+        target_id=reservation.id,
+        detail=f"{reservation.order_no} user={user.id} {final_price}",
+    )
+    db.commit()
+    return ResponseModel(message="已为同学预约并记为前台收款", data=_reservation_admin_item(db, reservation))
 
 
 @router.get("/stats", response_model=ResponseModel)
@@ -950,6 +1084,10 @@ def admin_cancel_reservation(
     user = db.get(User, reservation.user_id)
     if reservation.pay_status == 1 and user:
         amount = reservation.final_price or Decimal("0")
+        if reservation.pay_type == PayType.admin:
+            reservation.status = 3
+            db.commit()
+            return ResponseModel(message="已取消，前台收款订单不退款，座位已释放")
         if reservation.pay_type == PayType.balance and amount > 0:
             add_wallet_log(
                 db, user, "refund", amount,

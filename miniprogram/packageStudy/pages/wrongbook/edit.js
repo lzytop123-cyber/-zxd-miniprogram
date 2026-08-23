@@ -102,6 +102,7 @@ Page({
       sourceType: ['album', 'camera'],
       success: async (res) => {
         wx.showLoading({ title: '上传中', mask: true })
+        let ocrHint = ''
         try {
           let ocrText = this.data.ocrText
           const nextUrls = urls.slice()
@@ -114,8 +115,8 @@ Page({
             }
             if (isQuestion && data.ocr_text) {
               ocrText = ocrText ? `${ocrText}\n${data.ocr_text}` : data.ocr_text
-            } else if (isQuestion && data.ocr_error) {
-              wx.showToast({ title: String(data.ocr_error).slice(0, 40), icon: 'none' })
+            } else if (isQuestion) {
+              ocrHint = data.ocr_error || '未识别到文字，可手填题干'
             }
           }
           if (isQuestion) {
@@ -124,9 +125,16 @@ Page({
             this.setData({ answerImageUrls: nextUrls, displayAnswers: nextViews })
           }
         } catch (e) {
-          wx.showToast({ title: e.message || '上传失败', icon: 'none' })
+          ocrHint = e.message || '上传失败'
         } finally {
           wx.hideLoading()
+        }
+        if (ocrHint) {
+          wx.showModal({
+            title: '识别结果',
+            content: ocrHint,
+            showCancel: false,
+          })
         }
       },
     })

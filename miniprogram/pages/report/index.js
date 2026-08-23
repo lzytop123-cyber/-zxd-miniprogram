@@ -2,7 +2,27 @@ const { request } = require('../../utils/request')
 const { handleTabScroll } = require('../../utils/tabbar')
 const { syncTabBar, isStudyAssistantEnabled, leaveStudyAssistantIfDisabled } = require('../../utils/features')
 const { enableShareMenu, shareAppMessage, shareTimeline } = require('../../utils/share')
+const { resolveImageForDisplay } = require('../../utils/media')
 const routes = require('../../utils/routes')
+
+const WB_STATUS_FILTERS = [
+  { value: null, label: '全部' },
+  { value: 0, label: '未掌握' },
+  { value: 1, label: '仍然错' },
+  { value: 2, label: '已掌握' },
+]
+const WB_STATUS_LABELS = { 0: '未掌握', 1: '仍然错', 2: '已掌握' }
+
+async function decorateWbItem(row) {
+  const item = row || {}
+  const urls = item.image_urls || []
+  const display = await Promise.all(urls.map((u) => resolveImageForDisplay(u)))
+  return {
+    ...item,
+    cover: display[0] || '',
+    status_label: item.status_label || WB_STATUS_LABELS[item.status] || '未掌握',
+  }
+}
 
 // 将累计分钟数格式化为易读的「X时Y分」（不足 1 小时显示「X分钟」）
 function formatStudyMinutes(minutes) {
@@ -34,6 +54,19 @@ Page({
     loading: false,
     scrollInto: '',
     introLoaded: false,
+
+    wbSubjects: [],
+    wbSubjectId: null,
+    wbStatusFilters: WB_STATUS_FILTERS,
+    wbStatus: null,
+    wbTags: [],
+    wbTag: '',
+    wbKeyword: '',
+    wbItems: [],
+    wbPage: 1,
+    wbFinished: false,
+    wbLoading: false,
+    wbLoaded: false,
   },
 
   onShareAppMessage() {
@@ -65,6 +98,9 @@ Page({
     if (this.data.tab === 'assistant' && !this.data.introLoaded) {
       this.loadIntro()
     }
+    if (this.data.tab === 'wrongbook') {
+      this.reloadWrongbook()
+    }
   },
 
   onPullDownRefresh() {
@@ -73,7 +109,15 @@ Page({
       this.setData({ introLoaded: false })
       tasks.push(this.loadIntro({ force: true }))
     }
+    if (this.data.tab === 'wrongbook') {
+      tasks.push(this.reloadWrongbook())
+    }
     Promise.all(tasks).finally(() => wx.stopPullDownRefresh())
+  },
+
+  onReachBottom() {
+    if (this.data.tab !== 'wrongbook' || this.data.wbFinished || this.data.wbLoading) return
+    this.loadWrongbookList()
   },
 
   onPageScroll(e) {
@@ -159,10 +203,6 @@ Page({
       .catch(() => null)
   },
 
-  goWrongbook() {
-    wx.navigateTo({ url: routes.wrongbookIndex })
-  },
-
   switchTab(e) {
     const tab = e.currentTarget.dataset.tab
     if (tab === this.data.tab) return
@@ -170,6 +210,96 @@ Page({
     if (tab === 'assistant' && !this.data.introLoaded) {
       this.loadIntro()
     }
+    if (tab === 'wrongbook') {
+      this.reloadWrongbook()
+    }
+  },
+
+  reloadWrongbook() {
+    this.setData({ wbPage: 1, wbFinished: false, wbItems: [] })
+    return Promise.all([
+      request({ url: '/wrongbook/subjects', force: true }).then((rows) => {
+        this.setData({ wbSubjects: rows || [] })
+      }),
+      request({ url: '/wrongbook/tags', force: true, silent: true }).then((rows) => {
+        this.setData({ wbTags: rows || [] })
+      }).catch(() => {}),
+      this.loadWrongbookList(),
+    ])
+  },
+
+  loadWrongbookList() {
+    if (this.data.wbLoading) return Promise.resolve()
+    this.setData({ wbLoading: true })
+    const { wbSubjectId, wbStatus, wbTag, wbKeyword, wbPage } = this.data
+    const query = [
+      `page=${wbPage}`,
+      'page_size=20',
+      wbSubjectId != null ? `subject_id=${wbSubjectId}` : '',
+      wbStatus != null ? `status=${wbStatus}` : '',
+      wbTag ? `tag=${encodeURIComponent(wbTag)}` : '',
+      wbKeyword ? `keyword=${encodeURIComponent(wbKeyword)}` : '',
+    ].filter(Boolean).join('&')
+    return request({ url: `/wrongbook/list?${query}`, force: true })
+      .then(async (res) => {
+        const rows = (res && res.items) || []
+        const decorated = await Promise.all(rows.map((row) => decorateWbItem(row)))
+        const wbItems = wbPage === 1 ? decorated : this.data.wbItems.concat(decorated)
+        this.setData({
+          wbItems,
+          wbPage: wbPage + 1,
+          wbFinished: wbItems.length >= (res.total || 0),
+          wbLoading: false,
+          wbLoaded: true,
+        })
+      })
+      .catch(() => {
+        this.setData({ wbLoading: false })
+      })
+  },
+
+  onWbSubject(e) {
+    const id = e.currentTarget.dataset.id
+    const wbSubjectId = id === '' || id == null ? null : Number(id)
+    if (wbSubjectId === this.data.wbSubjectId) return
+    this.setData({ wbSubjectId, wbPage: 1, wbFinished: false, wbItems: [] })
+    this.loadWrongbookList()
+  },
+
+  onWbStatus(e) {
+    const raw = e.currentTarget.dataset.value
+    const wbStatus = raw === '' || raw == null ? null : Number(raw)
+    if (wbStatus === this.data.wbStatus) return
+    this.setData({ wbStatus, wbPage: 1, wbFinished: false, wbItems: [] })
+    this.loadWrongbookList()
+  },
+
+  onWbTag(e) {
+    const tag = e.currentTarget.dataset.tag || ''
+    const wbTag = tag === this.data.wbTag ? '' : tag
+    this.setData({ wbTag, wbPage: 1, wbFinished: false, wbItems: [] })
+    this.loadWrongbookList()
+  },
+
+  onWbKeyword(e) {
+    this.setData({ wbKeyword: e.detail.value || '' })
+  },
+
+  onWbSearch() {
+    this.setData({ wbPage: 1, wbFinished: false, wbItems: [] })
+    this.loadWrongbookList()
+  },
+
+  goWbDetail(e) {
+    wx.navigateTo({ url: `${routes.wrongbookDetail}?id=${e.currentTarget.dataset.id}` })
+  },
+
+  goWbCreate() {
+    wx.navigateTo({ url: routes.wrongbookEdit })
+  },
+
+  goWbSubjects() {
+    wx.navigateTo({ url: routes.wrongbookSubjects })
   },
 
   loadIntro(options = {}) {

@@ -69,7 +69,7 @@ def recognize_general(image_bytes: bytes) -> tuple[str, str]:
     message = str(data.get("Message") or data.get("message") or "").strip()
     if resp.status_code >= 400 or code:
         logger.warning("Aliyun OCR error HTTP %s code=%s msg=%s", resp.status_code, code, message[:200])
-        return "", message or code or f"识别失败({resp.status_code})"
+        return "", _friendly_error(code, message, resp.status_code)
 
     raw = data.get("Data") or data.get("data") or ""
     if isinstance(raw, str) and raw.strip():
@@ -83,3 +83,14 @@ def recognize_general(image_bytes: bytes) -> tuple[str, str]:
         text = str(raw.get("content") or raw.get("Content") or "").strip()
         return text, "" if text else "未识别到文字"
     return "", "未识别到文字"
+
+
+def _friendly_error(code: str, message: str, status_code: int) -> str:
+    raw = f"{code} {message}".lower()
+    if "ocrservicenotopen" in raw or "not activated" in raw or "have not activated" in raw:
+        return "阿里云未开通「通用文字识别」，请到 OCR 控制台开通后再试"
+    if "ocrserviceexpired" in raw or "expired" in raw:
+        return "阿里云 OCR 已欠费过期，请充值后续费"
+    if "nopermission" in raw or "not authorized" in raw:
+        return "AccessKey 没有 OCR 权限，请给该账号授予 AliyunOCRFullAccess"
+    return message or code or f"识别失败({status_code})"

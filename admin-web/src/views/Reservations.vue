@@ -3,7 +3,10 @@
     <template #header>
       <div class="header-row">
         <span>预约订单</span>
-        <el-button @click="load">刷新</el-button>
+        <div>
+          <el-button type="primary" @click="openCreate">代同学预约</el-button>
+          <el-button @click="load">刷新</el-button>
+        </div>
       </div>
     </template>
 
@@ -172,6 +175,83 @@
       </template>
     </el-dialog>
 
+    <el-dialog v-model="createVisible" title="代同学预约" width="640px" destroy-on-close @closed="resetCreate">
+      <el-form label-width="88px">
+        <el-form-item label="同学">
+          <div class="create-user-row">
+            <el-input v-model="createForm.keyword" placeholder="学号或手机号" clearable @keyup.enter="searchUser" />
+            <el-button type="primary" :loading="userSearching" @click="searchUser">搜索</el-button>
+          </div>
+          <div v-if="createForm.user" class="create-user-picked">
+            {{ createForm.user.nickname || '未设置昵称' }} · ID {{ createForm.user.id }}
+            <span v-if="createForm.user.phone"> · {{ createForm.user.phone }}</span>
+          </div>
+        </el-form-item>
+        <el-form-item label="门店">
+          <el-select v-model="createForm.store_id" placeholder="选择门店" style="width:100%" @change="clearPreview">
+            <el-option v-for="s in stores" :key="s.id" :label="s.name" :value="s.id" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="套餐">
+          <el-select v-model="createForm.bill_type" style="width:100%" @change="clearPreview">
+            <el-option v-for="item in createBillTypes" :key="item.value" :label="item.label" :value="item.value" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="开始">
+          <el-date-picker
+            v-model="createForm.start_time"
+            type="datetime"
+            placeholder="开始时间"
+            format="YYYY-MM-DD HH:mm"
+            value-format="YYYY-MM-DDTHH:mm:ss"
+            style="width:100%"
+            @change="clearPreview"
+          />
+        </el-form-item>
+        <el-form-item label="结束">
+          <el-date-picker
+            v-model="createForm.end_time"
+            type="datetime"
+            placeholder="可空：按套餐自动算"
+            format="YYYY-MM-DD HH:mm"
+            value-format="YYYY-MM-DDTHH:mm:ss"
+            style="width:100%"
+            @change="clearPreview"
+          />
+        </el-form-item>
+        <el-form-item>
+          <el-button :loading="previewLoading" @click="previewCreate">预览价格和空座</el-button>
+        </el-form-item>
+        <template v-if="createPreview">
+          <el-form-item label="时段">
+            <span>{{ formatTime(createPreview.start_time) }} 至 {{ formatTime(createPreview.end_time) }}</span>
+          </el-form-item>
+          <el-form-item label="系统价">¥{{ createPreview.original_price }}</el-form-item>
+          <el-form-item label="座位">
+            <el-select v-model="createForm.seat_id" filterable placeholder="选择空座" style="width:100%">
+              <el-option
+                v-for="s in createPreview.seats"
+                :key="s.id"
+                :label="`${s.seat_code}${s.zone_name ? ' · ' + s.zone_name : ''}${s.available ? '' : '（已被占）'}`"
+                :value="s.id"
+                :disabled="!s.available"
+              />
+            </el-select>
+          </el-form-item>
+          <el-form-item label="实收金额">
+            <el-input-number v-model="createForm.final_price" :min="0" :precision="2" :step="1" />
+            <el-button link type="primary" @click="createForm.final_price = 0">免单</el-button>
+          </el-form-item>
+        </template>
+      </el-form>
+      <template #footer>
+        <el-button @click="createVisible = false">取消</el-button>
+        <el-button type="primary" :loading="createSubmitting" :disabled="!canSubmitCreate" @click="submitCreate">
+          确认预约（前台收款）
+        </el-button>
+      </template>
+    </el-dialog>
+
     <el-dialog v-model="refundVisible" title="登记退款" width="420px">
       <p v-if="refundRow" class="sub">订单 {{ refundRow.order_no }} · ¥{{ refundRow.final_price ?? 0 }}</p>
       <el-input v-model="refundRemark" type="textarea" :rows="3" placeholder="退款原因/备注（人工登记，非微信自动退款）" />
@@ -215,6 +295,7 @@ const payTypeMap: Record<string, string> = {
   wechat: '微信',
   balance: '余额',
   period_card: '期限卡',
+  admin: '前台收款',
 }
 
 function billLabel(v: string) {
@@ -226,6 +307,9 @@ function payTypeLabel(v: string) {
 }
 
 function priceText(row: any) {
+  if (row.pay_type === 'admin') {
+    return Number(row.final_price) === 0 ? '前台免单' : `¥${row.final_price ?? 0}`
+  }
   if (row.pay_type === 'period_card' || (Number(row.final_price) === 0 && row.pay_status === 1)) {
     return row.card_name ? `期限卡 · ${row.card_name}` : '期限卡抵扣'
   }
@@ -268,6 +352,130 @@ const filters = reactive<{ order_no: string; user_id: number | null; store_id: n
   status: null,
 })
 const stores = ref<any[]>([])
+
+const createBillTypes = [
+  { value: 'hourly', label: '按小时' },
+  { value: 'daily', label: '天卡' },
+  { value: 'weekly', label: '周卡' },
+  { value: 'monthly', label: '月卡' },
+  { value: 'quarterly', label: '季卡' },
+  { value: 'session', label: '次卡' },
+  { value: 'night', label: '夜读' },
+]
+
+const createVisible = ref(false)
+const userSearching = ref(false)
+const previewLoading = ref(false)
+const createSubmitting = ref(false)
+const createPreview = ref<any>(null)
+const createForm = reactive({
+  keyword: '',
+  user: null as any,
+  store_id: null as number | null,
+  bill_type: 'daily',
+  start_time: '',
+  end_time: '',
+  seat_id: null as number | null,
+  final_price: 0,
+})
+
+const canSubmitCreate = computed(() => {
+  return !!(createForm.user && createForm.store_id && createForm.seat_id && createPreview.value)
+})
+
+function resetCreate() {
+  createForm.keyword = ''
+  createForm.user = null
+  createForm.store_id = stores.value[0]?.id || null
+  createForm.bill_type = 'daily'
+  createForm.start_time = ''
+  createForm.end_time = ''
+  createForm.seat_id = null
+  createForm.final_price = 0
+  createPreview.value = null
+}
+
+function openCreate() {
+  resetCreate()
+  createVisible.value = true
+}
+
+function clearPreview() {
+  createPreview.value = null
+  createForm.seat_id = null
+}
+
+async function searchUser() {
+  const keyword = createForm.keyword.trim()
+  if (!keyword) {
+    ElMessage.warning('请输入学号或手机号')
+    return
+  }
+  userSearching.value = true
+  try {
+    const res = await http.get('/admin/users', { params: { keyword, page: 1, page_size: 8 } })
+    const items = res.data?.items || []
+    if (!items.length) {
+      createForm.user = null
+      ElMessage.warning('没有找到已注册用户')
+      return
+    }
+    createForm.user = items[0]
+    if (items.length > 1) {
+      ElMessage.success(`已选中 ${createForm.user.nickname || createForm.user.id}，共 ${items.length} 条匹配，默认取第一条`)
+    }
+  } finally {
+    userSearching.value = false
+  }
+}
+
+async function previewCreate() {
+  if (!createForm.store_id || !createForm.start_time) {
+    ElMessage.warning('请选择门店和开始时间')
+    return
+  }
+  previewLoading.value = true
+  try {
+    const res = await http.post('/admin/reservations/preview', {
+      store_id: createForm.store_id,
+      bill_type: createForm.bill_type,
+      start_time: createForm.start_time,
+      end_time: createForm.end_time || null,
+    })
+    createPreview.value = res.data
+    createForm.final_price = Number(res.data.original_price || 0)
+    const first = (res.data.seats || []).find((s: any) => s.available)
+    createForm.seat_id = first ? first.id : null
+  } catch (e: any) {
+    createPreview.value = null
+    ElMessage.error(e?.response?.data?.detail || e?.message || '预览失败')
+  } finally {
+    previewLoading.value = false
+  }
+}
+
+async function submitCreate() {
+  if (!canSubmitCreate.value) return
+  createSubmitting.value = true
+  try {
+    const res = await http.post('/admin/reservations/create', {
+      user_id: createForm.user.id,
+      store_id: createForm.store_id,
+      bill_type: createForm.bill_type,
+      start_time: createForm.start_time,
+      end_time: createForm.end_time || null,
+      seat_id: createForm.seat_id,
+      final_price: createForm.final_price,
+    })
+    ElMessage.success(res.message || '已预约')
+    createVisible.value = false
+    load()
+  } catch (e: any) {
+    ElMessage.error(e?.response?.data?.detail || e?.message || '下单失败')
+  } finally {
+    createSubmitting.value = false
+  }
+}
 
 async function load() {
   loading.value = true
@@ -324,7 +532,9 @@ function canCancel(row: any) {
 async function cancelOrder(row: any) {
   const msg = row.pay_status === 0
     ? `确定取消未支付订单 ${row.order_no} 吗？座位将立即释放。`
-    : `确定取消订单 ${row.order_no} 吗？已付款将尝试退款。`
+    : row.pay_type === 'admin'
+      ? `确定取消订单 ${row.order_no} 吗？前台收款不退款，仅释放座位。`
+      : `确定取消订单 ${row.order_no} 吗？已付款将尝试退款。`
   await ElMessageBox.confirm(msg, '取消订单', { type: 'warning' })
   await http.post(`/admin/reservations/${row.id}/cancel`)
   ElMessage.success('已取消')
@@ -464,5 +674,7 @@ onUnmounted(() => {
 .cell-main { line-height: 1.3; }
 .sub { font-size: 12px; color: #999; line-height: 1.3; }
 .change-seat-meta { line-height: 1.8; }
+.create-user-row { display: flex; gap: 8px; width: 100%; }
+.create-user-picked { margin-top: 6px; color: #2D6A4F; font-size: 13px; }
 .pager { margin-top: 12px; display: flex; justify-content: flex-end; }
 </style>

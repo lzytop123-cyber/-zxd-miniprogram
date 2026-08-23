@@ -37,6 +37,7 @@ class PayType(str, enum.Enum):
     balance = "balance"
     wechat = "wechat"
     period_card = "period_card"
+    admin = "admin"
 
 
 class CardType(str, enum.Enum):

@@ -4,20 +4,10 @@
   <!-- 顶部分段切换 -->
   <view class="seg-wrap">
     <view class="seg">
-      <view class="seg-item {{tab==='assistant' ? 'on' : ''}}" bindtap="switchTab" data-tab="assistant">AI 助手</view>
+      <view class="seg-item {{tab==='assistant' ? 'on' : ''}}" bindtap="switchTab" data-tab="assistant">AI助手</view>
       <view class="seg-item {{tab==='report' ? 'on' : ''}}" bindtap="switchTab" data-tab="report">学习报告</view>
+      <view class="seg-item {{tab==='wrongbook' ? 'on' : ''}}" bindtap="switchTab" data-tab="wrongbook">错题本</view>
     </view>
-  </view>
-
-  <view class="wb-entry" bindtap="goWrongbook">
-    <view class="wb-entry-left">
-      <view class="wb-entry-icon">📒</view>
-      <view>
-        <view class="wb-entry-title">错题本</view>
-        <view class="wb-entry-sub">拍照收录 · 重做错题</view>
-      </view>
-    </view>
-    <text class="wb-entry-go">进入</text>
   </view>
 
   <!-- ============ 学习报告 ============ -->
@@ -77,6 +67,71 @@
         <view class="empty" wx:if="{{!leaderboard.length}}">暂无排行数据</view>
       </view>
     </view>
+  </view>
+
+  <!-- ============ 错题本 ============ -->
+  <view wx:elif="{{tab==='wrongbook'}}" class="wb-body">
+    <view class="wb-search-bar">
+      <input
+        class="wb-search"
+        value="{{wbKeyword}}"
+        placeholder="搜索题干 / 错因 / 答案"
+        confirm-type="search"
+        bindinput="onWbKeyword"
+        bindconfirm="onWbSearch"
+      />
+      <view class="wb-search-btn" bindtap="onWbSearch">搜索</view>
+    </view>
+    <scroll-view class="wb-chips" scroll-x>
+      <view class="wb-chip {{wbSubjectId==null?'on':''}}" bindtap="onWbSubject" data-id="">全部</view>
+      <view
+        class="wb-chip {{wbSubjectId===item.id?'on':''}}"
+        wx:for="{{wbSubjects}}"
+        wx:key="id"
+        bindtap="onWbSubject"
+        data-id="{{item.id}}"
+      >{{item.name}}</view>
+      <view class="wb-chip manage" bindtap="goWbSubjects">管理学科</view>
+    </scroll-view>
+    <view class="wb-chips wrap">
+      <view
+        class="wb-chip {{wbStatus===item.value?'on':''}}"
+        wx:for="{{wbStatusFilters}}"
+        wx:key="label"
+        bindtap="onWbStatus"
+        data-value="{{item.value}}"
+      >{{item.label}}</view>
+    </view>
+    <scroll-view class="wb-chips" scroll-x wx:if="{{wbTags.length}}">
+      <view
+        class="wb-chip {{wbTag===item?'on':''}}"
+        wx:for="{{wbTags}}"
+        wx:key="*this"
+        bindtap="onWbTag"
+        data-tag="{{item}}"
+      >{{item}}</view>
+    </scroll-view>
+    <view class="wb-list">
+      <view class="wb-card" wx:for="{{wbItems}}" wx:key="id" data-id="{{item.id}}" bindtap="goWbDetail">
+        <image class="wb-cover" src="{{item.cover}}" mode="aspectFill" wx:if="{{item.cover}}" />
+        <view class="wb-cover ph" wx:else>无图</view>
+        <view class="wb-card-body">
+          <view class="wb-title">{{item.ocr_text || '未填写题干'}}</view>
+          <view class="wb-meta">
+            <text>{{item.subject_name || '未分类'}}</text>
+            <text class="wb-st s{{item.status}}">{{item.status_label}}</text>
+          </view>
+        </view>
+      </view>
+    </view>
+    <view class="wb-empty" wx:if="{{!wbLoading && !wbItems.length}}">
+      <view class="wb-empty-title">拍下第一道错题</view>
+      <view class="wb-empty-sub">收录题目、答案和错因，复习时再打开</view>
+      <view class="wb-empty-btn" bindtap="goWbCreate">立即拍照</view>
+    </view>
+    <view class="wb-tip" wx:if="{{wbLoading}}">加载中...</view>
+    <view class="wb-tip" wx:elif="{{wbFinished && wbItems.length}}">没有更多了</view>
+    <view class="wb-fab" bindtap="goWbCreate">+</view>
   </view>
 
   <!-- ============ AI 助手 ============ -->

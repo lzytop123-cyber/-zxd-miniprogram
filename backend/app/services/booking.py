@@ -597,6 +597,8 @@ def reservation_display_meta(db: Session, reservation: Reservation) -> dict:
 
     if reservation.pay_status != 1:
         pay_source_label = "待支付"
+    elif reservation.pay_type == PayType.admin:
+        pay_source_label = "前台收款"
     elif reservation.pay_type == PayType.wechat:
         pay_source_label = "微信支付"
     elif reservation.pay_type == PayType.balance:
