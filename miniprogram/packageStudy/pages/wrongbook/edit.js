@@ -114,6 +114,8 @@ Page({
             }
             if (isQuestion && data.ocr_text) {
               ocrText = ocrText ? `${ocrText}\n${data.ocr_text}` : data.ocr_text
+            } else if (isQuestion && data.ocr_error) {
+              wx.showToast({ title: String(data.ocr_error).slice(0, 40), icon: 'none' })
             }
           }
           if (isQuestion) {

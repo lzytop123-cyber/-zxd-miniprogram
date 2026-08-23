@@ -130,9 +130,10 @@ async def upload_image(
     (UPLOAD_DIR / filename).write_bytes(content)
     url = f"/static/wrongbook/{filename}"
     ocr_text = ""
+    ocr_error = ""
     if upload_type == "question":
-        ocr_text = aliyun_ocr.recognize_general(content)
-    return ResponseModel(data={"url": url, "ocr_text": ocr_text})
+        ocr_text, ocr_error = aliyun_ocr.recognize_general(content)
+    return ResponseModel(data={"url": url, "ocr_text": ocr_text, "ocr_error": ocr_error})
 
 
 @router.get("/list", response_model=ResponseModel)
