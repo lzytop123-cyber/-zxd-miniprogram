@@ -148,6 +148,7 @@
           · {{ formatTime(seatOptions.start_time) }} 至 {{ formatTime(seatOptions.end_time) }}
         </div>
       </div>
+      <el-alert v-if="seatOptions.hint" type="info" :closable="false" show-icon :title="seatOptions.hint" class="tip" />
       <div class="seat-legend">
         <span><i class="dot current"></i>当前</span>
         <span><i class="dot free"></i>空座</span>
@@ -597,12 +598,14 @@ const seatOptions = reactive<{
   current_seat_id: number | null
   start_time: string
   end_time: string
+  hint: string
   seats: SeatOption[]
 }>({
   current_seat_code: null,
   current_seat_id: null,
   start_time: '',
   end_time: '',
+  hint: '',
   seats: [],
 })
 
@@ -657,6 +660,7 @@ function resetChangeSeat() {
   seatOptions.current_seat_id = null
   seatOptions.start_time = ''
   seatOptions.end_time = ''
+  seatOptions.hint = ''
   seatOptions.seats = []
 }
 
@@ -671,6 +675,7 @@ async function openChangeSeat(row: any) {
     seatOptions.current_seat_id = res.data.current_seat_id
     seatOptions.start_time = res.data.start_time
     seatOptions.end_time = res.data.end_time
+    seatOptions.hint = res.data.hint || ''
     seatOptions.seats = res.data.seats || []
   } catch (e: any) {
     ElMessage.error(e?.response?.data?.detail || '加载座位失败')
@@ -685,7 +690,7 @@ async function submitChangeSeat() {
   const target = selectedSeat.value
   const swapping = !!(target?.can_swap && target.occupied_by)
   const tip = swapping
-    ? `确定将 ${changeSeatRow.value.seat_code} 与 ${target.seat_code}（${target.occupied_by?.nickname} ID ${target.occupied_by?.user_id}）对调吗？订单仍挂在原同学名下。`
+    ? `确定将 ${changeSeatRow.value.seat_code} 与 ${target.seat_code}（${target.occupied_by?.nickname} ID ${target.occupied_by?.user_id}，${target.occupied_by?.end_label}）对调吗？两人只换座位，订单还在各自名下。对方若是月卡，整段都会换到当前座位。`
     : `确定将订单 ${changeSeatRow.value.order_no} 从 ${changeSeatRow.value.seat_code} 换到 ${target?.seat_code || changeSeatTargetId.value} 吗？`
   await ElMessageBox.confirm(tip, swapping ? '确认对调' : '确认换座', { type: 'warning' })
   changeSeatSubmitting.value = true

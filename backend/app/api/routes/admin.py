@@ -1142,6 +1142,15 @@ def admin_reservation_seat_options(
         raise HTTPException(status_code=400, detail="预约已结束，不可换座")
 
     current = db.get(Seat, reservation.seat_id)
+    seats = seat_options_for_change(db, reservation, for_admin=True)
+    empty_count = sum(1 for s in seats if s.get("selectable") and not s.get("can_swap"))
+    swap_count = sum(1 for s in seats if s.get("can_swap"))
+    if empty_count:
+        hint = f"该时段有 {empty_count} 个空座，已排在列表前面"
+    elif swap_count:
+        hint = f"该时段没有空座，可与 {swap_count} 个已占用座位对调（对方整段预约会换到当前座位）"
+    else:
+        hint = "该时段没有可换的座位"
     return ResponseModel(
         data={
             "reservation_id": reservation.id,
@@ -1151,7 +1160,10 @@ def admin_reservation_seat_options(
             "current_seat_code": current.seat_code if current else None,
             "start_time": reservation.start_time.isoformat(),
             "end_time": reservation.end_time.isoformat(),
-            "seats": seat_options_for_change(db, reservation, for_admin=True),
+            "empty_count": empty_count,
+            "swap_count": swap_count,
+            "hint": hint,
+            "seats": seats,
         }
     )
 
@@ -1166,6 +1178,24 @@ def admin_change_reservation_seat(
     reservation = db.get(Reservation, reservation_id)
     if not reservation:
         raise HTTPException(status_code=404, detail="订单不存在")
+    conflict = seat_conflict_excluding(
+        db,
+        body.seat_id,
+        reservation.start_time,
+        reservation.end_time,
+        reservation.id,
+    )
+    if conflict:
+        try:
+            seat_a, seat_b = swap_reservation_seats(db, reservation, conflict, force=True)
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e))
+        db.commit()
+        db.refresh(reservation)
+        return ResponseModel(
+            message=f"已对调：{seat_a.seat_code} ↔ {seat_b.seat_code}",
+            data=_reservation_admin_item(db, reservation),
+        )
     try:
         new_seat, old_seat = change_reservation_seat(db, reservation, body.seat_id)
     except ValueError as e:
@@ -1191,7 +1221,7 @@ def admin_swap_reservation_seats(
     if not reservation or not other:
         raise HTTPException(status_code=404, detail="订单不存在")
     try:
-        seat_a, seat_b = swap_reservation_seats(db, reservation, other)
+        seat_a, seat_b = swap_reservation_seats(db, reservation, other, force=True)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 

@@ -237,7 +237,9 @@ def _occupant_brief(db: Session, row: Reservation) -> dict:
     }
 
 
-def can_swap_reservations(db: Session, left: Reservation, right: Reservation) -> bool:
+def can_swap_reservations(
+    db: Session, left: Reservation, right: Reservation, *, force: bool = False
+) -> bool:
     try:
         _assert_reservation_can_change_seat(left)
         _assert_reservation_can_change_seat(right)
@@ -245,6 +247,8 @@ def can_swap_reservations(db: Session, left: Reservation, right: Reservation) ->
         return False
     if left.id == right.id or left.store_id != right.store_id or left.seat_id == right.seat_id:
         return False
+    if force:
+        return True
     if seat_conflict_excluding(db, right.seat_id, left.start_time, left.end_time, right.id):
         return False
     if seat_conflict_excluding(db, left.seat_id, right.start_time, right.end_time, left.id):
@@ -253,7 +257,11 @@ def can_swap_reservations(db: Session, left: Reservation, right: Reservation) ->
 
 
 def swap_reservation_seats(
-    db: Session, reservation_a: Reservation, reservation_b: Reservation
+    db: Session,
+    reservation_a: Reservation,
+    reservation_b: Reservation,
+    *,
+    force: bool = False,
 ) -> tuple[Seat, Seat]:
     _assert_reservation_can_change_seat(reservation_a)
     _assert_reservation_can_change_seat(reservation_b)
@@ -268,10 +276,11 @@ def swap_reservation_seats(
     seat_b = db.get(Seat, reservation_b.seat_id)
     if not seat_a or not seat_b:
         raise ValueError("座位不存在")
-    if seat_conflict_excluding(db, seat_b.id, reservation_a.start_time, reservation_a.end_time, reservation_b.id):
-        raise ValueError(f"座位 {seat_b.seat_code} 在本单时段还有其他人")
-    if seat_conflict_excluding(db, seat_a.id, reservation_b.start_time, reservation_b.end_time, reservation_a.id):
-        raise ValueError(f"座位 {seat_a.seat_code} 在对方时段还有其他人")
+    if not force:
+        if seat_conflict_excluding(db, seat_b.id, reservation_a.start_time, reservation_a.end_time, reservation_b.id):
+            raise ValueError(f"座位 {seat_b.seat_code} 在本单时段还有其他人")
+        if seat_conflict_excluding(db, seat_a.id, reservation_b.start_time, reservation_b.end_time, reservation_a.id):
+            raise ValueError(f"座位 {seat_a.seat_code} 在对方时段还有其他人")
 
     reservation_a.seat_id, reservation_b.seat_id = seat_b.id, seat_a.id
     return seat_a, seat_b
@@ -324,7 +333,7 @@ def seat_options_for_change(db: Session, reservation: Reservation, *, for_admin:
             if for_admin:
                 occupant = _occupant_brief(db, conflict)
                 base["occupied_by"] = occupant
-                base["can_swap"] = can_swap_reservations(db, reservation, conflict)
+                base["can_swap"] = can_swap_reservations(db, reservation, conflict, force=True)
                 base["reason"] = occupant["label"]
             else:
                 base["reason"] = "时段冲突"
@@ -332,6 +341,20 @@ def seat_options_for_change(db: Session, reservation: Reservation, *, for_admin:
         else:
             base["selectable"] = True
             options.append(base)
+        if for_admin and base["can_swap"]:
+            base["selectable"] = True
+
+    def _rank(item: dict) -> tuple[int, int]:
+        slot = seat_code_to_slot(item["seat_code"]) or 9999
+        if item.get("reason") == "当前座位":
+            return (0, slot)
+        if item.get("selectable") and not item.get("can_swap"):
+            return (1, slot)
+        if item.get("can_swap"):
+            return (2, slot)
+        return (3, slot)
+
+    options.sort(key=_rank)
     return options
 
 
