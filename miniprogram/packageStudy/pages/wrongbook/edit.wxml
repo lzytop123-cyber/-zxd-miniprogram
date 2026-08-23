@@ -1,0 +1,51 @@
+<view class="page">
+  <view class="card">
+    <view class="label">学科</view>
+    <picker mode="selector" range="{{subjects}}" range-key="name" value="{{subjectIndex}}" bindchange="onSubject">
+      <view class="picker">{{subjects[subjectIndex].name || '请选择学科'}}</view>
+    </picker>
+
+    <view class="label">题目原图</view>
+    <view class="images">
+      <view class="img-wrap" wx:for="{{displayImages}}" wx:key="*this">
+        <image class="img" src="{{item}}" mode="aspectFill" data-urls="{{displayImages}}" data-current="{{item}}" bindtap="preview" />
+        <view class="del" data-kind="question" data-index="{{index}}" catchtap="removeImage">×</view>
+      </view>
+      <view class="add" bindtap="chooseQuestion" wx:if="{{imageUrls.length < 6}}">+</view>
+    </view>
+
+    <view class="label">题干（可改 OCR 结果）</view>
+    <textarea class="textarea" value="{{ocrText}}" maxlength="2000" bindinput="onOcr" placeholder="拍照后自动识别，也可手填" />
+
+    <view class="label">标签</view>
+    <view class="tag-row">
+      <input class="input tag-input" value="{{tagInput}}" maxlength="20" bindinput="onTagInput" placeholder="如：选择题、公式" />
+      <view class="mini-btn" bindtap="onAddTag">添加</view>
+    </view>
+    <view class="tags" wx:if="{{tags.length}}">
+      <view class="tag on" wx:for="{{tags}}" wx:key="*this" data-index="{{index}}" bindtap="removeTag">{{item}} ×</view>
+    </view>
+    <view class="tags" wx:if="{{historyTags.length}}">
+      <view class="tag" wx:for="{{historyTags}}" wx:key="*this" data-tag="{{item}}" bindtap="onHistoryTag">{{item}}</view>
+    </view>
+
+    <view class="label">答案文字</view>
+    <textarea class="textarea" value="{{answerText}}" maxlength="2000" bindinput="onAnswer" placeholder="可手填，OCR 未配置时也能保存" />
+
+    <view class="label">答案图片</view>
+    <view class="images">
+      <view class="img-wrap" wx:for="{{displayAnswers}}" wx:key="*this">
+        <image class="img" src="{{item}}" mode="aspectFill" data-urls="{{displayAnswers}}" data-current="{{item}}" bindtap="preview" />
+        <view class="del" data-kind="answer" data-index="{{index}}" catchtap="removeImage">×</view>
+      </view>
+      <view class="add" bindtap="chooseAnswer" wx:if="{{answerImageUrls.length < 6}}">+</view>
+    </view>
+
+    <view class="label">错因</view>
+    <input class="input" value="{{reason}}" maxlength="200" bindinput="onReason" placeholder="如：审题不清、公式记错" />
+  </view>
+
+  <view class="btns">
+    <view class="btn primary {{submitting?'off':''}}" bindtap="submit">{{id ? '保存修改' : '保存错题'}}</view>
+  </view>
+</view>

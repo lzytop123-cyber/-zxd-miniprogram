@@ -54,6 +54,31 @@
   box-shadow: 0 4rpx 14rpx rgba(28, 43, 32, 0.1);
 }
 
+.wb-entry {
+  flex-shrink: 0;
+  margin: 8rpx 24rpx 12rpx;
+  padding: 20rpx 24rpx;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: #FFFFFF;
+  border-radius: 20rpx;
+  box-shadow: 0 4rpx 16rpx rgba(28, 43, 32, 0.06);
+}
+.wb-entry-left { display: flex; align-items: center; gap: 16rpx; }
+.wb-entry-icon {
+  width: 72rpx;
+  height: 72rpx;
+  line-height: 72rpx;
+  text-align: center;
+  background: #D8F3DC;
+  border-radius: 16rpx;
+  font-size: 36rpx;
+}
+.wb-entry-title { font-size: 28rpx; font-weight: 700; color: #2D6A4F; }
+.wb-entry-sub { margin-top: 2rpx; font-size: 22rpx; color: #8C9BA5; }
+.wb-entry-go { font-size: 24rpx; color: #52B788; font-weight: 600; }
+
 .ai-disclaimer {
   flex-shrink: 0;
   margin: 0 24rpx 8rpx;

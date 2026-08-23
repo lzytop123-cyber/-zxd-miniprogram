@@ -36,6 +36,7 @@
       "name": "profile",
       "pages": [
         "pages/profile/login",
+        "pages/profile/edit",
         "pages/profile/wallet",
         "pages/profile/orders",
         "pages/profile/change-seat",
@@ -57,6 +58,16 @@
         "pages/publish/index",
         "pages/mine/index",
         "pages/contacts/index"
+      ]
+    },
+    {
+      "root": "packageStudy",
+      "name": "study",
+      "pages": [
+        "pages/wrongbook/index",
+        "pages/wrongbook/edit",
+        "pages/wrongbook/detail",
+        "pages/wrongbook/subjects"
       ]
     }
   ],

@@ -8,6 +8,7 @@ module.exports = {
   exchangeIndex: '/pages/exchange/index',
   exchangeRecords: '/pages/exchange/records',
   profileLogin: '/packageProfile/pages/profile/login',
+  profileEdit: '/packageProfile/pages/profile/edit',
   profileWallet: '/packageProfile/pages/profile/wallet',
   profileOrders: '/packageProfile/pages/profile/orders',
   profileChangeSeat: '/packageProfile/pages/profile/change-seat',
@@ -23,4 +24,8 @@ module.exports = {
   marketPublish: '/packageMarket/pages/publish/index',
   marketMine: '/packageMarket/pages/mine/index',
   marketContacts: '/packageMarket/pages/contacts/index',
+  wrongbookIndex: '/packageStudy/pages/wrongbook/index',
+  wrongbookEdit: '/packageStudy/pages/wrongbook/edit',
+  wrongbookDetail: '/packageStudy/pages/wrongbook/detail',
+  wrongbookSubjects: '/packageStudy/pages/wrongbook/subjects',
 }

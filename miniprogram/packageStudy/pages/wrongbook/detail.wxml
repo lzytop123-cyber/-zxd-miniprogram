@@ -1,0 +1,61 @@
+<view class="page" wx:if="{{item}}">
+  <view class="card">
+    <view class="head">
+      <text class="subject">{{item.subject_name || '未分类'}}</text>
+      <text class="st s{{item.status}}">{{item.status_label}}</text>
+    </view>
+    <scroll-view class="imgs" scroll-x wx:if="{{item.display_images.length}}">
+      <image
+        class="qimg"
+        wx:for="{{item.display_images}}"
+        wx:for-item="img"
+        wx:key="*this"
+        src="{{img}}"
+        mode="aspectFill"
+        data-urls="{{item.display_images}}"
+        data-current="{{img}}"
+        bindtap="preview"
+      />
+    </scroll-view>
+    <view class="stem">{{item.ocr_text || '未填写题干'}}</view>
+    <view class="tags" wx:if="{{item.tags.length}}">
+      <text class="tag" wx:for="{{item.tags}}" wx:for-item="t" wx:key="*this">{{t}}</text>
+    </view>
+    <view class="meta">已复习 {{item.review_count}} 次</view>
+  </view>
+
+  <view class="card">
+    <view class="answer-toggle" bindtap="openAnswer">
+      {{answerOpen ? '收起答案' : '查看答案'}}
+    </view>
+    <block wx:if="{{answerOpen}}">
+      <view class="answer-text" wx:if="{{item.answer_text}}">{{item.answer_text}}</view>
+      <view class="answer-text muted" wx:else>暂无文字答案</view>
+      <view class="images" wx:if="{{item.display_answers.length}}">
+        <image
+          class="aimg"
+          wx:for="{{item.display_answers}}"
+          wx:for-item="img"
+          wx:key="*this"
+          src="{{img}}"
+          mode="aspectFill"
+          data-urls="{{item.display_answers}}"
+          data-current="{{img}}"
+          bindtap="preview"
+        />
+      </view>
+      <view class="reason" wx:if="{{item.reason}}">错因：{{item.reason}}</view>
+    </block>
+  </view>
+
+  <view class="actions">
+    <view class="link" bindtap="goEdit">编辑</view>
+    <view class="link danger" bindtap="onDelete">删除</view>
+  </view>
+
+  <view class="status-bar">
+    <view class="sbtn {{item.status===0?'on':''}}" data-status="0" bindtap="setStatus">未掌握</view>
+    <view class="sbtn {{item.status===1?'on':''}}" data-status="1" bindtap="setStatus">仍然错</view>
+    <view class="sbtn {{item.status===2?'on':''}}" data-status="2" bindtap="setStatus">已掌握</view>
+  </view>
+</view>

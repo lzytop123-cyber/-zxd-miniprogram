@@ -1,0 +1,72 @@
+<view class="page">
+  <view class="search-bar">
+    <input
+      class="search"
+      value="{{keyword}}"
+      placeholder="搜索题干 / 错因 / 答案"
+      confirm-type="search"
+      bindinput="onKeyword"
+      bindconfirm="onSearch"
+    />
+    <view class="search-btn" bindtap="onSearch">搜索</view>
+  </view>
+
+  <scroll-view class="chips" scroll-x>
+    <view class="chip {{subjectId==null?'on':''}}" bindtap="onSubject" data-id="">全部</view>
+    <view
+      class="chip {{subjectId===item.id?'on':''}}"
+      wx:for="{{subjects}}"
+      wx:key="id"
+      bindtap="onSubject"
+      data-id="{{item.id}}"
+    >{{item.name}}</view>
+    <view class="chip manage" bindtap="goSubjects">管理学科</view>
+  </scroll-view>
+
+  <view class="chips wrap">
+    <view
+      class="chip {{status===item.value?'on':''}}"
+      wx:for="{{statusFilters}}"
+      wx:key="label"
+      bindtap="onStatus"
+      data-value="{{item.value}}"
+    >{{item.label}}</view>
+  </view>
+
+  <scroll-view class="chips" scroll-x wx:if="{{tags.length}}">
+    <view
+      class="chip {{tag===item?'on':''}}"
+      wx:for="{{tags}}"
+      wx:key="*this"
+      bindtap="onTag"
+      data-tag="{{item}}"
+    >{{item}}</view>
+  </scroll-view>
+
+  <view class="list">
+    <view class="card" wx:for="{{items}}" wx:key="id" data-id="{{item.id}}" bindtap="goDetail">
+      <image class="cover" src="{{item.cover}}" mode="aspectFill" wx:if="{{item.cover}}" />
+      <view class="cover ph" wx:else>无图</view>
+      <view class="body">
+        <view class="title">{{item.ocr_text || '未填写题干'}}</view>
+        <view class="meta">
+          <text>{{item.subject_name || '未分类'}}</text>
+          <text class="st s{{item.status}}">{{item.status_label}}</text>
+        </view>
+        <view class="tags" wx:if="{{item.tags.length}}">
+          <text class="tag" wx:for="{{item.tags}}" wx:for-item="t" wx:key="*this">{{t}}</text>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <view class="empty" wx:if="{{!loading && !items.length}}">
+    <view class="empty-title">拍下第一道错题</view>
+    <view class="empty-sub">收录题目、答案和错因，复习时再打开</view>
+    <view class="empty-btn" bindtap="goCreate">立即拍照</view>
+  </view>
+  <view class="tip" wx:if="{{loading}}">加载中...</view>
+  <view class="tip" wx:elif="{{finished && items.length}}">没有更多了</view>
+
+  <view class="fab" bindtap="goCreate">+</view>
+</view>

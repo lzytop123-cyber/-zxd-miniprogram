@@ -1,10 +1,11 @@
 <view class="page-profile page-safe-bottom tabbar-clear">
   <view class="profile-header {{loginState === 'guest' ? 'guest' : ''}}">
     <block wx:if="{{loginState === 'guest'}}">
-      <view class="guest-header" bindtap="goLogin">
-        <view class="avatar avatar-placeholder guest">?</view>
-        <view class="nickname">未登录</view>
-        <view class="guest-login-tip">点击开始</view>
+      <view class="guest-header" hover-class="guest-header-hover" bindtap="goLogin">
+        <view class="avatar avatar-placeholder guest"><view class="mi-glyph glyph-lg icon-user"></view></view>
+        <view class="nickname">登录 / 注册</view>
+        <view class="guest-login-tip">登录后记录学习数据 · 领取积分权益</view>
+        <view class="guest-cta">立即登录</view>
       </view>
     </block>
 
@@ -14,6 +15,9 @@
     </block>
 
     <block wx:elif="{{loginState === 'ready' && user}}">
+      <view class="header-gear" hover-class="header-gear-hover" bindtap="goEdit">
+        <view class="gear-icon"></view>
+      </view>
       <button class="avatar-picker inline" hover-class="none" open-type="chooseAvatar" bindchooseavatar="onChooseAvatar">
         <image
           wx:if="{{avatarDisplay}}"
@@ -65,51 +69,43 @@
     </view>
   </view>
 
+  <view class="menu-sect-title">常用</view>
   <view class="menu-grid card">
-    <view class="menu-item" bindtap="go" data-url="{{menuUrls.wallet}}">
-      <view class="menu-icon">💰</view>
+    <view class="menu-item" hover-class="menu-item-hover" bindtap="go" data-url="{{menuUrls.wallet}}">
+      <view class="menu-icon"><view class="mi-glyph icon-wallet"></view></view>
       <text>钱包</text>
     </view>
-    <view class="menu-item" bindtap="go" data-url="{{menuUrls.orders}}">
-      <view class="menu-icon">📋</view>
+    <view class="menu-item" hover-class="menu-item-hover" bindtap="go" data-url="{{menuUrls.orders}}">
+      <view class="menu-icon"><view class="mi-glyph icon-orders"></view></view>
       <text>我的订单</text>
     </view>
-        <view class="menu-item" bindtap="goPackages">
-          <view class="menu-icon">🎫</view>
-          <text>我的期限卡</text>
-        </view>
-    <view class="menu-item" bindtap="go" data-url="{{menuUrls.coupons}}">
-      <view class="menu-icon">🏷</view>
+    <view class="menu-item" hover-class="menu-item-hover" bindtap="goPackages">
+      <view class="menu-icon"><view class="mi-glyph icon-cards"></view></view>
+      <text>我的期限卡</text>
+    </view>
+    <view class="menu-item" hover-class="menu-item-hover" bindtap="go" data-url="{{menuUrls.coupons}}">
+      <view class="menu-icon"><view class="mi-glyph icon-coupons"></view></view>
       <text>优惠券</text>
     </view>
-    <view class="menu-item" bindtap="go" data-url="{{menuUrls.points}}">
-      <view class="menu-icon">⭐</view>
+  </view>
+
+  <view class="menu-sect-title">更多</view>
+  <view class="menu-grid card">
+    <view class="menu-item" hover-class="menu-item-hover" bindtap="go" data-url="{{menuUrls.points}}">
+      <view class="menu-icon"><view class="mi-glyph icon-points"></view></view>
       <text>积分明细</text>
     </view>
-    <view class="menu-item" bindtap="go" data-url="{{menuUrls.invite}}">
-      <view class="menu-icon">🎁</view>
+    <view class="menu-item" hover-class="menu-item-hover" bindtap="go" data-url="{{menuUrls.invite}}">
+      <view class="menu-icon"><view class="mi-glyph icon-invite"></view></view>
       <text>邀请有礼</text>
     </view>
-    <view class="menu-item" bindtap="go" data-url="{{menuUrls.contact}}">
-      <view class="menu-icon">💬</view>
+    <view class="menu-item" hover-class="menu-item-hover" bindtap="go" data-url="{{menuUrls.contact}}">
+      <view class="menu-icon"><view class="mi-glyph icon-contact"></view></view>
       <text>联系店长</text>
     </view>
-    <view class="menu-item" wx:if="{{showMarketplace}}" bindtap="goMarket">
-      <view class="menu-icon">📚</view>
+    <view class="menu-item" wx:if="{{showMarketplace}}" hover-class="menu-item-hover" bindtap="goMarket">
+      <view class="menu-icon"><view class="mi-glyph icon-market"></view></view>
       <text>上岸集市</text>
-    </view>
-    <button
-      wx:if="{{loginState === 'ready' && user}}"
-      class="menu-item phone-btn"
-      open-type="getPhoneNumber"
-      bindgetphonenumber="bindPhone"
-    >
-      <view class="menu-icon">📱</view>
-      <text>{{user.phone ? '更换手机' : '绑定手机'}}</text>
-    </button>
-    <view wx:else class="menu-item" bindtap="goLogin">
-      <view class="menu-icon">📱</view>
-      <text>绑定手机</text>
     </view>
   </view>
 

@@ -97,6 +97,8 @@ def run_schema_migrations(db: Session) -> dict:
             MarketReport,
             MarketSensitiveWord,
             RechargeOrder,
+            WrongbookSubject,
+            WrongQuestion,
             SiteBookingSetting,
             SiteContactSetting,
             StoreCalendarDay,
@@ -117,6 +119,8 @@ def run_schema_migrations(db: Session) -> dict:
             MarketReport,
             MarketSensitiveWord,
             MarketModerationLog,
+            WrongbookSubject,
+            WrongQuestion,
         ):
             model.__table__.create(bind=engine, checkfirst=True)
             if inspector.has_table(model.__tablename__):

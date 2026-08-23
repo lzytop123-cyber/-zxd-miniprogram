@@ -143,6 +143,11 @@ Page({
     }
   },
 
+  goEdit() {
+    if (!auth.requireLogin('/pages/profile/index')) return
+    wx.navigateTo({ url: routes.profileEdit })
+  },
+
   goLogin() {
     auth.goLogin('/pages/profile/index', { replace: true })
   },
@@ -168,16 +173,6 @@ Page({
       data: String(id),
       success: () => wx.showToast({ title: '学号已复制', icon: 'success' }),
     })
-  },
-
-  bindPhone(e) {
-    const { code } = e.detail
-    if (!code) return
-    request({ url: '/user/bind-phone', method: 'POST', data: { code } })
-      .then(async (user) => {
-        wx.showToast({ title: '绑定成功' })
-        await this.applyUser(user, this.data.avatarDisplay)
-      })
   },
 
   go(e) {

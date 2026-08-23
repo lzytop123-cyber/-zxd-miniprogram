@@ -2,6 +2,7 @@ const { request } = require('../../utils/request')
 const { handleTabScroll } = require('../../utils/tabbar')
 const { syncTabBar, isStudyAssistantEnabled, leaveStudyAssistantIfDisabled } = require('../../utils/features')
 const { enableShareMenu, shareAppMessage, shareTimeline } = require('../../utils/share')
+const routes = require('../../utils/routes')
 
 // 将累计分钟数格式化为易读的「X时Y分」（不足 1 小时显示「X分钟」）
 function formatStudyMinutes(minutes) {
@@ -156,6 +157,10 @@ Page({
         return this._storeId
       })
       .catch(() => null)
+  },
+
+  goWrongbook() {
+    wx.navigateTo({ url: routes.wrongbookIndex })
   },
 
   switchTab(e) {

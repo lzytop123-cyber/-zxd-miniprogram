@@ -127,6 +127,10 @@ class Settings(BaseSettings):
     deepseek_embedding_model: str = "deepseek-embedding"
     deepseek_timeout_sec: float = 30.0
 
+    aliyun_access_key_id: str = ""
+    aliyun_access_key_secret: str = ""
+    aliyun_ocr_endpoint: str = "ocr-api.cn-hangzhou.aliyuncs.com"
+
     # AI 知识库 RAG（ChromaDB + DeepSeek Embedding）
     knowledge_rag_enabled: bool = True
     knowledge_rag_top_k: int = 5

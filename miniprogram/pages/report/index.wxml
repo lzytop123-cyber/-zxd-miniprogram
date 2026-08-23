@@ -9,6 +9,17 @@
     </view>
   </view>
 
+  <view class="wb-entry" bindtap="goWrongbook">
+    <view class="wb-entry-left">
+      <view class="wb-entry-icon">📒</view>
+      <view>
+        <view class="wb-entry-title">错题本</view>
+        <view class="wb-entry-sub">拍照收录 · 重做错题</view>
+      </view>
+    </view>
+    <text class="wb-entry-go">进入</text>
+  </view>
+
   <!-- ============ 学习报告 ============ -->
   <view wx:if="{{tab==='report'}}" class="report-body">
     <view class="card report-card">

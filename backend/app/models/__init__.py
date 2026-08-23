@@ -576,6 +576,7 @@ class StoreCalendarDay(Base):
 
 
 # 上岸集市模型（独立模块）
+from app.models.wrongbook import WrongbookSubject, WrongQuestion  # noqa: E402
 from app.models.market import (  # noqa: E402
     MarketCategory,
     MarketCategoryType,
