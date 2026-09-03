@@ -27,3 +27,10 @@ backend/uploads/
 backend/data/
 backend/*.db
 *.db
+
+# Root-level scratch/reference files
+/1.png
+/reference.png
+/openapi_tmp*
+/_ui_prompt*
+/*.tmp

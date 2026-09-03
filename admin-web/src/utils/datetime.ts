@@ -21,15 +21,6 @@ export function formatWallClock(value?: string | null): string {
     .slice(0, 19)
 }
 
-/** 保留原函数名以兼容既有调用方，行为等同 formatWallClock */
-export function formatDateTime(value?: string | null): string {
-  return formatWallClock(value)
-}
-
-export function formatFieldDateTime(_key: string, value: string): string {
-  return formatWallClock(value)
-}
-
 /** 递归把响应里的时间字段转成可读北京/墙钟时间 */
 export function transformResponseTimes<T>(payload: T): T {
   return walk(payload) as T
@@ -39,7 +30,7 @@ function walk(node: unknown, parentKey = ''): unknown {
   if (node == null) return node
   if (typeof node === 'string') {
     if (parentKey && looksLikeDateTime(node)) {
-      return formatFieldDateTime(parentKey, node)
+      return formatWallClock(node)
     }
     return node
   }
