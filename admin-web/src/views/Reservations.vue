@@ -688,16 +688,17 @@ async function openChangeSeat(row: any) {
 async function submitChangeSeat() {
   if (!changeSeatRow.value || !changeSeatTargetId.value) return
   const target = selectedSeat.value
-  const swapping = !!(target?.can_swap && target.occupied_by)
+  const occupiedBy = target?.occupied_by
+  const swapping = !!(target?.can_swap && occupiedBy)
   const tip = swapping
-    ? `确定将 ${changeSeatRow.value.seat_code} 与 ${target.seat_code}（${target.occupied_by?.nickname} ID ${target.occupied_by?.user_id}，${target.occupied_by?.end_label}）对调吗？两人只换座位，订单还在各自名下。对方若是月卡，整段都会换到当前座位。`
+    ? `确定将 ${changeSeatRow.value.seat_code} 与 ${target.seat_code}（${occupiedBy?.nickname} ID ${occupiedBy?.user_id}，${occupiedBy?.end_label}）对调吗？两人只换座位，订单还在各自名下。对方若是月卡，整段都会换到当前座位。`
     : `确定将订单 ${changeSeatRow.value.order_no} 从 ${changeSeatRow.value.seat_code} 换到 ${target?.seat_code || changeSeatTargetId.value} 吗？`
   await ElMessageBox.confirm(tip, swapping ? '确认对调' : '确认换座', { type: 'warning' })
   changeSeatSubmitting.value = true
   try {
-    const res = swapping
+    const res = swapping && occupiedBy
       ? await http.post(`/admin/reservations/${changeSeatRow.value.id}/swap-seats`, {
-          other_reservation_id: target.occupied_by.reservation_id,
+          other_reservation_id: occupiedBy.reservation_id,
         })
       : await http.post(`/admin/reservations/${changeSeatRow.value.id}/change-seat`, {
           seat_id: changeSeatTargetId.value,
