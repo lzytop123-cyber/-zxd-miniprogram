@@ -97,6 +97,7 @@
   justify-content: center;
   font-size: 48rpx;
   font-weight: 700;
+  line-height: 1;
   color: #2D6A4F;
   border-color: #52B788;
 }

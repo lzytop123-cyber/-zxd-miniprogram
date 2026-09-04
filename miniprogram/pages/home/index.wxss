@@ -501,6 +501,7 @@
   color: #FFFFFF;
   font-size: 38rpx;
   font-weight: 800;
+  line-height: 1;
   display: flex;
   align-items: center;
   justify-content: center;
