@@ -45,6 +45,7 @@
           <template #title>学习助手</template>
           <el-menu-item index="/study-data">学习数据</el-menu-item>
           <el-menu-item index="/knowledge">AI 知识库</el-menu-item>
+          <el-menu-item index="/wrongbook">错题本</el-menu-item>
         </el-sub-menu>
 
         <el-sub-menu index="market">

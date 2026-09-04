@@ -22,6 +22,7 @@ const router = createRouter({
         { path: 'wallet-logs', component: () => import('../views/WalletLogs.vue') },
         { path: 'study-data', component: () => import('../views/StudyData.vue') },
         { path: 'knowledge', component: () => import('../views/Knowledge.vue') },
+        { path: 'wrongbook', component: () => import('../views/Wrongbook.vue') },
         { path: 'system-status', component: () => import('../views/SystemStatus.vue') },
         { path: 'banners', component: () => import('../views/Banners.vue') },
         { path: 'announcements', component: () => import('../views/Announcements.vue') },
