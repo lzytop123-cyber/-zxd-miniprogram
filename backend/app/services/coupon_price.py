@@ -5,7 +5,7 @@ from __future__ import annotations
 from decimal import Decimal, InvalidOperation
 
 
-def _to_yuan(raw, *, fen_hint: bool = False) -> Decimal | None:
+def _to_yuan(raw, *, as_fen: bool = False) -> Decimal | None:
     if raw is None or raw == "":
         return None
     try:
@@ -14,11 +14,61 @@ def _to_yuan(raw, *, fen_hint: bool = False) -> Decimal | None:
         return None
     if val < 0:
         return None
-    if fen_hint:
-        # 整数分：990 → 9.90；若已是带小数的元则不再除
-        if val == val.to_integral_value() and val >= 1:
-            val = val / Decimal(100)
+    if as_fen:
+        val = val / Decimal(100)
     return val.quantize(Decimal("0.01"))
+
+
+def _price_from_amount_block(amount: dict | None) -> Decimal | None:
+    """抖音 amount 结构，单位分。优先券实付/用户实付。"""
+    if not isinstance(amount, dict):
+        return None
+    for key in (
+        "coupon_pay_amount",  # 券实付 = 用户实付 + 支付优惠
+        "pay_amount",  # 用户实付
+        "original_amount",
+        "list_market_amount",
+    ):
+        yuan = _to_yuan(amount.get(key), as_fen=True)
+        if yuan is not None:
+            return yuan
+    return None
+
+
+def _price_from_douyin_cert(cert: dict) -> Decimal | None:
+    yuan = _price_from_amount_block(cert.get("amount") if isinstance(cert.get("amount"), dict) else None)
+    if yuan is not None:
+        return yuan
+
+    # 次卡：serial_amount_list[].amount
+    time_card = cert.get("time_card") if isinstance(cert.get("time_card"), dict) else {}
+    serials = time_card.get("serial_amount_list") or []
+    if isinstance(serials, list):
+        for item in serials:
+            if not isinstance(item, dict):
+                continue
+            yuan = _price_from_amount_block(item.get("amount") if isinstance(item.get("amount"), dict) else None)
+            if yuan is not None:
+                return yuan
+
+    sku = cert.get("sku") if isinstance(cert.get("sku"), dict) else {}
+    for key in ("market_price", "actual_amount", "origin_amount", "price"):
+        yuan = _to_yuan(sku.get(key), as_fen=True)
+        if yuan is not None:
+            return yuan
+    return None
+
+
+def _unwrap_douyin_payload(raw: dict | None) -> dict | None:
+    if not isinstance(raw, dict):
+        return None
+    if "raw_prepare" in raw and isinstance(raw["raw_prepare"], dict):
+        raw = raw["raw_prepare"]
+    if "certificates" not in raw and "certificates_v2" not in raw:
+        data = raw.get("data")
+        if isinstance(data, dict):
+            raw = data
+    return raw if isinstance(raw, dict) else None
 
 
 def extract_deal_price(
@@ -28,7 +78,7 @@ def extract_deal_price(
     douyin_raw: dict | None = None,
     meituan_raw: dict | None = None,
 ) -> Decimal | None:
-    """优先 dealPrice（元），其次 payAmount（通常为分），再尝试抖音 amount。"""
+    """优先 dealPrice（元），其次 payAmount（分），再抖音 certificate.amount（分）。"""
     td = ticket_data
     if td is None and prepared:
         td = prepared.get("ticketData") if isinstance(prepared.get("ticketData"), dict) else None
@@ -37,36 +87,27 @@ def extract_deal_price(
     td = td or {}
 
     for key in ("dealPrice", "deal_price", "price"):
-        yuan = _to_yuan(td.get(key), fen_hint=False)
+        yuan = _to_yuan(td.get(key), as_fen=False)
         if yuan is not None:
             return yuan
 
-    # 云老板外层 payAmount：分
     pay = None
     if prepared:
         pay = prepared.get("payAmount")
     if pay is None and meituan_raw:
         pay = meituan_raw.get("payAmount")
-    yuan = _to_yuan(pay, fen_hint=True)
+    yuan = _to_yuan(pay, as_fen=True)
     if yuan is not None:
         return yuan
 
-    # 抖音官方 prepare 原始结构
-    raw = douyin_raw or (prepared or {}).get("raw_prepare")
-    if isinstance(raw, dict):
-        certs = raw.get("certificates_v2") or raw.get("certificates") or []
+    for candidate in (douyin_raw, prepared, meituan_raw):
+        payload = _unwrap_douyin_payload(candidate if isinstance(candidate, dict) else None)
+        if not payload:
+            continue
+        certs = payload.get("certificates_v2") or payload.get("certificates") or []
         if certs and isinstance(certs[0], dict):
-            amount = certs[0].get("amount") or {}
-            if isinstance(amount, dict):
-                for key in ("pay_amount", "original_amount", "list_market_amount"):
-                    yuan = _to_yuan(amount.get(key), fen_hint=True)
-                    if yuan is not None:
-                        return yuan
-            sku = certs[0].get("sku") or {}
-            if isinstance(sku, dict):
-                for key in ("actual_amount", "origin_amount", "market_price", "price"):
-                    # 抖音 sku 金额多为分
-                    yuan = _to_yuan(sku.get(key), fen_hint=True)
-                    if yuan is not None:
-                        return yuan
+            yuan = _price_from_douyin_cert(certs[0])
+            if yuan is not None:
+                return yuan
+
     return None

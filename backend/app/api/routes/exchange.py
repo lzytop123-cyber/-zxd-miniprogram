@@ -234,13 +234,17 @@ async def _exchange(
         prepared=prepared,
         douyin_raw=douyin_raw,
     )
-    order.meituan_raw = {
+    raw_payload: dict = {
         "result": consume_result,
         "ticketData": ticket_data,
         "voucherExpireDate": str(voucher_expire) if voucher_expire else None,
         "payAmount": prepared.get("payAmount"),
         "deal_price": float(order.deal_price) if order.deal_price is not None else None,
     }
+    if douyin_raw:
+        # 保留抖音 prepare 原文，便于对账/回填金额
+        raw_payload["raw_prepare"] = douyin_raw.get("raw_prepare") or douyin_raw
+    order.meituan_raw = raw_payload
     db.commit()
     db.refresh(card)
 

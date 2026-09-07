@@ -194,6 +194,9 @@ class DouyinService:
             "expire_time": expire_raw,
             "receiptEndDate": str(expire_date) if expire_date else None,
         }
+        amount = cert.get("amount") if isinstance(cert.get("amount"), dict) else {}
+        if amount:
+            ticket_data["amount"] = amount
         if deal_price is not None:
             ticket_data["dealPrice"] = float(deal_price)
 
@@ -204,6 +207,7 @@ class DouyinService:
             "ticketName": title,
             "ticketData": ticket_data,
             "raw_prepare": data,
+            "deal_price": float(deal_price) if deal_price is not None else None,
         }
 
     @staticmethod
