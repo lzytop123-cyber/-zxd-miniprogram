@@ -1682,12 +1682,15 @@ def list_exchange_records_admin(
 
 
 @router.post("/exchange-records/backfill-prices", response_model=ResponseModel)
-def backfill_exchange_prices(
+async def backfill_exchange_prices(
     admin: AdminUser = Depends(get_current_admin),
     db: Session = Depends(get_db),
 ):
-    """从 meituan_raw / 核销 result 回填缺失的 deal_price（含历史抖音官方单）。"""
+    """从 meituan_raw / 核销 result 回填缺失的 deal_price；老抖音单再查一次 certificate/get。"""
     from app.services.coupon_price import extract_deal_price
+    from app.services.douyin import DouyinService, use_douyin_official
+    import httpx
+    from app.core.config import settings
 
     rows = db.scalars(
         select(MeituanOrder).where(
@@ -1695,18 +1698,45 @@ def backfill_exchange_prices(
             MeituanOrder.deal_price.is_(None),
         ).limit(3000)
     ).all()
+
     updated = 0
-    for row in rows:
-        raw = row.meituan_raw if isinstance(row.meituan_raw, dict) else None
-        price = extract_deal_price(meituan_raw=raw)
-        if price is None:
-            continue
-        row.deal_price = price
-        if isinstance(raw, dict):
-            raw = dict(raw)
-            raw["deal_price"] = float(price)
-            row.meituan_raw = raw
-        updated += 1
+    client: httpx.AsyncClient | None = None
+    try:
+        for row in rows:
+            raw = row.meituan_raw if isinstance(row.meituan_raw, dict) else None
+            price = extract_deal_price(meituan_raw=raw)
+            # 老抖音单：raw 无 amount 时用 encrypted_code 再查一次
+            if price is None and isinstance(raw, dict) and use_douyin_official():
+                encrypted_code = raw.get("encrypted_code")
+                if not encrypted_code and isinstance(raw.get("raw_prepare"), dict):
+                    rp = raw["raw_prepare"]
+                    certs = rp.get("certificates_v2") or rp.get("certificates") or []
+                    if certs and isinstance(certs[0], dict):
+                        encrypted_code = certs[0].get("encrypted_code")
+                if encrypted_code:
+                    if client is None:
+                        client = httpx.AsyncClient(timeout=settings.yunlaoban_timeout_sec)
+                    try:
+                        cert = await DouyinService._get_certificate(client, encrypted_code)
+                    except Exception:
+                        cert = None
+                    if cert:
+                        price = extract_deal_price(douyin_raw={"certificate": cert})
+                        if price is not None and isinstance(raw, dict):
+                            raw = dict(raw)
+                            raw["_certificate_get"] = cert
+            if price is None:
+                continue
+            row.deal_price = price
+            if isinstance(raw, dict):
+                raw = dict(raw)
+                raw["deal_price"] = float(price)
+                row.meituan_raw = raw
+            updated += 1
+    finally:
+        if client is not None:
+            await client.aclose()
+
     if updated:
         log_admin_action(
             db,
