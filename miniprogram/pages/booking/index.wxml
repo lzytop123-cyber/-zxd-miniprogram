@@ -193,7 +193,6 @@
       <view class="seat-legend-item"><view class="seat-dot available"></view><text>可选</text></view>
       <view class="seat-legend-item"><view class="seat-dot selected"></view><text>已选</text></view>
       <view class="seat-legend-item"><view class="seat-dot reserved"></view><text>已约</text></view>
-      <view class="seat-legend-item"><view class="seat-dot occupied"></view><text>使用中</text></view>
       <view class="seat-count">
         <text class="seat-count-num">{{availableSeatCount}}</text>
         <text>座可订</text>

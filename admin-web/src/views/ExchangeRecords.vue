@@ -2,7 +2,10 @@
   <el-card>
     <template #header>
       <div class="header-row">
-        <span>团购兑换记录</span>
+        <div class="title-block">
+          <span>团购兑换记录</span>
+          <span class="month-sum">本月核销 ¥{{ monthAmount }}（{{ monthCount }} 笔）</span>
+        </div>
         <div class="right">
           <el-input-number v-model="userId" :min="1" controls-position="right" style="width:120px" />
           <el-select v-model="status" clearable placeholder="状态" style="width:110px; margin-left:8px">
@@ -26,6 +29,12 @@
       <el-table-column prop="deal_name" label="商品" min-width="160" />
       <el-table-column prop="coupon_code" label="券码" width="140" />
       <el-table-column prop="deal_type" label="类型" width="100" />
+      <el-table-column label="返回价" width="100">
+        <template #default="{ row }">
+          <span v-if="row.deal_price != null">¥{{ row.deal_price }}</span>
+          <span v-else class="sub">—</span>
+        </template>
+      </el-table-column>
       <el-table-column prop="status" label="状态" width="90">
         <template #default="{ row }">
           <el-tag :type="row.status === 'verified' ? 'success' : 'info'" size="small">{{ row.status }}</el-tag>
@@ -51,6 +60,8 @@ const page = ref(1)
 const total = ref(0)
 const userId = ref<number | null>(null)
 const status = ref<string | null>(null)
+const monthAmount = ref(0)
+const monthCount = ref(0)
 
 async function load() {
   loading.value = true
@@ -61,6 +72,8 @@ async function load() {
     const res = await http.get('/admin/exchange-records', { params })
     list.value = res.data.items
     total.value = res.data.total
+    monthAmount.value = res.data.month_verify_amount ?? 0
+    monthCount.value = res.data.month_verify_count ?? 0
   } finally {
     loading.value = false
   }
@@ -75,7 +88,9 @@ onMounted(load)
 </script>
 
 <style scoped>
-.header-row { display: flex; justify-content: space-between; align-items: center; }
+.header-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+.title-block { display: flex; align-items: baseline; gap: 12px; }
+.month-sum { font-size: 13px; color: #67c23a; font-weight: 600; }
 .right { display: flex; align-items: center; }
 .sub { font-size: 12px; color: #999; }
 .pager { margin-top: 16px; display: flex; justify-content: flex-end; }

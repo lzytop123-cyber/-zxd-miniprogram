@@ -77,6 +77,7 @@ class YunlaobanService:
             "ticketInfo": ticket["ticketInfo"],
             "ticketName": ticket.get("ticketName", ""),
             "ticketData": ticket_data,
+            "payAmount": ticket.get("payAmount"),
         }
 
     @staticmethod

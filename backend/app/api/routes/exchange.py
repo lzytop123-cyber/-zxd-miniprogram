@@ -19,6 +19,7 @@ from app.models import (
 )
 from app.schemas.common import ResponseModel
 from app.services.card_service import card_validity_api_fields, get_mapping_by_deal_id, issue_period_card
+from app.services.coupon_price import extract_deal_price
 from app.services.deal_mapping_service import (
     guess_limit_per_user_from_name,
     guess_reward_from_name,
@@ -228,10 +229,17 @@ async def _exchange(
     order.store_id = body.store_id or mapping.store_id
     order.status = MeituanOrderStatus.verified
     order.verified_at = datetime.now()
+    order.deal_price = extract_deal_price(
+        ticket_data=ticket_data,
+        prepared=prepared,
+        douyin_raw=douyin_raw,
+    )
     order.meituan_raw = {
         "result": consume_result,
         "ticketData": ticket_data,
         "voucherExpireDate": str(voucher_expire) if voucher_expire else None,
+        "payAmount": prepared.get("payAmount"),
+        "deal_price": float(order.deal_price) if order.deal_price is not None else None,
     }
     db.commit()
     db.refresh(card)

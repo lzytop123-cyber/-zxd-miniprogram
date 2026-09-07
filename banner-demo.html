@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<title>Banner 高级感 Demo</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+    background: #f2f2f2;
+    padding: 40px 20px;
+    min-height: 100vh;
+  }
+  .wrap {
+    max-width: 1200px;
+    margin: 0 auto;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 40px;
+  }
+  .col { display: flex; flex-direction: column; align-items: center; }
+  .col h2 {
+    font-size: 14px; color: #666; margin-bottom: 16px; font-weight: 500;
+    letter-spacing: 2px; text-transform: uppercase;
+  }
+  .phone {
+    width: 375px;
+    height: 500px;
+    background: #fff;
+    border-radius: 32px;
+    overflow: hidden;
+    box-shadow: 0 20px 60px rgba(0,0,0,.12);
+    position: relative;
+  }
+
+  /* ================= 现在（原版） ================= */
+  .old-banner {
+    width: 100%; height: 100%;
+    background: linear-gradient(180deg, #c8e6d0 0%, #a5d5b5 100%);
+    position: relative; padding: 40px 24px;
+    overflow: hidden;
+  }
+  .old-banner::before {
+    content: ""; position: absolute; right: -20px; top: 40px;
+    width: 260px; height: 320px;
+    background: radial-gradient(ellipse at 30% 40%, #f4e4c1 0%, #d4b98a 60%, transparent 100%);
+    border-radius: 50%; opacity: .85;
+  }
+  .old-chip {
+    display: inline-flex; align-items: center; gap: 6px;
+    background: #6ba87a; color: #fff; padding: 6px 14px;
+    border-radius: 20px; font-size: 11px; font-weight: 600;
+    letter-spacing: 1px;
+  }
+  .old-title {
+    font-size: 42px; font-weight: 900; color: #2d5f3f;
+    margin-top: 14px; letter-spacing: 2px;
+  }
+  .old-logos {
+    display: flex; gap: 8px; margin-top: 16px;
+  }
+  .old-logos span {
+    width: 32px; height: 32px; border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 10px; color: #fff; font-weight: 700;
+  }
+  .old-logos span:nth-child(1) { background: #ffc300; color: #333; }
+  .old-logos span:nth-child(2) { background: #ff6a00; }
+  .old-logos span:nth-child(3) { background: #000; }
+  .old-desc { font-size: 13px; color: #3d6b4d; margin-top: 8px; }
+  .old-pill {
+    background: rgba(255,255,255,.7);
+    padding: 8px 14px; border-radius: 20px;
+    font-size: 12px; color: #2d5f3f; margin-top: 14px;
+    display: inline-block;
+  }
+  .old-ticket {
+    margin-top: 20px; background: #f5efd8;
+    padding: 12px 20px; border-radius: 8px;
+    display: inline-block;
+    font-size: 20px; font-weight: 700; color: #3d6b4d;
+    position: relative; z-index: 2;
+  }
+  .old-ticket small { font-size: 11px; font-weight: 400; display: block; margin-top: 2px; }
+
+  /* ================= 改后 + 动画 ================= */
+  .new-banner {
+    width: 100%; height: 100%;
+    position: relative; overflow: hidden;
+    background: #1a3a2a;
+  }
+  .bg-img {
+    position: absolute; inset: 0;
+    background:
+      radial-gradient(ellipse at 70% 40%, #d4b98a 0%, #8b7355 40%, transparent 70%),
+      linear-gradient(135deg, #2d5f3f 0%, #1a3a2a 50%, #0f2818 100%);
+    animation: kenburns 8s ease-in-out infinite alternate;
+  }
+  .bg-img::after {
+    content: ""; position: absolute; inset: 0;
+    background: radial-gradient(circle at 75% 45%, rgba(255,220,150,.25), transparent 50%);
+  }
+  @keyframes kenburns {
+    0% { transform: scale(1) translate(0, 0); }
+    100% { transform: scale(1.25) translate(-40px, -20px); }
+  }
+  .grain {
+    position: absolute; inset: 0;
+    background: radial-gradient(circle at 20% 30%, rgba(255,255,255,.04) 1px, transparent 1px) 0 0/3px 3px;
+    pointer-events: none;
+  }
+  .glass {
+    position: absolute; left: 24px; right: 24px; bottom: 40px; top: 40px;
+    display: flex; flex-direction: column; justify-content: space-between;
+    padding: 28px 24px;
+    background: linear-gradient(180deg, rgba(255,255,255,.08) 0%, rgba(255,255,255,.02) 100%);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid rgba(255,255,255,.12);
+    border-radius: 24px;
+    box-shadow:
+      inset 0 1px 0 rgba(255,255,255,.2),
+      0 20px 40px rgba(0,0,0,.25);
+  }
+  .new-eyebrow {
+    font-size: 11px; color: rgba(255,255,255,.7);
+    letter-spacing: 4px; font-weight: 300;
+    opacity: 0; animation: cycleUp 5s .3s infinite;
+  }
+  .new-title {
+    font-size: 44px; font-weight: 900; color: #fff;
+    letter-spacing: 1px; line-height: 1.1; margin-top: 8px;
+    opacity: 0; animation: cycleUp 5s .6s infinite;
+  }
+  .new-title em {
+    font-style: normal;
+    background: linear-gradient(135deg, #f4e4c1, #d4b98a);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+  .new-sub {
+    font-size: 13px; color: rgba(255,255,255,.65);
+    font-weight: 300; margin-top: 12px; letter-spacing: .5px;
+    display: flex; align-items: center; gap: 8px;
+    opacity: 0; animation: cycleUp 5s .9s infinite;
+  }
+  .new-sub .dots {
+    display: inline-flex; gap: 4px;
+  }
+  .new-sub .dots i {
+    width: 14px; height: 14px; border-radius: 4px;
+    display: inline-block;
+  }
+  .new-sub .dots i:nth-child(1) { background: #ffc300; }
+  .new-sub .dots i:nth-child(2) { background: #ff6a00; }
+  .new-sub .dots i:nth-child(3) { background: #000; }
+  .new-cta {
+    align-self: flex-start;
+    margin-top: auto;
+    background: linear-gradient(135deg, #f4e4c1, #d4b98a);
+    color: #1a3a2a; font-weight: 700; font-size: 14px;
+    padding: 14px 28px; border-radius: 100px;
+    letter-spacing: 1px; border: none;
+    box-shadow:
+      0 8px 24px rgba(212,185,138,.4),
+      inset 0 1px 0 rgba(255,255,255,.5);
+    opacity: 0; animation: cycleUp 5s 1.2s infinite, glow 2s ease-in-out infinite;
+    cursor: pointer;
+  }
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(16px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  @keyframes cycleUp {
+    0%   { opacity: 0; transform: translateY(24px); }
+    15%  { opacity: 1; transform: translateY(0); }
+    80%  { opacity: 1; transform: translateY(0); }
+    100% { opacity: 0; transform: translateY(-8px); }
+  }
+  @keyframes glow {
+    0%, 100% { box-shadow: 0 8px 24px rgba(212,185,138,.4), inset 0 1px 0 rgba(255,255,255,.5); }
+    50% { box-shadow: 0 8px 32px rgba(212,185,138,.7), inset 0 1px 0 rgba(255,255,255,.5); }
+  }
+
+  /* 底部指示器 */
+  .indicator {
+    position: absolute; bottom: 16px; left: 50%; transform: translateX(-50%);
+    display: flex; gap: 6px;
+  }
+  .indicator i {
+    width: 6px; height: 6px; border-radius: 50%; background: rgba(255,255,255,.3);
+  }
+  .indicator i.active { width: 20px; border-radius: 3px; background: #f4e4c1; }
+
+  .note {
+    font-size: 12px; color: #888; margin-top: 20px; text-align: center;
+    max-width: 375px; line-height: 1.6;
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="col">
+    <h2>现在</h2>
+    <div class="phone">
+      <div class="old-banner">
+        <span class="old-chip">SUMMER PASS 🌿</span>
+        <div class="old-title">好评送日卡</div>
+        <div class="old-logos"><span>美团</span><span>点评</span><span>抖音</span></div>
+        <div class="old-desc">美团、大众点评、抖音好评</div>
+        <div class="old-pill">截图发给管理员领取日卡</div>
+        <div class="old-ticket">日卡 x1张<small>截图领取</small></div>
+      </div>
+    </div>
+    <p class="note">信息密集，6 个元素挤在左半屏，插画和文字层级打架</p>
+  </div>
+
+  <div class="col">
+    <h2>改后 + 动画</h2>
+    <div class="phone">
+      <div class="new-banner">
+        <div class="bg-img"></div>
+        <div class="grain"></div>
+        <div class="glass">
+          <div>
+            <div class="new-eyebrow">SUMMER · 限时活动</div>
+            <div class="new-title">好评<br><em>送日卡</em></div>
+            <div class="new-sub">
+              <span class="dots"><i></i><i></i><i></i></span>
+              三平台好评 · 截图领取
+            </div>
+          </div>
+          <button class="new-cta">立即领取 →</button>
+        </div>
+        <div class="indicator"><i class="active"></i><i></i><i></i></div>
+      </div>
+    </div>
+    <p class="note">背景缓慢推移（Ken Burns）· 文字错峰入场 · 按钮呼吸光晕<br>玻璃拟态 + 金色渐变文字 + 深绿底</p>
+  </div>
+</div>
+</body>
+</html>

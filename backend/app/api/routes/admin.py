@@ -27,6 +27,7 @@ from app.models import (
     SiteContactSetting,
     MeituanDealMapping,
     MeituanOrder,
+    MeituanOrderStatus,
     PendingDealMapping,
     PayType,
     PeriodCard,
@@ -327,6 +328,18 @@ def admin_stats(_: object = Depends(get_current_admin), db: Session = Depends(ge
             Reservation.created_at >= month_start,
         )
     )
+    month_verify_amount = db.scalar(
+        select(func.coalesce(func.sum(MeituanOrder.deal_price), 0)).where(
+            MeituanOrder.status == MeituanOrderStatus.verified,
+            MeituanOrder.verified_at >= month_start,
+        )
+    )
+    month_verify_count = db.scalar(
+        select(func.count()).where(
+            MeituanOrder.status == MeituanOrderStatus.verified,
+            MeituanOrder.verified_at >= month_start,
+        )
+    ) or 0
     new_users = db.scalar(
         select(func.count()).select_from(User).where(User.created_at >= today_start)
     )
@@ -335,6 +348,8 @@ def admin_stats(_: object = Depends(get_current_admin), db: Session = Depends(ge
         data={
             "today_revenue": float(today_revenue or 0),
             "month_revenue": float(month_revenue or 0),
+            "month_verify_amount": float(month_verify_amount or 0),
+            "month_verify_count": int(month_verify_count),
             "active_users": active_count or 0,
             "store_count": store_count or 0,
             "total_seats": total_seats or 0,
@@ -1626,6 +1641,19 @@ def list_exchange_records_admin(
     rows = db.scalars(
         query.order_by(MeituanOrder.created_at.desc()).offset((page - 1) * page_size).limit(page_size)
     ).all()
+    month_start = datetime.combine(date.today().replace(day=1), datetime.min.time())
+    month_verify_amount = db.scalar(
+        select(func.coalesce(func.sum(MeituanOrder.deal_price), 0)).where(
+            MeituanOrder.status == MeituanOrderStatus.verified,
+            MeituanOrder.verified_at >= month_start,
+        )
+    )
+    month_verify_count = db.scalar(
+        select(func.count()).where(
+            MeituanOrder.status == MeituanOrderStatus.verified,
+            MeituanOrder.verified_at >= month_start,
+        )
+    ) or 0
     items = []
     for row in rows:
         user = db.get(User, row.user_id) if row.user_id else None
@@ -1636,12 +1664,20 @@ def list_exchange_records_admin(
             "coupon_code": row.coupon_code,
             "deal_name": row.deal_name,
             "deal_type": row.deal_type,
+            "deal_price": float(row.deal_price) if row.deal_price is not None else None,
             "status": row.status.value,
             "verified_at": row.verified_at.isoformat() if row.verified_at else None,
             "created_at": row.created_at.isoformat() if row.created_at else None,
         })
     return ResponseModel(
-        data=PageResult(items=items, total=total or 0, page=page, page_size=page_size)
+        data={
+            "items": items,
+            "total": total or 0,
+            "page": page,
+            "page_size": page_size,
+            "month_verify_amount": float(month_verify_amount or 0),
+            "month_verify_count": int(month_verify_count),
+        }
     )
 
 

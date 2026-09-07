@@ -33,6 +33,7 @@ MIGRATION_STATEMENTS = [
     "ALTER TABLE reservations ADD COLUMN period_card_id INTEGER",
     "ALTER TABLE period_cards ADD COLUMN expire_reminded_at DATETIME",
     "ALTER TABLE meituan_deal_mapping ADD COLUMN limit_per_user INTEGER DEFAULT 0",
+    "ALTER TABLE meituan_orders ADD COLUMN deal_price NUMERIC(10, 2)",
 ]
 
 # 性能索引（存量库补建；已存在时忽略）
@@ -205,6 +206,33 @@ def run_schema_migrations(db: Session) -> dict:
         db.rollback()
         errors.append(f"fix verified_at tz: {exc.__class__.__name__}")
 
+    # 历史核销：从 meituan_raw.ticketData.dealPrice 回填 deal_price
+    deal_price_backfill = 0
+    try:
+        if inspector.has_table("meituan_orders"):
+            from app.models import MeituanOrder
+            from app.services.coupon_price import extract_deal_price
+
+            cols = {c["name"] for c in inspect(engine).get_columns("meituan_orders")}
+            if "deal_price" in cols:
+                rows = db.scalars(
+                    select(MeituanOrder).where(
+                        MeituanOrder.deal_price.is_(None),
+                        MeituanOrder.meituan_raw.is_not(None),
+                    ).limit(2000)
+                ).all()
+                for row in rows:
+                    price = extract_deal_price(meituan_raw=row.meituan_raw if isinstance(row.meituan_raw, dict) else None)
+                    if price is not None:
+                        row.deal_price = price
+                        deal_price_backfill += 1
+                if deal_price_backfill:
+                    db.commit()
+                    applied.append(f"backfill_deal_price:{deal_price_backfill}")
+    except Exception as exc:
+        db.rollback()
+        errors.append(f"backfill deal_price: {exc.__class__.__name__}")
+
     _last_result = {
         "status": "ok" if not errors else "partial",
         "dialect": dialect,
@@ -212,6 +240,7 @@ def run_schema_migrations(db: Session) -> dict:
         "backfill_hours": backfill_hours,
         "created_tables": created_tables,
         "seat_backfill": seat_backfill,
+        "deal_price_backfill": deal_price_backfill,
         "verified_tz_fix": verified_tz_fix,
         "errors": errors,
     }

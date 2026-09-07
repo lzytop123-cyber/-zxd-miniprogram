@@ -423,6 +423,7 @@ class MeituanOrder(Base):
     session_value: Mapped[int | None] = mapped_column(Integer)
     store_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("stores.id"))
     verify_code: Mapped[str | None] = mapped_column(String(50))
+    deal_price: Mapped[Decimal | None] = mapped_column(Numeric(10, 2))
     status: Mapped[MeituanOrderStatus] = mapped_column(
         Enum(MeituanOrderStatus), default=MeituanOrderStatus.pending
     )

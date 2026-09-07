@@ -130,6 +130,8 @@ onMounted(async () => {
   cards.value = [
     { label: '今日营收', value: `¥${d.today_revenue}` },
     { label: '本月营收', value: `¥${d.month_revenue}` },
+    { label: '本月核销', value: `¥${d.month_verify_amount ?? 0}` },
+    { label: '本月核销笔数', value: d.month_verify_count ?? 0 },
     { label: '在座人数', value: d.active_users },
     { label: '入座率', value: `${d.occupancy_rate}%` },
     { label: '今日新增用户', value: d.new_users_today },

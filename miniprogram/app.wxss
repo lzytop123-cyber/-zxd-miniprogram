@@ -195,25 +195,24 @@ page {
 }
 
 .seat-dot.available {
-  background: #FFFFFF;
-  border-color: var(--color-primary);
-  box-shadow: inset 0 0 0 4rpx rgba(82, 183, 136, 0.25);
+  background: #52B788;
+  border-color: #3F9A6E;
 }
 
 .seat-dot.selected {
-  background: rgba(82, 183, 136, 0.22);
-  border-color: #2d6a4f;
-  box-shadow: 0 0 0 3rpx rgba(82, 183, 136, 0.28);
+  background: #1B4332;
+  border-color: #FFFFFF;
+  box-shadow: 0 0 0 2rpx #1B4332;
 }
 
 .seat-dot.reserved {
-  background: rgba(255, 193, 94, 0.35);
+  background: #F4D89A;
   border-color: #C9A227;
 }
 
 .seat-dot.occupied {
-  background: rgba(45, 106, 79, 0.28);
-  border-color: rgba(45, 106, 79, 0.55);
+  background: #C9D0CB;
+  border-color: rgba(90, 105, 96, 0.55);
 }
 
 .seat-count {

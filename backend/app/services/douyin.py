@@ -182,20 +182,27 @@ class DouyinService:
             except (ValueError, OSError, OverflowError):
                 expire_date = None
 
+        from app.services.coupon_price import extract_deal_price
+
+        deal_price = extract_deal_price(douyin_raw=data)
+        ticket_data = {
+            "dealId": deal_id,
+            "dealTitle": title,
+            "receiptCode": normalize_coupon_input(raw) or raw,
+            "sku_id": sku.get("sku_id"),
+            "product_id": sku.get("product_id"),
+            "expire_time": expire_raw,
+            "receiptEndDate": str(expire_date) if expire_date else None,
+        }
+        if deal_price is not None:
+            ticket_data["dealPrice"] = float(deal_price)
+
         return {
             "verify_token": data.get("verify_token") or "",
             "encrypted_code": encrypted_code,
             "order_id": data.get("order_id"),
             "ticketName": title,
-            "ticketData": {
-                "dealId": deal_id,
-                "dealTitle": title,
-                "receiptCode": normalize_coupon_input(raw) or raw,
-                "sku_id": sku.get("sku_id"),
-                "product_id": sku.get("product_id"),
-                "expire_time": expire_raw,
-                "receiptEndDate": str(expire_date) if expire_date else None,
-            },
+            "ticketData": ticket_data,
             "raw_prepare": data,
         }
 
