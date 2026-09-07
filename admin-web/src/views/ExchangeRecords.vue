@@ -1,4 +1,64 @@
 <template>
+  <el-card style="margin-bottom:12px">
+    <template #header>
+      <div class="header-row">
+        <span>核销来源统计</span>
+        <el-select v-model="statsDays" style="width:120px" @change="loadStats">
+          <el-option label="近 7 天" :value="7" />
+          <el-option label="近 30 天" :value="30" />
+          <el-option label="近 90 天" :value="90" />
+          <el-option label="近 365 天" :value="365" />
+        </el-select>
+      </div>
+    </template>
+    <div v-loading="statsLoading" class="stat-grid">
+      <div class="stat-tile meituan">
+        <div class="stat-label">美团（含大众点评）</div>
+        <div class="stat-amt">¥{{ stats.meituan?.amount ?? 0 }}</div>
+        <div class="stat-sub">
+          {{ stats.meituan?.count ?? 0 }} 笔
+          <span v-if="stats.meituan?.refund_amount" class="refund-tag">退 ¥{{ stats.meituan.refund_amount }}</span>
+        </div>
+      </div>
+      <div class="stat-tile douyin">
+        <div class="stat-label">抖音</div>
+        <div class="stat-amt">¥{{ stats.douyin?.amount ?? 0 }}</div>
+        <div class="stat-sub">
+          {{ stats.douyin?.count ?? 0 }} 笔
+          <span v-if="stats.douyin?.refund_amount" class="refund-tag">退 ¥{{ stats.douyin.refund_amount }}</span>
+        </div>
+      </div>
+      <div class="stat-tile wechat">
+        <div class="stat-label">
+          微信支付
+          <el-tooltip v-if="stats.wechat_pay?.detail" placement="top">
+            <template #content>
+              <div>买卡 ¥{{ stats.wechat_pay.detail.card_purchase.amount }}（{{ stats.wechat_pay.detail.card_purchase.count }} 笔，退 ¥{{ stats.wechat_pay.detail.card_purchase.refund_amount }}）</div>
+              <div>预约 ¥{{ stats.wechat_pay.detail.reservation.amount }}（{{ stats.wechat_pay.detail.reservation.count }} 笔，退 ¥{{ stats.wechat_pay.detail.reservation.refund_amount }}）</div>
+              <div>充值 ¥{{ stats.wechat_pay.detail.recharge.amount }}（{{ stats.wechat_pay.detail.recharge.count }} 笔，退 ¥{{ stats.wechat_pay.detail.recharge.refund_amount }}）</div>
+            </template>
+            <el-icon style="vertical-align:middle;color:#999"><QuestionFilled /></el-icon>
+          </el-tooltip>
+        </div>
+        <div class="stat-amt">¥{{ stats.wechat_pay?.amount ?? 0 }}</div>
+        <div class="stat-sub">
+          {{ stats.wechat_pay?.count ?? 0 }} 笔
+          <span v-if="stats.wechat_pay?.refund_amount" class="refund-tag">退 ¥{{ stats.wechat_pay.refund_amount }}</span>
+        </div>
+      </div>
+      <div class="stat-tile refund">
+        <div class="stat-label">退款合计</div>
+        <div class="stat-amt">¥{{ stats.refund?.amount ?? 0 }}</div>
+        <div class="stat-sub">{{ stats.refund?.count ?? 0 }} 笔</div>
+      </div>
+      <div class="stat-tile total">
+        <div class="stat-label">净收入（收入 − 退款）</div>
+        <div class="stat-amt">¥{{ stats.total?.amount ?? 0 }}</div>
+        <div class="stat-sub">毛收入 ¥{{ stats.total?.gross ?? 0 }}</div>
+      </div>
+    </div>
+  </el-card>
+
   <el-card>
     <template #header>
       <div class="header-row">
@@ -54,6 +114,7 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
 import { ElMessage } from 'element-plus'
+import { QuestionFilled } from '@element-plus/icons-vue'
 import http from '../api/http'
 
 const list = ref<any[]>([])
@@ -65,6 +126,19 @@ const status = ref<string | null>(null)
 const monthAmount = ref(0)
 const monthCount = ref(0)
 const backfilling = ref(false)
+const statsDays = ref(30)
+const stats = ref<any>({})
+const statsLoading = ref(false)
+
+async function loadStats() {
+  statsLoading.value = true
+  try {
+    const res = await http.get('/admin/stats/verify-by-source', { params: { days: statsDays.value } })
+    stats.value = res.data || {}
+  } finally {
+    statsLoading.value = false
+  }
+}
 
 async function load() {
   loading.value = true
@@ -100,7 +174,10 @@ function search() {
   load()
 }
 
-onMounted(load)
+onMounted(() => {
+  load()
+  loadStats()
+})
 </script>
 
 <style scoped>
@@ -110,4 +187,17 @@ onMounted(load)
 .right { display: flex; align-items: center; }
 .sub { font-size: 12px; color: #999; }
 .pager { margin-top: 16px; display: flex; justify-content: flex-end; }
+.stat-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; }
+.stat-tile { padding: 14px 16px; border-radius: 8px; background: #f5f7fa; border-left: 4px solid #dcdfe6; }
+.stat-tile.meituan { border-left-color: #ffd100; }
+.stat-tile.douyin { border-left-color: #000; }
+.stat-tile.wechat { border-left-color: #07c160; }
+.stat-tile.refund { border-left-color: #f56c6c; background: #fef0f0; }
+.stat-tile.total { border-left-color: #409eff; background: #ecf5ff; }
+.stat-label { font-size: 13px; color: #606266; margin-bottom: 6px; }
+.stat-amt { font-size: 22px; font-weight: 700; color: #303133; }
+.stat-tile.refund .stat-amt { color: #f56c6c; }
+.stat-tile.total .stat-amt { color: #409eff; }
+.stat-sub { font-size: 12px; color: #909399; margin-top: 2px; }
+.refund-tag { color: #f56c6c; margin-left: 6px; }
 </style>

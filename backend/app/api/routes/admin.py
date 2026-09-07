@@ -19,6 +19,7 @@ from app.models import (
     AdminUser,
     BillType,
     CardPurchaseOrder,
+    CardSource,
     CardType,
     Coupon,
     HomeBanner,
@@ -31,6 +32,7 @@ from app.models import (
     PendingDealMapping,
     PayType,
     PeriodCard,
+    RechargeOrder,
     PointLog,
     PricingRule,
     Reservation,
@@ -1620,6 +1622,93 @@ def list_card_purchase_orders_admin(
         })
     return ResponseModel(
         data=PageResult(items=items, total=total or 0, page=page, page_size=page_size)
+    )
+
+
+@router.get("/stats/verify-by-source", response_model=ResponseModel)
+def verify_by_source(
+    days: int = Query(30, ge=1, le=365),
+    _: object = Depends(get_current_admin),
+    db: Session = Depends(get_db),
+):
+    """按来源统计核销/入账金额：美团(含大众点评) / 抖音 / 微信支付(买卡+预约+充值)。"""
+    since = datetime.combine(date.today() - timedelta(days=days - 1), datetime.min.time())
+
+    # 团购券核销 + 退款：join PeriodCard 拿 source
+    rows = db.execute(
+        select(
+            PeriodCard.source,
+            MeituanOrder.status,
+            func.coalesce(func.sum(MeituanOrder.deal_price), 0),
+            func.count(MeituanOrder.id),
+        )
+        .join(PeriodCard, PeriodCard.meituan_receipt == MeituanOrder.coupon_code, isouter=True)
+        .where(
+            MeituanOrder.status.in_([MeituanOrderStatus.verified, MeituanOrderStatus.refunded]),
+            MeituanOrder.verified_at >= since,
+        )
+        .group_by(PeriodCard.source, MeituanOrder.status)
+    ).all()
+    meituan_amt = meituan_ref = 0.0
+    meituan_cnt = meituan_ref_cnt = 0
+    douyin_amt = douyin_ref = 0.0
+    douyin_cnt = douyin_ref_cnt = 0
+    for src, st, amt, cnt in rows:
+        amt_f = float(amt or 0)
+        cnt_i = int(cnt or 0)
+        is_douyin = src == CardSource.douyin
+        is_refund = st == MeituanOrderStatus.refunded
+        if is_douyin and is_refund:
+            douyin_ref += amt_f; douyin_ref_cnt += cnt_i
+        elif is_douyin:
+            douyin_amt += amt_f; douyin_cnt += cnt_i
+        elif is_refund:
+            meituan_ref += amt_f; meituan_ref_cnt += cnt_i
+        else:
+            meituan_amt += amt_f; meituan_cnt += cnt_i
+
+    # 微信支付：买卡 + 预约 + 充值（pay_status: 1=已付, 2=已退）
+    def _sum(model, amt_col, wechat_only=False):
+        base = select(func.coalesce(func.sum(amt_col), 0), func.count()).where(
+            model.created_at >= since
+        )
+        if wechat_only:
+            base = base.where(model.pay_type == PayType.wechat)
+        paid = db.execute(base.where(model.pay_status == 1)).one()
+        refunded = db.execute(base.where(model.pay_status == 2)).one()
+        return (float(paid[0] or 0), int(paid[1] or 0), float(refunded[0] or 0), int(refunded[1] or 0))
+
+    card_amt, card_cnt, card_ref, card_ref_cnt = _sum(CardPurchaseOrder, CardPurchaseOrder.amount)
+    resv_amt, resv_cnt, resv_ref, resv_ref_cnt = _sum(Reservation, Reservation.final_price, wechat_only=True)
+    recharge_amt, recharge_cnt, recharge_ref, recharge_ref_cnt = _sum(RechargeOrder, RechargeOrder.amount)
+    wechat_amt = card_amt + resv_amt + recharge_amt
+    wechat_cnt = card_cnt + resv_cnt + recharge_cnt
+    wechat_ref = card_ref + resv_ref + recharge_ref
+    wechat_ref_cnt = card_ref_cnt + resv_ref_cnt + recharge_ref_cnt
+
+    gross = meituan_amt + douyin_amt + wechat_amt
+    refund = meituan_ref + douyin_ref + wechat_ref
+    net = gross - refund
+
+    return ResponseModel(
+        data={
+            "days": days,
+            "meituan": {"amount": round(meituan_amt, 2), "count": meituan_cnt,
+                        "refund_amount": round(meituan_ref, 2), "refund_count": meituan_ref_cnt},
+            "douyin": {"amount": round(douyin_amt, 2), "count": douyin_cnt,
+                       "refund_amount": round(douyin_ref, 2), "refund_count": douyin_ref_cnt},
+            "wechat_pay": {
+                "amount": round(wechat_amt, 2), "count": wechat_cnt,
+                "refund_amount": round(wechat_ref, 2), "refund_count": wechat_ref_cnt,
+                "detail": {
+                    "card_purchase": {"amount": card_amt, "count": card_cnt, "refund_amount": card_ref, "refund_count": card_ref_cnt},
+                    "reservation": {"amount": resv_amt, "count": resv_cnt, "refund_amount": resv_ref, "refund_count": resv_ref_cnt},
+                    "recharge": {"amount": recharge_amt, "count": recharge_cnt, "refund_amount": recharge_ref, "refund_count": recharge_ref_cnt},
+                },
+            },
+            "refund": {"amount": round(refund, 2), "count": meituan_ref_cnt + douyin_ref_cnt + wechat_ref_cnt},
+            "total": {"amount": round(net, 2), "gross": round(gross, 2), "count": meituan_cnt + douyin_cnt + wechat_cnt},
+        }
     )
 
 
