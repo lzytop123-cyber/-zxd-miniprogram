@@ -1,21 +1,21 @@
 .page { padding-bottom: 48rpx; }
 .card {
   margin: 24rpx;
-  background: #fff;
+  background: var(--color-bg-card);
   border-radius: 28rpx;
   padding: 28rpx;
-  box-shadow: 0 4rpx 24rpx rgba(28, 43, 32, 0.06);
+  box-shadow: var(--shadow-sm);
 }
 .label {
   margin-bottom: 16rpx;
-  color: #2D6A4F;
+  color: var(--color-text-brand);
   font-weight: 600;
   font-size: 24rpx;
 }
 .row { display: flex; gap: 12rpx; }
 .input {
   flex: 1;
-  background: #F4FAF6;
+  background: var(--color-bg-page);
   border-radius: 16rpx;
   padding: 20rpx 24rpx;
   min-height: 88rpx;
@@ -26,8 +26,8 @@
   height: 88rpx;
   line-height: 88rpx;
   text-align: center;
-  background: #52B788;
-  color: #fff;
+  background: var(--color-primary);
+  color: var(--color-bg-card);
   border-radius: 16rpx;
   font-weight: 600;
 }
@@ -36,9 +36,9 @@
   justify-content: space-between;
   align-items: center;
   padding: 20rpx 0;
-  border-bottom: 1rpx solid #F0F4F1;
+  border-bottom: 1rpx solid var(--color-border);
 }
 .item:last-child { border-bottom: none; }
-.name { font-size: 30rpx; color: #1C2B20; }
-.sub { margin-top: 4rpx; font-size: 22rpx; color: #8C9BA5; }
-.del { color: #C95C5C; font-size: 26rpx; }
+.name { font-size: 30rpx; color: var(--color-text); }
+.sub { margin-top: 4rpx; font-size: 22rpx; color: var(--color-text-secondary); }
+.del { color: var(--color-danger); font-size: 26rpx; }

@@ -1,9 +1,9 @@
 .store-card {
-  background: #FFFFFF;
+  background: var(--color-bg-card);
   border-radius: 32rpx;
   overflow: hidden;
   margin-bottom: 24rpx;
-  box-shadow: 0 4rpx 24rpx rgba(28, 43, 32, 0.06);
+  box-shadow: var(--shadow-sm);
 }
 
 .store-card:active {
@@ -53,7 +53,7 @@
 .cover-logo {
   font-size: 28rpx;
   font-weight: 700;
-  color: #2D6A4F;
+  color: var(--color-text-brand);
   letter-spacing: 2rpx;
 }
 
@@ -70,12 +70,12 @@
 
 .status-tag.open {
   background: rgba(216, 243, 220, 0.95);
-  color: #2D6A4F;
+  color: var(--color-text-brand);
 }
 
 .status-tag.closed {
   background: rgba(236, 239, 241, 0.95);
-  color: #8C9BA5;
+  color: var(--color-text-secondary);
 }
 
 .info {
@@ -91,13 +91,13 @@
 .name {
   font-size: 32rpx;
   font-weight: 700;
-  color: #1C2B20;
+  color: var(--color-text);
   flex: 1;
 }
 
 .arrow {
   font-size: 36rpx;
-  color: #CFD8DC;
+  color: var(--color-disabled);
   line-height: 1;
 }
 
@@ -117,7 +117,7 @@
 .addr {
   display: block;
   font-size: 24rpx;
-  color: #8C9BA5;
+  color: var(--color-text-secondary);
   line-height: 1.5;
 }
 
@@ -125,22 +125,22 @@
   display: inline-block;
   margin-top: 8rpx;
   font-size: 22rpx;
-  color: #52B788;
+  color: var(--color-primary);
   font-weight: 600;
 }
 
 .dist {
   font-size: 24rpx;
-  color: #52B788;
+  color: var(--color-primary);
   font-weight: 600;
   white-space: nowrap;
   padding: 4rpx 12rpx;
-  background: #F4FAF6;
+  background: var(--color-bg-page);
   border-radius: 8rpx;
 }
 
 .dist-hint {
-  color: #8C9BA5;
+  color: var(--color-text-secondary);
   font-weight: 500;
   background: transparent;
   padding: 0;

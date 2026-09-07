@@ -12,7 +12,7 @@
   margin-bottom: 28rpx;
   padding: 8rpx;
   border-radius: 20rpx;
-  background: #F4FAF6;
+  background: var(--color-bg-page);
 }
 
 .platform-tab {
@@ -22,13 +22,13 @@
   border-radius: 16rpx;
   font-size: 28rpx;
   font-weight: 600;
-  color: #52B788;
+  color: var(--color-primary);
 }
 
 .platform-tab.active {
-  background: #fff;
-  color: #2D6A4F;
-  box-shadow: 0 4rpx 16rpx rgba(45, 106, 79, 0.08);
+  background: var(--color-bg-card);
+  color: var(--color-text-brand);
+  box-shadow: var(--shadow-brand-soft);
 }
 
 .exchange-header {
@@ -42,7 +42,7 @@
   width: 80rpx;
   height: 80rpx;
   border-radius: 24rpx;
-  background: #D8F3DC;
+  background: var(--color-primary-soft);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -52,16 +52,16 @@
 .exchange-title {
   font-size: 32rpx;
   font-weight: 700;
-  color: #2D6A4F;
+  color: var(--color-text-brand);
 }
 
 .code-field {
   display: flex;
   align-items: stretch;
-  border: 2rpx solid #D8F3DC;
+  border: 2rpx solid var(--color-primary-soft);
   border-radius: 16rpx;
   margin: 28rpx 0 32rpx;
-  background: #F4FAF6;
+  background: var(--color-bg-page);
   overflow: hidden;
 }
 
@@ -79,7 +79,7 @@
   justify-content: center;
   width: 96rpx;
   flex-shrink: 0;
-  border-left: 2rpx solid #D8F3DC;
+  border-left: 2rpx solid var(--color-primary-soft);
   background: rgba(255, 255, 255, 0.55);
 }
 
@@ -94,7 +94,7 @@
 
 .link-records {
   text-align: center;
-  color: #52B788;
+  color: var(--color-primary);
   font-size: 26rpx;
   margin-top: 24rpx;
   font-weight: 600;

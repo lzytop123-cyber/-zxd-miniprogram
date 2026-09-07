@@ -1,22 +1,22 @@
 .page { padding: 24rpx; }
 .card {
-  background: #fff; border-radius: 24rpx; padding: 24rpx; margin-bottom: 16rpx;
-  box-shadow: 0 4rpx 24rpx rgba(28,43,32,.06);
+  background: var(--color-bg-card); border-radius: 24rpx; padding: 24rpx; margin-bottom: 16rpx;
+  box-shadow: var(--shadow-sm);
 }
 .title { font-weight: 600; }
-.meta { margin-top: 8rpx; color: #8C9BA5; font-size: 24rpx; }
+.meta { margin-top: 8rpx; color: var(--color-text-secondary); font-size: 24rpx; }
 .ops { display: flex; gap: 12rpx; margin-top: 16rpx; }
 .btn {
   flex: 1; text-align: center; height: 72rpx; line-height: 72rpx;
-  background: #52B788; color: #fff; border-radius: 16rpx; font-weight: 600;
+  background: var(--color-primary); color: var(--color-bg-card); border-radius: 16rpx; font-weight: 600;
 }
-.btn.ghost { background: #D8F3DC; color: #2D6A4F; }
+.btn.ghost { background: var(--color-primary-soft); color: var(--color-text-brand); }
 .contact-box {
-  margin-top: 16rpx; padding: 20rpx; background: #F4FAF6; border-radius: 16rpx;
+  margin-top: 16rpx; padding: 20rpx; background: var(--color-bg-page); border-radius: 16rpx;
 }
-.contact-label { color: #8C9BA5; font-size: 22rpx; }
+.contact-label { color: var(--color-text-secondary); font-size: 22rpx; }
 .contact-value {
-  margin: 8rpx 0 16rpx; font-size: 34rpx; font-weight: 700; color: #2D6A4F;
+  margin: 8rpx 0 16rpx; font-size: 34rpx; font-weight: 700; color: var(--color-text-brand);
   word-break: break-all;
 }
-.empty { text-align: center; color: #8C9BA5; padding: 80rpx 24rpx; }
+.empty { text-align: center; color: var(--color-text-secondary); padding: 80rpx 24rpx; }

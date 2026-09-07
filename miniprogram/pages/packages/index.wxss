@@ -8,8 +8,8 @@
   position: sticky;
   top: 0;
   z-index: 10;
-  background: #fff;
-  box-shadow: 0 4rpx 16rpx rgba(28, 43, 32, 0.05);
+  background: var(--color-bg-card);
+  box-shadow: var(--shadow-sm);
 }
 
 .store-row {
@@ -25,7 +25,7 @@
   min-width: 0;
   font-size: 30rpx;
   font-weight: 700;
-  color: #1C2B20;
+  color: var(--color-text);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -34,7 +34,7 @@
 .store-switch {
   flex-shrink: 0;
   font-size: 24rpx;
-  color: #52B788;
+  color: var(--color-primary);
   font-weight: 600;
 }
 
@@ -53,11 +53,11 @@
   position: relative;
   padding: 8rpx 4rpx 16rpx;
   font-size: 28rpx;
-  color: #8C9BA5;
+  color: var(--color-text-secondary);
 }
 
 .tab-item.active {
-  color: #2D6A4F;
+  color: var(--color-text-brand);
   font-weight: 700;
 }
 
@@ -70,14 +70,14 @@
   width: 40rpx;
   height: 6rpx;
   border-radius: 999rpx;
-  background: #52B788;
+  background: var(--color-primary);
 }
 
 /* ============ 我的期限卡紧凑条 ============ */
 .my-strip {
   margin: 16rpx 24rpx 0;
   padding: 20rpx 24rpx;
-  background: #fff;
+  background: var(--color-bg-card);
   border-radius: 24rpx;
   box-shadow: var(--shadow-card);
 }
@@ -98,19 +98,19 @@
 .my-strip-label {
   font-size: 28rpx;
   font-weight: 700;
-  color: #2D6A4F;
+  color: var(--color-text-brand);
 }
 
 .my-strip-count {
   font-size: 22rpx;
-  color: #52B788;
+  color: var(--color-primary);
   font-weight: 600;
 }
 
 .my-strip-more,
 .my-strip-link {
   font-size: 24rpx;
-  color: #52B788;
+  color: var(--color-primary);
   font-weight: 600;
 }
 
@@ -120,7 +120,7 @@
   align-items: center;
   justify-content: space-between;
   font-size: 26rpx;
-  color: #8C9BA5;
+  color: var(--color-text-secondary);
 }
 
 .my-scroll {
@@ -150,14 +150,14 @@
   padding: 2rpx 12rpx;
   border-radius: 999rpx;
   background: rgba(45, 106, 79, 0.12);
-  color: #2D6A4F;
+  color: var(--color-text-brand);
 }
 
 .my-chip-name {
   margin-top: 10rpx;
   font-size: 26rpx;
   font-weight: 700;
-  color: #1C2B20;
+  color: var(--color-text);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -166,7 +166,7 @@
 .my-chip-meta {
   margin-top: 8rpx;
   font-size: 22rpx;
-  color: #8C9BA5;
+  color: var(--color-text-secondary);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -183,12 +183,12 @@
 .section-title {
   font-size: 32rpx;
   font-weight: 800;
-  color: #2D6A4F;
+  color: var(--color-text-brand);
 }
 
 .section-sub {
   font-size: 24rpx;
-  color: #8C9BA5;
+  color: var(--color-text-secondary);
 }
 
 .buy-body {
@@ -198,7 +198,7 @@
 .loading {
   padding: 80rpx;
   text-align: center;
-  color: #8C9BA5;
+  color: var(--color-text-secondary);
 }
 
 .pkg-list {
@@ -212,8 +212,8 @@
   padding: 32rpx;
   border-radius: 28rpx;
   background: linear-gradient(135deg, #2D6A4F 0%, #40916C 55%, #52B788 100%);
-  color: #fff;
-  box-shadow: 0 16rpx 40rpx rgba(45, 106, 79, 0.22);
+  color: var(--color-bg-card);
+  box-shadow: var(--shadow-brand);
 }
 
 .pkg-deco {
@@ -254,7 +254,7 @@
 }
 
 .pkg-price-num {
-  font-size: 44rpx;
+  font-size: 40rpx;
   font-weight: 800;
 }
 
@@ -298,8 +298,8 @@
 .pkg-buy {
   padding: 14rpx 32rpx;
   border-radius: 999rpx;
-  background: #fff;
-  color: #2D6A4F;
+  background: var(--color-bg-card);
+  color: var(--color-text-brand);
   font-size: 26rpx;
   font-weight: 700;
 }
@@ -308,9 +308,9 @@
   margin-top: 16rpx;
   padding: 64rpx 32rpx;
   text-align: center;
-  background: #fff;
+  background: var(--color-bg-card);
   border-radius: 32rpx;
-  color: #8C9BA5;
+  color: var(--color-text-secondary);
   font-size: 28rpx;
   box-shadow: var(--shadow-card);
 }
@@ -333,7 +333,7 @@
 .sheet-panel {
   width: 100%;
   max-height: 78vh;
-  background: #F4FAF6;
+  background: var(--color-bg-page);
   border-radius: 32rpx 32rpx 0 0;
   display: flex;
   flex-direction: column;
@@ -357,12 +357,12 @@
 .sheet-title {
   font-size: 34rpx;
   font-weight: 800;
-  color: #2D6A4F;
+  color: var(--color-text-brand);
 }
 
 .sheet-close {
   font-size: 28rpx;
-  color: #8C9BA5;
+  color: var(--color-text-secondary);
 }
 
 .sheet-scroll {
@@ -377,8 +377,8 @@
   padding: 24rpx;
   font-size: 28rpx;
   font-weight: 600;
-  color: #52B788;
-  background: #fff;
+  color: var(--color-primary);
+  background: var(--color-bg-card);
   padding-bottom: calc(24rpx + env(safe-area-inset-bottom));
 }
 
@@ -389,8 +389,8 @@
   padding: 28rpx 32rpx;
   border-radius: 28rpx;
   background: linear-gradient(135deg, #2D6A4F 0%, #40916C 58%, #52B788 100%);
-  color: #fff;
-  box-shadow: 0 12rpx 32rpx rgba(45, 106, 79, 0.2);
+  color: var(--color-bg-card);
+  box-shadow: var(--shadow-brand);
 }
 
 .ticket-card--sheet:last-child {
@@ -432,7 +432,7 @@
   padding: 4rpx 16rpx;
   border-radius: 999rpx;
   background: rgba(255, 255, 255, 0.95);
-  color: #2D6A4F;
+  color: var(--color-text-brand);
   font-weight: 600;
 }
 
@@ -500,7 +500,7 @@
   width: 100%;
   max-height: 75vh;
   padding: 16rpx 32rpx calc(32rpx + env(safe-area-inset-bottom));
-  background: #fff;
+  background: var(--color-bg-card);
   border-radius: 32rpx 32rpx 0 0;
   box-sizing: border-box;
 }
@@ -516,7 +516,7 @@
 .detail-title {
   font-size: 36rpx;
   font-weight: 800;
-  color: #1C2B20;
+  color: var(--color-text);
   line-height: 1.35;
 }
 
@@ -524,7 +524,7 @@
   margin-top: 8rpx;
   font-size: 32rpx;
   font-weight: 700;
-  color: #52B788;
+  color: var(--color-primary);
 }
 
 .detail-lines {
@@ -543,7 +543,7 @@
 }
 
 .detail-dot {
-  color: #52B788;
+  color: var(--color-primary);
   font-weight: 700;
 }
 
@@ -560,12 +560,12 @@
   border-radius: 999rpx;
   font-size: 30rpx;
   font-weight: 600;
-  background: #E8F5E9;
-  color: #2D6A4F;
+  background: var(--green-100);
+  color: var(--color-text-brand);
 }
 
 .detail-btn.primary {
-  background: #52B788;
-  color: #fff;
-  box-shadow: 0 8rpx 20rpx rgba(82, 183, 136, 0.35);
+  background: var(--color-primary);
+  color: var(--color-bg-card);
+  box-shadow: var(--shadow-brand);
 }

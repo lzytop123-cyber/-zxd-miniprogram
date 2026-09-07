@@ -1627,12 +1627,22 @@ def list_card_purchase_orders_admin(
 
 @router.get("/stats/verify-by-source", response_model=ResponseModel)
 def verify_by_source(
-    days: int = Query(30, ge=1, le=365),
+    range: str = Query("30", description="7/30/90/365/month/all"),
     _: object = Depends(get_current_admin),
     db: Session = Depends(get_db),
 ):
     """按来源统计核销/入账金额：美团(含大众点评) / 抖音 / 微信支付(买卡+预约+充值)。"""
-    since = datetime.combine(date.today() - timedelta(days=days - 1), datetime.min.time())
+    today = date.today()
+    if range == "all":
+        since = datetime(1970, 1, 1)
+    elif range == "month":
+        since = datetime.combine(today.replace(day=1), datetime.min.time())
+    else:
+        try:
+            days = max(1, min(365, int(range)))
+        except ValueError:
+            days = 30
+        since = datetime.combine(today - timedelta(days=days - 1), datetime.min.time())
 
     # 团购券核销 + 退款：join PeriodCard 拿 source
     rows = db.execute(
@@ -1692,7 +1702,7 @@ def verify_by_source(
 
     return ResponseModel(
         data={
-            "days": days,
+            "range": range,
             "meituan": {"amount": round(meituan_amt, 2), "count": meituan_cnt,
                         "refund_amount": round(meituan_ref, 2), "refund_count": meituan_ref_cnt},
             "douyin": {"amount": round(douyin_amt, 2), "count": douyin_cnt,

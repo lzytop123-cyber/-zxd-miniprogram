@@ -10,11 +10,11 @@
 .item-card .name {
   font-size: 30rpx;
   font-weight: 700;
-  color: #2D6A4F;
+  color: var(--color-text-brand);
 }
 
 .item-card .info {
   font-size: 24rpx;
-  color: #8C9BA5;
+  color: var(--color-text-secondary);
   margin-top: 8rpx;
 }

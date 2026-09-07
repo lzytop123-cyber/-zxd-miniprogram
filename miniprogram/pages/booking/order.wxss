@@ -10,7 +10,7 @@
 .block-title {
   font-size: 30rpx;
   font-weight: 700;
-  color: #2D6A4F;
+  color: var(--color-text-brand);
   margin-bottom: 16rpx;
 }
 
@@ -24,12 +24,12 @@
   display: flex;
   justify-content: space-between;
   padding: 20rpx 0;
-  border-bottom: 2rpx solid #F4FAF6;
+  border-bottom: 2rpx solid var(--color-bg-page);
   font-size: 26rpx;
 }
 
 .row-label {
-  color: #8C9BA5;
+  color: var(--color-text-secondary);
 }
 
 .fee-block {
@@ -43,29 +43,29 @@
 }
 
 .price {
-  color: #52B788;
+  color: var(--color-primary);
   font-size: 40rpx;
   font-weight: 700;
 }
 
 .discount {
-  color: #52B788;
+  color: var(--color-primary);
   font-weight: 600;
 }
 
 .picker-row {
   padding: 24rpx;
-  border: 2rpx dashed #D8F3DC;
+  border: 2rpx dashed var(--color-primary-soft);
   border-radius: 16rpx;
-  color: #1C2B20;
+  color: var(--color-text);
   margin-bottom: 16rpx;
   font-size: 26rpx;
-  background: #F4FAF6;
+  background: var(--color-bg-page);
 }
 
 .hint-warn {
-  background: #FFF8E6;
-  color: #8A6D3B;
+  background: var(--color-warning-bg);
+  color: var(--color-warning-fg);
   font-size: 24rpx;
   padding: 20rpx 24rpx;
   border-radius: 16rpx;
@@ -92,16 +92,16 @@
   min-width: 180rpx;
   text-align: center;
   padding: 20rpx 12rpx;
-  border: 2rpx solid #D8F3DC;
+  border: 2rpx solid var(--color-primary-soft);
   border-radius: 16rpx;
   font-size: 26rpx;
-  color: #1C2B20;
+  color: var(--color-text);
 }
 
 .pay-item.active {
-  border-color: #52B788;
-  background: #D8F3DC;
-  color: #2D6A4F;
+  border-color: var(--color-primary);
+  background: var(--color-primary-soft);
+  color: var(--color-text-brand);
   font-weight: 600;
 }
 
@@ -115,13 +115,13 @@
 
 .pay-label {
   font-size: 26rpx;
-  color: #8C9BA5;
+  color: var(--color-text-secondary);
 }
 
 .pay-amount {
-  font-size: 44rpx;
+  font-size: 40rpx;
   font-weight: 700;
-  color: #52B788;
+  color: var(--color-primary);
 }
 
 .fixed-bottom-bar .submit-btn {

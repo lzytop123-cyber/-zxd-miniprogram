@@ -1,22 +1,152 @@
-/* 知行岛 · 设计 tokens（薄荷绿） */
+/* ============================================================
+   知行岛 · Design Tokens（三层架构）
+   Layer 1 Primitive → Layer 2 Semantic → Layer 3 Component
+   老变量名（--color-primary / --radius-card / --shadow-card ...）
+   作为兼容别名保留在最底部，计算值与旧版完全一致。
+   ============================================================ */
 page {
-  --color-primary: #52B788;
-  --color-primary-dark: #2D6A4F;
-  --color-primary-light: #D8F3DC;
-  --color-bg-page: #F4FAF6;
-  --color-bg-card: #FFFFFF;
-  --color-text: #1C2B20;
-  --color-text-secondary: #8C9BA5;
-  --color-disabled: #CFD8DC;
-  --color-warning-bg: #FFF8E6;
-  --color-warning-text: #8A6D3B;
-  --radius-card: 32rpx;
-  --radius-btn: 24rpx;
-  --radius-chip: 40rpx;
-  --shadow-card: 0 4rpx 24rpx rgba(28, 43, 32, 0.06);
+  /* -------- Layer 1 · Primitive（硬编码 hex，禁止 var 引用）-------- */
+
+  /* Green scale（品牌绿）*/
+  --green-50:  #F4FAF6;
+  --green-100: #E8F5E9;
+  --green-200: #D8F3DC;
+  --green-400: #52B788;
+  --green-500: #43976B;
+  --green-600: #40916C;
+  --green-700: #2D6A4F;
+  --green-900: #1B4332;
+
+  /* Neutral scale */
+  --neutral-0:   #FFFFFF;
+  --neutral-50:  #F0F4F1;
+  --neutral-100: #EEF4F0;
+  --neutral-200: #E8ECEA;
+  --neutral-300: #CFD8DC;
+  --neutral-500: #8C9BA5;
+  --neutral-700: #3D5245;
+  --neutral-900: #1C2B20;
+
+  /* Accent / Feedback */
+  --amber-50:  #FFF8E6;
+  --amber-100: #FDEFD0;
+  --amber-400: #FFB703;
+  --amber-500: #FB8500;
+  --amber-800: #8A6D3B;
+  --coral-500: #E07A5F;
+  --blue-50:   #EAF2F8;
+
+  /* Space scale（8rpx 基准）*/
+  --space-1:  8rpx;
+  --space-2: 16rpx;
+  --space-3: 24rpx;
+  --space-4: 32rpx;
+  --space-5: 48rpx;
+  --space-6: 64rpx;
+
+  /* Radius scale */
+  --radius-xs: 8rpx;
+  --radius-sm: 16rpx;
+  --radius-md: 24rpx;
+  --radius-lg: 32rpx;
+  --radius-xl: 40rpx;
+  --radius-pill: 999rpx;
+
+  /* Type scale（8 档，正在收敛中）*/
+  --font-xs:   20rpx;
+  --font-sm:   22rpx;
+  --font-base: 24rpx;
+  --font-md:   26rpx;
+  --font-lg:   30rpx;
+  --font-xl:   34rpx;
+  --font-2xl:  40rpx;
+  --font-3xl:  56rpx;
+
+  /* Weight scale */
+  --weight-regular:  400;
+  --weight-medium:   500;
+  --weight-semibold: 600;
+  --weight-bold:     700;
+  --weight-black:    800;
+
+  /* Shadow scale */
+  --shadow-xs:    0 2rpx 8rpx  rgba(28, 43, 32, 0.04);
+  --shadow-sm:    0 4rpx 24rpx rgba(28, 43, 32, 0.06);
+  --shadow-md:    0 8rpx 24rpx rgba(28, 43, 32, 0.10);
+  --shadow-lg:    0 16rpx 40rpx rgba(28, 43, 32, 0.14);
+  --shadow-brand:        0 8rpx 20rpx rgba(82, 183, 136, 0.30);
+  --shadow-brand-soft:   0 8rpx 24rpx rgba(45, 106, 79, 0.10);
+  --shadow-brand-strong: 0 12rpx 32rpx rgba(45, 106, 79, 0.36);
+  --shadow-accent:       0 6rpx 16rpx rgba(251, 133, 0, 0.32);
+  --shadow-inset-top:    0 -4rpx 24rpx rgba(28, 43, 32, 0.08);
+
+  /* -------- Layer 2 · Semantic -------- */
+
+  /* Brand */
+  --color-primary:        var(--green-400);
+  --color-primary-hover:  var(--green-600);
+  --color-primary-active: var(--green-700);
+  --color-primary-soft:   var(--green-200);
+  --color-primary-fg:     var(--neutral-0);
+
+  /* Surface */
+  --color-bg-page:   var(--green-50);
+  --color-bg-card:   var(--neutral-0);
+  --color-bg-sunken: var(--neutral-100);
+
+  /* Text */
+  --color-text:           var(--neutral-900);
+  --color-text-secondary: var(--neutral-500);
+  --color-text-brand:     var(--green-700);
+  --color-text-on-brand:  var(--neutral-0);
+
+  /* Border / Divider */
+  --color-border:        var(--neutral-100);
+  --color-border-strong: var(--neutral-300);
+
+  /* Feedback */
+  --color-warning-bg: var(--amber-50);
+  --color-warning-fg: var(--amber-800);
+  --color-danger:     var(--coral-500);
+  --color-accent:     var(--amber-500);
+  --color-info-bg:    var(--blue-50);
+
+  /* -------- Layer 3 · Component -------- */
+
+  /* Button */
+  --btn-height-md: 96rpx;
+  --btn-height-sm: 88rpx;
+  --btn-radius:    var(--radius-md);
+  --btn-shadow:    var(--shadow-brand);
+
+  /* Card */
+  --card-radius:   var(--radius-lg);
+  --card-shadow:   var(--shadow-sm);
+  --card-padding:  var(--space-4);
+
+  /* Hero */
+  --hero-radius-bottom: var(--radius-xl);
+  --hero-shadow:        var(--shadow-lg);
+
+  /* Chip */
+  --chip-radius:  var(--radius-xl);
+  --chip-padding: 12rpx 28rpx;
+
+  /* -------- Legacy 兼容别名（旧变量名 → 新 token）--------
+     旧代码继续能用；计算值与改动前完全一致。 */
+  --color-primary-dark:   var(--green-700);      /* = var(--color-text-brand) */
+  --color-primary-light:  var(--green-200);      /* = var(--color-primary-soft) */
+  --color-disabled:       var(--neutral-300);    /* = var(--color-disabled) */
+  --color-warning-text:   var(--color-warning-fg);
+  --radius-card:          var(--radius-lg);      /* = 32rpx */
+  --radius-btn:           var(--radius-md);      /* = 24rpx */
+  --radius-chip:          var(--radius-xl);      /* = 40rpx */
+  --shadow-card:          var(--shadow-sm);      /* = 0 4rpx 24rpx rgba(28,43,32,.06) */
+
+  /* -------- Base -------- */
   background: var(--color-bg-page);
   color: var(--color-text);
-  font-size: 26rpx;
+  font-size: var(--font-md);
   line-height: 1.5;
 }
 
@@ -37,7 +167,7 @@ page {
 
 .btn-primary {
   background: var(--color-primary);
-  color: #FFFFFF;
+  color: var(--color-bg-card);
   border-radius: var(--radius-btn);
   height: 96rpx;
   line-height: 96rpx;
@@ -46,11 +176,11 @@ page {
   font-size: 30rpx;
   margin: 24rpx auto;
   width: 90%;
-  box-shadow: 0 8rpx 20rpx rgba(82, 183, 136, 0.35);
+  box-shadow: var(--btn-shadow);
 }
 
 .btn-primary:active {
-  opacity: 0.85;
+  background: var(--color-primary-active);
   transform: scale(0.98);
 }
 
@@ -76,6 +206,60 @@ page {
   width: 90%;
 }
 
+.btn-outline:active {
+  background: var(--color-primary-soft);
+  transform: scale(0.98);
+}
+
+/* Danger 变体：破坏性操作（取消/提前离座/删除）*/
+.btn-danger {
+  background: transparent;
+  color: var(--color-danger);
+  border: 2rpx solid var(--color-danger);
+  border-radius: var(--btn-radius);
+  height: 88rpx;
+  line-height: 88rpx;
+  text-align: center;
+  font-size: 28rpx;
+  margin: 16rpx auto;
+  width: 90%;
+}
+
+.btn-danger:active {
+  background: rgba(224, 122, 95, 0.08);
+  transform: scale(0.98);
+}
+
+.btn-danger-solid {
+  background: var(--color-danger);
+  color: var(--color-bg-card);
+  border-radius: var(--btn-radius);
+  height: 96rpx;
+  line-height: 96rpx;
+  text-align: center;
+  font-weight: 600;
+  font-size: 30rpx;
+  margin: 24rpx auto;
+  width: 90%;
+  box-shadow: 0 8rpx 20rpx rgba(224, 122, 95, 0.30);
+}
+
+.btn-danger-solid:active {
+  background: #C86851;
+  transform: scale(0.98);
+}
+
+/* 文本级 danger 链接（用于卡片内嵌操作，如"提前离座"）*/
+.link-danger {
+  color: var(--color-danger);
+  font-weight: 600;
+  padding: 10rpx 20rpx;
+}
+
+.link-danger:active {
+  opacity: 0.7;
+}
+
 .chip {
   display: inline-block;
   padding: 12rpx 28rpx;
@@ -87,10 +271,23 @@ page {
   margin-right: 16rpx;
 }
 
+.chip:active {
+  background: var(--color-primary-soft);
+  transform: scale(0.98);
+}
+
 .chip.active {
   background: var(--color-primary);
-  color: #FFFFFF;
+  color: var(--color-bg-card);
   border-color: var(--color-primary);
+}
+
+.chip.disabled,
+.chip.disabled:active {
+  border-color: var(--color-border-strong);
+  color: var(--color-text-secondary);
+  background: transparent;
+  transform: none;
 }
 
 .tag {
@@ -103,7 +300,7 @@ page {
 }
 
 .tag.gray {
-  background: #ECEFF1;
+  background: var(--color-border);
   color: var(--color-text-secondary);
 }
 
@@ -158,7 +355,7 @@ page {
   bottom: 0;
   background: var(--color-bg-card);
   padding: 24rpx 32rpx calc(24rpx + env(safe-area-inset-bottom));
-  box-shadow: 0 -4rpx 24rpx rgba(28, 43, 32, 0.08);
+  box-shadow: var(--shadow-inset-top);
   z-index: 100;
 }
 
@@ -195,14 +392,14 @@ page {
 }
 
 .seat-dot.available {
-  background: #52B788;
-  border-color: #3F9A6E;
+  background: var(--color-primary);
+  border-color: var(--green-500);
 }
 
 .seat-dot.selected {
-  background: #1B4332;
-  border-color: #FFFFFF;
-  box-shadow: 0 0 0 2rpx #1B4332;
+  background: var(--green-900);
+  border-color: var(--color-bg-card);
+  box-shadow: 0 0 0 2rpx var(--green-900);
 }
 
 .seat-dot.reserved {
@@ -221,7 +418,7 @@ page {
   align-items: baseline;
   gap: 6rpx;
   padding: 10rpx 20rpx;
-  background: linear-gradient(120deg, #EAF7EF, #F4FAF6);
+  background: linear-gradient(120deg, #F4FAF6, #F4FAF6);
   border-radius: 999rpx;
   font-size: 22rpx;
   color: var(--color-primary-dark);
@@ -249,8 +446,8 @@ page {
 
 .seat-badge--on {
   background: linear-gradient(135deg, #52B788, #2D6A4F);
-  color: #FFFFFF;
-  box-shadow: 0 6rpx 16rpx rgba(45, 106, 79, 0.28);
+  color: var(--color-bg-card);
+  box-shadow: var(--shadow-brand);
 }
 
 .seat-badge-no {
@@ -274,7 +471,7 @@ page {
 }
 
 .seat-map-tip {
-  font-size: 23rpx;
+  font-size: 22rpx;
   color: var(--color-text-secondary);
   margin: -12rpx 0 20rpx;
   line-height: 1.5;
@@ -287,7 +484,7 @@ page {
   height: 0;
   border-radius: 24rpx;
   overflow: hidden;
-  background: linear-gradient(160deg, #EAF7EF 0%, #F4FAF6 100%);
+  background: linear-gradient(160deg, #F4FAF6 0%, #F4FAF6 100%);
   box-shadow:
     inset 0 0 0 2rpx rgba(82, 183, 136, 0.28),
     0 8rpx 24rpx rgba(45, 106, 79, 0.08);
@@ -298,7 +495,7 @@ page {
   text-align: center;
   font-size: 26rpx;
   color: var(--color-text-secondary);
-  background: linear-gradient(160deg, #EAF7EF 0%, #F4FAF6 100%);
+  background: linear-gradient(160deg, #F4FAF6 0%, #F4FAF6 100%);
   border-radius: 24rpx;
   border: 2rpx dashed rgba(82, 183, 136, 0.35);
 }
@@ -369,3 +566,40 @@ page {
   border-radius: 50%;
   margin: 24rpx auto;
 }
+
+/* ============ 图标系统（Lucide outline, 统一品牌绿描边）============
+   基础：.mi-glyph（40rpx 默认，套 .glyph-lg / .glyph-xl 换尺寸）
+   反色：.mi-glyph--invert 用于深色底把绿描边变白
+   =============================================================== */
+.mi-glyph {
+  width: 40rpx;
+  height: 40rpx;
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: contain;
+}
+
+.glyph-lg { width: 60rpx; height: 60rpx; }
+.glyph-xl { width: 80rpx; height: 80rpx; }
+
+.mi-glyph--invert { filter: brightness(0) invert(1); }
+
+.icon-wallet { background-image: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2224%22%20height%3D%2224%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%232D6A4F%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M19%207V4a1%201%200%200%200-1-1H5a2%202%200%200%200%200%204h15a1%201%200%200%201%201%201v4h-3a2%202%200%200%200%200%204h3a1%201%200%200%201%201-1v-2a1%201%200%200%200-1-1%22%2F%3E%3Cpath%20d%3D%22M3%205v14a2%202%200%200%200%202%202h15a1%201%200%200%200%201-1v-4%22%2F%3E%3C%2Fsvg%3E"); }
+.icon-orders { background-image: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2224%22%20height%3D%2224%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%232D6A4F%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M13%2016H8%22%2F%3E%3Cpath%20d%3D%22M14%208H8%22%2F%3E%3Cpath%20d%3D%22M16%2012H8%22%2F%3E%3Cpath%20d%3D%22M4%203a1%201%200%200%201%201-1%201.3%201.3%200%200%201%20.7.2l.933.6a1.3%201.3%200%200%200%201.4%200l.934-.6a1.3%201.3%200%200%201%201.4%200l.933.6a1.3%201.3%200%200%200%201.4%200l.933-.6a1.3%201.3%200%200%201%201.4%200l.934.6a1.3%201.3%200%200%200%201.4%200l.933-.6A1.3%201.3%200%200%201%2019%202a1%201%200%200%201%201%201v18a1%201%200%200%201-1%201%201.3%201.3%200%200%201-.7-.2l-.933-.6a1.3%201.3%200%200%200-1.4%200l-.934.6a1.3%201.3%200%200%201-1.4%200l-.933-.6a1.3%201.3%200%200%200-1.4%200l-.933.6a1.3%201.3%200%200%201-1.4%200l-.934-.6a1.3%201.3%200%200%200-1.4%200l-.933.6a1.3%201.3%200%200%201-.7.2%201%201%200%200%201-1-1z%22%2F%3E%3C%2Fsvg%3E"); }
+.icon-cards { background-image: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2224%22%20height%3D%2224%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%232D6A4F%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M2%209a3%203%200%200%201%200%206v2a2%202%200%200%200%202%202h16a2%202%200%200%200%202-2v-2a3%203%200%200%201%200-6V7a2%202%200%200%200-2-2H4a2%202%200%200%200-2%202Z%22%2F%3E%3Cpath%20d%3D%22M13%205v2%22%2F%3E%3Cpath%20d%3D%22M13%2017v2%22%2F%3E%3Cpath%20d%3D%22M13%2011v2%22%2F%3E%3C%2Fsvg%3E"); }
+.icon-coupons { background-image: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2224%22%20height%3D%2224%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%232D6A4F%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M2%209a3%203%200%201%201%200%206v2a2%202%200%200%200%202%202h16a2%202%200%200%200%202-2v-2a3%203%200%201%201%200-6V7a2%202%200%200%200-2-2H4a2%202%200%200%200-2%202Z%22%2F%3E%3Cpath%20d%3D%22M9%209h.01%22%2F%3E%3Cpath%20d%3D%22m15%209-6%206%22%2F%3E%3Cpath%20d%3D%22M15%2015h.01%22%2F%3E%3C%2Fsvg%3E"); }
+.icon-points { background-image: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2224%22%20height%3D%2224%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%232D6A4F%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M11.525%202.295a.53.53%200%200%201%20.95%200l2.31%204.679a2.123%202.123%200%200%200%201.595%201.16l5.166.756a.53.53%200%200%201%20.294.904l-3.736%203.638a2.123%202.123%200%200%200-.611%201.878l.882%205.14a.53.53%200%200%201-.771.56l-4.618-2.428a2.122%202.122%200%200%200-1.973%200L6.396%2021.01a.53.53%200%200%201-.77-.56l.881-5.139a2.122%202.122%200%200%200-.611-1.879L2.16%209.795a.53.53%200%200%201%20.294-.906l5.165-.755a2.122%202.122%200%200%200%201.597-1.16z%22%2F%3E%3C%2Fsvg%3E"); }
+.icon-invite { background-image: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2224%22%20height%3D%2224%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%232D6A4F%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M12%207v14%22%2F%3E%3Cpath%20d%3D%22M20%2011v8a2%202%200%200%201-2%202H6a2%202%200%200%201-2-2v-8%22%2F%3E%3Cpath%20d%3D%22M7.5%207a1%201%200%200%201%200-5A4.8%208%200%200%201%2012%207a4.8%208%200%200%201%204.5-5%201%201%200%200%201%200%205%22%2F%3E%3Crect%20x%3D%223%22%20y%3D%227%22%20width%3D%2218%22%20height%3D%224%22%20rx%3D%221%22%2F%3E%3C%2Fsvg%3E"); }
+.icon-contact { background-image: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2224%22%20height%3D%2224%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%232D6A4F%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M3%2011h3a2%202%200%200%201%202%202v3a2%202%200%200%201-2%202H5a2%202%200%200%201-2-2v-5Zm0%200a9%209%200%201%201%2018%200m0%200v5a2%202%200%200%201-2%202h-1a2%202%200%200%201-2-2v-3a2%202%200%200%201%202-2h3Z%22%2F%3E%3Cpath%20d%3D%22M21%2016v2a4%204%200%200%201-4%204h-5%22%2F%3E%3C%2Fsvg%3E"); }
+.icon-market { background-image: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2224%22%20height%3D%2224%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%232D6A4F%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M15%2021v-5a1%201%200%200%200-1-1h-4a1%201%200%200%200-1%201v5%22%2F%3E%3Cpath%20d%3D%22M17.774%2010.31a1.12%201.12%200%200%200-1.549%200%202.5%202.5%200%200%201-3.451%200%201.12%201.12%200%200%200-1.548%200%202.5%202.5%200%200%201-3.452%200%201.12%201.12%200%200%200-1.549%200%202.5%202.5%200%200%201-3.77-3.248l2.889-4.184A2%202%200%200%201%207%202h10a2%202%200%200%201%201.653.873l2.895%204.192a2.5%202.5%200%200%201-3.774%203.244%22%2F%3E%3Cpath%20d%3D%22M4%2010.95V19a2%202%200%200%200%202%202h12a2%202%200%200%200%202-2v-8.05%22%2F%3E%3C%2Fsvg%3E"); }
+.icon-user { background-image: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2224%22%20height%3D%2224%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%23fff%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M19%2021v-2a4%204%200%200%200-4-4H9a4%204%200%200%200-4%204v2%22%2F%3E%3Ccircle%20cx%3D%2212%22%20cy%3D%227%22%20r%3D%224%22%2F%3E%3C%2Fsvg%3E"); }
+
+/* --- 新增：首页 / 打卡页 / 公告 / 空态 --- */
+.icon-book { background-image: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2224%22%20height%3D%2224%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%232D6A4F%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M4%2019.5v-15A2.5%202.5%200%200%201%206.5%202H20v20H6.5a2.5%202.5%200%200%201%200-5H20%22%2F%3E%3C%2Fsvg%3E"); }
+.icon-ticket { background-image: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2224%22%20height%3D%2224%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%232D6A4F%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M2%209a3%203%200%200%201%200%206v2a2%202%200%200%200%202%202h16a2%202%200%200%200%202-2v-2a3%203%200%200%201%200-6V7a2%202%200%200%200-2-2H4a2%202%200%200%200-2%202Z%22%2F%3E%3Cpath%20d%3D%22M13%205v2%22%2F%3E%3Cpath%20d%3D%22M13%2017v2%22%2F%3E%3Cpath%20d%3D%22M13%2011v2%22%2F%3E%3C%2Fsvg%3E"); }
+.icon-wifi { background-image: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2224%22%20height%3D%2224%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%232D6A4F%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M12%2020h.01%22%2F%3E%3Cpath%20d%3D%22M2%208.82a15%2015%200%200%201%2020%200%22%2F%3E%3Cpath%20d%3D%22M5%2012.859a10%2010%200%200%201%2014%200%22%2F%3E%3Cpath%20d%3D%22M8.5%2016.429a5%205%200%200%201%207%200%22%2F%3E%3C%2Fsvg%3E"); }
+.icon-bluetooth { background-image: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2224%22%20height%3D%2224%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%232D6A4F%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22m7%207%2010%2010-5%205V2l5%205L7%2017%22%2F%3E%3C%2Fsvg%3E"); }
+.icon-megaphone { background-image: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2224%22%20height%3D%2224%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%238A6D3B%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22m3%2011%2018-5v12L3%2014v-3z%22%2F%3E%3Cpath%20d%3D%22M11.6%2016.8a3%203%200%201%201-5.8-1.6%22%2F%3E%3C%2Fsvg%3E"); }
+.icon-map-pin { background-image: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2224%22%20height%3D%2224%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%232D6A4F%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M20%2010c0%204.993-5.539%2010.193-7.399%2011.799a1%201%200%200%201-1.202%200C9.539%2020.193%204%2014.993%204%2010a8%208%200%200%201%2016%200%22%2F%3E%3Ccircle%20cx%3D%2212%22%20cy%3D%2210%22%20r%3D%223%22%2F%3E%3C%2Fsvg%3E"); }
+.icon-leaf { background-image: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2224%22%20height%3D%2224%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%238C9BA5%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M11%2020A7%207%200%200%201%209.8%206.1C15.5%205%2017%204.48%2019.2%202.96a1%201%200%200%201%201.8.66c0%204.36-.75%206.4-3.3%208.3C15%2014%2012%2015%2011%2020Z%22%2F%3E%3Cpath%20d%3D%22M2%2021c0-3%201.85-5.36%205.08-6%22%2F%3E%3C%2Fsvg%3E"); }
+.icon-book-open { background-image: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2224%22%20height%3D%2224%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%238C9BA5%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M12%207v14%22%2F%3E%3Cpath%20d%3D%22M3%2018a1%201%200%200%201-1-1V4a1%201%200%200%201%201-1h5a4%204%200%200%201%204%204%204%204%200%200%201%204-4h5a1%201%200%200%201%201%201v13a1%201%200%200%201-1%201h-6a3%203%200%200%200-3%203%203%203%200%200%200-3-3z%22%2F%3E%3C%2Fsvg%3E"); }

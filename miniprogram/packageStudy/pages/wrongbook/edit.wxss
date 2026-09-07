@@ -1,21 +1,21 @@
 .page { padding-bottom: 48rpx; }
 .card {
   margin: 24rpx;
-  background: #fff;
+  background: var(--color-bg-card);
   border-radius: 28rpx;
   padding: 28rpx;
-  box-shadow: 0 4rpx 24rpx rgba(28, 43, 32, 0.06);
+  box-shadow: var(--shadow-sm);
 }
 .label {
   margin-top: 24rpx;
   margin-bottom: 10rpx;
-  color: #2D6A4F;
+  color: var(--color-text-brand);
   font-weight: 600;
   font-size: 24rpx;
 }
 .label:first-child { margin-top: 0; }
 .picker, .input {
-  background: #F4FAF6;
+  background: var(--color-bg-page);
   border-radius: 16rpx;
   padding: 20rpx 24rpx;
   min-height: 88rpx;
@@ -23,7 +23,7 @@
   width: 100%;
 }
 .textarea {
-  background: #F4FAF6;
+  background: var(--color-bg-page);
   border-radius: 16rpx;
   padding: 20rpx 24rpx;
   width: 100%;
@@ -32,7 +32,7 @@
 }
 .images { display: flex; flex-wrap: wrap; gap: 16rpx; }
 .img-wrap { position: relative; width: 160rpx; height: 160rpx; }
-.img { width: 160rpx; height: 160rpx; border-radius: 16rpx; background: #E8ECEA; }
+.img { width: 160rpx; height: 160rpx; border-radius: 16rpx; background: var(--color-bg-sunken); }
 .del {
   position: absolute;
   right: -8rpx;
@@ -40,8 +40,8 @@
   width: 40rpx;
   height: 40rpx;
   border-radius: 50%;
-  background: #C95C5C;
-  color: #fff;
+  background: var(--color-danger);
+  color: var(--color-bg-card);
   text-align: center;
   line-height: 36rpx;
 }
@@ -49,8 +49,8 @@
   width: 160rpx;
   height: 160rpx;
   border-radius: 16rpx;
-  background: #F4FAF6;
-  color: #8C9BA5;
+  background: var(--color-bg-page);
+  color: var(--color-text-secondary);
   font-size: 64rpx;
   display: flex;
   align-items: center;
@@ -63,8 +63,8 @@
   height: 88rpx;
   line-height: 88rpx;
   text-align: center;
-  background: #D8F3DC;
-  color: #2D6A4F;
+  background: var(--color-primary-soft);
+  color: var(--color-text-brand);
   border-radius: 16rpx;
   font-weight: 600;
 }
@@ -73,12 +73,12 @@
   display: inline-block;
   margin: 0 8rpx 8rpx 0;
   padding: 6rpx 16rpx;
-  background: #F4FAF6;
+  background: var(--color-bg-page);
   color: #5C7567;
   border-radius: 20rpx;
   font-size: 22rpx;
 }
-.tag.on { background: #D8F3DC; color: #2D6A4F; }
+.tag.on { background: var(--color-primary-soft); color: var(--color-text-brand); }
 .btns { margin: 24rpx; }
 .btn {
   height: 88rpx;
@@ -87,5 +87,5 @@
   border-radius: 24rpx;
   font-weight: 600;
 }
-.btn.primary { background: #52B788; color: #fff; }
+.btn.primary { background: var(--color-primary); color: var(--color-bg-card); }
 .btn.off { opacity: 0.6; }

@@ -2,7 +2,7 @@
   min-height: 100vh;
   padding: 32rpx 32rpx 64rpx;
   box-sizing: border-box;
-  background: #F4FAF6;
+  background: var(--color-bg-page);
 }
 
 .hint {
@@ -14,10 +14,10 @@
 }
 
 .poster-wrap {
-  background: #FFFFFF;
+  background: var(--color-bg-card);
   border-radius: 24rpx;
   overflow: hidden;
-  box-shadow: 0 8rpx 28rpx rgba(45, 106, 79, 0.08);
+  box-shadow: var(--shadow-brand-soft);
 }
 
 .poster {
@@ -30,13 +30,13 @@
   margin-top: 24rpx;
   text-align: center;
   font-size: 24rpx;
-  color: #8C9BA5;
+  color: var(--color-text-secondary);
   line-height: 1.6;
   padding: 0 12rpx;
 }
 
 .tip-warn {
-  color: #8A6D3B;
+  color: var(--color-warning-fg);
   background: #FFF8E8;
   border-radius: 16rpx;
   padding: 16rpx 20rpx;
@@ -50,8 +50,8 @@
   line-height: 80rpx;
   text-align: center;
   font-size: 28rpx;
-  color: #2D6A4F;
-  background: #E8F5E9;
+  color: var(--color-text-brand);
+  background: var(--green-100);
   border-radius: 999rpx;
   font-weight: 600;
 }

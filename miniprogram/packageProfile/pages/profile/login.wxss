@@ -1,6 +1,6 @@
 .page-login {
   min-height: 100vh;
-  background: #F4FAF6;
+  background: var(--color-bg-page);
 }
 
 .welcome {
@@ -33,7 +33,7 @@
   right: 20rpx;
   top: 36rpx;
   height: 52rpx;
-  background: #1C2B20;
+  background: var(--color-text);
   border-radius: 40rpx 40rpx 18rpx 18rpx;
   clip-path: polygon(8% 70%, 22% 28%, 48% 8%, 72% 30%, 92% 68%, 100% 78%, 0 78%);
 }
@@ -43,7 +43,7 @@
   left: 28rpx;
   right: 28rpx;
   height: 6rpx;
-  background: #1C2B20;
+  background: var(--color-text);
   border-radius: 6rpx;
   opacity: 0.85;
 }
@@ -53,16 +53,16 @@
 .welcome-wave--3 { bottom: 20rpx; width: 45%; left: 27.5%; opacity: 0.35; }
 
 .welcome-name {
-  font-size: 44rpx;
+  font-size: 40rpx;
   font-weight: 800;
-  color: #1C2B20;
+  color: var(--color-text);
   letter-spacing: 2rpx;
 }
 
 .welcome-en {
   margin-top: 12rpx;
   font-size: 22rpx;
-  color: #8C9BA5;
+  color: var(--color-text-secondary);
   letter-spacing: 3rpx;
 }
 
@@ -98,8 +98,8 @@
   text-align: center;
   font-size: 30rpx;
   font-weight: 600;
-  color: #1C2B20;
-  background: #FFFFFF;
+  color: var(--color-text);
+  background: var(--color-bg-card);
   border: 2rpx solid #D5DED8;
   border-radius: 999rpx;
   box-sizing: border-box;
@@ -109,8 +109,8 @@
   width: 100%;
   margin: 24rpx 0 0;
   padding: 0;
-  background: #FFFFFF;
-  color: #1C2B20;
+  background: var(--color-bg-card);
+  color: var(--color-text);
   border: 2rpx solid #D5DED8;
   font-size: 30rpx;
   font-weight: 600;
@@ -122,7 +122,7 @@
 
 .welcome-secondary.disabled {
   opacity: 0.4;
-  color: #8C9BA5;
+  color: var(--color-text-secondary);
 }
 
 .welcome-links {
@@ -134,7 +134,7 @@
 .welcome-skip {
   text-align: center;
   font-size: 26rpx;
-  color: #8C9BA5;
+  color: var(--color-text-secondary);
 }
 
 .welcome-agree {
@@ -155,20 +155,20 @@
 }
 
 .agree-box.checked {
-  border-color: #2D6A4F;
-  background: #2D6A4F;
-  box-shadow: inset 0 0 0 6rpx #F4FAF6;
+  border-color: var(--color-text-brand);
+  background: var(--color-text-brand);
+  box-shadow: inset 0 0 0 6rpx var(--color-bg-page);
 }
 
 .agree-text {
   flex: 1;
   font-size: 22rpx;
-  color: #8C9BA5;
+  color: var(--color-text-secondary);
   line-height: 1.6;
 }
 
 .agree-link {
-  color: #2D6A4F;
+  color: var(--color-text-brand);
 }
 
 .login-loading {
@@ -182,7 +182,7 @@
 
 .loading-text {
   font-size: 28rpx;
-  color: #8C9BA5;
+  color: var(--color-text-secondary);
 }
 
 .login-panel {
@@ -196,7 +196,7 @@
   margin: 0 auto;
   border-radius: 32rpx;
   background: linear-gradient(160deg, #2D6A4F 0%, #52B788 100%);
-  color: #fff;
+  color: var(--color-bg-card);
   font-size: 56rpx;
   font-weight: 800;
   line-height: 120rpx;
@@ -206,20 +206,20 @@
   margin-top: 32rpx;
   font-size: 40rpx;
   font-weight: 800;
-  color: #1C2B20;
+  color: var(--color-text);
 }
 
 .login-desc {
   margin-top: 16rpx;
   font-size: 26rpx;
-  color: #8C9BA5;
+  color: var(--color-text-secondary);
   line-height: 1.6;
 }
 
 .login-error {
   margin-top: 24rpx;
   font-size: 24rpx;
-  color: #E07A5F;
+  color: var(--color-danger);
 }
 
 .login-btn {
@@ -229,7 +229,7 @@
 .login-note {
   margin-top: 24rpx;
   font-size: 22rpx;
-  color: #8C9BA5;
+  color: var(--color-text-secondary);
 }
 
 .setup-card {
@@ -240,13 +240,13 @@
 .setup-title {
   font-size: 34rpx;
   font-weight: 700;
-  color: #1C2B20;
+  color: var(--color-text);
 }
 
 .setup-desc {
   margin-top: 12rpx;
   font-size: 24rpx;
-  color: #8C9BA5;
+  color: var(--color-text-secondary);
   line-height: 1.5;
 }
 
@@ -273,8 +273,8 @@
   width: 128rpx;
   height: 128rpx;
   border-radius: 50%;
-  border: 4rpx solid #52B788;
-  background: #D8F3DC;
+  border: 4rpx solid var(--color-primary);
+  background: var(--color-primary-soft);
 }
 
 .avatar-placeholder {
@@ -283,22 +283,22 @@
   justify-content: center;
   font-size: 48rpx;
   font-weight: 700;
-  color: #2D6A4F;
+  color: var(--color-text-brand);
 }
 
 .avatar-placeholder--add {
   box-sizing: border-box;
   border-style: dashed;
-  background: #F4FAF6;
+  background: var(--color-bg-page);
   font-size: 64rpx;
   font-weight: 300;
-  color: #52B788;
+  color: var(--color-primary);
 }
 
 .avatar-tip {
   margin-top: 12rpx;
   font-size: 24rpx;
-  color: #52B788;
+  color: var(--color-primary);
   text-align: center;
   padding: 0 24rpx;
   line-height: 1.5;
@@ -312,17 +312,17 @@
 
 .field-label {
   font-size: 24rpx;
-  color: #8C9BA5;
+  color: var(--color-text-secondary);
   margin-bottom: 12rpx;
 }
 
 .nickname-input {
   height: 88rpx;
   padding: 0 24rpx;
-  background: #F4FAF6;
+  background: var(--color-bg-page);
   border-radius: 16rpx;
   font-size: 28rpx;
-  color: #1C2B20;
+  color: var(--color-text);
 }
 
 .goal-chips {
@@ -335,13 +335,13 @@
   padding: 14rpx 32rpx;
   border-radius: 999rpx;
   font-size: 26rpx;
-  color: #2D6A4F;
-  background: #E8F5E9;
+  color: var(--color-text-brand);
+  background: var(--green-100);
 }
 
 .goal-chip.active {
-  background: #2D6A4F;
-  color: #fff;
+  background: var(--color-text-brand);
+  color: var(--color-bg-card);
 }
 
 .setup-save {
@@ -351,7 +351,7 @@
 .setup-note {
   margin-top: 20rpx;
   font-size: 22rpx;
-  color: #8C9BA5;
+  color: var(--color-text-secondary);
 }
 
 .loading-cancel {

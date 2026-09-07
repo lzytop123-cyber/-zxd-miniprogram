@@ -3,11 +3,13 @@
     <template #header>
       <div class="header-row">
         <span>核销来源统计</span>
-        <el-select v-model="statsDays" style="width:120px" @change="loadStats">
-          <el-option label="近 7 天" :value="7" />
-          <el-option label="近 30 天" :value="30" />
-          <el-option label="近 90 天" :value="90" />
-          <el-option label="近 365 天" :value="365" />
+        <el-select v-model="statsRange" style="width:140px" @change="loadStats">
+          <el-option label="本月" value="month" />
+          <el-option label="近 7 天" value="7" />
+          <el-option label="近 30 天" value="30" />
+          <el-option label="近 90 天" value="90" />
+          <el-option label="近 365 天" value="365" />
+          <el-option label="全部（历史累计）" value="all" />
         </el-select>
       </div>
     </template>
@@ -126,14 +128,14 @@ const status = ref<string | null>(null)
 const monthAmount = ref(0)
 const monthCount = ref(0)
 const backfilling = ref(false)
-const statsDays = ref(30)
+const statsRange = ref('month')
 const stats = ref<any>({})
 const statsLoading = ref(false)
 
 async function loadStats() {
   statsLoading.value = true
   try {
-    const res = await http.get('/admin/stats/verify-by-source', { params: { days: statsDays.value } })
+    const res = await http.get('/admin/stats/verify-by-source', { params: { range: statsRange.value } })
     stats.value = res.data || {}
   } finally {
     statsLoading.value = false

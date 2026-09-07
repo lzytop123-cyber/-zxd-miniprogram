@@ -9,7 +9,7 @@
   </view>
 
   <view wx:elif="{{!reservation}}" class="empty card empty-card">
-    <view class="empty-icon">📚</view>
+    <view class="mi-glyph glyph-xl icon-book-open empty-icon"></view>
     <view class="empty-text">暂无进行中的订单</view>
     <view class="empty-hint">预约后到店开门即可</view>
     <view class="btn-primary" bindtap="goBooking">立即预定</view>
@@ -82,7 +82,7 @@
         bindtap="openDoorBle"
       >
         <view class="open-btn-icon-wrap">
-          <text class="open-btn-icon">📶</text>
+          <view class="mi-glyph icon-bluetooth open-btn-icon"></view>
         </view>
         <view class="open-btn-main">
           <view class="open-btn-title">{{opening ? '开门中…' : '蓝牙开门'}}</view>

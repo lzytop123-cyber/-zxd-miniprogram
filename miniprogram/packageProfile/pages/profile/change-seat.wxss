@@ -10,13 +10,13 @@
 
 .change-meta-strong {
   font-weight: 700;
-  color: #2D6A4F;
+  color: var(--color-text-brand);
 }
 
 .loading {
   margin: 32rpx;
   padding: 48rpx;
   text-align: center;
-  color: #8C9BA5;
+  color: var(--color-text-secondary);
   font-size: 28rpx;
 }

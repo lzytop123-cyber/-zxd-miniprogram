@@ -302,7 +302,7 @@
 .win {
   position: absolute;
   box-sizing: border-box;
-  background: #ffffff;
+  background: var(--color-bg-card);
 }
 
 .win--h {
@@ -466,14 +466,14 @@
   align-items: center;
   justify-content: center;
   border: 2rpx solid transparent;
-  background: #ffffff;
+  background: var(--color-bg-card);
   box-shadow: 0 3rpx 8rpx rgba(70, 86, 76, 0.08);
   transition: transform 0.12s ease, box-shadow 0.12s ease, border-color 0.12s ease;
 }
 
 .seat-chip.available {
   background: linear-gradient(180deg, #6EC895 0%, #52B788 100%);
-  border-color: #3F9A6E;
+  border-color: var(--green-500);
   box-shadow: 0 3rpx 10rpx rgba(45, 106, 79, 0.28);
   animation: seat-pulse 1.8s ease-in-out infinite;
 }
@@ -497,7 +497,7 @@
 
 .seat-chip.is-selected {
   background: linear-gradient(180deg, #2D6A4F 0%, #1B4332 100%);
-  border: 3rpx solid #FFFFFF;
+  border: 3rpx solid var(--color-bg-card);
   box-shadow: 0 0 0 5rpx rgba(45, 106, 79, 0.35), 0 4rpx 12rpx rgba(27, 67, 50, 0.35);
   transform: scale(1.16);
   animation: none;
@@ -508,7 +508,7 @@
   font-weight: 700;
   line-height: 1;
   pointer-events: none;
-  color: #FFFFFF;
+  color: var(--color-bg-card);
   text-shadow: 0 1rpx 1rpx rgba(0, 0, 0, 0.12);
 }
 
@@ -523,7 +523,7 @@
 }
 
 .seat-chip-label--active {
-  color: #FFFFFF;
+  color: var(--color-bg-card);
 }
 
 @keyframes seat-pulse {
