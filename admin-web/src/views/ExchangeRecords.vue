@@ -13,6 +13,7 @@
             <el-option label="待处理" value="pending" />
             <el-option label="已退款" value="refunded" />
           </el-select>
+          <el-button style="margin-left:8px" @click="backfillPrices" :loading="backfilling">回填金额</el-button>
           <el-button type="primary" style="margin-left:8px" @click="search">查询</el-button>
         </div>
       </div>
@@ -52,6 +53,7 @@
 
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
+import { ElMessage } from 'element-plus'
 import http from '../api/http'
 
 const list = ref<any[]>([])
@@ -62,6 +64,7 @@ const userId = ref<number | null>(null)
 const status = ref<string | null>(null)
 const monthAmount = ref(0)
 const monthCount = ref(0)
+const backfilling = ref(false)
 
 async function load() {
   loading.value = true
@@ -76,6 +79,19 @@ async function load() {
     monthCount.value = res.data.month_verify_count ?? 0
   } finally {
     loading.value = false
+  }
+}
+
+async function backfillPrices() {
+  backfilling.value = true
+  try {
+    const res = await http.post('/admin/exchange-records/backfill-prices')
+    ElMessage.success(res.message || '回填完成')
+    await load()
+  } catch (e: any) {
+    ElMessage.error(e?.message || '回填失败')
+  } finally {
+    backfilling.value = false
   }
 }
 

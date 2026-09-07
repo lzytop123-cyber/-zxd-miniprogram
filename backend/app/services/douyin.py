@@ -185,6 +185,20 @@ class DouyinService:
         from app.services.coupon_price import extract_deal_price
 
         deal_price = extract_deal_price(douyin_raw=data)
+        # prepare 常缺 amount：补一次券状态查询（官方 amount 更全）
+        if deal_price is None and encrypted_code:
+            try:
+                cert_detail = await DouyinService._get_certificate(client, encrypted_code)
+                if cert_detail:
+                    data["_certificate_get"] = cert_detail
+                    deal_price = extract_deal_price(douyin_raw={"certificate": cert_detail})
+                    amount = cert_detail.get("amount") if isinstance(cert_detail.get("amount"), dict) else None
+                    if amount:
+                        # 供落库/回填
+                        pass
+            except Exception as e:
+                logger.warning("douyin certificate.get failed: %s", e)
+
         ticket_data = {
             "dealId": deal_id,
             "dealTitle": title,
@@ -193,8 +207,11 @@ class DouyinService:
             "product_id": sku.get("product_id"),
             "expire_time": expire_raw,
             "receiptEndDate": str(expire_date) if expire_date else None,
+            "encrypted_code": encrypted_code,
         }
         amount = cert.get("amount") if isinstance(cert.get("amount"), dict) else {}
+        if not amount and isinstance(data.get("_certificate_get"), dict):
+            amount = data["_certificate_get"].get("amount") or {}
         if amount:
             ticket_data["amount"] = amount
         if deal_price is not None:
@@ -209,6 +226,23 @@ class DouyinService:
             "raw_prepare": data,
             "deal_price": float(deal_price) if deal_price is not None else None,
         }
+
+    @staticmethod
+    async def _get_certificate(client: httpx.AsyncClient, encrypted_code: str) -> dict | None:
+        """券状态查询：返回 certificate（含 amount，单位分）。"""
+        token = await DouyinService._get_client_token(client)
+        resp = await client.get(
+            f"{_API_BASE}/goodlife/v1/fulfilment/certificate/get/",
+            headers={"access-token": token, "content-type": "application/json"},
+            params={"encrypted_code": quote(encrypted_code, safe="")},
+        )
+        payload = resp.json()
+        data = payload.get("data") or {}
+        if data.get("error_code") not in (0, None):
+            logger.warning("certificate.get error: %s", _api_error(payload, fallback="查询失败"))
+            return None
+        cert = data.get("certificate")
+        return cert if isinstance(cert, dict) else None
 
     @staticmethod
     async def _verify_with_client(client: httpx.AsyncClient, prepared: dict) -> dict:

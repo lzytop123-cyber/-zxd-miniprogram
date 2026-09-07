@@ -1681,6 +1681,44 @@ def list_exchange_records_admin(
     )
 
 
+@router.post("/exchange-records/backfill-prices", response_model=ResponseModel)
+def backfill_exchange_prices(
+    admin: AdminUser = Depends(get_current_admin),
+    db: Session = Depends(get_db),
+):
+    """从 meituan_raw / 核销 result 回填缺失的 deal_price（含历史抖音官方单）。"""
+    from app.services.coupon_price import extract_deal_price
+
+    rows = db.scalars(
+        select(MeituanOrder).where(
+            MeituanOrder.status == MeituanOrderStatus.verified,
+            MeituanOrder.deal_price.is_(None),
+        ).limit(3000)
+    ).all()
+    updated = 0
+    for row in rows:
+        raw = row.meituan_raw if isinstance(row.meituan_raw, dict) else None
+        price = extract_deal_price(meituan_raw=raw)
+        if price is None:
+            continue
+        row.deal_price = price
+        if isinstance(raw, dict):
+            raw = dict(raw)
+            raw["deal_price"] = float(price)
+            row.meituan_raw = raw
+        updated += 1
+    if updated:
+        log_admin_action(
+            db,
+            admin,
+            "exchange_price_backfill",
+            target_type="meituan_order",
+            detail=f"updated={updated}",
+        )
+        db.commit()
+    return ResponseModel(message=f"已回填 {updated} 条", data={"updated": updated, "scanned": len(rows)})
+
+
 @router.get("/wallet-logs", response_model=ResponseModel)
 def list_wallet_logs_admin(
     page: int = Query(1, ge=1),

@@ -233,17 +233,27 @@ async def _exchange(
         ticket_data=ticket_data,
         prepared=prepared,
         douyin_raw=douyin_raw,
+        consume_result=consume_result,
     )
+    if order.deal_price is None and douyin_raw and douyin_raw.get("deal_price") is not None:
+        from decimal import Decimal
+
+        try:
+            order.deal_price = Decimal(str(douyin_raw["deal_price"]))
+        except Exception:
+            pass
     raw_payload: dict = {
         "result": consume_result,
         "ticketData": ticket_data,
         "voucherExpireDate": str(voucher_expire) if voucher_expire else None,
         "payAmount": prepared.get("payAmount"),
         "deal_price": float(order.deal_price) if order.deal_price is not None else None,
+        "platform": "douyin_official" if douyin_raw else "yunlaoban",
     }
     if douyin_raw:
-        # 保留抖音 prepare 原文，便于对账/回填金额
         raw_payload["raw_prepare"] = douyin_raw.get("raw_prepare") or douyin_raw
+        if douyin_raw.get("encrypted_code"):
+            raw_payload["encrypted_code"] = douyin_raw.get("encrypted_code")
     order.meituan_raw = raw_payload
     db.commit()
     db.refresh(card)
