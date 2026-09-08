@@ -18,7 +18,12 @@ from app.db.session import get_db
 from app.models import MarketFavorite, MarketListing, MarketListingStatus, Store, User
 from app.schemas.common import ResponseModel
 from app.services import market_service as svc
-from app.services.content_safety import check_listing_text, wechat_img_sec_check
+from app.services.content_safety import (
+    check_listing_text,
+    safety_to_audit_dict,
+    wechat_img_sec_check,
+    wechat_msg_sec_check,
+)
 from app.services.market_seed import ensure_market_categories
 
 router = APIRouter(prefix="/market", tags=["上岸集市"])
@@ -221,7 +226,11 @@ async def upload_market_image(
     (UPLOAD_DIR / filename).write_bytes(content)
     path = f"/static/market/{filename}"
     return ResponseModel(
-        data={"path": path, "url": public_static_url(path)}
+        data={
+            "path": path,
+            "url": public_static_url(path),
+            "content_security": safety_to_audit_dict(safety),
+        }
     )
 
 
@@ -232,6 +241,7 @@ async def create_listing(
     db: Session = Depends(get_db),
 ):
     _ensure_enabled()
+    safety = None
     if body.submit:
         safety = await check_listing_text(
             db, openid=user.openid, title=body.title, description=body.description
@@ -251,7 +261,10 @@ async def create_listing(
         copyright_declared=body.copyright_declared,
         submit=body.submit,
     )
-    return ResponseModel(message="已创建", data=svc.listing_to_dict(db, listing, viewer=user))
+    data = svc.listing_to_dict(db, listing, viewer=user)
+    if safety is not None:
+        data["content_security"] = safety_to_audit_dict(safety)
+    return ResponseModel(message="已创建", data=data)
 
 
 @router.put("/listings/{listing_id}", response_model=ResponseModel)
@@ -287,7 +300,40 @@ async def submit_listing(
     if not safety.ok:
         raise HTTPException(status_code=400, detail=safety.reason or "内容未通过安全检测")
     listing = svc.submit_listing(db, user, listing_id)
-    return ResponseModel(message="已提交审核", data=svc.listing_to_dict(db, listing, viewer=user))
+    data = svc.listing_to_dict(db, listing, viewer=user)
+    data["content_security"] = safety_to_audit_dict(safety)
+    return ResponseModel(message="已提交审核", data=data)
+
+
+@router.post("/security-selfcheck", response_model=ResponseModel)
+async def security_selfcheck(
+    user: User = Depends(get_current_user),
+):
+    """审核自检：真实调用微信 msgSecCheck，返回微信原始结果便于录屏举证。"""
+    _ensure_enabled()
+    if not settings.wx_content_security_enabled:
+        raise HTTPException(
+            status_code=400,
+            detail="服务器未开启 WX_CONTENT_SECURITY_ENABLED，请先在后端 .env 设为 true 并重启",
+        )
+    sample = "上岸集市内容安全自检：正常学习资料分享测试文案"
+    msg = await wechat_msg_sec_check(openid=user.openid, content=sample)
+    # 1x1 PNG，用于验证 imgSecCheck 通路（体积极小）
+    tiny_png = (
+        b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01"
+        b"\x08\x02\x00\x00\x00\x90wS\xde\x00\x00\x00\x0cIDATx\x9cc\xf8\x0f\x00"
+        b"\x00\x01\x01\x00\x05\x18\xd8N\x00\x00\x00\x00IEND\xaeB`\x82"
+    )
+    img = await wechat_img_sec_check(image_bytes=tiny_png, filename="selfcheck.png")
+    return ResponseModel(
+        message="内容安全自检完成",
+        data={
+            "enabled": True,
+            "note": "集市图片使用 imgSecCheck；文案使用 msgSecCheck。音视频未使用故不接 mediaCheckAsync。",
+            "msgSecCheck": safety_to_audit_dict(msg),
+            "imgSecCheck": safety_to_audit_dict(img),
+        },
+    )
 
 
 @router.post("/listings/{listing_id}/off", response_model=ResponseModel)
