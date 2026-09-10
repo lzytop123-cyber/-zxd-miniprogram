@@ -10,7 +10,7 @@
     </block>
 
     <block wx:elif="{{loginState === 'loading'}}">
-      <view class="avatar avatar-placeholder">岛</view>
+      <view class="avatar avatar-placeholder"><text class="avatar-glyph">岛</text></view>
       <view class="nickname">加载中...</view>
     </block>
 
@@ -25,35 +25,45 @@
           src="{{avatarDisplay}}"
           mode="aspectFill"
         />
-        <view wx:else class="avatar avatar-placeholder">岛</view>
+        <view wx:else class="avatar avatar-placeholder"><text class="avatar-glyph">岛</text></view>
       </button>
       <view class="nickname">{{user.nickname}}</view>
       <view class="title-badge">{{user.title || '小白'}}</view>
-
-      <view class="id-row" bindtap="copyUserId">
-        <text class="id-label">学号</text>
-        <text class="id-val">#{{user.id}}</text>
-        <text class="id-copy">复制</text>
-      </view>
-
-      <view class="phone-line" wx:if="{{user.phone}}">手机 {{user.phone}}</view>
-      <view class="phone-line muted" wx:else>未绑定手机</view>
-
-      <view class="stats-row">
-        <view class="stat-pill">
-          <view class="stat-val">¥{{user.balance}}</view>
-          <view class="stat-key">余额</view>
-        </view>
-        <view class="stat-pill">
-          <view class="stat-val">{{user.total_points}}</view>
-          <view class="stat-key">积分</view>
-        </view>
-      </view>
 
       <view class="edit-row" wx:if="{{avatarUploading}}">
         <view class="btn-outline small">头像更新中...</view>
       </view>
     </block>
+  </view>
+
+  <!-- 余额 / 积分 双入口卡（可点跳钱包/积分明细） -->
+  <view class="asset-row" wx:if="{{loginState === 'ready' && user}}">
+    <view class="asset-pill" hover-class="asset-pill-hover" bindtap="go" data-url="{{menuUrls.wallet}}">
+      <view class="asset-val">¥{{user.balance}}</view>
+      <view class="asset-key">余额 ›</view>
+    </view>
+    <view class="asset-pill" hover-class="asset-pill-hover" bindtap="go" data-url="{{menuUrls.points}}">
+      <view class="asset-val">{{user.total_points}}</view>
+      <view class="asset-key">积分 ›</view>
+    </view>
+  </view>
+
+  <!-- 资料信息（学号 + 手机号），弱视觉存在 -->
+  <view class="info-row" wx:if="{{loginState === 'ready' && user}}">
+    <view class="info-item" bindtap="copyUserId">
+      <text class="info-key">学号</text>
+      <text class="info-val">#{{user.id}}</text>
+      <text class="info-action">复制</text>
+    </view>
+    <view class="info-item" wx:if="{{user.phone}}">
+      <text class="info-key">手机</text>
+      <text class="info-val">{{user.phone}}</text>
+    </view>
+    <view class="info-item info-item--action" wx:else bindtap="goEdit">
+      <text class="info-key">手机</text>
+      <text class="info-val muted">未绑定</text>
+      <text class="info-action">去绑定 ›</text>
+    </view>
   </view>
 
   <view class="goal-card card" wx:if="{{loginState === 'ready' && user}}">
@@ -83,9 +93,9 @@
       <view class="menu-icon"><view class="mi-glyph icon-cards"></view></view>
       <text>我的期限卡</text>
     </view>
-    <view class="menu-item" hover-class="menu-item-hover" bindtap="go" data-url="{{menuUrls.coupons}}">
-      <view class="menu-icon"><view class="mi-glyph icon-coupons"></view></view>
-      <text>优惠券</text>
+    <view class="menu-item" hover-class="menu-item-hover" bindtap="go" data-url="{{menuUrls.wrongbook}}">
+      <view class="menu-icon"><view class="mi-glyph icon-book-open"></view></view>
+      <text>错题本</text>
     </view>
   </view>
 

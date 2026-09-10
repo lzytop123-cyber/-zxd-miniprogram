@@ -92,14 +92,27 @@
 }
 
 .avatar-placeholder {
+  font-size: 48rpx;
+  font-weight: 700;
+  color: var(--color-text-brand);
+  border-color: var(--color-primary);
+  box-sizing: border-box;
+  text-align: center;
+  /* content 高度 = 128 - 4*2 border = 120rpx；line-height 匹配让文字天然垂直居中 */
+  line-height: 120rpx;
+}
+
+/* guest 场景内含图标，改回 flex 居中 */
+.avatar-placeholder.guest {
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 48rpx;
-  font-weight: 700;
   line-height: 1;
-  color: var(--color-text-brand);
-  border-color: var(--color-primary);
+}
+
+.avatar-glyph {
+  display: inline;
+  line-height: 120rpx;
 }
 
 .setup-card .avatar {
@@ -145,8 +158,8 @@
 .profile-header {
   position: relative;
   overflow: hidden;
-  padding: 48rpx 32rpx 52rpx;
-  border-radius: 0 0 40rpx 40rpx;
+  padding: 40rpx 32rpx 44rpx;
+  border-radius: 0 0 32rpx 32rpx;
   text-align: center;
   color: var(--color-bg-card);
   background:
@@ -213,33 +226,82 @@
   opacity: 0.75;
 }
 
-.stats-row {
-  display: flex;
-  justify-content: center;
-  gap: 24rpx;
-  margin-top: 32rpx;
-}
-
-.stat-pill {
-  background: rgba(255, 255, 255, 0.15);
-  border-radius: 24rpx;
-  padding: 20rpx 40rpx;
-  min-width: 160rpx;
-}
-
-.stat-val {
-  font-size: 32rpx;
-  font-weight: 700;
-}
-
-.stat-key {
-  font-size: 22rpx;
-  opacity: 0.85;
-  margin-top: 4rpx;
-}
-
 .edit-row {
   margin-top: 20rpx;
+}
+
+/* 头图下方：余额 / 积分 双入口卡 */
+.asset-row {
+  display: flex;
+  gap: 16rpx;
+  margin: -28rpx 24rpx 0;
+  position: relative;
+  z-index: 2;
+}
+
+.asset-pill {
+  flex: 1;
+  padding: 24rpx 28rpx;
+  border-radius: 24rpx;
+  background: var(--color-bg-card);
+  box-shadow: var(--shadow-sm);
+  transition: transform 0.12s ease;
+}
+
+.asset-pill-hover {
+  background: var(--color-bg-page);
+  transform: scale(0.98);
+}
+
+.asset-val {
+  font-size: 34rpx;
+  font-weight: 800;
+  color: var(--color-text);
+  line-height: 1.1;
+}
+
+.asset-key {
+  margin-top: 6rpx;
+  font-size: 22rpx;
+  color: var(--color-primary);
+  font-weight: 600;
+}
+
+/* 资料信息条：学号 + 手机号，弱视觉 */
+.info-row {
+  display: flex;
+  gap: 24rpx;
+  margin: 20rpx 32rpx 0;
+  padding: 0 4rpx;
+}
+
+.info-item {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 10rpx;
+  font-size: 22rpx;
+  color: var(--color-text-secondary);
+}
+
+.info-key {
+  color: var(--color-text-secondary);
+  opacity: 0.7;
+}
+
+.info-val {
+  color: var(--color-text);
+  font-weight: 600;
+  letter-spacing: 0.5rpx;
+}
+
+.info-val.muted {
+  color: var(--color-text-secondary);
+  font-weight: 500;
+}
+
+.info-action {
+  color: var(--color-primary);
+  font-weight: 600;
 }
 
 .btn-outline.small {
@@ -253,43 +315,38 @@
 
 .menu-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 0;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8rpx 4rpx;
   margin: 0 24rpx;
+  padding: 20rpx 8rpx;
 }
 
 .menu-item {
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
-  padding: 36rpx 16rpx;
-  font-size: 26rpx;
+  justify-content: flex-start;
+  padding: 16rpx 8rpx;
+  font-size: 22rpx;
   color: var(--color-text);
-  transition: background 0.15s ease;
-}
-
-.menu-grid .menu-item:nth-child(-n + 2) {
-  border-bottom: 2rpx solid var(--color-border);
-}
-
-.menu-item:nth-child(odd) {
-  border-right: 2rpx solid var(--color-border);
+  transition: background 0.15s ease, transform 0.12s ease;
+  border-radius: 16rpx;
 }
 
 .menu-item-hover {
   background: var(--color-bg-page);
+  transform: scale(0.96);
 }
 
 .menu-icon {
-  width: 84rpx;
-  height: 84rpx;
-  border-radius: 50%;
+  width: 72rpx;
+  height: 72rpx;
+  border-radius: 24rpx;
   background: var(--green-100);
   display: flex;
   align-items: center;
   justify-content: center;
-  margin-bottom: 14rpx;
+  margin-bottom: 10rpx;
 }
 
 .phone-btn {

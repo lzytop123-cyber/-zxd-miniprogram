@@ -2,8 +2,20 @@ const { request } = require('../../utils/request')
 const { handleTabScroll } = require('../../utils/tabbar')
 const { syncTabBar, isStudyAssistantEnabled, leaveStudyAssistantIfDisabled } = require('../../utils/features')
 const { enableShareMenu, shareAppMessage, shareTimeline } = require('../../utils/share')
+const { resolveStaticUrl } = require('../../config')
 const { resolveImageForDisplay } = require('../../utils/media')
 const routes = require('../../utils/routes')
+
+/** 排行榜头像：优先下载到本地；失败时回退 HTTPS/完整 URL，避免被吞成空占位 */
+async function resolveLeaderboardAvatar(url) {
+  if (!url) return ''
+  const fallback = resolveStaticUrl(url) || url
+  try {
+    return (await resolveImageForDisplay(url)) || fallback
+  } catch (err) {
+    return fallback
+  }
+}
 
 const WB_STATUS_FILTERS = [
   { value: null, label: '全部' },
@@ -142,11 +154,14 @@ Page({
   loadLeaderboard(options = {}) {
     const { force = false } = options
     const params = this.data.storeId ? `?store_id=${this.data.storeId}` : ''
-    return request({ url: `/report/leaderboard${params}`, silent: true, force }).then((leaderboard) => {
-      const list = (leaderboard || []).map((item) => ({
-        ...item,
-        time_label: formatStudyMinutes(item.total_minutes),
-      }))
+    return request({ url: `/report/leaderboard${params}`, silent: true, force }).then(async (leaderboard) => {
+      const list = await Promise.all(
+        (leaderboard || []).map(async (item) => ({
+          ...item,
+          time_label: formatStudyMinutes(item.total_minutes),
+          avatar_url: await resolveLeaderboardAvatar(item.avatar_url),
+        }))
+      )
       this.setData({ leaderboard: list })
     }).catch(() => {})
   },

@@ -127,11 +127,15 @@
       <view class="member-info">
         <view class="member-hi">{{user ? (user.nickname) : '欢迎来到知行岛'}}</view>
         <view class="member-meta">
-          <text class="member-badge">{{user.title || '新同学'}}</text>
-          <text class="member-meta-dot">·</text>
-          <text class="member-summary-item" catchtap="goPoints">积分 {{user.total_points || 0}}</text>
-          <text class="member-meta-dot">·</text>
-          <text class="member-summary-item" catchtap="goPackages">期限卡 {{user ? cardCount : 0}}张</text>
+          <view class="member-pill title">{{user.title || '新同学'}}</view>
+          <view class="member-pill data" catchtap="goPoints">
+            <text class="pill-val">{{user.total_points || 0}}</text>
+            <text class="pill-key">积分</text>
+          </view>
+          <view class="member-pill data" catchtap="goPackages">
+            <text class="pill-val">{{user ? cardCount : 0}}</text>
+            <text class="pill-key">期限卡</text>
+          </view>
         </view>
       </view>
       <view class="member-arrow">›</view>
@@ -149,9 +153,9 @@
         <view class="member-action-icon"><view class="mi-glyph icon-orders"></view></view>
         <text>我的订单</text>
       </view>
-      <view class="member-action" bindtap="showWifi">
-        <view class="member-action-icon"><view class="mi-glyph icon-wifi"></view></view>
-        <text>WIFI连接</text>
+      <view class="member-action" bindtap="goWrongbook">
+        <view class="member-action-icon"><view class="mi-glyph icon-book-open"></view></view>
+        <text>错题本</text>
       </view>
     </view>
   </view>

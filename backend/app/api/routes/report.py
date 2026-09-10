@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user
 from app.core.prod import block_mock_in_production
+from app.core.static_url import public_static_path
 from app.db.session import get_db
 from app.models import PeriodCard, RechargeOrder, Reservation, Seat, StudyStat, User, WalletLog
 from app.schemas.common import ResponseModel
@@ -133,6 +134,7 @@ def leaderboard(
                 total_minutes=int(row.total_minutes or 0),
                 session_count=int(row.session_count or 0),
                 is_self=u.id == user.id if u else False,
+                avatar_url=public_static_path(u.avatar_url) if u else None,
             )
         )
     return ResponseModel(data=items)

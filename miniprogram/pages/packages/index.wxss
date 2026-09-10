@@ -73,20 +73,20 @@
   background: var(--color-primary);
 }
 
-/* ============ 我的期限卡紧凑条 ============ */
+/* ============ 我的期限卡（section 风格，去卡片外壳） ============ */
 .my-strip {
-  margin: 16rpx 24rpx 0;
-  padding: 20rpx 24rpx;
-  background: var(--color-bg-card);
-  border-radius: 24rpx;
-  box-shadow: var(--shadow-card);
+  margin: 20rpx 24rpx 0;
+  padding: 0;
+  background: transparent;
+  box-shadow: none;
 }
 
 .my-strip-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 16rpx;
+  padding: 0 4rpx;
+  margin-bottom: 12rpx;
 }
 
 .my-strip-title {
@@ -96,15 +96,15 @@
 }
 
 .my-strip-label {
-  font-size: 28rpx;
+  font-size: 26rpx;
   font-weight: 700;
-  color: var(--color-text-brand);
+  color: var(--color-text);
 }
 
 .my-strip-count {
   font-size: 22rpx;
-  color: var(--color-primary);
-  font-weight: 600;
+  color: var(--color-text-secondary);
+  font-weight: 500;
 }
 
 .my-strip-more,
@@ -114,11 +114,13 @@
   font-weight: 600;
 }
 
+/* 空态 / 未登录：无卡片外壳，纯文字行 */
 .my-strip--empty,
 .my-strip--guest {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  padding: 4rpx;
   font-size: 26rpx;
   color: var(--color-text-secondary);
 }
@@ -134,14 +136,20 @@
   padding-bottom: 4rpx;
 }
 
+/* 已有卡 chip：极浅底 + 淡边框，弱化视觉重量 */
 .my-chip {
   display: inline-block;
-  width: 280rpx;
+  width: 260rpx;
   padding: 20rpx;
   border-radius: 20rpx;
-  background: linear-gradient(135deg, #E8F5E9 0%, #D8F3DC 100%);
+  background: var(--color-bg-card);
+  border: 1rpx solid var(--color-primary-soft);
   vertical-align: top;
   white-space: normal;
+}
+
+.my-chip:active {
+  background: var(--color-bg-page);
 }
 
 .my-chip-type {
@@ -149,7 +157,7 @@
   font-size: 20rpx;
   padding: 2rpx 12rpx;
   border-radius: 999rpx;
-  background: rgba(45, 106, 79, 0.12);
+  background: var(--color-primary-soft);
   color: var(--color-text-brand);
 }
 
@@ -285,23 +293,33 @@
   gap: 20rpx;
   margin-top: 28rpx;
   padding-top: 24rpx;
-  border-top: 2rpx dashed rgba(255, 255, 255, 0.22);
+  border-top: 1rpx solid rgba(255, 255, 255, 0.18);
 }
 
+/* 查看详情：文字链接（次要） */
 .pkg-detail {
-  padding: 14rpx 28rpx;
-  border-radius: 999rpx;
-  border: 2rpx solid rgba(255, 255, 255, 0.65);
+  padding: 6rpx 4rpx;
   font-size: 24rpx;
+  color: rgba(255, 255, 255, 0.88);
 }
 
+.pkg-detail:active {
+  opacity: 0.65;
+}
+
+/* 立即购买：主 CTA（白/绿实心胶囊） */
 .pkg-buy {
-  padding: 14rpx 32rpx;
+  padding: 16rpx 36rpx;
   border-radius: 999rpx;
   background: var(--color-bg-card);
   color: var(--color-text-brand);
   font-size: 26rpx;
   font-weight: 700;
+  transition: transform 0.12s ease;
+}
+
+.pkg-buy:active {
+  transform: scale(0.96);
 }
 
 .buy-empty {

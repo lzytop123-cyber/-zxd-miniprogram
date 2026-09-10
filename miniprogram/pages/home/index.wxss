@@ -7,7 +7,7 @@
 .hero {
   position: relative;
   overflow: hidden;
-  border-radius: 0 0 52rpx 52rpx;
+  border-radius: 0 0 40rpx 40rpx;
   background: linear-gradient(160deg, #2D6A4F 0%, #40916C 46%, #52B788 100%);
   box-shadow: var(--shadow-lg);
 }
@@ -416,7 +416,7 @@
 .entries {
   display: flex;
   gap: 24rpx;
-  margin: -36rpx 24rpx 0;
+  margin: 24rpx 24rpx 0;
   position: relative;
   z-index: 5;
 }
@@ -448,7 +448,23 @@
 }
 
 .entry-verify {
-  background: linear-gradient(150deg, #F08C00, #FFB703);
+  background: linear-gradient(150deg, #F4FAF6, #EBF4EE);
+  color: var(--color-text-brand);
+  border: 2rpx solid rgba(45, 106, 79, 0.14);
+  box-shadow: 0 4rpx 16rpx rgba(28, 43, 32, 0.05);
+}
+
+.entry-verify .entry-desc {
+  color: var(--color-text-secondary);
+}
+
+/* verify 图标恢复默认品牌绿描边（撤销 --invert 白色）*/
+.entry-verify .mi-glyph--invert {
+  filter: none;
+}
+
+.entry-verify .entry-deco {
+  background: rgba(45, 106, 79, 0.05);
 }
 
 .entry-deco {
@@ -541,28 +557,45 @@
   min-width: 0;
 }
 
-.member-badge {
+.member-pill {
   display: inline-flex;
   align-items: center;
-  padding: 2rpx 12rpx;
-  font-size: 20rpx;
-  line-height: 1.4;
-  color: var(--color-text-brand);
-  background: var(--color-primary-soft);
-  border-radius: 20rpx;
+  gap: 8rpx;
+  padding: 0 20rpx;
+  height: 48rpx;
+  border-radius: 999rpx;
+  line-height: 1;
   flex-shrink: 0;
 }
 
-.member-meta-dot {
-  color: #C2CDD6;
+.member-pill.title {
+  padding: 0 18rpx;
   font-size: 22rpx;
-  line-height: 1;
+  font-weight: 600;
+  color: var(--color-text-brand);
+  background: var(--color-primary-soft);
 }
 
-.member-summary-item {
+.member-pill.data {
+  background: var(--color-bg-page);
+  border: 1rpx solid var(--color-border);
+}
+
+.member-pill.data:active {
+  background: var(--color-primary-soft);
+  border-color: var(--color-primary-soft);
+  transform: scale(0.96);
+}
+
+.pill-val {
+  font-size: 24rpx;
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.pill-key {
   font-size: 22rpx;
-  color: #6B7C71;
-  line-height: 1.4;
+  color: var(--color-text-secondary);
 }
 
 .member-arrow {
@@ -644,7 +677,6 @@
   background: var(--color-border);
 }
 
-/* ============ 快捷功能 ============ */
 /* ============ 邀请 Banner ============ */
 .promo {
   display: flex;

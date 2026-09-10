@@ -3,50 +3,18 @@
   padding-bottom: 200rpx;
 }
 
-/* ============ 门店 Hero ============ */
+/* ============ 门店 Hero（精简，只留渐变+店名） ============ */
 .bk-hero {
-  position: relative;
-  margin: 0;
-  padding: 40rpx 36rpx 48rpx;
+  padding: 28rpx 32rpx 40rpx;
   background: linear-gradient(150deg, #2D6A4F 0%, #40916C 55%, #52B788 100%);
-  border-radius: 0 0 40rpx 40rpx;
-  overflow: hidden;
-}
-
-.bk-hero-orb {
-  position: absolute;
-  width: 280rpx;
-  height: 280rpx;
-  right: -80rpx;
-  top: -110rpx;
-  border-radius: 50%;
-  background: radial-gradient(circle, rgba(255, 255, 255, 0.5), rgba(255, 255, 255, 0));
-  opacity: 0.4;
-}
-
-.bk-hero-grid {
-  position: absolute;
-  inset: 0;
-  background-image: linear-gradient(rgba(255, 255, 255, 0.06) 2rpx, transparent 2rpx),
-    linear-gradient(90deg, rgba(255, 255, 255, 0.06) 2rpx, transparent 2rpx);
-  background-size: 56rpx 56rpx;
-}
-
-.bk-hero-label {
-  position: relative;
-  font-size: 22rpx;
-  letter-spacing: 2rpx;
-  color: rgba(255, 255, 255, 0.82);
-  font-weight: 600;
+  border-radius: 0 0 32rpx 32rpx;
 }
 
 .bk-hero-store {
-  position: relative;
-  font-size: 40rpx;
+  font-size: 34rpx;
   font-weight: 800;
   color: var(--color-bg-card);
-  margin-top: 10rpx;
-  text-shadow: 0 4rpx 16rpx rgba(15, 45, 30, 0.25);
+  text-shadow: 0 2rpx 12rpx rgba(15, 45, 30, 0.2);
 }
 
 /* ============ 卡片 ============ */
@@ -71,17 +39,17 @@
   margin-bottom: 24rpx;
 }
 
-.bk-bar {
-  width: 8rpx;
-  height: 30rpx;
-  border-radius: 4rpx;
-  background: linear-gradient(180deg, #52B788, #2D6A4F);
+.bk-sec-title {
+  font-size: 32rpx;
+  font-weight: 800;
+  color: var(--color-text);
+  letter-spacing: 0.5rpx;
 }
 
-.bk-sec text {
-  font-size: 30rpx;
-  font-weight: 700;
-  color: var(--color-text);
+.bk-divider {
+  height: 1rpx;
+  background: var(--color-border);
+  margin: 32rpx 0 28rpx;
 }
 
 /* ============ 套餐类型 ============ */
@@ -99,108 +67,148 @@
   border-radius: 999rpx;
 }
 
+/* 主类型：横排 chip 一排（多则 wrap） */
 .type-primary-grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 16rpx;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12rpx;
 }
 
 .type-primary {
-  display: flex;
-  flex-direction: column;
+  display: inline-flex;
   align-items: center;
-  justify-content: center;
-  gap: 6rpx;
-  padding: 24rpx 12rpx;
-  border-radius: 24rpx;
-  background: #F1F7F3;
-  border: 2rpx solid transparent;
-  transition: all 0.2s ease;
+  padding: 16rpx 26rpx;
+  border-radius: 999rpx;
+  background: var(--color-bg-page);
+  border: 1rpx solid var(--color-border);
+  transition: background 0.15s ease, border-color 0.15s ease, transform 0.12s ease;
+}
+
+.type-primary:active {
+  transform: scale(0.96);
 }
 
 .type-primary-label {
-  font-size: 28rpx;
-  font-weight: 700;
-  color: #3D5247;
+  font-size: 26rpx;
+  font-weight: 600;
+  color: var(--color-text-secondary);
 }
 
 .type-primary.active {
   background: linear-gradient(135deg, #52B788, #2D6A4F);
-  border-color: var(--color-text-brand);
+  border-color: transparent;
   box-shadow: var(--shadow-brand);
 }
 
 .type-primary.active .type-primary-label {
   color: var(--color-bg-card);
+  font-weight: 700;
 }
 
-.type-primary--night {
-  grid-column: span 2;
-}
-
+/* 子类型：同风格 chip，用间距和位置暗示层级 */
 .type-sub-row {
   display: flex;
+  flex-wrap: wrap;
   gap: 12rpx;
-  margin-top: 20rpx;
-  padding-top: 20rpx;
-  border-top: 2rpx dashed #E4EDE7;
+  margin-top: 16rpx;
+  padding-left: 16rpx;
+  border-left: 3rpx solid var(--color-primary-soft);
 }
 
 .type-sub {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 4rpx;
-  padding: 18rpx 8rpx;
-  border-radius: 16rpx;
+  display: inline-flex;
+  align-items: baseline;
+  gap: 8rpx;
+  padding: 14rpx 22rpx;
+  border-radius: 999rpx;
   background: var(--color-bg-page);
-  border: 2rpx solid #E4EDE7;
+  border: 1rpx solid var(--color-border);
+  transition: background 0.15s ease, border-color 0.15s ease, transform 0.12s ease;
+}
+
+.type-sub:active {
+  transform: scale(0.96);
 }
 
 .type-sub-label {
-  font-size: 26rpx;
-  font-weight: 700;
-  color: #5C7567;
+  font-size: 24rpx;
+  font-weight: 600;
+  color: var(--color-text-secondary);
 }
 
 .type-sub-days {
   font-size: 20rpx;
-  color: #9CACA2;
+  color: var(--color-text-secondary);
+  opacity: 0.7;
 }
 
 .type-sub.active {
-  background: var(--color-bg-page);
+  background: var(--color-primary-soft);
   border-color: var(--color-primary);
 }
 
 .type-sub.active .type-sub-label {
   color: var(--color-text-brand);
+  font-weight: 700;
 }
 
 .type-sub.active .type-sub-days {
-  color: var(--color-primary);
+  color: var(--color-text-brand);
+  opacity: 1;
 }
 
-/* ============ 字段行 ============ */
-.field {
+/* ============ 字段 pill ============ */
+.field-group {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 26rpx 4rpx;
-  border-bottom: 2rpx solid #F1F5F2;
+  flex-wrap: wrap;
+  gap: 12rpx;
+  margin-top: 8rpx;
+}
+
+.field {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 10rpx;
+  padding: 16rpx 22rpx;
+  border-radius: 999rpx;
+  background: var(--color-bg-page);
+  border: 1rpx solid var(--color-border);
+  transition: background 0.15s ease, border-color 0.15s ease, transform 0.12s ease;
+}
+
+.field:active {
+  background: var(--color-primary-soft);
+  border-color: var(--color-primary-soft);
+  transform: scale(0.97);
+}
+
+.field--static {
+  background: transparent;
+  border-color: transparent;
+  padding-left: 8rpx;
+  padding-right: 8rpx;
+}
+
+.field--static:active {
+  background: transparent;
+  border-color: transparent;
+  transform: none;
+}
+
+.field--wide {
+  flex: 1;
 }
 
 .field-key {
-  font-size: 28rpx;
-  color: #5C7567;
+  font-size: 22rpx;
+  color: var(--color-text-secondary);
   font-weight: 500;
 }
 
 .field-val {
-  font-size: 30rpx;
+  font-size: 26rpx;
   color: var(--color-text);
-  font-weight: 600;
+  font-weight: 700;
 }
 
 .quick-btns {
@@ -290,7 +298,8 @@
 }
 
 .bk-cta--disabled {
-  opacity: 0.42;
+  background: var(--color-disabled);
+  color: var(--color-text-secondary);
   box-shadow: none;
 }
 

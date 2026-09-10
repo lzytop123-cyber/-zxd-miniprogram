@@ -51,7 +51,7 @@
 .seg-item.on {
   background: var(--color-bg-card);
   color: var(--color-text-brand);
-  box-shadow: var(--shadow-md);
+  box-shadow: var(--shadow-sm);
 }
 
 .wb-body { padding-bottom: calc(200rpx + env(safe-area-inset-bottom)); }
@@ -161,47 +161,16 @@
   box-shadow: var(--shadow-brand-strong);
 }
 
-.ai-disclaimer {
-  flex-shrink: 0;
-  margin: 0 24rpx 8rpx;
-  padding: 12rpx 20rpx;
-  text-align: center;
-  font-size: 22rpx;
-  font-weight: 600;
-  color: var(--color-warning-fg);
-  background: #FFF8E8;
-  border-radius: 16rpx;
-  border: 1rpx solid #F0E0B8;
-}
-
-.ai-tag {
-  display: inline-block;
-  margin: 0 0 8rpx;
-  padding: 2rpx 12rpx;
-  font-size: 20rpx;
-  font-weight: 600;
-  color: var(--color-text-brand);
-  background: rgba(45, 106, 79, 0.12);
-  border-radius: 8rpx;
-  line-height: 1.4;
-}
-
 /* ============ 学习报告 ============ */
 .report-card {
   margin-bottom: 24rpx;
 }
 
-.header {
+/* scope picker：卡外靠右浮 */
+.report-scope-row {
   display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 32rpx;
-}
-
-.header-title {
-  font-size: 36rpx;
-  font-weight: 700;
-  color: var(--color-text-brand);
+  justify-content: flex-end;
+  padding: 4rpx 32rpx 12rpx;
 }
 
 .scope {
@@ -212,18 +181,35 @@
   border-radius: 40rpx;
 }
 
+/* 卡内 header（标题 + 右侧 tabs 或空） */
+.card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16rpx;
+  margin-bottom: 24rpx;
+}
+
+.card-head-title {
+  font-size: 30rpx;
+  font-weight: 800;
+  color: var(--color-text);
+}
+
+/* 卡 A：个人成绩 */
 .my-rank {
   text-align: center;
-  margin-bottom: 32rpx;
-  padding: 32rpx;
+  margin-bottom: 24rpx;
+  padding: 28rpx 24rpx;
   background: linear-gradient(135deg, #D8F3DC, #F4FAF6);
   border-radius: 24rpx;
 }
 
 .rank-no {
-  font-size: 56rpx;
-  font-weight: 700;
+  font-size: 48rpx;
+  font-weight: 800;
   color: var(--color-primary);
+  line-height: 1.1;
 }
 
 .title-badge {
@@ -236,13 +222,19 @@
   margin-top: 12rpx;
 }
 
+.my-rank .beat {
+  margin-top: 14rpx;
+  margin-bottom: 0;
+  font-size: 22rpx;
+  color: var(--color-text-brand);
+  opacity: 0.75;
+  font-weight: 500;
+}
+
 .stat-row {
   display: flex;
   justify-content: space-around;
-  margin-bottom: 24rpx;
-  padding: 24rpx 0;
-  border-top: 2rpx solid var(--color-bg-page);
-  border-bottom: 2rpx solid var(--color-bg-page);
+  padding: 8rpx 0 0;
 }
 
 .stat {
@@ -261,17 +253,10 @@
   margin-top: 8rpx;
 }
 
-.beat {
-  text-align: center;
-  color: var(--color-text-secondary);
-  font-size: 24rpx;
-  margin-bottom: 32rpx;
-}
-
 .tabs {
   display: flex;
-  gap: 16rpx;
-  margin-bottom: 24rpx;
+  gap: 12rpx;
+  margin: 0;
 }
 
 /* ============ 每日学习时长趋势 ============ */
@@ -281,7 +266,6 @@
   gap: 8rpx;
   height: 200rpx;
   padding: 12rpx 4rpx 0;
-  margin-bottom: 28rpx;
   overflow-x: auto;
 }
 
@@ -322,21 +306,19 @@
   padding: 36rpx 0;
   text-align: center;
   font-size: 24rpx;
-  color: #9CACA2;
-  margin-bottom: 12rpx;
-}
-
-.section-title.inner {
-  padding: 0;
-  margin-bottom: 16rpx;
+  color: var(--color-text-secondary);
 }
 
 .rank-item {
   display: flex;
-  padding: 24rpx 16rpx;
-  border-bottom: 2rpx solid var(--color-bg-page);
+  padding: 20rpx 16rpx;
+  border-bottom: 1rpx solid var(--color-border);
   align-items: center;
   border-radius: 16rpx;
+}
+
+.rank-item:last-child {
+  border-bottom: none;
 }
 
 .rank-item.self {
@@ -348,6 +330,24 @@
   font-weight: 700;
   color: var(--color-primary);
   font-size: 28rpx;
+}
+
+.rank-avatar {
+  width: 64rpx;
+  height: 64rpx;
+  border-radius: 50%;
+  margin-right: 16rpx;
+  flex-shrink: 0;
+  background: var(--color-primary-soft);
+}
+
+.rank-avatar-ph {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-text-brand);
+  font-size: 24rpx;
+  font-weight: 700;
 }
 
 .name {

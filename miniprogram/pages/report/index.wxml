@@ -6,25 +6,25 @@
     <view class="seg">
       <view class="seg-item {{tab==='assistant' ? 'on' : ''}}" bindtap="switchTab" data-tab="assistant">AI助手</view>
       <view class="seg-item {{tab==='report' ? 'on' : ''}}" bindtap="switchTab" data-tab="report">学习报告</view>
-      <view class="seg-item {{tab==='wrongbook' ? 'on' : ''}}" bindtap="switchTab" data-tab="wrongbook">错题本</view>
     </view>
   </view>
 
   <!-- ============ 学习报告 ============ -->
   <view wx:if="{{tab==='report'}}" class="report-body">
-    <view class="card report-card">
-      <view class="header">
-        <text class="header-title">学习报告</text>
-        <picker mode="selector" range="{{['全平台','本店']}}" bindchange="onScopeChange">
-          <view class="scope">{{scopeLabel}} ▼</view>
-        </picker>
-      </view>
+    <!-- scope 切换靠右浮 -->
+    <view class="report-scope-row">
+      <picker mode="selector" range="{{['全平台','本店']}}" bindchange="onScopeChange">
+        <view class="scope">{{scopeLabel}} ▼</view>
+      </picker>
+    </view>
 
+    <!-- 卡 A：个人成绩 -->
+    <view class="card report-card">
       <view class="my-rank" wx:if="{{summary}}">
         <view class="rank-no" wx:if="{{summary.rank}}">#{{summary.rank}}</view>
         <view class="title-badge">{{summary.title}}</view>
+        <view class="beat">超越了 {{summary.beat_percent}}% 的学员</view>
       </view>
-
       <view class="stat-row" wx:if="{{summary}}">
         <view class="stat">
           <view class="num">{{summary.total_sessions}}</view>
@@ -39,14 +39,17 @@
           <view class="stat-label">日均</view>
         </view>
       </view>
+    </view>
 
-      <view class="beat" wx:if="{{summary}}">超越了 {{summary.beat_percent}}% 的学员</view>
-
-      <view class="tabs">
-        <view class="chip {{days===7?'active':''}}" bindtap="setDays" data-d="7">近7日</view>
-        <view class="chip {{days===30?'active':''}}" bindtap="setDays" data-d="30">近30日</view>
+    <!-- 卡 B：趋势图表 -->
+    <view class="card report-card">
+      <view class="card-head">
+        <text class="card-head-title">学习趋势</text>
+        <view class="tabs">
+          <view class="chip {{days===7?'active':''}}" bindtap="setDays" data-d="7">近7日</view>
+          <view class="chip {{days===30?'active':''}}" bindtap="setDays" data-d="30">近30日</view>
+        </view>
       </view>
-
       <view class="daily-chart" wx:if="{{daily.length}}">
         <view class="daily-bar" wx:for="{{daily}}" wx:key="label">
           <view class="daily-bar-track">
@@ -56,11 +59,18 @@
         </view>
       </view>
       <view class="daily-empty" wx:else>近{{days}}日暂无学习记录</view>
+    </view>
 
-      <view class="section-title inner">排行榜</view>
+    <!-- 卡 C：排行榜 -->
+    <view class="card report-card">
+      <view class="card-head">
+        <text class="card-head-title">排行榜</text>
+      </view>
       <view class="rank-list">
         <view class="rank-item {{item.is_self?'self':''}}" wx:for="{{leaderboard}}" wx:key="rank">
           <text class="rank">{{item.rank === 1 ? '🏆' : item.rank}}</text>
+          <image wx:if="{{item.avatar_url}}" class="rank-avatar" src="{{item.avatar_url}}" mode="aspectFill" />
+          <view wx:else class="rank-avatar rank-avatar-ph">岛</view>
           <text class="name">{{item.nickname}}</text>
           <text class="mins">{{item.time_label}}</text>
         </view>
@@ -69,74 +79,8 @@
     </view>
   </view>
 
-  <!-- ============ 错题本 ============ -->
-  <view wx:elif="{{tab==='wrongbook'}}" class="wb-body">
-    <view class="wb-search-bar">
-      <input
-        class="wb-search"
-        value="{{wbKeyword}}"
-        placeholder="搜索题干 / 错因 / 答案"
-        confirm-type="search"
-        bindinput="onWbKeyword"
-        bindconfirm="onWbSearch"
-      />
-      <view class="wb-search-btn" bindtap="onWbSearch">搜索</view>
-    </view>
-    <scroll-view class="wb-chips" scroll-x>
-      <view class="wb-chip {{wbSubjectId==null?'on':''}}" bindtap="onWbSubject" data-id="">全部</view>
-      <view
-        class="wb-chip {{wbSubjectId===item.id?'on':''}}"
-        wx:for="{{wbSubjects}}"
-        wx:key="id"
-        bindtap="onWbSubject"
-        data-id="{{item.id}}"
-      >{{item.name}}</view>
-      <view class="wb-chip manage" bindtap="goWbSubjects">管理学科</view>
-    </scroll-view>
-    <view class="wb-chips wrap">
-      <view
-        class="wb-chip {{wbStatus===item.value?'on':''}}"
-        wx:for="{{wbStatusFilters}}"
-        wx:key="label"
-        bindtap="onWbStatus"
-        data-value="{{item.value}}"
-      >{{item.label}}</view>
-    </view>
-    <scroll-view class="wb-chips" scroll-x wx:if="{{wbTags.length}}">
-      <view
-        class="wb-chip {{wbTag===item?'on':''}}"
-        wx:for="{{wbTags}}"
-        wx:key="*this"
-        bindtap="onWbTag"
-        data-tag="{{item}}"
-      >{{item}}</view>
-    </scroll-view>
-    <view class="wb-list">
-      <view class="wb-card" wx:for="{{wbItems}}" wx:key="id" data-id="{{item.id}}" bindtap="goWbDetail">
-        <image class="wb-cover" src="{{item.cover}}" mode="aspectFill" wx:if="{{item.cover}}" />
-        <view class="wb-cover ph" wx:else>无图</view>
-        <view class="wb-card-body">
-          <view class="wb-title">{{item.ocr_text || '未填写题干'}}</view>
-          <view class="wb-meta">
-            <text>{{item.subject_name || '未分类'}}</text>
-            <text class="wb-st s{{item.status}}">{{item.status_label}}</text>
-          </view>
-        </view>
-      </view>
-    </view>
-    <view class="wb-empty" wx:if="{{!wbLoading && !wbItems.length}}">
-      <view class="wb-empty-title">拍下第一道错题</view>
-      <view class="wb-empty-sub">收录题目、答案和错因，复习时再打开</view>
-      <view class="wb-empty-btn" bindtap="goWbCreate">立即拍照</view>
-    </view>
-    <view class="wb-tip" wx:if="{{wbLoading}}">加载中...</view>
-    <view class="wb-tip" wx:elif="{{wbFinished && wbItems.length}}">没有更多了</view>
-    <view class="wb-fab" bindtap="goWbCreate">+</view>
-  </view>
-
   <!-- ============ AI 助手 ============ -->
   <block wx:else>
-    <view class="ai-disclaimer">内容由人工智能生成，仅供参考</view>
     <scroll-view
       class="chat-scroll"
       scroll-y
@@ -148,7 +92,6 @@
         <view class="msg-row left" wx:if="{{greeting}}">
           <view class="avatar bot">岛</view>
           <view class="bubble bot">
-            <view class="ai-tag">AI生成</view>
             <text>{{greeting}}</text>
           </view>
         </view>
@@ -170,7 +113,6 @@
         >
           <view wx:if="{{item.role !== 'user'}}" class="avatar bot">岛</view>
           <view class="bubble {{item.role === 'user' ? 'user' : 'bot'}}">
-            <view class="ai-tag" wx:if="{{item.role !== 'user'}}">AI生成</view>
             <text>{{item.content}}</text>
           </view>
         </view>

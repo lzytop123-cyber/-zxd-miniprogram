@@ -1,5 +1,4 @@
-<view class="tabbar-wrap {{collapsed ? 'is-collapsed' : ''}}">
-  <view class="tabbar-scrim"></view>
+<view class="tabbar-wrap">
   <view class="tabbar">
     <view
       class="tab-item {{selected === index ? 'is-on' : ''}} {{index === 2 ? 'is-center' : ''}}"
@@ -16,9 +15,5 @@
         <text class="tab-item-text">{{item.text}}</text>
       </view>
     </view>
-  </view>
-
-  <view class="tabbar-mini" bindtap="onExpand">
-    <image class="tabbar-mini-icon" src="{{list[selected].icon}}" mode="aspectFit" />
   </view>
 </view>

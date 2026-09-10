@@ -24,7 +24,7 @@ Page({
     menuUrls: {
       wallet: routes.profileWallet,
       orders: routes.profileOrders,
-      coupons: routes.profileCoupons,
+      wrongbook: routes.wrongbookIndex,
       points: routes.profilePoints,
       invite: routes.profileInvite,
       contact: routes.profileContact,

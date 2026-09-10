@@ -1,16 +1,14 @@
 <view class="page-booking page-safe-bottom">
   <!-- 门店 Hero -->
   <view class="bk-hero">
-    <view class="bk-hero-orb"></view>
-    <view class="bk-hero-grid"></view>
     <view class="bk-hero-store">{{storeName}}</view>
   </view>
 
-  <!-- 套餐类型 -->
+  <!-- 套餐 + 时间（合并卡） -->
   <view class="bk-card">
+    <!-- 段1：套餐 -->
     <view class="bk-sec bk-sec--type">
-      <view class="bk-bar"></view>
-      <text>选择套餐</text>
+      <text class="bk-sec-title">选择套餐</text>
       <text class="bk-sec-tag">{{selectedTypeLabel}}</text>
     </view>
 
@@ -46,24 +44,27 @@
         <text class="type-sub-days">{{item.days}}</text>
       </view>
     </view>
-  </view>
 
-  <!-- 时间设置 -->
-  <view class="bk-card">
-    <view class="bk-sec"><view class="bk-bar"></view><text>使用时间</text></view>
+    <!-- 段间分隔 -->
+    <view class="bk-divider"></view>
+
+    <!-- 段2：时间 -->
+    <view class="bk-sec"><text class="bk-sec-title">使用时间</text></view>
     <view class="hint hint--sec" wx:if="{{billType !== 'night'}}">{{storeHoursHint}}</view>
 
     <!-- 按小时 -->
     <block wx:if="{{billType==='hourly'}}">
-      <picker mode="date" value="{{startDate}}" start="{{today}}" bindchange="onStartDateChange">
-        <view class="field"><text class="field-key">开始日期</text><text class="field-val">{{startDate}} ›</text></view>
-      </picker>
-      <picker mode="time" value="{{startClock}}" bindchange="onStartClockChange">
-        <view class="field"><text class="field-key">开始时间</text><text class="field-val">{{startClock}} ›</text></view>
-      </picker>
-      <picker mode="time" value="{{endClock}}" bindchange="onEndClockChange">
-        <view class="field"><text class="field-key">结束时间</text><text class="field-val">{{endClock}} ›</text></view>
-      </picker>
+      <view class="field-group">
+        <picker mode="date" value="{{startDate}}" start="{{today}}" bindchange="onStartDateChange">
+          <view class="field"><text class="field-key">日期</text><text class="field-val">{{startDate}}</text></view>
+        </picker>
+        <picker mode="time" value="{{startClock}}" bindchange="onStartClockChange">
+          <view class="field"><text class="field-key">开始</text><text class="field-val">{{startClock}}</text></view>
+        </picker>
+        <picker mode="time" value="{{endClock}}" bindchange="onEndClockChange">
+          <view class="field"><text class="field-key">结束</text><text class="field-val">{{endClock}}</text></view>
+        </picker>
+      </view>
       <view class="quick-btns">
         <view class="chip {{quickHours===2?'active':''}}" bindtap="setHours" data-h="2">2小时</view>
         <view class="chip {{quickHours===4?'active':''}}" bindtap="setHours" data-h="4">4小时</view>
@@ -76,36 +77,44 @@
     <block wx:if="{{billType==='daily'}}">
       <block wx:if="{{dailyUseMode==='multi_pass' && multiDayDailyCard}}">
         <block wx:if="{{dailyPassFlexible}}">
-          <picker mode="date" value="{{startDate}}" start="{{dailyPassStartMin}}" end="{{dailyPassStartMax}}" bindchange="onStartDateChange">
-            <view class="field"><text class="field-key">开始日期</text><text class="field-val">{{startDate}} ›</text></view>
-          </picker>
-          <view class="field"><text class="field-key">连续使用</text><text class="field-val">{{startDate}} 至 {{endDate}}</text></view>
+          <view class="field-group">
+            <picker mode="date" value="{{startDate}}" start="{{dailyPassStartMin}}" end="{{dailyPassStartMax}}" bindchange="onStartDateChange">
+              <view class="field"><text class="field-key">开始</text><text class="field-val">{{startDate}}</text></view>
+            </picker>
+            <view class="field field--static"><text class="field-key">至</text><text class="field-val">{{endDate}}</text></view>
+          </view>
           <view class="hint">有效期 {{dailyPassStartMin}} ~ {{dailyPassStartMax}} 内选开始日，连续 {{dailyPassSpan}} 天</view>
         </block>
         <block wx:else>
-          <view class="field"><text class="field-key">连续使用</text><text class="field-val">{{startDate}} 至 {{endDate}}</text></view>
+          <view class="field-group">
+            <view class="field field--static"><text class="field-key">连续使用</text><text class="field-val">{{startDate}} 至 {{endDate}}</text></view>
+          </view>
           <view class="hint">须连续约满 {{dailyPassSpan}} 天</view>
         </block>
       </block>
       <block wx:else>
-        <picker mode="date" value="{{startDate}}" start="{{today}}" bindchange="onStartDateChange">
-          <view class="field"><text class="field-key">使用日期</text><text class="field-val">{{startDate}} ›</text></view>
-        </picker>
-        <picker mode="date" value="{{endDate}}" start="{{startDate}}" bindchange="onEndDateChange">
-          <view class="field"><text class="field-key">结束日期</text><text class="field-val">{{endDate}} ›</text></view>
-        </picker>
+        <view class="field-group">
+          <picker mode="date" value="{{startDate}}" start="{{today}}" bindchange="onStartDateChange">
+            <view class="field"><text class="field-key">日期</text><text class="field-val">{{startDate}}</text></view>
+          </picker>
+          <picker mode="date" value="{{endDate}}" start="{{startDate}}" bindchange="onEndDateChange">
+            <view class="field"><text class="field-key">至</text><text class="field-val">{{endDate}}</text></view>
+          </picker>
+        </view>
         <block wx:if="{{startDate === endDate}}">
-          <picker mode="time" value="{{startClock}}" bindchange="onStartClockChange">
-            <view class="field"><text class="field-key">开始时间</text><text class="field-val">{{startClock}} ›</text></view>
-          </picker>
-          <picker mode="time" value="{{endClock}}" bindchange="onEndClockChange">
-            <view class="field"><text class="field-key">结束时间</text><text class="field-val">{{endClock}} ›</text></view>
-          </picker>
-      <view class="quick-btns">
-        <view class="chip {{quickDailyPreset==='full'?'active':''}}" bindtap="setDailyFullDay">全天</view>
-        <view class="chip {{quickDailyPreset==='8-18'?'active':''}}" bindtap="setDailyPreset" data-start="08:00" data-end="18:00">8-18点</view>
-        <view class="chip {{quickDailyPreset==='9-21'?'active':''}}" bindtap="setDailyPreset" data-start="09:00" data-end="21:00">9-21点</view>
-      </view>
+          <view class="field-group">
+            <picker mode="time" value="{{startClock}}" bindchange="onStartClockChange">
+              <view class="field"><text class="field-key">开始</text><text class="field-val">{{startClock}}</text></view>
+            </picker>
+            <picker mode="time" value="{{endClock}}" bindchange="onEndClockChange">
+              <view class="field"><text class="field-key">结束</text><text class="field-val">{{endClock}}</text></view>
+            </picker>
+          </view>
+          <view class="quick-btns">
+            <view class="chip {{quickDailyPreset==='full'?'active':''}}" bindtap="setDailyFullDay">全天</view>
+            <view class="chip {{quickDailyPreset==='8-18'?'active':''}}" bindtap="setDailyPreset" data-start="08:00" data-end="18:00">8-18点</view>
+            <view class="chip {{quickDailyPreset==='9-21'?'active':''}}" bindtap="setDailyPreset" data-start="09:00" data-end="21:00">9-21点</view>
+          </view>
         </block>
         <view class="hint">单日可选时段，跨日全天</view>
       </block>
@@ -117,12 +126,14 @@
 
     <!-- 次卡 -->
     <block wx:if="{{billType==='session'}}">
-      <picker mode="date" value="{{startDate}}" start="{{today}}" bindchange="onStartDateChange">
-        <view class="field"><text class="field-key">开始日期</text><text class="field-val">{{startDate}} ›</text></view>
-      </picker>
-      <picker mode="date" value="{{endDate}}" start="{{startDate}}" bindchange="onEndDateChange">
-        <view class="field"><text class="field-key">结束日期</text><text class="field-val">{{endDate}} ›</text></view>
-      </picker>
+      <view class="field-group">
+        <picker mode="date" value="{{startDate}}" start="{{today}}" bindchange="onStartDateChange">
+          <view class="field"><text class="field-key">开始</text><text class="field-val">{{startDate}}</text></view>
+        </picker>
+        <picker mode="date" value="{{endDate}}" start="{{startDate}}" bindchange="onEndDateChange">
+          <view class="field"><text class="field-key">至</text><text class="field-val">{{endDate}}</text></view>
+        </picker>
+      </view>
       <view class="quick-btns">
         <view class="chip {{quickSessionDays===1?'active':''}}" bindtap="setSessionDays" data-d="1">1天</view>
         <view class="chip {{quickSessionDays===3?'active':''}}" bindtap="setSessionDays" data-d="3">3天</view>
@@ -141,28 +152,34 @@
         value="{{periodCardChoiceIndex}}"
         bindchange="onPeriodCardPick"
       >
-        <view class="field">
-          <text class="field-key">使用期限卡</text>
-          <text class="field-val">{{periodCardChoices[periodCardChoiceIndex].label}} ›</text>
+        <view class="field-group">
+          <view class="field field--wide">
+            <text class="field-key">使用期限卡</text>
+            <text class="field-val">{{periodCardChoices[periodCardChoiceIndex].label}}</text>
+          </view>
         </view>
       </picker>
-      <picker mode="date" value="{{startDate}}" start="{{periodDateMin || today}}" end="{{periodUseDeadline || ''}}" bindchange="onStartDateChange">
-        <view class="field"><text class="field-key">开始日期</text><text class="field-val">{{startDate}} ›</text></view>
-      </picker>
-      <picker mode="date" value="{{endDate}}" start="{{startDate}}" end="{{periodEndMax || periodUseDeadline || ''}}" bindchange="onEndDateChange">
-        <view class="field"><text class="field-key">结束日期</text><text class="field-val">{{endDate}} ›</text></view>
-      </picker>
+      <view class="field-group">
+        <picker mode="date" value="{{startDate}}" start="{{periodDateMin || today}}" end="{{periodUseDeadline || ''}}" bindchange="onStartDateChange">
+          <view class="field"><text class="field-key">开始</text><text class="field-val">{{startDate}}</text></view>
+        </picker>
+        <picker mode="date" value="{{endDate}}" start="{{startDate}}" end="{{periodEndMax || periodUseDeadline || ''}}" bindchange="onEndDateChange">
+          <view class="field"><text class="field-key">至</text><text class="field-val">{{endDate}}</text></view>
+        </picker>
+      </view>
       <view class="hint" wx:if="{{activePeriodCard && periodCardHint}}">{{periodCardHint}}</view>
     </block>
 
     <!-- 夜读 -->
     <block wx:if="{{billType==='night'}}">
-      <picker mode="date" value="{{startDate}}" start="{{nightDateMin || today}}" end="{{nightDateMax || ''}}" bindchange="onStartDateChange">
-        <view class="field"><text class="field-key">开始日期</text><text class="field-val">{{startDate}} ›</text></view>
-      </picker>
-      <picker mode="date" value="{{endDate}}" start="{{startDate}}" end="{{nightDateMax || ''}}" bindchange="onEndDateChange">
-        <view class="field"><text class="field-key">结束日期</text><text class="field-val">{{endDate}} ›</text></view>
-      </picker>
+      <view class="field-group">
+        <picker mode="date" value="{{startDate}}" start="{{nightDateMin || today}}" end="{{nightDateMax || ''}}" bindchange="onStartDateChange">
+          <view class="field"><text class="field-key">开始</text><text class="field-val">{{startDate}}</text></view>
+        </picker>
+        <picker mode="date" value="{{endDate}}" start="{{startDate}}" end="{{nightDateMax || ''}}" bindchange="onEndDateChange">
+          <view class="field"><text class="field-key">至</text><text class="field-val">{{endDate}}</text></view>
+        </picker>
+      </view>
       <view class="hint" wx:if="{{activeNightCard && nightCardHint}}">{{nightCardHint}}</view>
       <view class="hint" wx:else>{{nightHint}}</view>
     </block>
@@ -176,7 +193,7 @@
   <!-- 选择座位（内嵌平面图） -->
   <view class="bk-card bk-card--seat">
     <view class="bk-sec">
-      <view class="bk-bar"></view><text>选择座位</text>
+      <text class="bk-sec-title">选择座位</text>
       <view class="seat-badge {{selectedLabel ? 'seat-badge--on' : ''}}">
         <block wx:if="{{selectedLabel}}">
           <text class="seat-badge-no">{{selectedLabel}}号</text>
@@ -187,7 +204,7 @@
       </view>
     </view>
 
-    <view class="seat-map-tip">点击编号选座 · 双指缩放</view>
+    <view class="seat-map-tip" wx:if="{{!seatTipDismissed}}">点击编号选座 · 双指缩放</view>
 
     <view class="seat-legend">
       <view class="seat-legend-item"><view class="seat-dot available"></view><text>可选</text></view>
@@ -214,11 +231,26 @@
 
   <view class="fixed-bottom-spacer"></view>
 
+  <wxs module="cta">
+    module.exports = {
+      text: function(loading, err, seatId, preview) {
+        if (loading) return '计算中…'
+        if (err) return '请检查使用时间'
+        if (!seatId) return '请选择座位'
+        if (preview && preview.seat_id === seatId) return '立即预定'
+        return '请稍候…'
+      },
+      ready: function(seatId, preview, loading) {
+        return !!(seatId && preview && !loading && preview.seat_id === seatId)
+      }
+    }
+  </wxs>
+
   <!-- 底部 CTA：禁用时文案说明缺什么 -->
   <view class="bk-bottom">
     <view
-      class="bk-cta full {{seatId && preview && !previewLoading && preview.seat_id === seatId ? '' : 'bk-cta--disabled'}}"
+      class="bk-cta full {{cta.ready(seatId, preview, previewLoading) ? '' : 'bk-cta--disabled'}}"
       bindtap="goOrder"
-    >{{previewLoading ? '计算中…' : (previewError ? '请检查使用时间' : (!seatId ? '请选择座位' : ((preview && preview.seat_id === seatId) ? '立即预定' : '请稍候…')))}}</view>
+    >{{cta.text(previewLoading, previewError, seatId, preview)}}</view>
   </view>
 </view>

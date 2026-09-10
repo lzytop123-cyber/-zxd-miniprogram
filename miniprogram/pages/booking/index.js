@@ -167,6 +167,7 @@ Page({
     previewError: '',
     seatsLoading: false,
     previewLoading: false,
+    seatTipDismissed: false,
     showSeatMap: false,
     userCards: [],
     activePeriodCard: null,
@@ -201,6 +202,9 @@ Page({
 
     const today = todayStr()
     this._layout = getLayout()
+    if (wx.getStorageSync('seatTipDismissed')) {
+      this.setData({ seatTipDismissed: true })
+    }
     this._refreshPreviewDebounced = debounce(() => this._doRefreshPreview(), 450)
     this.setData({
       storeId: options.storeId,
@@ -1084,13 +1088,18 @@ Page({
     }
     const seat = this.data.seats.find((s) => s.id === Number(id))
     const display = this._layout.seatDisplay(seat)
-    this.setData({
+    const patch = {
       seatId: Number(id),
       seatCode: code,
       selectedId: Number(id),
       selectedLabel: display.mapLabel,
       selectedZone: display.zoneName,
-    }, () => this.refreshPreview({ immediate: true }))
+    }
+    if (!this.data.seatTipDismissed) {
+      patch.seatTipDismissed = true
+      wx.setStorageSync('seatTipDismissed', 1)
+    }
+    this.setData(patch, () => this.refreshPreview({ immediate: true }))
   },
 
   goOrder() {

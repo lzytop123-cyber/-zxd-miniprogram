@@ -28,6 +28,7 @@ class LeaderboardItem(BaseModel):
     total_minutes: int
     session_count: int
     is_self: bool = False
+    avatar_url: str | None = None
 
 
 class RechargeRequest(BaseModel):

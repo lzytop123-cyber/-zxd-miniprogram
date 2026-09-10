@@ -528,6 +528,10 @@ Page({
     wx.navigateTo({ url: routes.marketHome })
   },
 
+  goWrongbook() {
+    wx.navigateTo({ url: routes.wrongbookIndex })
+  },
+
   goPackages() {
     wx.switchTab({ url: '/pages/packages/index' })
   },

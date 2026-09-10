@@ -1,7 +1,6 @@
 Component({
   data: {
     selected: 0,
-    collapsed: false,
     list: [],
   },
   lifetimes: {
@@ -33,7 +32,7 @@ Component({
         // ignore
       }
       if (current === path) {
-        this.setData({ selected: index, collapsed: false })
+        this.setData({ selected: index })
         return
       }
 
@@ -43,17 +42,7 @@ Component({
           wx.reLaunch({ url: path })
         },
       })
-      this.setData({ selected: index, collapsed: false })
-    },
-
-    onExpand() {
-      wx.vibrateShort({ type: 'light' })
-      this.setCollapsed(false)
-    },
-
-    setCollapsed(collapsed) {
-      if (this.data.collapsed === collapsed) return
-      this.setData({ collapsed })
+      this.setData({ selected: index })
     },
   },
 })

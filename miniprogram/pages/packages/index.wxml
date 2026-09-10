@@ -75,7 +75,7 @@
         </view>
         <view class="pkg-rule">{{item.ruleText}}</view>
         <view class="pkg-foot">
-          <view class="pkg-detail" data-index="{{index}}" bindtap="showPackageDetail">查看详情</view>
+          <view class="pkg-detail" data-index="{{index}}" bindtap="showPackageDetail">查看详情 ›</view>
           <view class="pkg-buy" data-type="{{item.bill_type}}" bindtap="buy">立即购买</view>
         </view>
       </view>
