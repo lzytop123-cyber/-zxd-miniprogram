@@ -18,26 +18,28 @@
       </div>
     </div>
 
-    <div class="stats">
-      <div class="stat">
-        <div class="label">在座</div>
-        <div class="value hot">{{ data?.counts?.occupied ?? 0 }}</div>
+    <div class="stat-bar">
+      <div class="rate">
+        <div class="rate-num">{{ data?.occupancy_rate ?? 0 }}<span class="rate-suffix">%</span></div>
+        <div class="rate-lbl">入座率</div>
       </div>
-      <div class="stat">
-        <div class="label">已预约未到</div>
-        <div class="value warn">{{ data?.counts?.booked ?? 0 }}</div>
-      </div>
-      <div class="stat">
-        <div class="label">空闲</div>
-        <div class="value ok">{{ data?.counts?.free ?? 0 }}</div>
-      </div>
-      <div class="stat">
-        <div class="label">停用</div>
-        <div class="value mute">{{ data?.counts?.disabled ?? 0 }}</div>
-      </div>
-      <div class="stat main">
-        <div class="label">入座率</div>
-        <div class="value big">{{ data?.occupancy_rate ?? 0 }}%</div>
+      <div class="bar-wrap">
+        <div class="bar">
+          <div
+            v-for="seg in segments"
+            :key="seg.key"
+            :class="'seg s-' + seg.key"
+            :style="{ width: seg.width }"
+            :title="`${seg.name} ${seg.count}`"
+          />
+        </div>
+        <div class="chips">
+          <span class="chip"><i class="dot s-occupied" />在座 <b>{{ data?.counts?.occupied ?? 0 }}</b></span>
+          <span class="chip"><i class="dot s-booked" />已预约未到 <b>{{ data?.counts?.booked ?? 0 }}</b></span>
+          <span class="chip"><i class="dot s-free" />空闲 <b>{{ data?.counts?.free ?? 0 }}</b></span>
+          <span class="chip"><i class="dot s-disabled" />停用 <b>{{ data?.counts?.disabled ?? 0 }}</b></span>
+          <span class="chip total">共 <b>{{ totalSeats }}</b> 座</span>
+        </div>
       </div>
     </div>
 
@@ -47,7 +49,11 @@
           v-for="seat in seats"
           :key="seat.id"
           class="seat"
-          :class="['s-' + seat.state, { 'not-checked': seat.info && !seat.info.checked_in }]"
+          :class="[
+            's-' + seat.state,
+            { 'not-checked': seat.info && !seat.info.checked_in },
+            popSide(seat),
+          ]"
           :style="seatStyle(seat)"
         >
           <div class="code">{{ seat.seat_code }}</div>
@@ -56,25 +62,31 @@
             <div class="time">{{ seat.info.is_hourly ? seat.info.today_hours : seat.info.bill_type }}</div>
           </template>
           <div v-if="seat.info" class="pop">
-            <div class="pop-row"><span class="lbl">座位号</span>{{ seat.seat_code }} · {{ seat.zone_name }}</div>
-            <div class="pop-row"><span class="lbl">用户昵称</span>{{ seat.info.user }}</div>
-            <div class="pop-row"><span class="lbl">手机号码</span>{{ seat.info.phone || '未绑定' }}</div>
-            <div class="pop-row"><span class="lbl">预约类型</span>{{ seat.info.bill_type }}</div>
-            <div class="pop-row"><span class="lbl">有效期</span>{{ seat.info.period }}</div>
-            <div v-if="!seat.info.is_hourly" class="pop-row"><span class="lbl">今日可用</span>{{ seat.info.today_hours }}</div>
-            <div v-if="seat.info.check_in" class="pop-row"><span class="lbl">到店时间</span>{{ seat.info.check_in }}</div>
-            <div class="pop-row"><span class="lbl">当前状态</span>{{ seat.info.checked_in ? '已入座' : '已预约未到店' }}</div>
-            <div class="pop-row"><span class="lbl">订单编号</span>{{ seat.info.order_no }}</div>
+            <div class="pop-head">
+              <span class="pop-user">{{ seat.info.user }}</span>
+              <span class="pop-badge" :class="'b-' + seat.state">
+                {{ seat.info.checked_in ? '已入座' : '已预约未到店' }}
+              </span>
+            </div>
+            <div class="pop-grid">
+              <span class="lbl">座位</span><span>{{ seat.seat_code }} · {{ seat.zone_name }}</span>
+              <span class="lbl">手机</span><span>{{ seat.info.phone || '未绑定' }}</span>
+              <span class="lbl">类型</span><span>{{ seat.info.bill_type }}</span>
+              <span class="lbl">有效期</span><span>{{ seat.info.period }}</span>
+              <template v-if="!seat.info.is_hourly">
+                <span class="lbl">今日可用</span><span>{{ seat.info.today_hours }}</span>
+              </template>
+              <template v-if="seat.info.check_in">
+                <span class="lbl">到店</span><span>{{ seat.info.check_in }}</span>
+              </template>
+              <span class="lbl">订单</span><span class="mono">{{ seat.info.order_no }}</span>
+            </div>
           </div>
         </div>
       </div>
     </div>
 
     <div class="legend">
-      <span><i class="dot s-occupied" />在座</span>
-      <span><i class="dot s-booked" />已预约未到</span>
-      <span><i class="dot s-free" />空闲</span>
-      <span><i class="dot s-disabled" />停用</span>
       <span class="refresh">每 10 秒自动刷新 · 服务器 {{ data?.server_time || '-' }}</span>
     </div>
   </div>
@@ -97,8 +109,35 @@ const seats = computed<any[]>(() =>
   (data.value?.seats || []).filter((s: any) => s.left_pct != null && s.top_pct != null)
 )
 
+const totalSeats = computed(() => {
+  const c = data.value?.counts
+  return c ? c.occupied + c.booked + c.free + c.disabled : 0
+})
+
+const segments = computed(() => {
+  const c = data.value?.counts
+  if (!c) return []
+  const total = c.occupied + c.booked + c.free + c.disabled || 1
+  const pct = (n: number) => `${(n / total * 100).toFixed(1)}%`
+  return [
+    { key: 'occupied', name: '在座', count: c.occupied, width: pct(c.occupied) },
+    { key: 'booked', name: '已预约未到', count: c.booked, width: pct(c.booked) },
+    { key: 'free', name: '空闲', count: c.free, width: pct(c.free) },
+    { key: 'disabled', name: '停用', count: c.disabled, width: pct(c.disabled) },
+  ].filter((s) => s.count > 0)
+})
+
 function seatStyle(seat: any) {
   return { left: `${seat.left_pct}%`, top: `${seat.top_pct}%` }
+}
+
+function popSide(seat: any) {
+  // 顶部座位往下弹，左右边缘座位气泡对齐边缘避免溢出
+  const cls: string[] = []
+  cls.push(seat.top_pct < 35 ? 'pop-below' : 'pop-above')
+  if (seat.left_pct < 20) cls.push('pop-left')
+  else if (seat.left_pct > 80) cls.push('pop-right')
+  return cls
 }
 
 function shortName(name: string) {
@@ -173,21 +212,43 @@ onUnmounted(() => {
 .tools { display: flex; align-items: center; gap: 12px; }
 .clock { font-variant-numeric: tabular-nums; font-size: 18px; color: #9aa5b1; }
 
-.stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; }
-.stat {
+.stat-bar {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  flex-wrap: wrap;
   background: linear-gradient(180deg, #171c24 0%, #12161d 100%);
   border: 1px solid #232a35;
-  border-radius: 10px;
-  padding: 14px 18px;
+  border-radius: 12px;
+  padding: 16px 22px;
 }
-.stat.main { background: linear-gradient(180deg, #1f1a0a 0%, #171205 100%); border-color: #3a2f10; }
-.label { color: #8b95a1; font-size: 13px; }
-.value { font-size: 30px; font-weight: 700; margin-top: 6px; font-variant-numeric: tabular-nums; }
-.value.big { font-size: 40px; color: #FFD000; }
-.value.hot { color: #ff6b6b; }
-.value.warn { color: #f5a623; }
-.value.ok { color: #7ed957; }
-.value.mute { color: #6b7280; }
+.rate { display: flex; flex-direction: column; align-items: center; min-width: 120px; }
+.rate-num { font-size: 44px; font-weight: 800; color: #FFD000; line-height: 1; font-variant-numeric: tabular-nums; }
+.rate-suffix { font-size: 22px; margin-left: 2px; opacity: 0.8; }
+.rate-lbl { color: #8b95a1; font-size: 13px; margin-top: 6px; letter-spacing: 2px; }
+.bar-wrap { flex: 1; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.bar {
+  display: flex;
+  height: 14px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: #1a1f2a;
+  border: 1px solid #232a35;
+}
+.seg { height: 100%; transition: width 0.4s ease; }
+.seg.s-occupied { background: linear-gradient(90deg, #ff6b6b, #b13d3d); }
+.seg.s-booked { background: linear-gradient(90deg, #f5a623, #c58a1e); }
+.seg.s-free { background: linear-gradient(90deg, #7ed957, #4a7a2d); }
+.seg.s-disabled { background: #333944; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: 13px; color: #c1c9d3; }
+.chip { display: inline-flex; align-items: center; }
+.chip b { font-weight: 700; margin-left: 6px; font-variant-numeric: tabular-nums; }
+.chip.total { color: #8b95a1; margin-left: auto; }
+.chip .dot { width: 10px; height: 10px; border-radius: 3px; margin-right: 6px; }
+.chip .dot.s-occupied { background: #ff6b6b; }
+.chip .dot.s-booked { background: #f5a623; }
+.chip .dot.s-free { background: #7ed957; }
+.chip .dot.s-disabled { background: #4b5563; }
 
 .map-wrap { flex: 1; display: flex; justify-content: center; align-items: flex-start; }
 .floor-map {
@@ -228,40 +289,65 @@ onUnmounted(() => {
 
 .seat .pop {
   position: absolute;
-  bottom: calc(100% + 8px);
   left: 50%;
   transform: translateX(-50%);
   background: #1a1f2a;
   border: 1px solid #FFD000;
-  border-radius: 8px;
-  padding: 10px 12px;
-  min-width: clamp(240px, 26cqw, 300px);
-  font-size: clamp(11px, 1.1cqw, 13px);
+  border-radius: 10px;
+  padding: 12px 14px;
+  min-width: clamp(260px, 26cqw, 320px);
+  font-size: 13px;
   color: #e6edf3;
   text-align: left;
-  box-shadow: 0 12px 32px rgba(0,0,0,0.7);
+  box-shadow: 0 16px 40px rgba(0,0,0,0.7);
   opacity: 0;
   pointer-events: none;
-  transition: opacity 0.15s;
+  transition: opacity 0.12s;
   z-index: 10;
   white-space: nowrap;
 }
+.seat.pop-above .pop { bottom: calc(100% + 10px); }
+.seat.pop-below .pop { top: calc(100% + 10px); }
+.seat.pop-left .pop { left: 0; transform: none; }
+.seat.pop-right .pop { left: auto; right: 0; transform: none; }
 .seat:hover .pop { opacity: 1; }
 .seat .pop::after {
   content: '';
   position: absolute;
-  top: 100%; left: 50%;
+  left: 50%;
   transform: translateX(-50%);
   border: 6px solid transparent;
-  border-top-color: #FFD000;
 }
-.pop-row { padding: 3px 0; }
-.pop-row .lbl {
-  display: inline-block;
-  min-width: 68px;
-  color: #8b95a1;
-  margin-right: 10px;
+.seat.pop-above .pop::after { top: 100%; border-top-color: #FFD000; }
+.seat.pop-below .pop::after { bottom: 100%; border-bottom-color: #FFD000; }
+.seat.pop-left .pop::after { left: 20px; transform: none; }
+.seat.pop-right .pop::after { left: auto; right: 20px; transform: none; }
+
+.pop-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-bottom: 8px;
+  margin-bottom: 8px;
+  border-bottom: 1px solid #2a2f3a;
 }
+.pop-user { font-size: 15px; font-weight: 700; color: #FFD000; }
+.pop-badge {
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+}
+.pop-badge.b-occupied { background: rgba(255,107,107,0.15); color: #ff8080; border: 1px solid #7a1b1b; }
+.pop-badge.b-booked { background: rgba(245,166,35,0.15); color: #ffb84d; border: 1px solid #7a5a10; }
+.pop-grid {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  column-gap: 12px;
+  row-gap: 4px;
+}
+.pop-grid .lbl { color: #8b95a1; font-size: 12px; }
+.pop-grid .mono { font-family: 'Consolas', 'Menlo', monospace; font-size: 12px; opacity: 0.85; }
 
 .s-free { background: #1e2a1e; border: 1px solid #2b4a2b; color: #7ed957; }
 .s-occupied { background: linear-gradient(180deg, #7a1b1b, #4a0f0f); border: 1px solid #b13d3d; }
