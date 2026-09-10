@@ -49,10 +49,20 @@
           class="seat"
           :class="['s-' + seat.state, { 'not-checked': seat.info && !seat.info.checked_in }]"
           :style="seatStyle(seat)"
-          :title="seatTip(seat)"
         >
           <div class="code">{{ seat.seat_code }}</div>
-          <div v-if="seat.info" class="who">{{ shortName(seat.info.user) }}</div>
+          <template v-if="seat.info">
+            <div class="who">{{ shortName(seat.info.user) }}</div>
+            <div class="time">{{ seat.info.start }}-{{ seat.info.end }}</div>
+          </template>
+          <div v-if="seat.info" class="pop">
+            <div class="pop-row"><span class="lbl">座位</span>{{ seat.seat_code }} · {{ seat.zone_name }}</div>
+            <div class="pop-row"><span class="lbl">姓名</span>{{ seat.info.user }}</div>
+            <div class="pop-row"><span class="lbl">手机</span>{{ seat.info.phone || '未绑定' }}</div>
+            <div class="pop-row"><span class="lbl">时段</span>{{ seat.info.start }} - {{ seat.info.end }}</div>
+            <div class="pop-row"><span class="lbl">状态</span>{{ seat.info.checked_in ? '已入座' : '未到场' }}</div>
+            <div class="pop-row"><span class="lbl">订单</span>{{ seat.info.order_no }}</div>
+          </div>
         </div>
       </div>
     </div>
@@ -88,24 +98,10 @@ function seatStyle(seat: any) {
   return { left: `${seat.left_pct}%`, top: `${seat.top_pct}%` }
 }
 
-function seatTip(s: any) {
-  if (!s.info) return `${s.seat_code} · ${labelOf(s.state)}`
-  return `${s.seat_code} · ${s.info.user} · ${s.info.start}-${s.info.end}`
-}
-
 function shortName(name: string) {
   if (!name) return ''
-  // 手机号中段脱敏后仍偏长，截前 4 个可见字符
   const s = name.replace(/\*+/, '*')
   return s.length > 5 ? s.slice(0, 4) + '…' : s
-}
-
-function labelOf(state: string) {
-  return (
-    { free: '空闲', booked: '已预约未到', occupied: '在座', disabled: '停用' }[
-      state
-    ] || state
-  )
 }
 
 async function load() {
@@ -168,12 +164,12 @@ onUnmounted(() => {
   gap: 16px;
 }
 .board.fullscreen { min-height: 100vh; margin: 0; }
-.top-bar { display: flex; justify-content: space-between; align-items: center; }
+.top-bar { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
 .brand { font-size: 22px; font-weight: 700; letter-spacing: 1px; color: #FFD000; }
 .tools { display: flex; align-items: center; gap: 12px; }
 .clock { font-variant-numeric: tabular-nums; font-size: 18px; color: #9aa5b1; }
 
-.stats { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; }
+.stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; }
 .stat {
   background: linear-gradient(180deg, #171c24 0%, #12161d 100%);
   border: 1px solid #232a35;
@@ -195,6 +191,7 @@ onUnmounted(() => {
   width: 100%;
   max-width: 1200px;
   aspect-ratio: 900 / 700;
+  container-type: inline-size;
   background:
     linear-gradient(#161b22 1px, transparent 1px) 0 0 / 40px 40px,
     linear-gradient(90deg, #161b22 1px, transparent 1px) 0 0 / 40px 40px,
@@ -205,24 +202,62 @@ onUnmounted(() => {
 }
 .seat {
   position: absolute;
-  width: 48px;
-  height: 44px;
-  margin-left: -24px;
-  margin-top: -22px;
-  border-radius: 6px;
+  width: clamp(40px, 5.5cqw, 66px);
+  height: clamp(38px, 5.2cqw, 62px);
+  transform: translate(-50%, -50%);
+  border-radius: 8px;
   color: #fff;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  font-size: 11px;
+  font-size: clamp(9px, 1cqw, 11px);
+  padding: 3px 2px;
   box-shadow: 0 3px 8px rgba(0, 0, 0, 0.5);
   transition: transform 0.15s;
-  overflow: hidden;
+  cursor: default;
 }
-.seat:hover { transform: scale(1.25); z-index: 3; box-shadow: 0 8px 20px rgba(0,0,0,0.7); }
-.seat .code { font-weight: 700; font-size: 13px; line-height: 1.1; }
-.seat .who { font-size: 10px; opacity: 0.85; margin-top: 1px; max-width: 42px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.seat:hover { transform: translate(-50%, -50%) scale(1.08); z-index: 3; box-shadow: 0 8px 20px rgba(0,0,0,0.7); }
+.seat .code { font-weight: 700; font-size: clamp(11px, 1.35cqw, 15px); line-height: 1.1; }
+.seat .who { font-size: clamp(9px, 1.05cqw, 12px); opacity: 0.92; margin-top: 2px; max-width: 92%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.seat .time { font-size: clamp(8px, 0.95cqw, 11px); opacity: 0.75; font-variant-numeric: tabular-nums; }
+
+.seat .pop {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: #1a1f2a;
+  border: 1px solid #FFD000;
+  border-radius: 8px;
+  padding: 10px 12px;
+  min-width: clamp(180px, 22cqw, 240px);
+  font-size: clamp(11px, 1.1cqw, 13px);
+  color: #e6edf3;
+  text-align: left;
+  box-shadow: 0 12px 32px rgba(0,0,0,0.7);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s;
+  z-index: 10;
+  white-space: nowrap;
+}
+.seat:hover .pop { opacity: 1; }
+.seat .pop::after {
+  content: '';
+  position: absolute;
+  top: 100%; left: 50%;
+  transform: translateX(-50%);
+  border: 6px solid transparent;
+  border-top-color: #FFD000;
+}
+.pop-row { padding: 3px 0; }
+.pop-row .lbl {
+  display: inline-block;
+  min-width: 40px;
+  color: #8b95a1;
+  margin-right: 8px;
+}
 
 .s-free { background: #1e2a1e; border: 1px solid #2b4a2b; color: #7ed957; }
 .s-occupied { background: linear-gradient(180deg, #7a1b1b, #4a0f0f); border: 1px solid #b13d3d; }

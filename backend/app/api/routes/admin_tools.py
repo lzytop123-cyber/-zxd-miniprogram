@@ -415,10 +415,12 @@ def store_live_board(
             r, u = active_by_seat[s.id]
             state = "occupied" if r.check_in_time else "booked"
             info = {
-                "user": u.nickname or _mask_phone(u.phone) or f"用户{u.id}",
+                "user": u.nickname or f"用户{u.id}",
+                "phone": _mask_phone(u.phone),
                 "start": r.start_time.strftime("%H:%M"),
                 "end": r.end_time.strftime("%H:%M"),
                 "checked_in": bool(r.check_in_time),
+                "order_no": r.order_no,
             }
         else:
             state = "free"
