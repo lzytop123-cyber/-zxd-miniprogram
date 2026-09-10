@@ -365,11 +365,21 @@ def store_live_board(
         z.id: z.name
         for z in db.scalars(select(Zone).where(Zone.store_id == store_id)).all()
     }
-    seats = db.scalars(
+    seats_raw = db.scalars(
         select(Seat)
         .where(Seat.store_id == store_id, Seat.is_buffer == 0)
-        .order_by(Seat.seat_code)
+        .order_by(Seat.seat_code, Seat.id)
     ).all()
+    # ponytail: 同 store 下 seat_code 无唯一约束，历史脏数据可能有重复，按 code 去重
+    # 优先保留已启用 + 有坐标的那条；根治方案：加唯一约束 + 迁移脚本清理
+    def _score(s: Seat) -> int:
+        return (2 if s.status == 1 else 0) + (1 if s.pos_x is not None and s.pos_y is not None else 0)
+    dedup: dict[str, Seat] = {}
+    for s in seats_raw:
+        cur = dedup.get(s.seat_code)
+        if cur is None or _score(s) > _score(cur):
+            dedup[s.seat_code] = s
+    seats = sorted(dedup.values(), key=lambda x: x.seat_code)
     # 当前时刻有效的预约（已支付、未取消、未离座、时间窗口覆盖 now）
     rows = db.execute(
         select(Reservation, User)
