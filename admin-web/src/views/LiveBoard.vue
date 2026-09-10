@@ -47,15 +47,12 @@
           v-for="seat in seats"
           :key="seat.id"
           class="seat"
-          :class="['s-' + seat.state]"
+          :class="['s-' + seat.state, { 'not-checked': seat.info && !seat.info.checked_in }]"
           :style="seatStyle(seat)"
           :title="seatTip(seat)"
         >
           <div class="code">{{ seat.seat_code }}</div>
-          <div v-if="seat.info" class="who">{{ seat.info.user }}</div>
-          <div v-if="seat.info" class="time">
-            {{ seat.info.start }}-{{ seat.info.end }}
-          </div>
+          <div v-if="seat.info" class="who">{{ shortName(seat.info.user) }}</div>
         </div>
       </div>
     </div>
@@ -98,6 +95,13 @@ function seatStyle(seat: any) {
 function seatTip(s: any) {
   if (!s.info) return `${s.seat_code} · ${labelOf(s.state)}`
   return `${s.seat_code} · ${s.info.user} · ${s.info.start}-${s.info.end}`
+}
+
+function shortName(name: string) {
+  if (!name) return ''
+  // 手机号中段脱敏后仍偏长，截前 4 个可见字符
+  const s = name.replace(/\*+/, '*')
+  return s.length > 5 ? s.slice(0, 4) + '…' : s
 }
 
 function labelOf(state: string) {
@@ -205,33 +209,46 @@ onUnmounted(() => {
 }
 .seat {
   position: absolute;
-  width: 68px;
-  height: 60px;
-  margin-left: -34px;
-  margin-top: -30px;
-  border-radius: 8px;
+  width: 48px;
+  height: 44px;
+  margin-left: -24px;
+  margin-top: -22px;
+  border-radius: 6px;
   color: #fff;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  font-size: 12px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
-  transition: transform 0.2s;
+  font-size: 11px;
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.5);
+  transition: transform 0.15s;
+  overflow: hidden;
 }
-.seat:hover { transform: scale(1.05); z-index: 2; }
-.seat .code { font-weight: 700; font-size: 14px; }
-.seat .who { font-size: 11px; opacity: 0.9; margin-top: 2px; max-width: 60px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.seat .time { font-size: 10px; opacity: 0.7; }
+.seat:hover { transform: scale(1.25); z-index: 3; box-shadow: 0 8px 20px rgba(0,0,0,0.7); }
+.seat .code { font-weight: 700; font-size: 13px; line-height: 1.1; }
+.seat .who { font-size: 10px; opacity: 0.85; margin-top: 1px; max-width: 42px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 .s-free { background: #1e2a1e; border: 1px solid #2b4a2b; color: #7ed957; }
-.s-occupied { background: linear-gradient(180deg, #7a1b1b, #4a0f0f); border: 1px solid #b13d3d; animation: pulse 2s ease-in-out infinite; }
+.s-occupied { background: linear-gradient(180deg, #7a1b1b, #4a0f0f); border: 1px solid #b13d3d; }
+.s-occupied::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 6px;
+  box-shadow: inset 0 0 0 1px rgba(255,107,107,0.5);
+  animation: pulse 2.4s ease-in-out infinite;
+  pointer-events: none;
+}
 .s-booked { background: linear-gradient(180deg, #7a5a10, #4a3708); border: 1px solid #c58a1e; }
-.s-disabled { background: #1a1d24; border: 1px dashed #333944; color: #55606f; }
+.s-booked.not-checked { animation: dashSpin 8s linear infinite; }
+.s-disabled { background: #14171d; border: 1px dashed #2a303a; color: #4b5563; opacity: 0.55; box-shadow: none; }
 
 @keyframes pulse {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(255, 107, 107, 0.5); }
-  50% { box-shadow: 0 0 0 8px rgba(255, 107, 107, 0); }
+  0%, 100% { opacity: 0.4; }
+  50% { opacity: 1; }
+}
+@keyframes dashSpin {
+  to { background-position: 40px 0; }
 }
 
 .legend {
