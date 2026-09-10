@@ -53,13 +53,15 @@
           <div class="code">{{ seat.seat_code }}</div>
           <template v-if="seat.info">
             <div class="who">{{ shortName(seat.info.user) }}</div>
-            <div class="time">{{ seat.info.start }}-{{ seat.info.end }}</div>
+            <div class="time">{{ tileTime(seat.info) }}</div>
           </template>
           <div v-if="seat.info" class="pop">
             <div class="pop-row"><span class="lbl">座位</span>{{ seat.seat_code }} · {{ seat.zone_name }}</div>
             <div class="pop-row"><span class="lbl">姓名</span>{{ seat.info.user }}</div>
             <div class="pop-row"><span class="lbl">手机</span>{{ seat.info.phone || '未绑定' }}</div>
+            <div class="pop-row"><span class="lbl">类型</span>{{ seat.info.bill_type }}</div>
             <div class="pop-row"><span class="lbl">时段</span>{{ seat.info.start }} - {{ seat.info.end }}</div>
+            <div v-if="seat.info.check_in" class="pop-row"><span class="lbl">到店</span>{{ seat.info.check_in }}</div>
             <div class="pop-row"><span class="lbl">状态</span>{{ seat.info.checked_in ? '已入座' : '未到场' }}</div>
             <div class="pop-row"><span class="lbl">订单</span>{{ seat.info.order_no }}</div>
           </div>
@@ -102,6 +104,12 @@ function shortName(name: string) {
   if (!name) return ''
   const s = name.replace(/\*+/, '*')
   return s.length > 5 ? s.slice(0, 4) + '…' : s
+}
+
+function tileTime(info: any) {
+  // 按小时预约显示真实时段；卡类（天/月/季/次）start-end 是营业时间，改显示类型
+  if (info.is_hourly) return `${info.start}-${info.end}`
+  return info.bill_type
 }
 
 async function load() {

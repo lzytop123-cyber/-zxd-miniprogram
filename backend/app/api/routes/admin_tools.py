@@ -15,6 +15,7 @@ from app.db.session import get_db
 from app.models import (
     AdminOperationLog,
     AdminUser,
+    BillType,
     PendingDealMapping,
     PricingRule,
     Reservation,
@@ -25,6 +26,17 @@ from app.models import (
     User,
     Zone,
 )
+
+_BILL_LABELS: dict = {
+    BillType.hourly: "按小时",
+    BillType.daily: "天卡",
+    BillType.weekly: "周卡",
+    BillType.monthly: "月卡",
+    BillType.quarterly: "季卡",
+    BillType.night: "夜读",
+    BillType.night_monthly: "夜读月卡",
+    BillType.session: "次卡",
+}
 from app.schemas.common import PageResult, ResponseModel
 from app.services.admin_audit import log_admin_action
 from app.services.csv_export import export_reservations_csv, export_study_stats_csv, export_wallet_logs_csv
@@ -414,11 +426,16 @@ def store_live_board(
         elif s.id in active_by_seat:
             r, u = active_by_seat[s.id]
             state = "occupied" if r.check_in_time else "booked"
+            bt_label = _BILL_LABELS.get(r.bill_type, str(r.bill_type))
+            is_hourly = r.bill_type == BillType.hourly
             info = {
                 "user": u.nickname or f"用户{u.id}",
                 "phone": _mask_phone(u.phone),
+                "bill_type": bt_label,
+                "is_hourly": is_hourly,
                 "start": r.start_time.strftime("%H:%M"),
                 "end": r.end_time.strftime("%H:%M"),
+                "check_in": r.check_in_time.strftime("%H:%M") if r.check_in_time else None,
                 "checked_in": bool(r.check_in_time),
                 "order_no": r.order_no,
             }
