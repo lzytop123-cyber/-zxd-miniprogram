@@ -81,15 +81,11 @@ let timer: number | undefined
 let clockTimer: number | undefined
 
 const seats = computed<any[]>(() =>
-  (data.value?.seats || []).filter((s: any) => s.pos_x != null && s.pos_y != null)
+  (data.value?.seats || []).filter((s: any) => s.left_pct != null && s.top_pct != null)
 )
 
 function seatStyle(seat: any) {
-  const x = Number(seat.pos_x) || 0
-  const y = Number(seat.pos_y) || 0
-  const left = x <= 100 ? x : x / 9
-  const top = y <= 100 ? y : y / 7
-  return { left: `${left}%`, top: `${top}%` }
+  return { left: `${seat.left_pct}%`, top: `${seat.top_pct}%` }
 }
 
 function seatTip(s: any) {

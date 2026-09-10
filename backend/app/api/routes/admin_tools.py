@@ -402,6 +402,11 @@ def store_live_board(
 
     seat_items = []
     counts = {"free": 0, "booked": 0, "occupied": 0, "disabled": 0}
+    # ponytail: seed 存 900×700 画布像素，前端按百分比渲染；直接在后端归一化
+    def _pct(x: int | None, denom: int) -> float | None:
+        if x is None:
+            return None
+        return round(x / denom * 100, 3)
     for s in seats:
         if s.status != 1:
             state = "disabled"
@@ -424,8 +429,8 @@ def store_live_board(
                 "id": s.id,
                 "seat_code": s.seat_code,
                 "zone_name": zones.get(s.zone_id, "-"),
-                "pos_x": s.pos_x,
-                "pos_y": s.pos_y,
+                "left_pct": _pct(s.pos_x, 900),
+                "top_pct": _pct(s.pos_y, 700),
                 "state": state,
                 "info": info,
             }
