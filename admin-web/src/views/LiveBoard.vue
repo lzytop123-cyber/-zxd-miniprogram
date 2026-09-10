@@ -7,15 +7,71 @@
           v-model="storeId"
           size="small"
           style="width: 180px"
-          @change="load"
+          @change="onStoreChange"
         >
           <el-option v-for="s in stores" :key="s.id" :label="s.name" :value="s.id" />
         </el-select>
+        <el-button
+          size="small"
+          :type="expiring.length ? 'danger' : ''"
+          @click="showExpiring = !showExpiring"
+        >
+          即将到期 {{ expiring.length }}
+        </el-button>
         <span class="clock">{{ clock }}</span>
         <el-button size="small" @click="toggleFull">
           {{ isFull ? '退出全屏' : '全屏' }}
         </el-button>
       </div>
+    </div>
+
+    <div v-if="showExpiring && expiring.length" class="expire-panel">
+      <div class="expire-head">
+        <span>{{ expiring.length }} 张卡即将到期 · 7 天内 / 剩余次数/时长临近</span>
+        <el-button link @click="showExpiring = false">收起</el-button>
+      </div>
+      <el-table :data="expiring" size="small" stripe max-height="240">
+        <el-table-column label="用户" min-width="120">
+          <template #default="{ row }">
+            {{ row.user_name }}
+            <span class="phone">{{ row.phone }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column prop="card_name" label="卡种" min-width="110" />
+        <el-table-column label="到期情况" min-width="180">
+          <template #default="{ row }">
+            <span v-if="row.reason === 'date'">
+              {{ row.end_date }}
+              <el-tag :type="row.days_left <= 2 ? 'danger' : 'warning'" size="small" round>
+                剩 {{ row.days_left }} 天
+              </el-tag>
+            </span>
+            <span v-else-if="row.reason === 'sessions'">
+              <el-tag type="warning" size="small" round>剩 {{ row.remaining_sessions }} 次</el-tag>
+            </span>
+            <span v-else-if="row.reason === 'hours'">
+              <el-tag type="warning" size="small" round>剩 {{ row.remaining_hours }} 小时</el-tag>
+            </span>
+          </template>
+        </el-table-column>
+        <el-table-column label="上次提醒" width="130">
+          <template #default="{ row }">
+            {{ row.reminded_at || '未提醒' }}
+          </template>
+        </el-table-column>
+        <el-table-column label="操作" width="120">
+          <template #default="{ row }">
+            <el-button
+              size="small"
+              type="primary"
+              :loading="remindingId === row.card_id"
+              @click="sendRemind(row)"
+            >
+              发送提醒
+            </el-button>
+          </template>
+        </el-table-column>
+      </el-table>
     </div>
 
     <div class="stat-bar">
@@ -74,7 +130,7 @@
               <span class="lbl">类型</span><span>{{ seat.info.bill_type }}</span>
               <span class="lbl">有效期</span><span>{{ seat.info.period }}</span>
               <template v-if="!seat.info.is_hourly">
-                <span class="lbl">今日可用</span><span>{{ seat.info.today_hours }}</span>
+                <span class="lbl">预计离场</span><span>今日 {{ seat.info.leave_at }}</span>
               </template>
               <template v-if="seat.info.check_in">
                 <span class="lbl">到店</span><span>{{ seat.info.check_in }}</span>
@@ -94,6 +150,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { ElMessage } from 'element-plus'
 import http from '../api/http'
 
 const stores = ref<any[]>([])
@@ -147,10 +204,40 @@ function shortName(name: string) {
 }
 
 
+const expiring = ref<any[]>([])
+const showExpiring = ref(false)
+const remindingId = ref<number | null>(null)
+
 async function load() {
   if (!storeId.value) return
   const res = await http.get(`/admin/stores/${storeId.value}/live-board`)
   data.value = res.data
+  loadExpiring()
+}
+
+async function loadExpiring() {
+  if (!storeId.value) return
+  const res = await http.get(`/admin/stores/${storeId.value}/expiring-cards`, {
+    params: { days: 7 },
+  })
+  expiring.value = res.data.items || []
+}
+
+async function sendRemind(row: any) {
+  remindingId.value = row.card_id
+  try {
+    await http.post(`/admin/period-cards/${row.card_id}/remind`)
+    ElMessage.success(`已提醒 ${row.user_name}`)
+    await loadExpiring()
+  } catch (e: any) {
+    ElMessage.error(e?.response?.data?.detail || e?.message || '发送失败')
+  } finally {
+    remindingId.value = null
+  }
+}
+
+async function onStoreChange() {
+  await load()
 }
 
 function tickClock() {
@@ -388,4 +475,27 @@ onUnmounted(() => {
   vertical-align: middle;
 }
 .legend .refresh { margin-left: auto; }
+
+.expire-panel {
+  background: linear-gradient(180deg, #201a0a 0%, #12160e 100%);
+  border: 1px solid #7a5a10;
+  border-radius: 10px;
+  padding: 12px 16px;
+}
+.expire-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  color: #ffb84d;
+  font-size: 13px;
+  margin-bottom: 10px;
+}
+.expire-panel :deep(.el-table) { background: transparent; color: #e6edf3; }
+.expire-panel :deep(.el-table tr), .expire-panel :deep(.el-table td),
+.expire-panel :deep(.el-table th.el-table__cell) { background: transparent !important; }
+.expire-panel :deep(.el-table--enable-row-hover .el-table__body tr:hover > td) {
+  background: rgba(255,208,0,0.06) !important;
+}
+.expire-panel :deep(.el-table__inner-wrapper::before) { display: none; }
+.expire-panel .phone { color: #8b95a1; margin-left: 8px; font-size: 12px; }
 </style>

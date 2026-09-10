@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import date, datetime, time
+from datetime import date, datetime, time, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import Response
@@ -16,7 +16,9 @@ from app.models import (
     AdminOperationLog,
     AdminUser,
     BillType,
+    CardType,
     PendingDealMapping,
+    PeriodCard,
     PricingRule,
     Reservation,
     Seat,
@@ -43,6 +45,11 @@ from app.services.csv_export import export_reservations_csv, export_study_stats_
 from app.services.deal_template_service import import_deal_templates, list_deal_templates
 from app.services.points import adjust_points
 from app.services.seat_setup import seat_code_to_slot, store_seat_summary
+from app.services.subscribe_notify import (
+    _build_template_data,
+    _card_type_label,
+    _has_accept_subscription,
+)
 
 router = APIRouter(prefix="/admin", tags=["后台扩展"])
 
@@ -443,6 +450,7 @@ def store_live_board(
                 "is_hourly": is_hourly,
                 "period": _format_period(r.bill_type, r.start_time, r.end_time),
                 "today_hours": f"{r.start_time.strftime('%H:%M')}-{r.end_time.strftime('%H:%M')}",
+                "leave_at": r.end_time.strftime("%H:%M"),
                 "check_in": r.check_in_time.strftime("%m-%d %H:%M") if r.check_in_time else None,
                 "checked_in": bool(r.check_in_time),
                 "order_no": r.order_no,
@@ -476,6 +484,96 @@ def store_live_board(
             "seats": seat_items,
         }
     )
+
+
+@router.get("/stores/{store_id}/expiring-cards", response_model=ResponseModel)
+def store_expiring_cards(
+    store_id: int,
+    days: int = Query(7, ge=1, le=60, description="未来 N 天内到期"),
+    _: object = Depends(get_current_admin),
+    db: Session = Depends(get_db),
+):
+    """扫描即将到期的期限卡：按日期临期、次数临近、时长临近三种。"""
+    today = date.today()
+    deadline = today + timedelta(days=days)
+    cards = db.scalars(
+        select(PeriodCard).where(
+            PeriodCard.status == 1,
+            (PeriodCard.store_id == store_id) | (PeriodCard.store_id.is_(None)),
+        )
+    ).all()
+    items = []
+    for c in cards:
+        reason = None
+        days_left = None
+        if c.end_date and today <= c.end_date <= deadline:
+            reason = "date"
+            days_left = (c.end_date - today).days
+        elif c.remaining_sessions is not None and 0 < c.remaining_sessions <= 3:
+            reason = "sessions"
+        elif c.remaining_hours is not None and 0 < float(c.remaining_hours) <= 5:
+            reason = "hours"
+        if not reason:
+            continue
+        u = db.get(User, c.user_id)
+        if not u:
+            continue
+        items.append(
+            {
+                "card_id": c.id,
+                "user_id": u.id,
+                "user_name": u.nickname or f"用户{u.id}",
+                "phone": u.phone or "",
+                "card_name": _card_type_label(c),
+                "reason": reason,
+                "end_date": c.end_date.isoformat() if c.end_date else None,
+                "days_left": days_left,
+                "remaining_sessions": c.remaining_sessions,
+                "remaining_hours": float(c.remaining_hours) if c.remaining_hours is not None else None,
+                "reminded_at": c.expire_reminded_at.strftime("%m-%d %H:%M") if c.expire_reminded_at else None,
+            }
+        )
+    items.sort(key=lambda x: (x["days_left"] if x["days_left"] is not None else 9999, x["card_id"]))
+    return ResponseModel(data={"items": items, "count": len(items)})
+
+
+@router.post("/period-cards/{card_id}/remind", response_model=ResponseModel)
+def remind_period_card(
+    card_id: int,
+    admin: AdminUser = Depends(get_current_admin),
+    db: Session = Depends(get_db),
+):
+    """管理员手动触发单张卡的到期提醒（订阅消息 + 记录时间戳）。"""
+    from app.core.config import settings
+    from app.services.business import WechatService
+    import asyncio
+
+    card = db.get(PeriodCard, card_id)
+    if not card:
+        raise HTTPException(status_code=404, detail="期限卡不存在")
+    user = db.get(User, card.user_id)
+    if not user or not user.openid:
+        raise HTTPException(status_code=400, detail="用户未绑定微信")
+    tmpl_id = (settings.wx_subscribe_card_expire_tmpl_id or "").strip()
+    if not tmpl_id:
+        raise HTTPException(status_code=400, detail="未配置到期订阅模板 ID")
+    if not _has_accept_subscription(db, user.id, tmpl_id):
+        raise HTTPException(status_code=400, detail="用户未授权订阅消息，无法推送")
+    try:
+        asyncio.run(
+            WechatService.send_subscribe_message(
+                openid=user.openid,
+                template_id=tmpl_id,
+                data=_build_template_data(card),
+                page="pages/packages/index",
+            )
+        )
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"发送失败：{exc}")
+    card.expire_reminded_at = datetime.now()
+    log_admin_action(db, admin, "remind_period_card", target_type="period_card", target_id=card.id)
+    db.commit()
+    return ResponseModel(message="已发送到期提醒")
 
 
 @router.post("/stores/{source_id}/pricing/copy-to/{target_id}", response_model=ResponseModel)
