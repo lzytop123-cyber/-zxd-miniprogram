@@ -4,6 +4,7 @@
       <div class="logo">知行岛后台</div>
       <el-menu :default-active="route.path" router background-color="#1a1a1a" text-color="#fff" active-text-color="#FFD000">
         <el-menu-item index="/dashboard">数据总览</el-menu-item>
+        <el-menu-item index="/live-board">实时占座</el-menu-item>
 
         <el-sub-menu index="home">
           <template #title>首页 · 运营</template>

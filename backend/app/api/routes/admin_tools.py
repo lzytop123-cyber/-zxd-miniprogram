@@ -344,6 +344,95 @@ def store_seats_layout(
     )
 
 
+def _mask_phone(p: str | None) -> str:
+    if not p or len(p) < 7:
+        return ""
+    return f"{p[:3]}****{p[-4:]}"
+
+
+@router.get("/stores/{store_id}/live-board", response_model=ResponseModel)
+def store_live_board(
+    store_id: int,
+    _: object = Depends(get_current_admin),
+    db: Session = Depends(get_db),
+):
+    """实时占座大屏数据：每个座位当前状态 + 汇总。"""
+    store = db.get(Store, store_id)
+    if not store:
+        raise HTTPException(status_code=404, detail="门店不存在")
+    now = datetime.now()
+    zones = {
+        z.id: z.name
+        for z in db.scalars(select(Zone).where(Zone.store_id == store_id)).all()
+    }
+    seats = db.scalars(
+        select(Seat)
+        .where(Seat.store_id == store_id, Seat.is_buffer == 0)
+        .order_by(Seat.seat_code)
+    ).all()
+    # 当前时刻有效的预约（已支付、未取消、未离座、时间窗口覆盖 now）
+    rows = db.execute(
+        select(Reservation, User)
+        .join(User, User.id == Reservation.user_id)
+        .where(
+            Reservation.store_id == store_id,
+            Reservation.pay_status == 1,
+            Reservation.status.in_((0, 1)),
+            Reservation.start_time <= now,
+            Reservation.end_time > now,
+            Reservation.actual_end_time.is_(None),
+        )
+    ).all()
+    active_by_seat: dict[int, tuple[Reservation, User]] = {}
+    for r, u in rows:
+        active_by_seat[r.seat_id] = (r, u)
+
+    seat_items = []
+    counts = {"free": 0, "booked": 0, "occupied": 0, "disabled": 0}
+    for s in seats:
+        if s.status != 1:
+            state = "disabled"
+            info = None
+        elif s.id in active_by_seat:
+            r, u = active_by_seat[s.id]
+            state = "occupied" if r.check_in_time else "booked"
+            info = {
+                "user": u.nickname or _mask_phone(u.phone) or f"用户{u.id}",
+                "start": r.start_time.strftime("%H:%M"),
+                "end": r.end_time.strftime("%H:%M"),
+                "checked_in": bool(r.check_in_time),
+            }
+        else:
+            state = "free"
+            info = None
+        counts[state] += 1
+        seat_items.append(
+            {
+                "id": s.id,
+                "seat_code": s.seat_code,
+                "zone_name": zones.get(s.zone_id, "-"),
+                "pos_x": s.pos_x,
+                "pos_y": s.pos_y,
+                "state": state,
+                "info": info,
+            }
+        )
+    total_active = counts["free"] + counts["booked"] + counts["occupied"]
+    occupancy = round(
+        (counts["occupied"] + counts["booked"]) / max(total_active, 1) * 100, 1
+    )
+    return ResponseModel(
+        data={
+            "store_id": store_id,
+            "store_name": store.name,
+            "server_time": now.strftime("%Y-%m-%d %H:%M:%S"),
+            "counts": counts,
+            "occupancy_rate": occupancy,
+            "seats": seat_items,
+        }
+    )
+
+
 @router.post("/stores/{source_id}/pricing/copy-to/{target_id}", response_model=ResponseModel)
 def copy_pricing_to_store(
     source_id: int,
