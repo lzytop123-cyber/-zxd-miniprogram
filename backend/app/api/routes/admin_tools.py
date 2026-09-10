@@ -30,7 +30,7 @@ from app.services.admin_audit import log_admin_action
 from app.services.csv_export import export_reservations_csv, export_study_stats_csv, export_wallet_logs_csv
 from app.services.deal_template_service import import_deal_templates, list_deal_templates
 from app.services.points import adjust_points
-from app.services.seat_setup import store_seat_summary
+from app.services.seat_setup import seat_code_to_slot, store_seat_summary
 
 router = APIRouter(prefix="/admin", tags=["后台扩展"])
 
@@ -370,16 +370,19 @@ def store_live_board(
         .where(Seat.store_id == store_id, Seat.is_buffer == 0)
         .order_by(Seat.seat_code, Seat.id)
     ).all()
-    # ponytail: 同 store 下 seat_code 无唯一约束，历史脏数据可能有重复，按 code 去重
-    # 优先保留已启用 + 有坐标的那条；根治方案：加唯一约束 + 迁移脚本清理
+    # ponytail: 历史 A01~D03 与新编号 1~28 指向同一 slot，按 slot 去重
+    # 优先启用 + 有坐标的；无 slot 映射的直接丢弃（视为脏数据）
     def _score(s: Seat) -> int:
         return (2 if s.status == 1 else 0) + (1 if s.pos_x is not None and s.pos_y is not None else 0)
-    dedup: dict[str, Seat] = {}
+    dedup: dict[int, Seat] = {}
     for s in seats_raw:
-        cur = dedup.get(s.seat_code)
+        slot = seat_code_to_slot(s.seat_code)
+        if slot is None:
+            continue
+        cur = dedup.get(slot)
         if cur is None or _score(s) > _score(cur):
-            dedup[s.seat_code] = s
-    seats = sorted(dedup.values(), key=lambda x: x.seat_code)
+            dedup[slot] = s
+    seats = [dedup[k] for k in sorted(dedup.keys())]
     # 当前时刻有效的预约（已支付、未取消、未离座、时间窗口覆盖 now）
     rows = db.execute(
         select(Reservation, User)
