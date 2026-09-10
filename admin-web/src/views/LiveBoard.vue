@@ -53,17 +53,18 @@
           <div class="code">{{ seat.seat_code }}</div>
           <template v-if="seat.info">
             <div class="who">{{ shortName(seat.info.user) }}</div>
-            <div class="time">{{ tileTime(seat.info) }}</div>
+            <div class="time">{{ seat.info.is_hourly ? seat.info.today_hours : seat.info.bill_type }}</div>
           </template>
           <div v-if="seat.info" class="pop">
-            <div class="pop-row"><span class="lbl">座位</span>{{ seat.seat_code }} · {{ seat.zone_name }}</div>
-            <div class="pop-row"><span class="lbl">姓名</span>{{ seat.info.user }}</div>
-            <div class="pop-row"><span class="lbl">手机</span>{{ seat.info.phone || '未绑定' }}</div>
-            <div class="pop-row"><span class="lbl">类型</span>{{ seat.info.bill_type }}</div>
-            <div class="pop-row"><span class="lbl">时段</span>{{ seat.info.start }} - {{ seat.info.end }}</div>
-            <div v-if="seat.info.check_in" class="pop-row"><span class="lbl">到店</span>{{ seat.info.check_in }}</div>
-            <div class="pop-row"><span class="lbl">状态</span>{{ seat.info.checked_in ? '已入座' : '未到场' }}</div>
-            <div class="pop-row"><span class="lbl">订单</span>{{ seat.info.order_no }}</div>
+            <div class="pop-row"><span class="lbl">座位号</span>{{ seat.seat_code }} · {{ seat.zone_name }}</div>
+            <div class="pop-row"><span class="lbl">用户昵称</span>{{ seat.info.user }}</div>
+            <div class="pop-row"><span class="lbl">手机号码</span>{{ seat.info.phone || '未绑定' }}</div>
+            <div class="pop-row"><span class="lbl">预约类型</span>{{ seat.info.bill_type }}</div>
+            <div class="pop-row"><span class="lbl">有效期</span>{{ seat.info.period }}</div>
+            <div v-if="!seat.info.is_hourly" class="pop-row"><span class="lbl">今日可用</span>{{ seat.info.today_hours }}</div>
+            <div v-if="seat.info.check_in" class="pop-row"><span class="lbl">到店时间</span>{{ seat.info.check_in }}</div>
+            <div class="pop-row"><span class="lbl">当前状态</span>{{ seat.info.checked_in ? '已入座' : '已预约未到店' }}</div>
+            <div class="pop-row"><span class="lbl">订单编号</span>{{ seat.info.order_no }}</div>
           </div>
         </div>
       </div>
@@ -106,11 +107,6 @@ function shortName(name: string) {
   return s.length > 5 ? s.slice(0, 4) + '…' : s
 }
 
-function tileTime(info: any) {
-  // 按小时预约显示真实时段；卡类（天/月/季/次）start-end 是营业时间，改显示类型
-  if (info.is_hourly) return `${info.start}-${info.end}`
-  return info.bill_type
-}
 
 async function load() {
   if (!storeId.value) return
@@ -239,7 +235,7 @@ onUnmounted(() => {
   border: 1px solid #FFD000;
   border-radius: 8px;
   padding: 10px 12px;
-  min-width: clamp(180px, 22cqw, 240px);
+  min-width: clamp(240px, 26cqw, 300px);
   font-size: clamp(11px, 1.1cqw, 13px);
   color: #e6edf3;
   text-align: left;
@@ -262,9 +258,9 @@ onUnmounted(() => {
 .pop-row { padding: 3px 0; }
 .pop-row .lbl {
   display: inline-block;
-  min-width: 40px;
+  min-width: 68px;
   color: #8b95a1;
-  margin-right: 8px;
+  margin-right: 10px;
 }
 
 .s-free { background: #1e2a1e; border: 1px solid #2b4a2b; color: #7ed957; }

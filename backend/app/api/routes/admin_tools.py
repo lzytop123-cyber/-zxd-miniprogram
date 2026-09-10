@@ -356,10 +356,18 @@ def store_seats_layout(
     )
 
 
-def _mask_phone(p: str | None) -> str:
-    if not p or len(p) < 7:
-        return ""
-    return f"{p[:3]}****{p[-4:]}"
+def _format_period(bill_type: "BillType", start: datetime, end: datetime) -> str:
+    """按预约类型格式化时段：按小时→时段；夜读→当晚时段；卡类→日期区间。"""
+    if bill_type == BillType.hourly:
+        return f"{start.strftime('%H:%M')} - {end.strftime('%H:%M')}"
+    if bill_type == BillType.night:
+        return f"{start.strftime('%m月%d日')} 夜读 {start.strftime('%H:%M')}-{end.strftime('%H:%M')}"
+    # 天卡/月卡/季卡/周卡/次卡/夜读月卡：显示日期区间
+    s = start.strftime("%Y-%m-%d")
+    e = end.strftime("%Y-%m-%d")
+    if s == e:
+        return start.strftime("%Y年%m月%d日")
+    return f"{start.strftime('%m月%d日')} → {end.strftime('%m月%d日')}"
 
 
 @router.get("/stores/{store_id}/live-board", response_model=ResponseModel)
@@ -430,12 +438,12 @@ def store_live_board(
             is_hourly = r.bill_type == BillType.hourly
             info = {
                 "user": u.nickname or f"用户{u.id}",
-                "phone": _mask_phone(u.phone),
+                "phone": u.phone or "",
                 "bill_type": bt_label,
                 "is_hourly": is_hourly,
-                "start": r.start_time.strftime("%H:%M"),
-                "end": r.end_time.strftime("%H:%M"),
-                "check_in": r.check_in_time.strftime("%H:%M") if r.check_in_time else None,
+                "period": _format_period(r.bill_type, r.start_time, r.end_time),
+                "today_hours": f"{r.start_time.strftime('%H:%M')}-{r.end_time.strftime('%H:%M')}",
+                "check_in": r.check_in_time.strftime("%m-%d %H:%M") if r.check_in_time else None,
                 "checked_in": bool(r.check_in_time),
                 "order_no": r.order_no,
             }
