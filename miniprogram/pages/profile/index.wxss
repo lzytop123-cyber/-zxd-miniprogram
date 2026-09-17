@@ -523,3 +523,20 @@
 }
 
 /* icons moved to app.wxss (see .mi-glyph / .icon-*) */
+
+.menu-item--msg .menu-icon { position: relative; }
+.msg-badge {
+  position: absolute;
+  top: -6rpx;
+  right: -12rpx;
+  min-width: 32rpx;
+  height: 32rpx;
+  padding: 0 8rpx;
+  border-radius: 16rpx;
+  background: #ff4d4f;
+  color: #fff;
+  font-size: 20rpx;
+  line-height: 32rpx;
+  text-align: center;
+  font-weight: 600;
+}

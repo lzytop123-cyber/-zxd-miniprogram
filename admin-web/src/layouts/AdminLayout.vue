@@ -10,6 +10,7 @@
           <template #title>首页 · 运营</template>
           <el-menu-item index="/banners">首页活动</el-menu-item>
           <el-menu-item index="/announcements">消息公告</el-menu-item>
+          <el-menu-item index="/notifications">站内消息</el-menu-item>
           <el-menu-item index="/contact-setting">联系店长</el-menu-item>
           <el-menu-item index="/stores">门店管理</el-menu-item>
           <el-menu-item index="/store-calendar">营业日历</el-menu-item>
@@ -45,6 +46,7 @@
         <el-sub-menu index="study">
           <template #title>学习助手</template>
           <el-menu-item index="/study-data">学习数据</el-menu-item>
+          <el-menu-item index="/assistant-usage">AI 使用统计</el-menu-item>
           <el-menu-item index="/knowledge">AI 知识库</el-menu-item>
           <el-menu-item index="/wrongbook">错题本</el-menu-item>
         </el-sub-menu>

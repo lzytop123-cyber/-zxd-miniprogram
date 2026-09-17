@@ -252,30 +252,26 @@ Page({
     const tick = () => {
       const now = new Date()
       const end = parseTime(reservation.end_time)
-      const duration = formatReservationDuration(reservation, now)
-      const canOpen = computeCanOpen(reservation, now)
-      const openWindowHint = getOpenWindowHint(reservation, now)
-      if (end <= now) {
-        this.setData({
-          durationLabel: '剩余时长',
-          countdown: '已结束',
-          canOpen: false,
-          canChangeSeat: false,
-          openWindowHint: '订单已结束',
-        })
-        if (this._expiredReloadFor !== reservation.id) {
-          this._expiredReloadFor = reservation.id
-          this.loadActive()
-        }
-        return
-      }
-      this.setData({
+      const ended = end <= now
+      const duration = ended
+        ? { label: '剩余时长', text: '已结束' }
+        : formatReservationDuration(reservation, now)
+      const next = {
         durationLabel: duration.label,
         countdown: duration.text,
-        canOpen,
-        canChangeSeat: canChangeSeatFor(reservation, now),
-        openWindowHint,
-      })
+        canOpen: ended ? false : computeCanOpen(reservation, now),
+        canChangeSeat: ended ? false : canChangeSeatFor(reservation, now),
+        openWindowHint: ended ? '订单已结束' : getOpenWindowHint(reservation, now),
+      }
+      const patch = {}
+      for (const k in next) {
+        if (next[k] !== this.data[k]) patch[k] = next[k]
+      }
+      if (Object.keys(patch).length) this.setData(patch)
+      if (ended && this._expiredReloadFor !== reservation.id) {
+        this._expiredReloadFor = reservation.id
+        this.loadActive()
+      }
     }
     tick()
     if (this._timer) clearInterval(this._timer)

@@ -95,17 +95,27 @@
     <el-dialog v-model="editVisible" title="期限卡运维" width="520px">
       <el-form :model="editForm" label-width="110px">
         <el-form-item label="卡名称"><el-input :model-value="editRow?.card_name" disabled /></el-form-item>
+        <el-form-item label="卡类型">
+          <el-select v-model="editForm.card_type" style="width:100%">
+            <el-option v-for="t in cardTypes" :key="t.value" :label="t.label" :value="t.value" />
+          </el-select>
+          <div class="hint">映射发错类型时可在此纠正（如 day_pass 误发 → 改成季卡）</div>
+        </el-form-item>
+        <el-form-item label="连约天数">
+          <el-input-number v-model="editForm.total_sessions" :min="0" style="width:100%" />
+          <div class="hint">周/月/季卡一次须约满的天数，季卡一般填 90</div>
+        </el-form-item>
         <el-form-item label="延长天数">
           <el-input-number v-model="editForm.extend_days" :min="0" style="width:100%" />
           <div class="hint">续费用：卡面截止日期 +N；天/周/月/季卡的「连续约满天数」同步 +N</div>
         </el-form-item>
-        <el-form-item v-if="editRow?.card_type === 'hourly'" label="剩余小时">
+        <el-form-item v-if="editForm.card_type === 'hourly'" label="剩余小时">
           <el-input-number v-model="editForm.remaining_hours" :min="0" :step="0.5" :precision="1" style="width:100%" />
         </el-form-item>
-        <el-form-item v-if="editRow?.card_type === 'hourly'" label="总小时">
+        <el-form-item v-if="editForm.card_type === 'hourly'" label="总小时">
           <el-input-number v-model="editForm.total_hours" :min="0" :step="0.5" :precision="1" style="width:100%" />
         </el-form-item>
-        <el-form-item v-if="editRow?.card_type === 'session'" label="剩余次数">
+        <el-form-item v-if="editForm.card_type === 'session'" label="剩余次数">
           <el-input-number v-model="editForm.remaining_sessions" :min="0" style="width:100%" />
         </el-form-item>
         <el-form-item label="备注"><el-input v-model="editForm.remark" /></el-form-item>
@@ -145,6 +155,8 @@ const issueForm = reactive({
   remark: '',
 })
 const editForm = reactive({
+  card_type: 'daily',
+  total_sessions: null as number | null,
   extend_days: 0,
   remaining_hours: null as number | null,
   total_hours: null as number | null,
@@ -244,6 +256,8 @@ async function submitIssue() {
 
 function openEdit(row: any) {
   editRow.value = row
+  editForm.card_type = row.card_type || 'daily'
+  editForm.total_sessions = row.total_sessions ?? row.period_pass_days ?? null
   editForm.extend_days = 0
   editForm.remaining_hours = row.remaining_hours
   editForm.total_hours = row.total_hours
@@ -256,11 +270,15 @@ async function submitEdit() {
   if (!editRow.value) return
   submitting.value = true
   try {
-    const body: Record<string, unknown> = { remark: editForm.remark }
+    const body: Record<string, unknown> = {
+      remark: editForm.remark,
+      card_type: editForm.card_type,
+    }
     if (editForm.extend_days > 0) body.extend_days = editForm.extend_days
     if (editForm.remaining_hours != null) body.remaining_hours = editForm.remaining_hours
     if (editForm.total_hours != null) body.total_hours = editForm.total_hours
     if (editForm.remaining_sessions != null) body.remaining_sessions = editForm.remaining_sessions
+    if (editForm.total_sessions != null) body.total_sessions = editForm.total_sessions
     const res = await http.patch(`/admin/period-cards/${editRow.value.id}`, body)
     ElMessage.success(res.message || '已更新')
     editVisible.value = false

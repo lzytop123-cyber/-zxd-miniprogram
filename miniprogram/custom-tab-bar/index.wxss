@@ -41,8 +41,8 @@
 }
 
 .tab-item-icon-box {
-  width: 42rpx;
-  height: 42rpx;
+  width: 48rpx;
+  height: 48rpx;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -50,12 +50,12 @@
 }
 
 .tab-item-icon {
-  width: 42rpx;
-  height: 42rpx;
+  width: 48rpx;
+  height: 48rpx;
 }
 
 .tab-item-text {
-  font-size: 20rpx;
+  font-size: 22rpx;
   line-height: 1;
   color: var(--color-text-secondary);
 }

@@ -90,6 +90,8 @@ def run_schema_migrations(db: Session) -> dict:
     try:
         from app.models import (
             AdminOperationLog,
+            AssistantChatLog,
+            AssistantUsageDaily,
             MarketCategory,
             MarketContactRequest,
             MarketFavorite,
@@ -97,6 +99,8 @@ def run_schema_migrations(db: Session) -> dict:
             MarketModerationLog,
             MarketReport,
             MarketSensitiveWord,
+            Notification,
+            NotificationRead,
             RechargeOrder,
             WrongbookSubject,
             WrongQuestion,
@@ -122,6 +126,10 @@ def run_schema_migrations(db: Session) -> dict:
             MarketModerationLog,
             WrongbookSubject,
             WrongQuestion,
+            Notification,
+            NotificationRead,
+            AssistantUsageDaily,
+            AssistantChatLog,
         ):
             model.__table__.create(bind=engine, checkfirst=True)
             if inspector.has_table(model.__tablename__):

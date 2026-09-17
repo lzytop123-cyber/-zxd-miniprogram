@@ -358,6 +358,35 @@ class StudyStat(Base):
     session_count: Mapped[int] = mapped_column(Integer, default=0)
 
 
+class AssistantUsageDaily(Base):
+    """AI 助手按日汇总：谁用了、用了几次。"""
+
+    __tablename__ = "assistant_usage_daily"
+    __table_args__ = (UniqueConstraint("user_id", "stat_date", name="uk_ai_user_date"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"), nullable=False)
+    stat_date: Mapped[date] = mapped_column(Date, nullable=False)
+    chat_count: Mapped[int] = mapped_column(Integer, default=0)
+    last_used_at: Mapped[datetime | None] = mapped_column(DateTime)
+
+
+class AssistantChatLog(Base):
+    """AI 助手问答明细：一问一答。"""
+
+    __tablename__ = "assistant_chat_logs"
+    __table_args__ = (
+        Index("ix_assistant_chat_logs_user_created", "user_id", "created_at"),
+        Index("ix_assistant_chat_logs_created", "created_at"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"), nullable=False)
+    question: Mapped[str] = mapped_column(Text, nullable=False)
+    reply: Mapped[str] = mapped_column(Text, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
+
+
 class BleLock(Base):
     __tablename__ = "ble_locks"
 
@@ -477,6 +506,38 @@ class WechatSubscription(Base):
     scene: Mapped[str | None] = mapped_column(String(50))
     status: Mapped[int] = mapped_column(Integer, default=1)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
+
+
+class Notification(Base):
+    __tablename__ = "notifications"
+    __table_args__ = (
+        Index("ix_notifications_target_user", "target_user_id"),
+        Index("ix_notifications_store", "store_id"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    title: Mapped[str] = mapped_column(String(100), nullable=False)
+    content: Mapped[str] = mapped_column(Text, nullable=False)
+    category: Mapped[str] = mapped_column(String(20), default="system")  # system/reminder/promo
+    target_type: Mapped[str] = mapped_column(String(10), default="all")  # all/user/store
+    target_user_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("users.id"))
+    store_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("stores.id"))
+    link_path: Mapped[str | None] = mapped_column(String(200))
+    sent_by_admin_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("admin_users.id"))
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
+
+
+class NotificationRead(Base):
+    __tablename__ = "notification_reads"
+    __table_args__ = (
+        UniqueConstraint("notification_id", "user_id", name="uk_notification_user"),
+        Index("ix_notification_reads_user", "user_id"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    notification_id: Mapped[int] = mapped_column(Integer, ForeignKey("notifications.id"), nullable=False)
+    user_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"), nullable=False)
+    read_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
 
 
 class HomeBanner(Base):

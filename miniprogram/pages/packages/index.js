@@ -8,22 +8,14 @@ const { enableShareMenu, shareAppMessage, shareTimeline } = require('../../utils
 const { requestCardExpireSubscribe } = require('../../utils/subscribe')
 const {
   PKG_CATEGORY_TABS,
-  formatCard,
-  isCardUsable,
   enrichPackage,
   filterPackages,
-  buildCardDetail,
   buildPackageDetail,
-  cardBillTypeForBooking,
 } = require('../../utils/cardDisplay')
 
 Page({
   data: {
     loggedIn: false,
-    cards: [],
-    activeCount: 0,
-    detailCard: null,
-    myCardsSheetVisible: false,
     stores: [],
     storeId: null,
     storeName: '',
@@ -68,27 +60,7 @@ Page({
 
   refreshPage(options = {}) {
     const { force = false, silent = false } = options
-    this.loadCards({ force, silent })
     return this.ensureBuyLoaded({ force, silent })
-  },
-
-  loadCards(options = {}) {
-    const { force = false } = options
-    if (!auth.isLoggedIn()) {
-      this.setData({ cards: [], activeCount: 0, loggedIn: false })
-      return Promise.resolve()
-    }
-    if (force) invalidateCache('/user/cards')
-    return request({ url: '/user/cards', silent: true, force })
-      .then((cards) => {
-        const list = (cards || []).filter(isCardUsable).map(formatCard)
-        this.setData({ cards: list, activeCount: list.length, loggedIn: true })
-      })
-      .catch(() => {
-        if (!this.data.cards.length) {
-          this.setData({ cards: [], activeCount: 0 })
-        }
-      })
   },
 
   ensureBuyLoaded(options = {}) {
@@ -164,30 +136,6 @@ Page({
     })
   },
 
-  openMyCardsSheet() {
-    if (!auth.isLoggedIn()) {
-      auth.goLogin('/pages/packages/index')
-      return
-    }
-    this.setData({ myCardsSheetVisible: true, detailVisible: false })
-  },
-
-  closeMyCardsSheet() {
-    this.setData({ myCardsSheetVisible: false })
-  },
-
-  showCardDetail(e) {
-    const idx = Number(e.currentTarget.dataset.index)
-    const card = this.data.cards[idx]
-    if (!card) return
-    this.setData({
-      myCardsSheetVisible: false,
-      detailVisible: true,
-      detailCard: card,
-      detail: buildCardDetail(card),
-    })
-  },
-
   showPackageDetail(e) {
     const idx = Number(e.currentTarget.dataset.index)
     const pkg = this.data.displayPackages[idx]
@@ -196,25 +144,7 @@ Page({
   },
 
   closeDetail() {
-    this.setData({ detailVisible: false, detail: null, detailCard: null })
-  },
-
-  goBookWithCard() {
-    const card = this.data.detailCard
-    const storeId = this.data.storeId
-    if (!card || !storeId) {
-      wx.showToast({ title: '请先选择门店', icon: 'none' })
-      return
-    }
-    const billType = cardBillTypeForBooking(card)
-    if (!billType) {
-      wx.showToast({ title: '该卡暂不支持在线预约', icon: 'none' })
-      return
-    }
-    wx.setStorageSync('pendingBooking', { storeId, billType })
-    invalidateCache('/user/cards')
-    this.setData({ detailVisible: false, detail: null, detailCard: null })
-    wx.navigateTo({ url: `${routes.bookingIndex}?storeId=${storeId}&billType=${billType}` })
+    this.setData({ detailVisible: false, detail: null })
   },
 
   noop() {},
@@ -267,8 +197,12 @@ Page({
       wx.showModal({
         title: '购买成功',
         content: `已购买：${(confirmed && confirmed.card_name) || res.label || '期限卡'}`,
-        showCancel: false,
-        success: () => this.loadCards({ force: true }),
+        confirmText: '查看卡包',
+        cancelText: '继续购卡',
+        confirmColor: '#2D6A4F',
+        success: (r) => {
+          if (r.confirm) wx.navigateTo({ url: routes.profileCards })
+        },
       })
     } catch (err) {
       wx.hideLoading()

@@ -163,15 +163,19 @@ def update_admin_period_card(
     card: PeriodCard,
     *,
     status: int | None = None,
+    card_type: CardType | None = None,
     end_date: date | None = None,
     extend_days: int | None = None,
     remaining_hours: Decimal | None = None,
     total_hours: Decimal | None = None,
     remaining_sessions: int | None = None,
+    total_sessions: int | None = None,
     remark: str | None = None,
 ) -> PeriodCard:
     if status is not None:
         card.status = status
+    if card_type is not None:
+        card.card_type = card_type
     if end_date is not None:
         card.end_date = end_date
     elif extend_days is not None and extend_days > 0:
@@ -190,6 +194,8 @@ def update_admin_period_card(
         card.total_hours = total_hours
     if remaining_sessions is not None:
         card.remaining_sessions = remaining_sessions
+    if total_sessions is not None:
+        card.total_sessions = total_sessions
     if remark is not None:
         card.remark = remark
     return card

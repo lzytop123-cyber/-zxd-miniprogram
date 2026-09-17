@@ -19,47 +19,6 @@
     </scroll-view>
   </view>
 
-  <!-- 可用期限卡：顶部紧凑入口，不占主视觉 -->
-  <view class="my-strip" wx:if="{{loggedIn && cards.length}}">
-    <view class="my-strip-head" bindtap="openMyCardsSheet">
-      <view class="my-strip-title">
-        <text class="my-strip-label">我的期限卡</text>
-        <text class="my-strip-count">{{activeCount}} 张可用</text>
-      </view>
-      <view class="my-strip-more">全部 ›</view>
-    </view>
-    <scroll-view class="my-scroll" scroll-x enhanced show-scrollbar="{{false}}">
-      <view class="my-scroll-inner">
-        <view
-          class="my-chip"
-          wx:for="{{cards}}"
-          wx:key="id"
-          data-index="{{index}}"
-          bindtap="showCardDetail"
-        >
-          <view class="my-chip-type">{{item.typeLabel}}</view>
-          <view class="my-chip-name">{{item.card_name || item.typeLabel}}</view>
-          <view class="my-chip-meta">{{item.chipMeta}}</view>
-        </view>
-      </view>
-    </scroll-view>
-  </view>
-
-  <view class="my-strip my-strip--empty" wx:elif="{{loggedIn}}" bindtap="goExchange">
-    <text>暂无可用期限卡</text>
-    <text class="my-strip-link">团购验券 ›</text>
-  </view>
-
-  <view class="my-strip my-strip--guest" wx:else bindtap="goLogin">
-    <text>登录查看</text>
-    <text class="my-strip-link">去登录 ›</text>
-  </view>
-
-  <!-- 购买期限卡：页面主体 -->
-  <view class="section-head">
-    <view class="section-title">购买套餐</view>
-  </view>
-
   <view class="buy-body">
     <view class="loading" wx:if="{{loading}}">加载中...</view>
 
@@ -87,44 +46,6 @@
     </view>
   </view>
 
-  <!-- 我的期限卡列表弹层 -->
-  <view class="sheet-mask" wx:if="{{myCardsSheetVisible}}" bindtap="closeMyCardsSheet">
-    <view class="sheet-panel" catchtap="noop">
-      <view class="sheet-handle"></view>
-      <view class="sheet-head">
-        <view class="sheet-title">我的期限卡</view>
-        <view class="sheet-close" bindtap="closeMyCardsSheet">关闭</view>
-      </view>
-      <scroll-view class="sheet-scroll" scroll-y>
-        <view
-          class="ticket-card ticket-card--sheet"
-          wx:for="{{cards}}"
-          wx:key="id"
-          data-index="{{index}}"
-          bindtap="showCardDetail"
-        >
-          <view class="ticket-deco"></view>
-          <view class="ticket-top">
-            <view class="ticket-type">{{item.typeLabel}}</view>
-            <view class="ticket-badge">可用</view>
-          </view>
-          <view class="ticket-name">{{item.card_name || item.typeLabel}}</view>
-          <view class="ticket-meta" wx:if="{{item.validityRangeText}}">
-            <text>效期 {{item.validityRangeText}}</text>
-            <text class="ticket-remain {{item.validityRemainUrgent ? 'urgent' : ''}}" wx:if="{{item.validityRemainText}}"> · {{item.validityRemainText}}</text>
-          </view>
-          <view class="ticket-meta" wx:elif="{{item.validityText}}">{{item.validityText}}</view>
-          <view class="ticket-meta highlight" wx:if="{{item.remainText}}">{{item.remainText}}</view>
-          <view class="ticket-foot">
-            <view class="ticket-brief">{{item.ruleText}}</view>
-            <view class="ticket-more">详情 ›</view>
-          </view>
-        </view>
-      </scroll-view>
-      <view class="sheet-foot" bindtap="goExchange">团购验券兑换 ›</view>
-    </view>
-  </view>
-
   <!-- 详情弹层 -->
   <view class="detail-mask" wx:if="{{detailVisible}}" bindtap="closeDetail">
     <view class="detail-sheet" catchtap="noop">
@@ -141,10 +62,7 @@
         <view class="detail-btn primary" wx:if="{{detail.mode === 'buy'}}" bindtap="buyFromDetail">
           立即购买 ¥{{detail.priceText}}
         </view>
-        <view class="detail-btn primary" wx:elif="{{detail.mode === 'owned'}}" bindtap="goBookWithCard">
-          去预约
-        </view>
-        <view class="detail-btn" bindtap="closeDetail">{{detail.mode === 'buy' ? '再看看' : '知道了'}}</view>
+        <view class="detail-btn" bindtap="closeDetail">再看看</view>
       </view>
     </view>
   </view>

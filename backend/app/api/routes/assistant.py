@@ -74,4 +74,9 @@ def chat(
             break
     system_prompt = assistant_service.build_system_prompt(user_context, query=last_user_query)
     reply = assistant_service.chat(system_prompt, history)
+    try:
+        assistant_service.record_chat_usage(db, user.id, last_user_query, reply)
+    except Exception:
+        # 统计失败不影响正常回复
+        pass
     return ResponseModel(data=ChatResponse(reply=reply))

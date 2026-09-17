@@ -28,7 +28,9 @@ Page({
       points: routes.profilePoints,
       invite: routes.profileInvite,
       contact: routes.profileContact,
+      messages: routes.profileMessages,
     },
+    unreadCount: 0,
   },
 
   onShareAppMessage() {
@@ -45,6 +47,14 @@ Page({
     syncTabBar(this, '/pages/profile/index')
     this._tabbarLastTop = 0
     this.bootstrap({ silent: true })
+    this.loadUnread()
+  },
+
+  loadUnread() {
+    if (!auth.isLoggedIn()) return
+    request({ url: '/notifications/unread-count', silent: true })
+      .then((d) => this.setData({ unreadCount: (d && d.count) || 0 }))
+      .catch(() => {})
   },
 
   onPageScroll(e) {
@@ -182,7 +192,7 @@ Page({
   },
 
   goPackages() {
-    wx.switchTab({ url: '/pages/packages/index' })
+    wx.navigateTo({ url: '/packageProfile/pages/profile/cards' })
   },
 
   goMarket() {

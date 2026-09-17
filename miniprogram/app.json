@@ -45,7 +45,8 @@
         "pages/profile/points",
         "pages/profile/invite",
         "pages/profile/contact",
-        "pages/profile/agreement"
+        "pages/profile/agreement",
+        "pages/profile/messages"
       ]
     },
     {

@@ -5,7 +5,7 @@
 """
 
 import logging
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from functools import lru_cache
 from io import BytesIO
 from pathlib import Path
@@ -15,13 +15,14 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
-from app.models import StudyStat, User
+from app.models import AssistantChatLog, AssistantUsageDaily, StudyStat, User
 
 logger = logging.getLogger(__name__)
 
 KNOWLEDGE_PATH = Path(__file__).resolve().parent.parent / "knowledge" / "zhixingdao_kb.md"
 KNOWLEDGE_ALLOWED_EXTENSIONS = {".md", ".markdown", ".txt", ".docx"}
 KNOWLEDGE_MAX_BYTES = 2_000_000
+CHAT_LOG_MAX_CHARS = 8000
 
 # 历史消息限制，控制 token 成本
 MAX_HISTORY_MESSAGES = 12
@@ -236,3 +237,32 @@ def chat(system_prompt: str, history: list[dict]) -> str:
     except (httpx.HTTPError, KeyError, IndexError, ValueError) as exc:
         logger.warning("DeepSeek 调用失败: %s", exc)
         return "AI 助手暂时不可用，请稍后再试～"
+
+
+def record_chat_usage(db: Session, user_id: int, question: str, reply: str) -> None:
+    """写入日汇总 + 问答明细。失败由调用方决定是否吞掉。"""
+    now = datetime.now()
+    today = now.date()
+    q = (question or "").strip()[:CHAT_LOG_MAX_CHARS] or "（空）"
+    a = (reply or "").strip()[:CHAT_LOG_MAX_CHARS] or "（空）"
+
+    row = db.scalar(
+        select(AssistantUsageDaily).where(
+            AssistantUsageDaily.user_id == user_id,
+            AssistantUsageDaily.stat_date == today,
+        )
+    )
+    if row:
+        row.chat_count = int(row.chat_count or 0) + 1
+        row.last_used_at = now
+    else:
+        db.add(
+            AssistantUsageDaily(
+                user_id=user_id,
+                stat_date=today,
+                chat_count=1,
+                last_used_at=now,
+            )
+        )
+    db.add(AssistantChatLog(user_id=user_id, question=q, reply=a, created_at=now))
+    db.commit()

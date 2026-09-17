@@ -1,5 +1,6 @@
 {
   "navigationBarTitleText": "我的期限卡",
   "navigationBarBackgroundColor": "#52B788",
-  "navigationBarTextStyle": "white"
+  "navigationBarTextStyle": "white",
+  "enablePullDownRefresh": true
 }

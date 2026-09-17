@@ -64,8 +64,9 @@
           <el-tag :type="row.is_active ? 'success' : 'info'">{{ row.is_active ? '启用' : '停用' }}</el-tag>
         </template>
       </el-table-column>
-      <el-table-column label="操作" width="120" fixed="right">
+      <el-table-column label="操作" width="180" fixed="right">
         <template #default="{ row }">
+          <el-button link type="primary" @click="openEdit(row)">编辑</el-button>
           <el-button link type="primary" @click="toggleLimit(row)">
             {{ row.limit_per_user > 0 ? '取消限兑' : '设限兑1次' }}
           </el-button>
@@ -75,7 +76,7 @@
 
     <el-dialog v-model="showAdd" :title="dialogTitle" width="480px">
       <el-form :model="form" label-width="100px">
-        <el-form-item label="Deal ID"><el-input v-model="form.deal_id" :disabled="!!resolveId" /></el-form-item>
+        <el-form-item label="Deal ID"><el-input v-model="form.deal_id" :disabled="!!resolveId || !!editId" /></el-form-item>
         <el-form-item label="商品名称"><el-input v-model="form.deal_name" /></el-form-item>
         <el-form-item label="权益类型">
           <el-select v-model="form.reward_type" style="width:100%">
@@ -108,6 +109,7 @@ const platformTab = ref('1')
 const loading = ref(false)
 const showAdd = ref(false)
 const resolveId = ref<number | null>(null)
+const editId = ref<number | null>(null)
 const rewardTypes = ['hours', 'day_pass', 'week_pass', 'month_pass', 'quarter_pass', 'night_monthly', 'session']
 const form = reactive({
   deal_id: '',
@@ -119,7 +121,11 @@ const form = reactive({
   limit_once: false,
 })
 
-const dialogTitle = computed(() => (resolveId.value ? '配置待处理团购' : '新增团购映射'))
+const dialogTitle = computed(() => {
+  if (editId.value) return '编辑团购映射'
+  if (resolveId.value) return '配置待处理团购'
+  return '新增团购映射'
+})
 const currentPlatform = computed(() => Number(platformTab.value))
 
 function nameLooksLimited(name: string) {
@@ -160,6 +166,7 @@ async function importTemplates() {
 
 function openAdd() {
   resolveId.value = null
+  editId.value = null
   form.deal_id = ''
   form.deal_name = ''
   form.reward_type = 'hours'
@@ -169,7 +176,20 @@ function openAdd() {
   showAdd.value = true
 }
 
+function openEdit(row: any) {
+  resolveId.value = null
+  editId.value = row.id
+  form.deal_id = row.deal_id
+  form.deal_name = row.deal_name || ''
+  form.reward_type = row.reward_type || 'day_pass'
+  form.reward_value = row.reward_value || 1
+  form.limit_once = Number(row.limit_per_user || 0) > 0
+  form.platform = currentPlatform.value
+  showAdd.value = true
+}
+
 function openResolve(row: any) {
+  editId.value = null
   resolveId.value = row.id
   form.deal_id = row.deal_id
   form.deal_name = row.deal_name || ''
@@ -182,7 +202,15 @@ function openResolve(row: any) {
 
 async function submit() {
   const limit_per_user = form.limit_once ? 1 : 0
-  if (resolveId.value) {
+  if (editId.value) {
+    await http.put(`/admin/deal-mappings/${editId.value}`, {
+      deal_name: form.deal_name,
+      reward_type: form.reward_type,
+      reward_value: form.reward_value,
+      limit_per_user,
+    })
+    ElMessage.success('映射已更新（已发卡需在期限卡里单独改类型）')
+  } else if (resolveId.value) {
     await http.post(`/admin/deal-mappings/pending/${resolveId.value}/resolve`, {
       store_id: storeId.value,
       deal_name: form.deal_name,
@@ -201,6 +229,7 @@ async function submit() {
   }
   showAdd.value = false
   resolveId.value = null
+  editId.value = null
   load()
 }
 

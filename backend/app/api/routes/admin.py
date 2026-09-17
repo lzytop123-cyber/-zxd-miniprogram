@@ -17,6 +17,8 @@ from app.core.security import create_access_token, hash_password, verify_passwor
 from app.db.session import get_db
 from app.models import (
     AdminUser,
+    AssistantChatLog,
+    AssistantUsageDaily,
     BillType,
     CardPurchaseOrder,
     CardSource,
@@ -409,6 +411,14 @@ class DealMappingCreateRequest(BaseModel):
     limit_per_user: int = 0
 
 
+class DealMappingUpdateRequest(BaseModel):
+    deal_name: str | None = None
+    reward_type: RewardType | None = None
+    reward_value: int | None = None
+    is_active: int | None = None
+    limit_per_user: int | None = None
+
+
 class PendingDealResolveRequest(BaseModel):
     store_id: int | None = None
     deal_name: str | None = None
@@ -607,6 +617,42 @@ def create_deal_mapping(
     db.refresh(row)
     mark_pending_resolved_by_deal_id(db, body.deal_id)
     return ResponseModel(message="已添加", data={"id": row.id})
+
+
+@router.put("/deal-mappings/{mapping_id}", response_model=ResponseModel)
+def update_deal_mapping(
+    mapping_id: int,
+    body: DealMappingUpdateRequest,
+    _: object = Depends(get_current_admin),
+    db: Session = Depends(get_db),
+):
+    row = db.get(MeituanDealMapping, mapping_id)
+    if not row:
+        raise HTTPException(status_code=404, detail="映射不存在")
+    if body.deal_name is not None:
+        row.deal_name = body.deal_name.strip() or row.deal_name
+    if body.reward_type is not None:
+        row.reward_type = body.reward_type
+    if body.reward_value is not None:
+        row.reward_value = body.reward_value
+    if body.is_active is not None:
+        row.is_active = body.is_active
+    if body.limit_per_user is not None:
+        row.limit_per_user = body.limit_per_user
+    db.commit()
+    db.refresh(row)
+    return ResponseModel(
+        message="映射已更新",
+        data={
+            "id": row.id,
+            "deal_id": row.deal_id,
+            "deal_name": row.deal_name,
+            "reward_type": row.reward_type.value,
+            "reward_value": row.reward_value,
+            "is_active": row.is_active,
+            "limit_per_user": row.limit_per_user,
+        },
+    )
 
 
 @router.put("/deal-mappings/{mapping_id}/limit", response_model=ResponseModel)
@@ -1510,11 +1556,13 @@ class AdminIssuePeriodCardRequest(BaseModel):
 
 class AdminUpdatePeriodCardRequest(BaseModel):
     status: int | None = None
+    card_type: str | None = None
     end_date: date | None = None
     extend_days: int | None = None
     remaining_hours: float | None = None
     total_hours: float | None = None
     remaining_sessions: int | None = None
+    total_sessions: int | None = None
     remark: str | None = None
 
 
@@ -1556,15 +1604,21 @@ def update_period_card_admin(
     if not card:
         raise HTTPException(status_code=404, detail="期限卡不存在")
     try:
+        card_type = CardType(body.card_type) if body.card_type else None
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail="卡类型无效") from e
+    try:
         update_admin_period_card(
             db,
             card,
             status=body.status,
+            card_type=card_type,
             end_date=body.end_date,
             extend_days=body.extend_days,
             remaining_hours=Decimal(str(body.remaining_hours)) if body.remaining_hours is not None else None,
             total_hours=Decimal(str(body.total_hours)) if body.total_hours is not None else None,
             remaining_sessions=body.remaining_sessions,
+            total_sessions=body.total_sessions,
             remark=body.remark,
         )
     except ValueError as e:
@@ -1881,6 +1935,100 @@ def list_wallet_logs_admin(
         })
     return ResponseModel(
         data=PageResult(items=items, total=total or 0, page=page, page_size=page_size)
+    )
+
+
+@router.get("/assistant/usage/daily", response_model=ResponseModel)
+def assistant_usage_daily_admin(
+    stat_date: date | None = None,
+    page: int = Query(1, ge=1),
+    page_size: int = Query(50, ge=1, le=100),
+    _: object = Depends(get_current_admin),
+    db: Session = Depends(get_db),
+):
+    """某日 AI 使用汇总：谁用了、用了几次。"""
+    day = stat_date or date.today()
+    query = select(AssistantUsageDaily).where(AssistantUsageDaily.stat_date == day)
+    total = db.scalar(select(func.count()).select_from(query.subquery())) or 0
+    chat_total = (
+        db.scalar(
+            select(func.coalesce(func.sum(AssistantUsageDaily.chat_count), 0)).where(
+                AssistantUsageDaily.stat_date == day
+            )
+        )
+        or 0
+    )
+    rows = db.scalars(
+        query.order_by(AssistantUsageDaily.chat_count.desc(), AssistantUsageDaily.id.desc())
+        .offset((page - 1) * page_size)
+        .limit(page_size)
+    ).all()
+    items = []
+    for row in rows:
+        user = db.get(User, row.user_id)
+        items.append(
+            {
+                "id": row.id,
+                "user_id": row.user_id,
+                "user_nickname": user.nickname if user else None,
+                "user_phone": user.phone if user else None,
+                "stat_date": row.stat_date.isoformat(),
+                "chat_count": int(row.chat_count or 0),
+                "last_used_at": row.last_used_at.isoformat() if row.last_used_at else None,
+            }
+        )
+    return ResponseModel(
+        data={
+            "stat_date": day.isoformat(),
+            "user_count": total,
+            "chat_total": int(chat_total),
+            "items": items,
+            "total": total,
+            "page": page,
+            "page_size": page_size,
+        }
+    )
+
+
+@router.get("/assistant/chat-logs", response_model=ResponseModel)
+def assistant_chat_logs_admin(
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
+    user_id: int | None = None,
+    stat_date: date | None = None,
+    _: object = Depends(get_current_admin),
+    db: Session = Depends(get_db),
+):
+    """AI 问答明细。"""
+    query = select(AssistantChatLog)
+    if user_id:
+        query = query.where(AssistantChatLog.user_id == user_id)
+    if stat_date:
+        start = datetime.combine(stat_date, time.min)
+        end = datetime.combine(stat_date, time.max)
+        query = query.where(AssistantChatLog.created_at >= start, AssistantChatLog.created_at <= end)
+    total = db.scalar(select(func.count()).select_from(query.subquery())) or 0
+    rows = db.scalars(
+        query.order_by(AssistantChatLog.created_at.desc())
+        .offset((page - 1) * page_size)
+        .limit(page_size)
+    ).all()
+    items = []
+    for row in rows:
+        user = db.get(User, row.user_id)
+        items.append(
+            {
+                "id": row.id,
+                "user_id": row.user_id,
+                "user_nickname": user.nickname if user else None,
+                "user_phone": user.phone if user else None,
+                "question": row.question,
+                "reply": row.reply,
+                "created_at": row.created_at.isoformat() if row.created_at else None,
+            }
+        )
+    return ResponseModel(
+        data=PageResult(items=items, total=total, page=page, page_size=page_size)
     )
 
 
