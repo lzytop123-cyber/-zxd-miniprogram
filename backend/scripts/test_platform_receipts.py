@@ -131,6 +131,31 @@ class PlatformReceiptsTests(unittest.TestCase):
         self.assertEqual(self.summary(9)["month"]["received"], "39.00")
         self.assertIsNone(self.pending()["items"][0]["channel"])
 
+    def test_bulk_reconcile_links_and_inserts_reference_price(self):
+        # A: reference price only, channel + date known → should insert at reference_price.
+        a = self.order(deal_price=Decimal("99"))
+        # B: manual receipt matches → should link, not double-insert.
+        b = self.order(deal_price=Decimal("88"))
+        manual = self.receipt(channel="meituan", amount="88", received_on="2025-09-02", reference=b.coupon_code)
+        # C: unknown channel → must skip; safety hasn't changed.
+        c = self.order(None, {"platform": "yunlaoban"}, deal_price=Decimal("77"))
+        self.sync_platforms()
+        res = self.client.post("/admin/receipts/platform-review/bulk-reconcile")
+        self.assertEqual(res.status_code, 200, res.text)
+        self.assertEqual(res.json()["data"], {"linked": 1, "inserted": 1, "skipped": 1})
+        self.assertEqual(self.summary(9)["month"]["received"], f"{99 + 88}.00")
+        self.assertEqual(self.pending()["total"], 1)
+        rows = self.db.scalars(select(Receipt)).all()
+        self.assertEqual({r.reference for r in rows}, {a.coupon_code, b.coupon_code})
+        self.assertEqual(next(r for r in rows if r.reference == b.coupon_code).id, manual["id"])
+        # Idempotent: running again does nothing.
+        self.assertEqual(self.client.post("/admin/receipts/platform-review/bulk-reconcile").json()["data"], {"linked": 0, "inserted": 0, "skipped": 1})
+        # Auth check.
+        from app.api.deps import get_current_admin
+        self.app.dependency_overrides.pop(get_current_admin)
+        self.assertEqual(self.client.post("/admin/receipts/platform-review/bulk-reconcile").status_code, 401)
+        self.assertEqual(c.id, c.id)  # keep reference alive
+
     def test_confirmation_validation_and_authentication(self):
         from app.api.deps import get_current_admin
         order = self.order(raw={"ticketData": {"dealPrice": 99}})

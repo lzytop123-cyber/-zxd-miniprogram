@@ -123,6 +123,49 @@ def platform_review(page: int = Query(1, ge=1), page_size: int = Query(20, ge=1,
     return ResponseModel(data=PageResult(items=items[(page - 1) * page_size:page * page_size], total=len(items), page=page, page_size=page_size))
 
 
+@router.post("/platform-review/bulk-reconcile", response_model=ResponseModel)
+def bulk_reconcile(admin: AdminUser = Depends(get_current_admin), db: Session = Depends(get_db)):
+    """先关联已有手工登记，再用参考价把剩余能定的批量入账；其余保持待核对。"""
+    linked = inserted = skipped = 0
+    for item in platform_svc.candidates(db):
+        channel, day = item["channel"], item["received_on"]
+        amount = item["amount"] or item["reference_price"]
+        if not channel or not day or not amount or day > svc.today():
+            skipped += 1
+            continue
+        amount = Decimal(amount)
+        key = platform_svc.source_key(item["id"])
+        if db.scalar(select(Receipt.id).where(Receipt.source_key == key)):
+            skipped += 1
+            continue
+        if item["existing_receipt_id"]:
+            row = db.get(Receipt, item["existing_receipt_id"])
+            if not row or not row.source_key.startswith("manual:") or row.channel != channel or row.amount != amount or row.received_on != day:
+                skipped += 1
+                continue
+            changed = db.execute(update(Receipt).where(Receipt.id == row.id, Receipt.source_key == row.source_key).values(source_key=key, source_refunded=item["source_refunded"]))
+            if changed.rowcount != 1:
+                skipped += 1
+                continue
+            linked += 1
+        else:
+            row = Receipt(source_key=key, channel=channel, amount=amount, received_on=day,
+                          reference=item["reference"], customer=item["customer"],
+                          remark=f"核销收款（一键核对） · {item['deal_name']}"[:500], source_refunded=item["source_refunded"])
+            try:
+                with db.begin_nested():
+                    db.add(row)
+                    db.flush()
+                inserted += 1
+            except IntegrityError:
+                skipped += 1
+    if linked or inserted:
+        log_admin_action(db, admin, "receipt_platform_bulk", target_type="receipt",
+                         detail=f"一键核对：关联 {linked} 笔，入账 {inserted} 笔，跳过 {skipped} 笔")
+    db.commit()
+    return ResponseModel(data={"linked": linked, "inserted": inserted, "skipped": skipped})
+
+
 @router.post("/platform-review/{order_id}/confirm", response_model=ResponseModel)
 def confirm_platform(order_id: int, body: PlatformConfirmBody, admin: AdminUser = Depends(get_current_admin), db: Session = Depends(get_db)):
     order = db.get(MeituanOrder, order_id)

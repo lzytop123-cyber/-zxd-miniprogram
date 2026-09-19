@@ -73,7 +73,10 @@
         <el-tag v-if="review" type="warning" closable @close="clearReview">{{ review === 'date' ? '全部待补日期' : '全部待核实退款' }}（不限年月渠道）</el-tag>
         <span v-else class="muted">{{ periodLabel }} · {{ tab === 'receipts' ? '按收款日期' : '按退款日期' }}</span>
       </div>
-      <p v-else class="muted">显示全部待核对核销，不限年月。参考价不计入汇总；已经手工记过账的券请关联原收款。</p>
+      <div v-else class="list-tools">
+        <span class="muted">显示全部待核对核销，不限年月。参考价不计入汇总；已经手工记过账的券请关联原收款。</span>
+        <el-button type="primary" :loading="reconciling" :disabled="!total" @click="bulkReconcile">一键核对</el-button>
+      </div>
       <el-table v-if="tab === 'receipts'" :data="receipts" v-loading="listLoading" stripe empty-text="暂无收款记录，可登记收款或切换年月查看">
         <el-table-column prop="id" label="编号" width="75" />
         <el-table-column label="收款日期" width="135"><template #default="{ row }"><span v-if="row.received_on">{{ row.received_on }}</span><el-tag v-else type="warning" size="small">待补日期</el-tag></template></el-table-column>
@@ -164,7 +167,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import http from '../api/http'
 
 type Channel = 'meituan' | 'douyin' | 'wechat_pay' | 'wechat_transfer'
@@ -185,7 +188,7 @@ const nowYear = Number(chinaDate().slice(0, 4)), nowMonth = Number(chinaDate().s
 const filters = reactive({ year: nowYear, month: nowMonth, channel: '' as Channel | '' })
 const applied = reactive({ ...filters })
 const currentSummary = ref<Summary>(), selectedSummary = ref<Summary>()
-const initialLoading = ref(true), refreshing = ref(false), loading = ref(false), listLoading = ref(false), saving = ref(false)
+const initialLoading = ref(true), refreshing = ref(false), loading = ref(false), listLoading = ref(false), saving = ref(false), reconciling = ref(false)
 const error = ref(''), tab = ref('receipts'), keyword = ref(''), appliedKeyword = ref(''), page = ref(1), total = ref(0)
 const review = ref<'' | 'date' | 'refund'>('')
 const receipts = ref<Receipt[]>([]), refunds = ref<Refund[]>([])
@@ -270,6 +273,16 @@ function reset() { Object.assign(filters, { year: Number(chinaDate().slice(0, 4)
 function searchList() { appliedKeyword.value = keyword.value.trim(); page.value = 1; void loadList() }
 function changeTab() { if (tab.value !== 'receipts') review.value = ''; page.value = 1; void loadList() }
 function showPlatformReview() { tab.value = 'platforms'; review.value = ''; page.value = 1; void loadList() }
+async function bulkReconcile() {
+  if (reconciling.value) return
+  try { await ElMessageBox.confirm('将先关联已有手工登记，再用参考价把渠道/日期/金额齐全的核销批量入账。其余保持待核对。', '一键核对', { confirmButtonText: '继续', cancelButtonText: '取消', type: 'warning' }) } catch { return }
+  reconciling.value = true
+  try {
+    const res = await http.post<{ linked: number; inserted: number; skipped: number }>('/admin/receipts/platform-review/bulk-reconcile')
+    ElMessage.success(`关联 ${res.data.linked} 笔，入账 ${res.data.inserted} 笔，跳过 ${res.data.skipped} 笔`)
+    await refresh()
+  } catch (err) { ElMessage.error(message(err)) } finally { reconciling.value = false }
+}
 function openPlatform(row: PlatformReceipt) {
   activePlatform.value = row
   Object.assign(platformForm, { channel: row.channel || '', amount: row.amount === null ? undefined : Number(row.amount), received_on: row.received_on || '', existing_receipt_id: row.existing_receipt_id || undefined, confirmed: false })
