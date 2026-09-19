@@ -83,16 +83,19 @@ def sync_wechat(db: Session) -> int:
             .outerjoin(User, User.id == model.user_id)
             .outerjoin(Receipt, Receipt.source_key == source_key)
             .where(model.pay_type == PayType.wechat, model.pay_status.in_([1, 2]), amount_col > 0)
-            .where(or_(Receipt.id.is_(None), (model.pay_status == 2) & (Receipt.source_refunded == False)))
+            .where(or_(Receipt.id.is_(None), (model.pay_status == 2) & (Receipt.source_refunded == False), Receipt.received_on.is_(None)))
         )
         for order, nickname, existing in db.execute(query).all():
+            fallback = order.paid_at or order.created_at
             if existing:
                 existing.source_refunded = order.pay_status == 2
+                if existing.received_on is None and fallback:
+                    existing.received_on = fallback.date()
                 continue
             row = Receipt(
                 source_key=prefix + order.order_no, channel="wechat_pay",
                 amount=order.final_price if model is Reservation else order.amount,
-                received_on=order.paid_at.date() if order.paid_at else None,
+                received_on=fallback.date() if fallback else None,
                 customer=nickname or f"用户 {order.user_id}", reference=order.order_no,
                 remark=label, source_refunded=order.pay_status == 2,
             )

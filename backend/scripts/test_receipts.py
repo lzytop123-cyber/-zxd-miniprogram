@@ -234,28 +234,30 @@ class ReceiptsTests(unittest.TestCase):
             finally:
                 engine.dispose()
 
-    def test_sync_excludes_balance_and_missing_dates_and_is_idempotent(self):
+    def test_sync_excludes_balance_falls_back_to_created_at_and_is_idempotent(self):
+        from app.models.receipts import Receipt
         self.db.add_all([
             RechargeOrder(order_no="RCH1", user_id=1, amount=Decimal("50"), pay_status=1, pay_type=PayType.wechat, paid_at=datetime(2025, 9, 2)),
             RechargeOrder(order_no="RCH2", user_id=1, amount=Decimal("80"), pay_status=0),
             CardPurchaseOrder(order_no="CRD1", user_id=1, store_id=1, bill_type=BillType.daily, amount=Decimal("20"), pay_status=1, pay_type=PayType.balance),
-            CardPurchaseOrder(order_no="CRD2", user_id=1, store_id=1, bill_type=BillType.daily, amount=Decimal("30"), pay_status=1, pay_type=PayType.wechat),
+            CardPurchaseOrder(order_no="CRD2", user_id=1, store_id=1, bill_type=BillType.daily, amount=Decimal("30"), pay_status=1, pay_type=PayType.wechat, created_at=datetime(2025, 9, 3, 10)),
         ])
+        self.db.commit()
+        # Pre-seed a stale Receipt with no date to prove the sync also backfills existing rows.
+        self.db.add(Receipt(source_key="card:CRD2", channel="wechat_pay", amount=Decimal("30"), reference="CRD2", customer="老王", remark="套餐购买"))
         self.db.commit()
         for _ in range(2):
             result = self.client.post("/admin/receipts/sync-wechat")
             self.assertEqual(result.status_code, 200, result.text)
         summary = self.summary(9)
-        self.assertEqual(Decimal(summary["month"]["received"]), Decimal("50"))
-        self.assertEqual(summary["missing_dates"], 1)
-        rows = self.client.get("/admin/receipts", params={"needs_date": True}).json()["data"]
-        self.assertEqual(rows["total"], 1)
-        row = rows["items"][0]
-        self.assertEqual(self.refund(row["id"]).status_code, 400)
-        result = self.client.patch(f'/admin/receipts/{row["id"]}/date', json={"received_on": "2025-09-03"})
+        self.assertEqual(Decimal(summary["month"]["received"]), Decimal("80"))
+        self.assertEqual(summary["missing_dates"], 0)
+        # 补日期 endpoint still works when both paid_at and created_at are missing.
+        self.db.add(Receipt(source_key="manual-orphan", channel="wechat_transfer", amount=Decimal("5"), reference="orphan", customer="孤儿"))
+        self.db.commit()
+        orphan = self.db.scalar(select(Receipt).where(Receipt.source_key == "manual-orphan"))
+        result = self.client.patch(f"/admin/receipts/{orphan.id}/date", json={"received_on": "2025-09-05"})
         self.assertEqual(result.status_code, 200, result.text)
-        self.client.post("/admin/receipts/sync-wechat")
-        self.assertEqual(Decimal(self.summary(9)["month"]["received"]), Decimal("80"))
 
 
 if __name__ == "__main__":
