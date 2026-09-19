@@ -105,8 +105,8 @@ function logout() {
   flex: 1;
   min-height: 0;
   overflow: auto;
-  background: #f5f5f5;
-  padding: 16px;
+  background: #f6f7f9;
+  padding: 20px 24px;
 }
 :deep(.el-sub-menu__title) { color: #ccc !important; }
 </style>
