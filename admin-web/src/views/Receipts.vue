@@ -1,9 +1,9 @@
 <template>
   <div class="receipts" v-loading="initialLoading">
     <div class="heading">
-      <div><h2>收款管理</h2><p>四个渠道统一记账，按实际收款和退款日期统计。</p></div>
+      <div><h2>收款管理</h2><p>美团、抖音按核销入账，微信按支付入账，微信转账手工登记。</p></div>
       <div class="actions">
-        <el-button :loading="refreshing" @click="refresh">刷新并同步微信支付</el-button>
+        <el-button :loading="refreshing" @click="refresh">刷新并同步收款</el-button>
         <el-button type="primary" @click="openCreate">登记收款</el-button>
       </div>
     </div>
@@ -15,13 +15,16 @@
         <div class="metric-value">{{ card.value === undefined ? '—' : `¥${money(card.value)}` }}</div>
       </el-card>
     </div>
-    <div v-if="currentSummary && (currentSummary.missing_dates || currentSummary.refunds_to_review)" class="review-notice">
+    <div v-if="currentSummary && (currentSummary.missing_dates || currentSummary.refunds_to_review || currentSummary.platforms_to_review)" class="review-notice">
       <span>统计待核对：</span>
       <el-button v-if="currentSummary.missing_dates" link type="warning" @click="showReview('date')">
         {{ currentSummary.missing_dates }} 笔缺少收款日期，未计入汇总
       </el-button>
       <el-button v-if="currentSummary.refunds_to_review" link type="warning" @click="showReview('refund')">
         {{ currentSummary.refunds_to_review }} 笔订单标记退款，需核实实际退款
+      </el-button>
+      <el-button v-if="currentSummary.platforms_to_review" link type="warning" @click="showPlatformReview">
+        {{ currentSummary.platforms_to_review }} 笔核销待核对，尚未自动入账
       </el-button>
     </div>
 
@@ -62,13 +65,15 @@
       <el-tabs v-model="tab" @tab-change="changeTab">
         <el-tab-pane label="收款记录" name="receipts" />
         <el-tab-pane label="退款记录" name="refunds" />
+        <el-tab-pane label="核销待核对" name="platforms" />
       </el-tabs>
-      <div class="list-tools">
+      <div v-if="tab !== 'platforms'" class="list-tools">
         <el-input v-model="keyword" placeholder="同学姓名、流水号或收款备注" clearable maxlength="100" style="max-width:320px" @keyup.enter="searchList" @clear="searchList" />
         <el-button :loading="listLoading" @click="searchList">搜索明细</el-button>
         <el-tag v-if="review" type="warning" closable @close="clearReview">{{ review === 'date' ? '全部待补日期' : '全部待核实退款' }}（不限年月渠道）</el-tag>
         <span v-else class="muted">{{ periodLabel }} · {{ tab === 'receipts' ? '按收款日期' : '按退款日期' }}</span>
       </div>
+      <p v-else class="muted">显示全部待核对核销，不限年月。参考价不计入汇总；已经手工记过账的券请关联原收款。</p>
       <el-table v-if="tab === 'receipts'" :data="receipts" v-loading="listLoading" stripe empty-text="暂无收款记录，可登记收款或切换年月查看">
         <el-table-column prop="id" label="编号" width="75" />
         <el-table-column label="收款日期" width="135"><template #default="{ row }"><span v-if="row.received_on">{{ row.received_on }}</span><el-tag v-else type="warning" size="small">待补日期</el-tag></template></el-table-column>
@@ -78,14 +83,14 @@
         <el-table-column label="累计退款（元）" width="130" align="right"><template #default="{ row }">{{ money(row.refunded_amount) }}</template></el-table-column>
         <el-table-column prop="reference" label="流水号 / 订单号" min-width="180" show-overflow-tooltip />
         <el-table-column prop="remark" label="备注" min-width="140" show-overflow-tooltip />
-        <el-table-column label="来源 / 状态" width="140"><template #default="{ row }"><span>{{ row.automatic ? '微信同步' : '手工登记' }}</span><div v-if="row.refund_needs_review"><el-tag size="small" type="warning">退款待核实</el-tag></div></template></el-table-column>
+        <el-table-column label="来源 / 状态" width="140"><template #default="{ row }"><span>{{ row.source_label }}</span><div v-if="row.refund_needs_review"><el-tag size="small" type="warning">退款待核实</el-tag></div></template></el-table-column>
         <el-table-column label="操作" width="115" fixed="right"><template #default="{ row }">
           <el-button v-if="!row.received_on" link type="primary" @click="openDate(row)">补收款日期</el-button>
           <el-button v-else-if="Number(row.remaining) > 0" link type="primary" @click="openRefund(row)">登记退款</el-button>
           <span v-else class="muted">已全额退款</span>
         </template></el-table-column>
       </el-table>
-      <el-table v-else :data="refunds" v-loading="listLoading" stripe empty-text="所选期间暂无已登记退款">
+      <el-table v-else-if="tab === 'refunds'" :data="refunds" v-loading="listLoading" stripe empty-text="所选期间暂无已登记退款">
         <el-table-column prop="refunded_on" label="退款日期" width="130" />
         <el-table-column prop="receipt_id" label="原收款编号" width="105" />
         <el-table-column label="渠道" width="155"><template #default="{ row }">{{ channels[row.channel as Channel] }}</template></el-table-column>
@@ -95,18 +100,30 @@
         <el-table-column prop="reason" label="退款原因" min-width="180" show-overflow-tooltip />
         <el-table-column label="状态" width="110"><template #default><el-tag type="success" size="small">已完成退款</el-tag></template></el-table-column>
       </el-table>
+      <el-table v-else :data="platforms" v-loading="listLoading" stripe empty-text="暂无待核对核销">
+        <el-table-column label="渠道" width="120"><template #default="{ row }">{{ row.channel ? channels[row.channel as Channel] : '待确认' }}</template></el-table-column>
+        <el-table-column prop="received_on" label="核销日期" width="125" />
+        <el-table-column prop="customer" label="同学" width="110" />
+        <el-table-column prop="deal_name" label="团购名称" min-width="150" show-overflow-tooltip />
+        <el-table-column prop="reference" label="券码 / 流水号" min-width="160" show-overflow-tooltip />
+        <el-table-column label="接口实付（元）" width="135" align="right"><template #default="{ row }">{{ row.amount === null ? '待核对' : money(row.amount) }}</template></el-table-column>
+        <el-table-column label="参考价（元）" width="125" align="right"><template #default="{ row }">{{ row.reference_price === null ? '—' : money(row.reference_price) }}</template></el-table-column>
+        <el-table-column prop="reason" label="待核对原因" min-width="240" />
+        <el-table-column label="操作" width="100" fixed="right"><template #default="{ row }"><el-button link type="primary" @click="openPlatform(row)">核对入账</el-button></template></el-table-column>
+      </el-table>
       <div class="pager"><el-pagination v-model:current-page="page" :page-size="20" :total="total" layout="total, prev, pager, next" @current-change="loadList" /></div>
     </el-card>
-    <p class="footnote">净收款 = 收款 − 已登记退款。微信支付包含预约、购卡、充值；余额消费不重复计收款。美团、抖音按实际结算收款登记。退款登记不自动退钱，也不变更余额、套餐或预约权益。</p>
+    <p class="footnote">净收款 = 已入账金额 − 已登记退款。美团、抖音按核销日期及已确认金额统计，不是扣佣后的到账额，平台后续结算不再重复入账。微信支付包含预约、购卡、充值，余额消费不重复计收款。退款登记不自动退钱，也不变更余额、套餐或预约权益。</p>
 
     <el-dialog v-model="createVisible" title="登记收款" width="min(520px, 94vw)" :close-on-click-modal="false">
+      <el-alert v-if="createForm.channel !== 'wechat_transfer'" title="平台核销会自动同步；待核对的券请在「核销待核对」中处理。这里只补记未收录的款项，请勿重复登记平台结算款。" type="warning" :closable="false" />
       <el-form label-width="100px" @submit.prevent="saveReceipt">
         <el-form-item label="收款渠道" required><el-select v-model="createForm.channel" style="width:100%"><el-option v-for="channel in manualChannels" :key="channel" :label="channels[channel]" :value="channel" /></el-select></el-form-item>
         <el-form-item label="实收金额" required><el-input-number v-model="createForm.amount" :min="0.01" :max="99999999.99" :precision="2" :step="1" style="width:100%" /></el-form-item>
         <el-form-item label="收款日期" required><el-date-picker v-model="createForm.received_on" type="date" value-format="YYYY-MM-DD" :disabled-date="futureDate" style="width:100%" /></el-form-item>
-        <el-form-item label="同学 / 付款人"><el-input v-model="createForm.customer" maxlength="100" placeholder="例如：小王、平台结算" /></el-form-item>
-        <el-form-item label="流水号"><el-input v-model="createForm.reference" maxlength="100" placeholder="选填，用于识别重复登记" /></el-form-item>
-        <el-form-item label="备注"><el-input v-model="createForm.remark" type="textarea" maxlength="500" show-word-limit placeholder="例如：9 月月卡、平台结算批次" /></el-form-item>
+        <el-form-item label="同学 / 付款人"><el-input v-model="createForm.customer" maxlength="100" placeholder="例如：小王" /></el-form-item>
+        <el-form-item label="流水号"><el-input v-model="createForm.reference" maxlength="100" placeholder="平台请填券码，用于识别重复登记" /></el-form-item>
+        <el-form-item label="备注"><el-input v-model="createForm.remark" type="textarea" maxlength="500" show-word-limit placeholder="例如：9 月月卡" /></el-form-item>
       </el-form>
       <template #footer><el-button @click="createVisible = false">取消</el-button><el-button type="primary" :loading="saving" @click="saveReceipt">保存收款</el-button></template>
     </el-dialog>
@@ -121,6 +138,20 @@
         <el-form-item><el-checkbox v-model="refundForm.completed">我确认这笔钱已经实际退给同学</el-checkbox></el-form-item>
       </el-form>
       <template #footer><el-button @click="refundVisible = false">取消</el-button><el-button type="primary" :loading="saving" :disabled="!refundForm.completed" @click="saveRefund">保存退款记录</el-button></template>
+    </el-dialog>
+
+    <el-dialog v-model="platformVisible" title="核对平台核销入账" width="min(540px, 94vw)" :close-on-click-modal="false">
+      <el-alert :title="activePlatform?.reason || '请核对本次核销金额'" type="warning" show-icon :closable="false" />
+      <p>{{ activePlatform?.deal_name }} · {{ activePlatform?.reference }}<br />参考价：{{ activePlatform?.reference_price === null ? '无' : `¥${money(activePlatform?.reference_price)}` }}（不会自动用作入账金额）</p>
+      <el-form label-width="120px" @submit.prevent="savePlatform">
+        <el-form-item label="渠道" required><el-select v-model="platformForm.channel" :disabled="!!activePlatform?.channel"><el-option label="美团" value="meituan" /><el-option label="抖音" value="douyin" /></el-select></el-form-item>
+        <el-form-item label="确认金额（元）" required><el-input-number v-model="platformForm.amount" :min="0.01" :max="99999999.99" :precision="2" /></el-form-item>
+        <el-form-item label="核销入账日期" required><el-date-picker v-model="platformForm.received_on" type="date" value-format="YYYY-MM-DD" :disabled-date="futureDate" /></el-form-item>
+        <el-form-item label="原收款编号"><el-input-number v-model="platformForm.existing_receipt_id" :min="1" :precision="0" :disabled="!!activePlatform?.existing_receipt_id" placeholder="未记过账则留空" /></el-form-item>
+        <p class="muted">已经手工记账时填写原收款编号，仅建立关联，不增加收入；渠道、金额、日期必须与原记录一致。</p>
+        <el-form-item><el-checkbox v-model="platformForm.confirmed">已核对本次核销金额及是否重复记账</el-checkbox></el-form-item>
+      </el-form>
+      <template #footer><el-button @click="platformVisible = false">取消</el-button><el-button type="primary" :loading="saving" :disabled="!platformForm.confirmed" @click="savePlatform">确认入账 / 关联</el-button></template>
     </el-dialog>
 
     <el-dialog v-model="dateVisible" title="补全实际收款日期" width="min(460px, 94vw)" :close-on-click-modal="false">
@@ -139,7 +170,8 @@ import http from '../api/http'
 type Channel = 'meituan' | 'douyin' | 'wechat_pay' | 'wechat_transfer'
 type ManualChannel = Exclude<Channel, 'wechat_pay'>
 type Totals = { received: string; refunded: string; net: string }
-type Summary = { month: Totals; year: Totals; channels: (Totals & { channel: Channel })[]; missing_dates: number; refunds_to_review: number }
+type Summary = { month: Totals; year: Totals; channels: (Totals & { channel: Channel })[]; missing_dates: number; refunds_to_review: number; platforms_to_review: number }
+type PlatformReceipt = { id: number; channel: 'meituan' | 'douyin' | null; amount: string | null; reference_price: string | null; received_on: string | null; reference: string; customer: string; deal_name: string; reason: string; existing_receipt_id: number | null }
 type Receipt = { id: number; channel: Channel; amount: string; refunded_amount: string; remaining: string; received_on: string | null; customer: string; reference: string; remark: string; automatic: boolean; refund_needs_review: boolean }
 type Refund = { id: number; receipt_id: number; channel: Channel; amount: string; refunded_on: string; reason: string; customer: string; reference: string }
 const channels: Record<Channel, string> = { meituan: '美团', douyin: '抖音', wechat_pay: '小程序微信支付', wechat_transfer: '微信转账' }
@@ -157,6 +189,8 @@ const initialLoading = ref(true), refreshing = ref(false), loading = ref(false),
 const error = ref(''), tab = ref('receipts'), keyword = ref(''), appliedKeyword = ref(''), page = ref(1), total = ref(0)
 const review = ref<'' | 'date' | 'refund'>('')
 const receipts = ref<Receipt[]>([]), refunds = ref<Refund[]>([])
+const platforms = ref<PlatformReceipt[]>([]), activePlatform = ref<PlatformReceipt>(), platformVisible = ref(false)
+const platformForm = reactive({ channel: '' as 'meituan' | 'douyin' | '', amount: undefined as number | undefined, received_on: '', existing_receipt_id: undefined as number | undefined, confirmed: false })
 const createVisible = ref(false), refundVisible = ref(false), dateVisible = ref(false)
 const activeReceipt = ref<Receipt>(), confirmedDate = ref('')
 function requestId() {
@@ -202,6 +236,11 @@ async function loadList() {
   const id = ++listRequest, currentTab = tab.value
   listLoading.value = true
   try {
+    if (currentTab === 'platforms') {
+      const result = await http.get<{ items: PlatformReceipt[]; total: number }>('/admin/receipts/platform-review', { params: { page: page.value, page_size: 20 } })
+      if (id === listRequest) { platforms.value = result.data.items; total.value = result.data.total }
+      return
+    }
     const query = { ...(review.value ? {} : params()), page: page.value, page_size: 20, keyword: appliedKeyword.value || undefined, needs_date: review.value === 'date', needs_refund: review.value === 'refund' }
     const result = await http.get<{ items: Receipt[] | Refund[]; total: number }>(currentTab === 'receipts' ? '/admin/receipts' : '/admin/receipts/refunds', { params: query })
     if (id !== listRequest) return
@@ -209,14 +248,14 @@ async function loadList() {
     else refunds.value = result.data.items as Refund[]
     total.value = result.data.total
   } catch (err) {
-    if (id === listRequest) { receipts.value = []; refunds.value = []; total.value = 0; error.value = message(err) }
+    if (id === listRequest) { receipts.value = []; refunds.value = []; platforms.value = []; total.value = 0; error.value = message(err) }
   } finally { if (id === listRequest) listLoading.value = false }
 }
 async function refresh() {
   if (refreshing.value) return
   refreshing.value = true; error.value = ''
   try {
-    await http.post('/admin/receipts/sync-wechat')
+    await http.post('/admin/receipts/sync')
     await Promise.all([loadCurrent(), loadSummary(), loadList()])
   } catch (err) { error.value = message(err) }
   finally { refreshing.value = false; initialLoading.value = false }
@@ -229,7 +268,20 @@ async function search() {
 }
 function reset() { Object.assign(filters, { year: Number(chinaDate().slice(0, 4)), month: Number(chinaDate().slice(5, 7)), channel: '' }); keyword.value = ''; appliedKeyword.value = ''; void search() }
 function searchList() { appliedKeyword.value = keyword.value.trim(); page.value = 1; void loadList() }
-function changeTab() { if (tab.value === 'refunds') review.value = ''; page.value = 1; void loadList() }
+function changeTab() { if (tab.value !== 'receipts') review.value = ''; page.value = 1; void loadList() }
+function showPlatformReview() { tab.value = 'platforms'; review.value = ''; page.value = 1; void loadList() }
+function openPlatform(row: PlatformReceipt) {
+  activePlatform.value = row
+  Object.assign(platformForm, { channel: row.channel || '', amount: row.amount === null ? undefined : Number(row.amount), received_on: row.received_on || '', existing_receipt_id: row.existing_receipt_id || undefined, confirmed: false })
+  platformVisible.value = true
+}
+async function savePlatform() {
+  if (saving.value || !activePlatform.value) return
+  if (!platformForm.channel || !platformForm.amount || !platformForm.received_on || !platformForm.confirmed) { ElMessage.warning('请核对渠道、金额、日期并勾选确认'); return }
+  saving.value = true
+  try { await http.post(`/admin/receipts/platform-review/${activePlatform.value.id}/confirm`, { ...platformForm, amount: platformForm.amount.toFixed(2) }); platformVisible.value = false; ElMessage.success('核销已关联收款'); await refresh() }
+  catch (err) { ElMessage.error(message(err)) } finally { saving.value = false }
+}
 function clearReview() { review.value = ''; page.value = 1; void loadList() }
 function showReview(kind: 'date' | 'refund') { tab.value = 'receipts'; review.value = kind; keyword.value = ''; appliedKeyword.value = ''; page.value = 1; void loadList() }
 function openCreate() { Object.assign(createForm, { channel: 'wechat_transfer', amount: undefined, received_on: chinaDate(), customer: '', reference: '', remark: '', request_id: requestId() }); createVisible.value = true }

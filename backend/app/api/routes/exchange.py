@@ -243,6 +243,7 @@ async def _exchange(
         except Exception:
             pass
     raw_payload: dict = {
+        "receipt_channel": source.value,
         "result": consume_result,
         "ticketData": ticket_data,
         "voucherExpireDate": str(voucher_expire) if voucher_expire else None,

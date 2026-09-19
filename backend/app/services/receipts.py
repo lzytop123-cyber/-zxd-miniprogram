@@ -39,6 +39,7 @@ def receipt_item(row: Receipt) -> dict:
         "received_on": row.received_on, "customer": row.customer,
         "reference": row.reference, "remark": row.remark,
         "automatic": not row.source_key.startswith("manual:"),
+        "source_label": "核销同步" if row.source_key.startswith("platform:") else ("手工登记" if row.source_key.startswith("manual:") else "微信同步"),
         "refund_needs_review": row.source_refunded and row.refunded_amount < row.amount,
     }
 
