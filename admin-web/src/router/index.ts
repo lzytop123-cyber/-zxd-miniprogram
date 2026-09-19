@@ -4,6 +4,7 @@ const router = createRouter({
   history: createWebHistory(),
   routes: [
     { path: '/login', component: () => import('../views/Login.vue') },
+    { path: '/landing', component: () => import('../views/Landing.vue') },
     {
       path: '/',
       component: () => import('../layouts/AdminLayout.vue'),
@@ -47,9 +48,10 @@ const router = createRouter({
   ],
 })
 
+const PUBLIC = new Set(['/login', '/landing'])
 router.beforeEach((to) => {
   const token = localStorage.getItem('admin_token')
-  if (to.path !== '/login' && !token) return '/login'
+  if (!PUBLIC.has(to.path) && !token) return '/login'
 })
 
 export default router

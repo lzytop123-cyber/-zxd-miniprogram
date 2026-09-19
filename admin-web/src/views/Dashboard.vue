@@ -65,16 +65,7 @@
           <h3>近 7 日营收</h3>
           <span class="muted">总计 ¥{{ revenueSum.toLocaleString('zh-CN') }} · {{ revenueOrders }} 单</span>
         </header>
-        <div class="chart">
-          <div v-for="r in revenue" :key="r.date" class="chart-row">
-            <span class="chart-date">{{ shortDate(r.date) }}</span>
-            <div class="chart-track">
-              <div class="chart-bar" :style="{ width: barWidth(r.revenue) + '%' }"></div>
-            </div>
-            <span class="chart-value">¥{{ Number(r.revenue).toLocaleString('zh-CN') }}</span>
-            <span class="chart-tag">{{ r.orders }} 单</span>
-          </div>
-        </div>
+        <div ref="chartEl" class="revenue-chart"></div>
       </section>
 
       <section class="panel">
@@ -115,15 +106,21 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import {
   Refresh, ArrowRight, ArrowDown, Download,
   Money, TrendCharts, PieChart,
-  Ticket, List, User, Plus, Location, OfficeBuilding,
-  CreditCard, Setting, Bell, Cpu,
+  Ticket, User, Plus, Location, OfficeBuilding,
+  CreditCard, Setting, Bell,
 } from '@element-plus/icons-vue'
+import * as echarts from 'echarts/core'
+import { LineChart } from 'echarts/charts'
+import { GridComponent, TooltipComponent, MarkLineComponent } from 'echarts/components'
+import { CanvasRenderer } from 'echarts/renderers'
 import http from '../api/http'
+
+echarts.use([LineChart, GridComponent, TooltipComponent, MarkLineComponent, CanvasRenderer])
 
 const revenue = ref<any[]>([])
 const stats = ref<any>({})
@@ -203,14 +200,68 @@ const featureMap = [
 
 const revenueSum = computed(() => revenue.value.reduce((s, r) => s + Number(r.revenue || 0), 0))
 const revenueOrders = computed(() => revenue.value.reduce((s, r) => s + Number(r.orders || 0), 0))
-const maxRevenue = computed(() => Math.max(1, ...revenue.value.map(r => Number(r.revenue || 0))))
+
+const chartEl = ref<HTMLElement>()
+let chart: echarts.ECharts | null = null
+function renderChart() {
+  if (!chartEl.value) return
+  chart ||= echarts.init(chartEl.value)
+  const dates = revenue.value.map(r => shortDate(r.date))
+  const values = revenue.value.map(r => Number(r.revenue || 0))
+  chart.setOption({
+    grid: { top: 20, right: 16, bottom: 26, left: 40 },
+    tooltip: {
+      trigger: 'axis',
+      backgroundColor: '#16171d',
+      borderColor: '#16171d',
+      textStyle: { color: '#f5f5f7', fontSize: 12 },
+      padding: [8, 12],
+      formatter: (params: any[]) => {
+        const p = params[0]
+        const r = revenue.value[p.dataIndex]
+        return `<div style="font-weight:600;margin-bottom:4px">${p.axisValue}</div>
+                <div>营收 <b style="color:#FFD000">¥${Number(r.revenue).toLocaleString('zh-CN')}</b></div>
+                <div style="color:#909096">订单 ${r.orders} 单</div>`
+      },
+    },
+    xAxis: {
+      type: 'category', data: dates, boundaryGap: false,
+      axisLine: { lineStyle: { color: '#eceef2' } },
+      axisLabel: { color: '#8a8b93', fontSize: 11 },
+      axisTick: { show: false },
+    },
+    yAxis: {
+      type: 'value',
+      splitLine: { lineStyle: { color: '#f2f3f6', type: 'dashed' } },
+      axisLabel: { color: '#8a8b93', fontSize: 11, formatter: (v: number) => v >= 1000 ? `${v / 1000}k` : v },
+    },
+    series: [{
+      type: 'line', data: values, smooth: true, symbol: 'circle', symbolSize: 6,
+      itemStyle: { color: '#FFD000', borderColor: '#fff', borderWidth: 2 },
+      lineStyle: { color: '#FFD000', width: 3, shadowColor: 'rgba(255,208,0,0.4)', shadowBlur: 10, shadowOffsetY: 4 },
+      areaStyle: {
+        color: {
+          type: 'linear', x: 0, y: 0, x2: 0, y2: 1,
+          colorStops: [
+            { offset: 0, color: 'rgba(255, 208, 0, 0.35)' },
+            { offset: 1, color: 'rgba(255, 208, 0, 0.02)' },
+          ],
+        },
+      },
+      emphasis: { itemStyle: { borderWidth: 3, shadowBlur: 12, shadowColor: 'rgba(255,208,0,0.6)' } },
+    }],
+  })
+}
+watch(revenue, async () => { await nextTick(); renderChart() }, { deep: true })
+const onResize = () => chart?.resize()
+onMounted(() => window.addEventListener('resize', onResize))
+onBeforeUnmount(() => { window.removeEventListener('resize', onResize); chart?.dispose() })
 
 function fmt(v: any) { return Number(v || 0).toLocaleString('zh-CN', { minimumFractionDigits: 0, maximumFractionDigits: 2 }) }
 function avg(total: any, count: any) {
   const c = Number(count || 0); if (!c) return '0'
   return (Number(total || 0) / c).toFixed(2)
 }
-function barWidth(v: any) { return Math.max(2, (Number(v || 0) / maxRevenue.value) * 100) }
 function shortDate(s: string) {
   const [, m, d] = s.split('-'); return `${m}-${d}`
 }
@@ -398,26 +449,8 @@ onMounted(refreshAll)
 /* ============ 两栏（营收 + 导出） ============ */
 .two-col { display: grid; grid-template-columns: 1.4fr 1fr; gap: 16px; }
 
-/* --- 营收条形图 --- */
-.chart { display: flex; flex-direction: column; gap: 10px; }
-.chart-row {
-  display: grid; grid-template-columns: 60px 1fr 100px 60px;
-  gap: 12px; align-items: center;
-  font-size: 13px;
-}
-.chart-date { color: #6b6c76; font-variant-numeric: tabular-nums; }
-.chart-track {
-  height: 8px; background: #f2f3f6; border-radius: 999px; overflow: hidden;
-}
-.chart-bar {
-  height: 100%; border-radius: 999px;
-  background: linear-gradient(90deg, #ffb400, #FFD000);
-  box-shadow: 0 0 12px rgba(255, 208, 0, 0.3);
-  transition: width 0.6s cubic-bezier(0.16, 1, 0.3, 1);
-  min-width: 4px;
-}
-.chart-value { text-align: right; color: #16171d; font-weight: 600; font-feature-settings: 'tnum'; }
-.chart-tag { text-align: right; color: #8a8b93; font-size: 12px; }
+/* --- 营收 ECharts --- */
+.revenue-chart { width: 100%; height: 260px; }
 
 /* --- 导出 --- */
 .exports { display: flex; flex-direction: column; gap: 8px; }

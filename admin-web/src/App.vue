@@ -6,7 +6,5 @@
 </script>
 
 <style>
-* { margin: 0; padding: 0; box-sizing: border-box; }
-html, body, #app { height: 100%; }
-body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f5f5f5; }
+/* global styles moved to src/styles/global.css */
 </style>
