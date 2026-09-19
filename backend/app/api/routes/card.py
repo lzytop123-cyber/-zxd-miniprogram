@@ -234,7 +234,7 @@ def confirm_purchase_card(
         if int(paid_fen) != expected:
             raise HTTPException(status_code=400, detail="支付金额异常，请联系店长")
 
-    card = fulfill_card_purchase(db, order)
+    card = fulfill_card_purchase(db, order, success_time=query.get("success_time"))
     db.commit()
     return ResponseModel(
         message="购买成功",

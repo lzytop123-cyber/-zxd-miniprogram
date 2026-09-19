@@ -12,6 +12,8 @@ from app.db.session import engine
 logger = logging.getLogger(__name__)
 
 MIGRATION_STATEMENTS = [
+    "ALTER TABLE reservations ADD COLUMN paid_at DATETIME",
+    "ALTER TABLE card_purchase_orders ADD COLUMN paid_at DATETIME",
     "ALTER TABLE users ADD COLUMN invite_code VARCHAR(20)",
     "ALTER TABLE users ADD COLUMN invited_by INTEGER",
     "ALTER TABLE users ADD COLUMN study_goal VARCHAR(20)",
@@ -88,6 +90,11 @@ def run_schema_migrations(db: Session) -> dict:
 
     created_tables: list[str] = []
     try:
+        from app.models.receipts import Receipt, ReceiptRefund
+        for model in (Receipt, ReceiptRefund):
+            model.__table__.create(bind=engine, checkfirst=True)
+            created_tables.append(model.__tablename__)
+
         from app.models import (
             AdminOperationLog,
             AssistantChatLog,

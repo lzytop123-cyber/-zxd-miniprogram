@@ -676,7 +676,7 @@ def issue_period_card_from_pricing(
     )
 
 
-def fulfill_card_purchase(db: Session, order) -> PeriodCard:
+def fulfill_card_purchase(db: Session, order, *, success_time: str | None = None) -> PeriodCard:
     """支付成功后发卡（幂等）。"""
     from app.models import CardPurchaseOrder, PricingRule
 
@@ -696,4 +696,6 @@ def fulfill_card_purchase(db: Session, order) -> PeriodCard:
     )
     order.period_card_id = card.id
     order.pay_status = 1
+    from app.services.receipts import payment_time
+    order.paid_at = payment_time(success_time)
     return card

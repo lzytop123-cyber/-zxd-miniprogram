@@ -236,6 +236,7 @@ class Reservation(Base):
     period_card_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("period_cards.id"))
     refund_remark: Mapped[str | None] = mapped_column(String(200))
     refunded_at: Mapped[datetime | None] = mapped_column(DateTime)
+    paid_at: Mapped[datetime | None] = mapped_column(DateTime)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
 
 
@@ -277,6 +278,7 @@ class CardPurchaseOrder(Base):
     amount: Mapped[Decimal] = mapped_column(Numeric(10, 2), nullable=False)
     pay_type: Mapped[PayType] = mapped_column(Enum(PayType), nullable=False)
     pay_status: Mapped[int] = mapped_column(Integer, default=0)
+    paid_at: Mapped[datetime | None] = mapped_column(DateTime)
     period_card_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("period_cards.id"))
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
 
@@ -639,6 +641,7 @@ class StoreCalendarDay(Base):
 
 
 # 上岸集市模型（独立模块）
+from app.models.receipts import Receipt, ReceiptRefund  # noqa: E402
 from app.models.wrongbook import WrongbookSubject, WrongQuestion  # noqa: E402
 from app.models.market import (  # noqa: E402
     MarketCategory,

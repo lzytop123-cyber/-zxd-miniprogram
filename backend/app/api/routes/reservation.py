@@ -462,6 +462,7 @@ async def confirm_pay(
         reservation,
         attach=query.get("attach"),
         paid_fen=query.get("amount_total"),
+        success_time=query.get("success_time"),
     )
     if outcome == "conflict":
         raise HTTPException(status_code=409, detail="座位已被占用，款项将原路退回")

@@ -11,6 +11,7 @@ from app.core.config import settings
 from app.db.session import get_db
 from app.services.health import run_health_checks
 from app.tasks.scheduler import start_scheduler
+from app.api.routes import admin_receipts
 
 UPLOADS_DIR = Path(__file__).resolve().parent.parent / "uploads"
 
@@ -64,6 +65,7 @@ app.include_router(admin.router, prefix="/api")
 app.include_router(admin_market.router, prefix="/api")
 app.include_router(admin_tools.router, prefix="/api")
 app.include_router(admin_wrongbook.router, prefix="/api")
+app.include_router(admin_receipts.router, prefix="/api")
 app.include_router(notifications.router, prefix="/api")
 
 UPLOADS_DIR.mkdir(parents=True, exist_ok=True)

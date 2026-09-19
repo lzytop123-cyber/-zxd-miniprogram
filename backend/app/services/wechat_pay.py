@@ -193,6 +193,7 @@ class WechatPayService:
             amount_total = amount.get("total")
         return {
             "out_trade_no": data.get("out_trade_no"),
+            "success_time": data.get("success_time"),
             "trade_state": data.get("trade_state"),
             "attach": data.get("attach"),
             "amount_total": amount_total,
@@ -221,6 +222,7 @@ class WechatPayService:
 
         return {
             "out_trade_no": resource.get("out_trade_no"),
+            "success_time": resource.get("success_time"),
             "trade_state": trade_state or "SUCCESS",
             "attach": resource.get("attach"),
             "amount_total": amount_total,

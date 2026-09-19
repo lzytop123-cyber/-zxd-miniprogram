@@ -12,6 +12,7 @@ from app.services.booking import finalize_reservation_after_pay, fulfill_recharg
 from app.services.card_service import fulfill_card_purchase
 from app.services.coupon_service import mark_coupon_used
 from app.services.wechat_pay import WechatPayService
+from app.services.receipts import payment_time
 
 logger = logging.getLogger(__name__)
 
@@ -46,12 +47,13 @@ async def complete_reservation_wechat_payment(
     *,
     attach: str | None = None,
     paid_fen: int | None = None,
+    success_time: str | None = None,
 ) -> str:
     """
     将预约标记为已支付并完成后续流程。
     返回: paid | conflict | amount_mismatch | already_paid
     """
-    if reservation.pay_status == 1:
+    if reservation.pay_status in (1, 2):
         return "already_paid"
     if not _amount_ok(reservation.final_price, paid_fen):
         logger.error(
@@ -63,6 +65,8 @@ async def complete_reservation_wechat_payment(
         return "amount_mismatch"
 
     with RedisLock(f"seat_lock:{reservation.seat_id}", expire=10):
+        reservation.paid_at = payment_time(success_time)
+        reservation.pay_type = PayType.wechat
         conflict = seat_conflict_excluding(
             db,
             reservation.seat_id,
@@ -107,7 +111,7 @@ async def wechat_pay_notify(request: Request, db: Session = Depends(get_db)):
                 if not _amount_ok(order.amount, paid_fen):
                     logger.error("回调金额不符 CRD %s 订单=%s 实付分=%s", order_no, order.amount, paid_fen)
                     return {"code": "SUCCESS", "message": "成功"}
-                fulfill_card_purchase(db, order)
+                fulfill_card_purchase(db, order, success_time=result.get("success_time"))
                 db.commit()
             return {"code": "SUCCESS", "message": "成功"}
 
@@ -117,7 +121,7 @@ async def wechat_pay_notify(request: Request, db: Session = Depends(get_db)):
                 if not _amount_ok(order.amount, paid_fen):
                     logger.error("回调金额不符 RCH %s 订单=%s 实付分=%s", order_no, order.amount, paid_fen)
                     return {"code": "SUCCESS", "message": "成功"}
-                fulfill_recharge_order(db, order)
+                fulfill_recharge_order(db, order, success_time=result.get("success_time"))
                 db.commit()
             return {"code": "SUCCESS", "message": "成功"}
 
@@ -128,5 +132,6 @@ async def wechat_pay_notify(request: Request, db: Session = Depends(get_db)):
                 reservation,
                 attach=result.get("attach"),
                 paid_fen=paid_fen,
+                success_time=result.get("success_time"),
             )
     return {"code": "SUCCESS", "message": "成功"}

@@ -456,7 +456,7 @@ def add_wallet_log(
     return log
 
 
-def fulfill_recharge_order(db: Session, order) -> bool:
+def fulfill_recharge_order(db: Session, order, *, success_time: str | None = None) -> bool:
     """履约充值订单：余额入账并记流水。幂等——已支付订单不会重复入账。"""
     if order is None or order.pay_status == 1:
         return False
@@ -464,7 +464,8 @@ def fulfill_recharge_order(db: Session, order) -> bool:
     if not user:
         return False
     order.pay_status = 1
-    order.paid_at = datetime.now()
+    from app.services.receipts import payment_time
+    order.paid_at = payment_time(success_time)
     add_wallet_log(db, user, "recharge", order.amount, "余额充值", order.order_no)
     return True
 

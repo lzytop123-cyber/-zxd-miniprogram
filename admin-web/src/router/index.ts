@@ -10,6 +10,7 @@ const router = createRouter({
       redirect: '/dashboard',
       children: [
         { path: 'dashboard', component: () => import('../views/Dashboard.vue') },
+        { path: 'receipts', component: () => import('../views/Receipts.vue') },
         { path: 'live-board', component: () => import('../views/LiveBoard.vue') },
         { path: 'stores', component: () => import('../views/Stores.vue') },
         { path: 'pricing', component: () => import('../views/Pricing.vue') },
