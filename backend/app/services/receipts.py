@@ -59,12 +59,14 @@ def period(year: int, month: int | None = None) -> tuple[date, date]:
 
 
 def totals(db: Session, start: date, end: date, channel: str | None = None) -> dict:
-    receipts = select(func.coalesce(func.sum(Receipt.amount), 0)).where(Receipt.received_on >= start, Receipt.received_on < end)
-    refunds = select(func.coalesce(func.sum(ReceiptRefund.amount), 0)).join(Receipt).where(ReceiptRefund.refunded_on >= start, ReceiptRefund.refunded_on < end)
+    """月汇总跟收款走：退款从原收款所在月份扣除，不记到退款当天。"""
+    query = select(
+        func.coalesce(func.sum(Receipt.amount), 0),
+        func.coalesce(func.sum(Receipt.refunded_amount), 0),
+    ).where(Receipt.received_on >= start, Receipt.received_on < end)
     if channel:
-        receipts = receipts.where(Receipt.channel == channel)
-        refunds = refunds.where(Receipt.channel == channel)
-    received, refunded = db.scalar(receipts), db.scalar(refunds)
+        query = query.where(Receipt.channel == channel)
+    received, refunded = db.execute(query).one()
     return {"received": money(received), "refunded": money(refunded), "net": money(received - refunded)}
 
 

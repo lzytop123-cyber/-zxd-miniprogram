@@ -116,7 +116,7 @@
       </el-table>
       <div class="pager"><el-pagination v-model:current-page="page" :page-size="20" :total="total" layout="total, prev, pager, next" @current-change="loadList" /></div>
     </el-card>
-    <p class="footnote">净收款 = 已入账金额 − 已登记退款。美团、抖音按核销日期及已确认金额统计，不是扣佣后的到账额，平台后续结算不再重复入账。微信支付包含预约、购卡、充值，余额消费不重复计收款。退款登记不自动退钱，也不变更余额、套餐或预约权益。</p>
+    <p class="footnote">每个月只统计该月收款，退款从原收款月份扣除，不记到退款当天。净收款 = 当月收款 − 这些收款上已登记的退款。美团、抖音按核销日期及已确认金额统计，不是扣佣后的到账额。退款记录页仍按退款日期列出。退款登记不自动退钱，也不变更余额、套餐或预约权益。</p>
 
     <el-dialog v-model="createVisible" title="登记收款" width="min(520px, 94vw)" :close-on-click-modal="false">
       <el-alert v-if="createForm.channel !== 'wechat_transfer'" title="平台核销会自动同步；待核对的券请在「核销待核对」中处理。这里只补记未收录的款项，请勿重复登记平台结算款。" type="warning" :closable="false" />

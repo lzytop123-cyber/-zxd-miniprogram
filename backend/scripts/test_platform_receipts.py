@@ -75,8 +75,8 @@ class PlatformReceiptsTests(unittest.TestCase):
         self.assertEqual(self.refund(receipt_id, amount="9", refunded_on="2025-10-01").status_code, 200)
         self.sync_platforms()
         self.assertEqual(self.pending()["total"], 0)
-        self.assertEqual(self.summary(9)["month"]["net"], "39.00")
-        self.assertEqual(self.summary(10)["month"]["net"], "-9.00")
+        self.assertEqual(self.summary(9)["month"]["net"], "30.00")
+        self.assertEqual(self.summary(10)["month"]["net"], "0.00")
 
     def test_unknown_channel_requires_confirmation_not_default_meituan(self):
         order = self.order(None, {"platform": "yunlaoban", "payAmount": 3900})

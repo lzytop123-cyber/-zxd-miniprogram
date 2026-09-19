@@ -60,12 +60,14 @@ class ReceiptsTests(unittest.TestCase):
     def summary(self, month):
         return self.client.get("/admin/receipts/summary", params={"year": 2025, "month": month}).json()["data"]
 
-    def test_cross_month_refund_uses_refund_date(self):
+    def test_cross_month_refund_stays_on_receipt_month(self):
         row = self.receipt()
         self.assertEqual(self.refund(row["id"]).status_code, 200)
         aug, sep = self.summary(8), self.summary(9)
-        self.assertEqual(Decimal(aug["month"]["net"]), Decimal("100"))
-        self.assertEqual(Decimal(sep["month"]["net"]), Decimal("-30"))
+        self.assertEqual(Decimal(aug["month"]["received"]), Decimal("100"))
+        self.assertEqual(Decimal(aug["month"]["refunded"]), Decimal("30"))
+        self.assertEqual(Decimal(aug["month"]["net"]), Decimal("70"))
+        self.assertEqual(Decimal(sep["month"]["net"]), Decimal("0"))
         self.assertEqual(Decimal(sep["year"]["net"]), Decimal("70"))
         data = self.client.get("/admin/receipts/refunds", params={"year": 2025, "month": 9}).json()["data"]
         self.assertEqual(data["total"], 1)
@@ -132,7 +134,8 @@ class ReceiptsTests(unittest.TestCase):
         result = self.refund(rows["items"][0]["id"], amount="18")
         self.assertEqual(result.status_code, 200, result.text)
         self.assertEqual(self.summary(9)["refunds_to_review"], 0)
-        self.assertEqual(self.summary(9)["month"]["net"], "-18.00")
+        self.assertEqual(self.summary(8)["month"]["net"], "0.00")
+        self.assertEqual(self.summary(9)["month"]["net"], "0.00")
 
     def test_platform_payment_time_uses_beijing_date(self):
         from app.services.receipts import payment_time
