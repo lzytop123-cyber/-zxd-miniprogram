@@ -32,6 +32,11 @@
   color: var(--color-text-secondary);
 }
 
+.row-value {
+  max-width: 68%;
+  text-align: right;
+}
+
 .fee-block {
   margin-top: 16rpx;
   padding-top: 8rpx;
@@ -80,6 +85,26 @@
   line-height: 1.5;
 }
 
+.retry-hint {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20rpx;
+}
+
+.retry-link {
+  flex-shrink: 0;
+  color: var(--color-text-brand);
+  font-weight: 700;
+  padding: 8rpx 0;
+}
+
+.card-usage {
+  color: var(--color-text-brand);
+  font-size: 24rpx;
+  line-height: 1.5;
+}
+
 .pay-types {
   display: flex;
   gap: 16rpx;
@@ -122,6 +147,16 @@
   font-size: 40rpx;
   font-weight: 700;
   color: var(--color-primary);
+}
+
+.pay-card-name {
+  max-width: 70%;
+  color: var(--color-text-brand);
+  font-size: 28rpx;
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .fixed-bottom-bar .submit-btn {

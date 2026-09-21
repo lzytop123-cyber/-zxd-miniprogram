@@ -8,6 +8,13 @@
     </view>
   </view>
 
+  <view wx:elif="{{loadError && !reservation}}" class="empty card empty-card error-card">
+    <view class="mi-glyph glyph-xl icon-orders empty-icon"></view>
+    <view class="empty-text">订单加载失败</view>
+    <view class="empty-hint">{{loadError}}</view>
+    <view class="btn-primary" bindtap="retryLoadActive">重新加载订单</view>
+  </view>
+
   <view wx:elif="{{!reservation}}" class="empty card empty-card">
     <view class="mi-glyph glyph-xl icon-book-open empty-icon"></view>
     <view class="empty-text">暂无进行中的订单</view>
@@ -16,6 +23,10 @@
   </view>
 
   <view wx:else class="active-panel">
+    <view class="inline-error" wx:if="{{loadError}}">
+      <text>{{loadError}}</text>
+      <text class="inline-error-action" bindtap="retryLoadActive">重新加载</text>
+    </view>
     <view class="hero card">
       <view class="hero-header">
         <view class="hero-header-main">
@@ -76,6 +87,7 @@
       </view>
 
       <view class="tip warn" wx:if="{{lastOpenError}}">{{lastOpenError}}</view>
+      <view class="open-help" wx:if="{{lastOpenError}}" bindtap="goContact">多次尝试仍无法开门？联系店长</view>
 
       <view
         class="open-btn {{canOpen && pluginReady && !opening ? 'open-btn--active' : 'open-btn--disabled'}}"

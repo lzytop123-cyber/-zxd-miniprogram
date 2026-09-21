@@ -216,7 +216,12 @@
       </view>
     </view>
 
-    <view class="seat-map-frame" wx:if="{{showSeatMap}}">
+    <view class="seat-load-error" wx:if="{{seatLoadError}}">
+      <text>{{seatLoadError}}</text>
+      <view class="seat-retry" bindtap="retrySeatLoad">重新加载座位</view>
+    </view>
+
+    <view class="seat-map-frame" wx:elif="{{showSeatMap}}">
       <floor-plan-map
         seats="{{seats}}"
         selectedId="{{selectedId}}"
@@ -227,6 +232,27 @@
       </view>
     </view>
     <view class="seat-map-empty" wx:else>请先选择时间</view>
+
+    <view class="seat-list" wx:if="{{seatGroups.length && !seatLoadError}}">
+      <view class="seat-list-title">列表选座</view>
+      <view class="seat-list-hint">单手操作时，可直接按区域选择空座</view>
+      <view class="seat-list-group" wx:for="{{seatGroups}}" wx:key="name" wx:for-item="group">
+        <view class="seat-list-group-name">{{group.name}}</view>
+        <view class="seat-list-options">
+          <view
+            class="seat-list-option {{selectedId===item.id?'active':''}}"
+            aria-role="button"
+            aria-label="{{selectedId===item.id?'已选择座位':''}}{{group.name}}{{item.label}}号"
+            wx:for="{{group.seats}}"
+            wx:key="id"
+            data-id="{{item.id}}"
+            data-code="{{item.code}}"
+            data-status="{{item.status}}"
+            bindtap="selectSeat"
+          >{{item.label}}号</view>
+        </view>
+      </view>
+    </view>
   </view>
 
   <view class="fixed-bottom-spacer"></view>

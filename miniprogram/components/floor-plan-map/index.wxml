@@ -92,4 +92,9 @@
       </view>
     </movable-view>
   </movable-area>
+  <view class="zoom-controls">
+    <view class="zoom-btn" aria-role="button" aria-label="缩小座位图" catchtap="zoomOut">－</view>
+    <view class="zoom-btn zoom-reset" aria-role="button" aria-label="复位座位图" catchtap="zoomReset">复位</view>
+    <view class="zoom-btn" aria-role="button" aria-label="放大座位图" catchtap="zoomIn">＋</view>
+  </view>
 </view>

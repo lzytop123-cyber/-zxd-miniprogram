@@ -14,6 +14,34 @@
   padding-bottom: calc(160rpx + env(safe-area-inset-bottom));
 }
 
+.report-loading,
+.report-error {
+  margin: 8rpx 24rpx 20rpx;
+  padding: 28rpx 24rpx;
+  border-radius: 16rpx;
+  background: var(--color-bg-card);
+  color: var(--color-text-secondary);
+  font-size: 24rpx;
+  line-height: 1.5;
+  text-align: center;
+}
+
+.report-error {
+  background: var(--color-warning-bg);
+  color: var(--color-warning-fg);
+}
+
+.report-retry {
+  width: 220rpx;
+  min-height: 76rpx;
+  line-height: 76rpx;
+  margin: 20rpx auto 0;
+  border-radius: 16rpx;
+  background: var(--color-primary-active);
+  color: var(--color-bg-card);
+  font-weight: 700;
+}
+
 /* 助手模式：固定高度，聊天区滚动 + 输入框吸底（预留悬浮 tabBar 空间） */
 .page-report.chat-mode {
   height: 100vh;
@@ -298,7 +326,7 @@
 .daily-bar-label {
   margin-top: 8rpx;
   font-size: 20rpx;
-  color: #9CACA2;
+  color: var(--color-text-secondary);
   white-space: nowrap;
 }
 

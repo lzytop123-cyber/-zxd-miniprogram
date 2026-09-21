@@ -224,7 +224,7 @@
 
 .hint {
   font-size: 22rpx;
-  color: #9CACA2;
+  color: var(--color-text-secondary);
   margin-top: 18rpx;
   line-height: 1.6;
 }
@@ -305,6 +305,84 @@
 
 .bk-cta--disabled:active {
   transform: none;
+}
+
+.seat-load-error {
+  padding: 40rpx 28rpx;
+  border-radius: 16rpx;
+  background: var(--color-warning-bg);
+  color: var(--color-warning-fg);
+  font-size: 24rpx;
+  line-height: 1.5;
+  text-align: center;
+}
+
+.seat-retry {
+  width: 240rpx;
+  min-height: 80rpx;
+  line-height: 80rpx;
+  margin: 24rpx auto 0;
+  border-radius: 16rpx;
+  background: var(--color-primary-active);
+  color: var(--color-bg-card);
+  font-size: 26rpx;
+  font-weight: 700;
+}
+
+.seat-list {
+  margin-top: 28rpx;
+  padding-top: 24rpx;
+  border-top: 2rpx solid var(--color-border);
+}
+
+.seat-list-title {
+  color: var(--color-text);
+  font-size: 28rpx;
+  font-weight: 700;
+}
+
+.seat-list-hint {
+  margin-top: 6rpx;
+  color: var(--color-text-secondary);
+  font-size: 22rpx;
+}
+
+.seat-list-group {
+  margin-top: 24rpx;
+}
+
+.seat-list-group-name {
+  margin-bottom: 12rpx;
+  color: var(--color-text-brand);
+  font-size: 24rpx;
+  font-weight: 600;
+}
+
+.seat-list-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12rpx;
+}
+
+.seat-list-option {
+  min-width: 96rpx;
+  min-height: 80rpx;
+  padding: 0 20rpx;
+  line-height: 80rpx;
+  box-sizing: border-box;
+  border: 2rpx solid var(--color-primary-soft);
+  border-radius: 16rpx;
+  background: var(--color-bg-card);
+  color: var(--color-text);
+  font-size: 26rpx;
+  text-align: center;
+}
+
+.seat-list-option.active {
+  border-color: var(--color-primary-active);
+  background: var(--color-primary-soft);
+  color: var(--color-text-brand);
+  font-weight: 700;
 }
 
 .seat-map-loading {

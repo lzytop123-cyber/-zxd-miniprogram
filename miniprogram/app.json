@@ -75,15 +75,15 @@
   "lazyCodeLoading": "requiredComponents",
   "preloadRule": {},
   "window": {
-    "navigationBarBackgroundColor": "#52B788",
+    "navigationBarBackgroundColor": "#2D6A4F",
     "navigationBarTitleText": "知行岛自习室",
     "navigationBarTextStyle": "white",
     "backgroundColor": "#F4FAF6"
   },
   "tabBar": {
     "custom": true,
-    "color": "#8C9BA5",
-    "selectedColor": "#52B788",
+    "color": "#3D5245",
+    "selectedColor": "#2D6A4F",
     "backgroundColor": "#FFFFFF",
     "list": [
       {

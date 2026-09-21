@@ -39,6 +39,26 @@ page {
   margin-bottom: 40rpx;
 }
 
+.inline-error {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16rpx;
+  padding: 18rpx 20rpx;
+  border-radius: 16rpx;
+  background: var(--color-warning-bg);
+  color: var(--color-warning-fg);
+  font-size: 24rpx;
+  line-height: 1.45;
+}
+
+.inline-error-action {
+  flex-shrink: 0;
+  color: var(--color-text-brand);
+  font-weight: 700;
+  padding: 8rpx 0;
+}
+
 .active-panel {
   display: flex;
   flex-direction: column;
@@ -282,6 +302,16 @@ page {
   text-align: left;
 }
 
+.open-help {
+  align-self: center;
+  min-height: 64rpx;
+  line-height: 64rpx;
+  padding: 0 20rpx;
+  color: var(--color-text-brand);
+  font-size: 24rpx;
+  font-weight: 700;
+}
+
 .open-btn {
   display: flex;
   align-items: center;
@@ -359,7 +389,7 @@ page {
 }
 
 .open-btn--disabled .open-btn-desc {
-  color: #A8B5AD;
+  color: var(--color-text-secondary);
 }
 
 .open-btn-chevron {
@@ -407,7 +437,7 @@ page {
 
 .checkout-hint {
   font-size: 22rpx;
-  color: #B0BEC5;
+  color: var(--color-text-secondary);
   text-align: center;
   line-height: 1.5;
 }

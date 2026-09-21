@@ -148,6 +148,7 @@ Page({
     selectedLabel: '',
     selectedZone: '',
     seats: [],
+    seatGroups: [],
     availableSeatCount: 0,
     planSeatCount: 27,
     preview: null,
@@ -166,6 +167,7 @@ Page({
     hourlyHint: '最少2小时，最长24小时',
     previewError: '',
     seatsLoading: false,
+    seatLoadError: '',
     previewLoading: false,
     seatTipDismissed: false,
     showSeatMap: false,
@@ -970,6 +972,8 @@ Page({
   _doRefreshPreview(options = {}) {
     const { storeId, billType, seatId } = this.data
     if (!storeId) return Promise.resolve()
+    const requestId = (this._previewRequestId || 0) + 1
+    this._previewRequestId = requestId
     let start
     let end
     try {
@@ -982,6 +986,10 @@ Page({
         timeSummary: '',
         startTime: '',
         endTime: '',
+        seats: [],
+        seatGroups: [],
+        availableSeatCount: 0,
+        seatLoadError: '',
         previewLoading: false,
         showSeatMap: false,
         previewError: err.message || '请检查使用时间',
@@ -1009,6 +1017,7 @@ Page({
 
     const previewPromise = request({ url: '/reservation/preview', method: 'POST', data: body, silent: true })
       .then((preview) => {
+        if (requestId !== this._previewRequestId) return
         const patch = { preview, previewLoading: false }
         if (this.data.seatId && preview.seat_id === this.data.seatId) {
           patch.seatCode = preview.seat_code
@@ -1016,6 +1025,7 @@ Page({
         this.setData(patch)
       })
       .catch((e) => {
+        if (requestId !== this._previewRequestId) return
         this.setData({
           preview: null,
           previewLoading: false,
@@ -1036,17 +1046,22 @@ Page({
       return Promise.resolve()
     }
     this._seatRange = range
-
-    const showLoadingOverlay = force || !this._hasSeatAvailability()
-    if (showLoadingOverlay) {
-      this.setData({ seatsLoading: true })
-    }
+    const requestId = (this._seatRequestId || 0) + 1
+    this._seatRequestId = requestId
+    this.setData({
+      seatsLoading: true,
+      seatLoadError: '',
+      seats: [],
+      seatGroups: [],
+      availableSeatCount: 0,
+    })
 
     return request({
       url: `/store/${storeId}/availability?start_time=${encodeURIComponent(start)}&end_time=${encodeURIComponent(end)}`,
       silent: true,
     })
       .then((seats) => {
+        if (requestId !== this._seatRequestId) return
         const applied = this._layout.applySeats(seats)
         // 只统计平面图 1–28（避免旧 A01 与新编号并存时虚高到 50+）
         const availableSlots = new Set()
@@ -1054,7 +1069,13 @@ Page({
           if (s.status === 'available' && s.map_slot) availableSlots.add(s.map_slot)
         })
         const availableSeatCount = availableSlots.size
-        const patch = { seats: applied, availableSeatCount, seatsLoading: false }
+        const patch = {
+          seats: applied,
+          seatGroups: this.buildSeatGroups(applied),
+          availableSeatCount,
+          seatsLoading: false,
+          seatLoadError: '',
+        }
         if (this.data.seatId) {
           const current = applied.find((s) => s.id === this.data.seatId)
           if (!current || current.status !== 'available') {
@@ -1069,11 +1090,57 @@ Page({
         }
         this.setData(patch)
       })
-      .catch(() => this.setData({ seatsLoading: false }))
+      .catch(() => {
+        if (requestId !== this._seatRequestId) return
+        this.setData({
+          seatsLoading: false,
+          seats: [],
+          seatGroups: [],
+          availableSeatCount: 0,
+          seatId: null,
+          seatCode: '',
+          selectedId: null,
+          selectedLabel: '',
+          selectedZone: '',
+          seatLoadError: '座位加载失败，请检查网络后重新加载',
+        })
+      })
+  },
+
+  buildSeatGroups(seats) {
+    const groups = []
+    const byName = new Map()
+    ;(seats || []).forEach((seat) => {
+      if (!seat || seat.status !== 'available') return
+      const display = this._layout.seatDisplay(seat)
+      const name = display.zoneName || '其他区域'
+      let group = byName.get(name)
+      if (!group) {
+        group = { name, seats: [] }
+        byName.set(name, group)
+        groups.push(group)
+      }
+      group.seats.push({
+        id: seat.id,
+        code: seat.seat_code,
+        label: display.mapLabel || seat.seat_code,
+        status: seat.status,
+      })
+    })
+    return groups
+  },
+
+  retrySeatLoad() {
+    const { startTime, endTime } = this.data
+    if (!startTime || !endTime) return Promise.resolve()
+    return this.loadSeats(startTime, endTime, { force: true })
   },
 
   selectSeat(e) {
-    const { id, code, status } = e.detail
+    const source = e.detail && e.detail.id
+      ? e.detail
+      : ((e.currentTarget && e.currentTarget.dataset) || {})
+    const { id, code, status } = source
     if (this.data.seatsLoading) {
       wx.showToast({ title: '更新中…', icon: 'none' })
       return
@@ -1103,7 +1170,7 @@ Page({
   },
 
   goOrder() {
-    const { storeId, preview, billType, seatId } = this.data
+    const { storeId, storeName, preview, billType, seatId } = this.data
     if (!auth.isLoggedIn()) {
       const redirect = `${routes.bookingIndex}?storeId=${storeId}`
       auth.requireLogin(redirect)
@@ -1119,7 +1186,7 @@ Page({
     }
     if (preview && preview.seat_id === seatId) {
       wx.navigateTo({
-        url: `${routes.bookingOrder}?storeId=${storeId}&start=${encodeURIComponent(preview.start_time)}&end=${encodeURIComponent(preview.end_time)}&seatId=${preview.seat_id}&price=${preview.final_price}&seatCode=${preview.seat_code}&billType=${billType}`,
+        url: `${routes.bookingOrder}?storeId=${storeId}&storeName=${encodeURIComponent(storeName || '')}&start=${encodeURIComponent(preview.start_time)}&end=${encodeURIComponent(preview.end_time)}&seatId=${preview.seat_id}&price=${preview.final_price}&seatCode=${preview.seat_code}&billType=${billType}`,
       })
       return
     }
@@ -1128,7 +1195,7 @@ Page({
       const { preview: latest, seatId: sid, previewError } = this.data
       if (latest && latest.seat_id === sid) {
         wx.navigateTo({
-          url: `${routes.bookingOrder}?storeId=${storeId}&start=${encodeURIComponent(latest.start_time)}&end=${encodeURIComponent(latest.end_time)}&seatId=${latest.seat_id}&price=${latest.final_price}&seatCode=${latest.seat_code}&billType=${billType}`,
+          url: `${routes.bookingOrder}?storeId=${storeId}&storeName=${encodeURIComponent(storeName || '')}&start=${encodeURIComponent(latest.start_time)}&end=${encodeURIComponent(latest.end_time)}&seatId=${latest.seat_id}&price=${latest.final_price}&seatCode=${latest.seat_code}&billType=${billType}`,
         })
       } else {
         const tip = (previewError || '').trim()

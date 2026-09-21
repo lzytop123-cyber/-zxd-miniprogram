@@ -1,10 +1,12 @@
 <view class="page-order page-safe-bottom">
   <view class="card order-card">
     <view class="block-title">订单信息</view>
+    <view class="row"><text class="row-label">门店</text><text class="row-value">{{storeName || '当前门店'}}</text></view>
     <view class="row"><text class="row-label">预定方式</text><text>{{billTypeLabel}}</text></view>
     <view class="row"><text class="row-label">座位</text><text>{{seatDisplay || seatCode}}</text></view>
     <view class="row"><text class="row-label">开始</text><text>{{startDisplay}}</text></view>
     <view class="row"><text class="row-label">结束</text><text>{{endDisplay}}</text></view>
+    <view class="row"><text class="row-label">时长</text><text>{{durationDisplay}}</text></view>
     <view class="hint-warn" wx:if="{{billType === 'night' && nightDays > 0}}">
       {{nightBookingHint}}
     </view>
@@ -12,7 +14,7 @@
     <view class="section-title inner" wx:if="{{usableCoupons.length}}">优惠券</view>
     <picker wx:if="{{usableCoupons.length}}" mode="selector" range="{{usableCoupons}}" range-key="coupon_name" bindchange="selectCoupon">
       <view class="picker-row">
-        {{selectedCouponId ? '已选优惠券' : '选择优惠券'}}
+        {{selectedCouponId ? selectedCouponName : '选择优惠券'}}
       </view>
     </picker>
 
@@ -24,7 +26,10 @@
       {{cardMismatchHint}}
     </view>
 
-    <view class="hint-warn" wx:if="{{payOptionsError}}">{{payOptionsError}}</view>
+    <view class="hint-warn retry-hint" wx:if="{{payOptionsError}}">
+      <text>{{payOptionsError}}</text>
+      <text class="retry-link" wx:if="{{payType !== 'period_card'}}" bindtap="retryPrice">重新计算</text>
+    </view>
 
     <view class="hint-soft" wx:if="{{usableCards.length && payType === 'wechat'}}">
       有 {{usableCards.length}} 张期限卡可用，可切换支付方式
@@ -45,14 +50,21 @@
     <picker wx:if="{{payType==='period_card' && usableCards.length}}" mode="selector" range="{{usableCards}}" range-key="card_name" bindchange="selectCard">
       <view class="picker-row">{{selectedCardName || '选择期限卡'}}</view>
     </picker>
+    <view class="card-usage" wx:if="{{payType==='period_card' && selectedCardId}}">{{cardUsageText}}</view>
   </view>
 
   <view class="fixed-bottom-spacer"></view>
   <view class="fixed-bottom-bar">
     <view class="pay-summary">
-      <text class="pay-label">实付</text>
-      <text class="pay-amount">¥{{price}}</text>
+      <block wx:if="{{payType==='period_card'}}">
+        <text class="pay-label">使用</text>
+        <text class="pay-card-name">{{selectedCardName}}</text>
+      </block>
+      <block wx:else>
+        <text class="pay-label">{{priceLoading ? '正在计算' : '实付'}}</text>
+        <text class="pay-amount">{{priceLoading ? '…' : '¥' + price}}</text>
+      </block>
     </view>
-    <view class="btn-primary submit-btn {{submitting?'disabled':''}}" bindtap="submitOrder">{{submitting?'提交中…':'确认支付'}}</view>
+    <view class="btn-primary submit-btn {{(submitting || priceLoading || (payOptionsError && payType !== 'period_card'))?'disabled':''}}" bindtap="submitOrder">{{submitting?'提交中…':(payType==='period_card'?'确认预约':'确认支付')}}</view>
   </view>
 </view>

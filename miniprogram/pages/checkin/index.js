@@ -93,6 +93,7 @@ function canChangeSeatFor(reservation, now = new Date()) {
 Page({
   data: {
     pageLoading: true,
+    loadError: '',
     activeList: [],
     selectedId: null,
     reservation: null,
@@ -149,14 +150,18 @@ Page({
 
   loadActive(options = {}) {
     const { force = false, silent = false } = options
+    const requestId = (this._activeRequestId || 0) + 1
+    this._activeRequestId = requestId
     const hasList = (this.data.activeList || []).length > 0
     if (!hasList || force) {
       if (!silent || !hasList) {
         this.setData({ pageLoading: !hasList })
       }
     }
+    this.setData({ loadError: '' })
     return request({ url: '/reservation/active/list', silent: true, force })
       .then((list) => {
+        if (requestId !== this._activeRequestId) return
         const items = list || []
         if (!items.length) {
           this._expiredReloadFor = null
@@ -167,6 +172,7 @@ Page({
             reservation: null,
             canOpen: false,
             pageLoading: false,
+            loadError: '',
           })
           return
         }
@@ -180,11 +186,13 @@ Page({
           selectedId = items[0].id
         }
 
-        this.setData({ activeList: items, selectedId, pageLoading: false })
+        this.setData({ activeList: items, selectedId, pageLoading: false, loadError: '' })
         const reservation = items.find((item) => item.id === selectedId) || items[0]
         this.applyReservation(reservation)
       })
       .catch(() => {
+        if (requestId !== this._activeRequestId) return
+        const loadError = '订单加载失败，请检查网络后重试'
         if (!hasList) {
           this.setData({
             activeList: [],
@@ -192,11 +200,16 @@ Page({
             reservation: null,
             canOpen: false,
             pageLoading: false,
+            loadError,
           })
         } else {
-          this.setData({ pageLoading: false })
+          this.setData({ pageLoading: false, loadError })
         }
       })
+  },
+
+  retryLoadActive() {
+    return this.loadActive({ force: true })
   },
 
   selectReservation(e) {
@@ -412,6 +425,10 @@ Page({
     const { reservation, canChangeSeat } = this.data
     if (!reservation || !canChangeSeat) return
     wx.navigateTo({ url: `${routes.profileChangeSeat}?id=${reservation.id}` })
+  },
+
+  goContact() {
+    wx.navigateTo({ url: routes.profileContact })
   },
 
   checkout() {

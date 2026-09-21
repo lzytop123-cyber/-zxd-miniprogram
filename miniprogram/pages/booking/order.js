@@ -271,9 +271,23 @@ function formatOrderRange(billType, startIso, endIso) {
   }
 }
 
+function formatDurationDisplay(billType, startIso, endIso) {
+  if (billType === 'hourly') return `${bookingHours(startIso, endIso)} 小时`
+  const days = countSessionDays(startIso, endIso)
+  if (billType === 'session') return `${days} 天（扣 ${days} 次）`
+  return `${days} 天`
+}
+
+function formatCardUsage(billType, startIso, endIso) {
+  if (billType === 'hourly') return `本次扣除 ${bookingHours(startIso, endIso)} 小时`
+  if (billType === 'session') return `本次扣除 ${countSessionDays(startIso, endIso)} 次`
+  return '本次使用此卡权益'
+}
+
 Page({
   data: {
     storeId: null,
+    storeName: '',
     startTime: '',
     endTime: '',
     seatId: null,
@@ -296,10 +310,14 @@ Page({
     coupons: [],
     usableCoupons: [],
     selectedCouponId: null,
+    selectedCouponName: '',
+    durationDisplay: '',
+    cardUsageText: '',
     sessionDays: 0,
     nightDays: 0,
     nightBookingHint: OFFICE_NIGHT_BOOKING_HINT,
     payOptionsError: '',
+    priceLoading: false,
     cardMismatchHint: '',
     submitting: false,
   },
@@ -317,6 +335,7 @@ Page({
     const range = formatOrderRange(billType, startTime, endTime)
     this.setData({
       storeId: options.storeId,
+      storeName: options.storeName ? decodeURIComponent(options.storeName) : '',
       startTime,
       endTime,
       seatId: options.seatId,
@@ -330,6 +349,8 @@ Page({
       endDisplay: range.endDisplay,
       nightDays: range.nightDays,
       sessionDays: billType === 'session' ? countSessionDays(startTime, endTime) : 0,
+      durationDisplay: formatDurationDisplay(billType, startTime, endTime),
+      cardUsageText: formatCardUsage(billType, startTime, endTime),
     })
   },
 
@@ -344,6 +365,7 @@ Page({
   async loadPayOptions(options = {}) {
     const { force = false } = options
     try {
+      let shouldRefreshPrice = false
       const [cards, coupons] = await Promise.all([
         request({ url: '/user/cards', silent: true, force }),
         request({ url: '/user/coupons', silent: true, force }),
@@ -377,6 +399,7 @@ Page({
         patch.price = 0
         patch.discountPrice = 0
         patch.selectedCouponId = null
+        patch.selectedCouponName = ''
       } else if (this.data.payType === 'period_card') {
         const cur = usableCards.find((c) => c.id === this.data.selectedCardId) || usableCards[0]
         if (cur) {
@@ -388,47 +411,60 @@ Page({
           patch.payType = 'wechat'
           patch.selectedCardId = null
           patch.selectedCardName = ''
+          shouldRefreshPrice = true
         }
       } else if (!usableCards.length) {
         patch.selectedCardId = null
         patch.selectedCardName = ''
       }
       this.setData(patch)
+      if (shouldRefreshPrice) {
+        await this.refreshPrice(this.data.selectedCouponId)
+      }
     } catch (e) {
       this.setData({ payOptionsError: formatRequestError(e) })
     }
   },
 
-  setPay(e) {
+  async setPay(e) {
     this._payTypePinned = true
     const payType = e.currentTarget.dataset.type
-    const patch = { payType }
+    const patch = { payType, payOptionsError: '' }
     if (payType === 'period_card' && this.data.usableCards.length) {
+      this._priceRequestId = (this._priceRequestId || 0) + 1
       const card = this.data.usableCards[0]
       patch.selectedCardId = card.id
       patch.selectedCardName = card.card_name || card.card_type
       patch.selectedCouponId = null
+      patch.selectedCouponName = ''
       patch.price = 0
       patch.discountPrice = 0
+      patch.priceLoading = false
     } else if (payType !== 'period_card') {
       patch.selectedCardId = null
       patch.selectedCardName = ''
-      this.refreshPrice(this.data.selectedCouponId)
+      patch.priceLoading = true
     }
     this.setData(patch)
+    if (payType !== 'period_card') {
+      await this.refreshPrice(this.data.selectedCouponId)
+    }
   },
 
   selectCard(e) {
     const idx = Number(e.detail.value)
     const card = this.data.usableCards[idx]
     if (!card) return
+    this._priceRequestId = (this._priceRequestId || 0) + 1
     this.setData({
       selectedCardId: card.id,
       selectedCardName: card.card_name || card.card_type,
       payType: 'period_card',
       selectedCouponId: null,
+      selectedCouponName: '',
       price: 0,
       discountPrice: 0,
+      priceLoading: false,
     })
   },
 
@@ -438,14 +474,18 @@ Page({
     const couponId = coupon ? coupon.id : null
     this.setData({
       selectedCouponId: couponId,
+      selectedCouponName: coupon ? coupon.coupon_name : '',
       payType: this.data.payType === 'period_card' ? 'wechat' : this.data.payType,
       selectedCardId: null,
     })
-    this.refreshPrice(couponId)
+    return this.refreshPrice(couponId)
   },
 
   async refreshPrice(couponId) {
     if (this.data.payType === 'period_card') return
+    const requestId = (this._priceRequestId || 0) + 1
+    this._priceRequestId = requestId
+    this.setData({ priceLoading: true, payOptionsError: '' })
     const body = {
       store_id: Number(this.data.storeId),
       bill_type: this.data.billType,
@@ -456,18 +496,37 @@ Page({
     if (couponId) body.coupon_id = couponId
     try {
       const preview = await request({ url: '/reservation/preview', method: 'POST', data: body })
+      if (requestId !== this._priceRequestId) return
       this.setData({
         price: preview.final_price,
         discountPrice: preview.discount_price || 0,
         originalPrice: preview.original_price,
+        priceLoading: false,
       })
     } catch (e) {
-      wx.showToast({ title: formatRequestError(e), icon: 'none' })
+      if (requestId !== this._priceRequestId) return
+      const message = formatRequestError(e) || '价格计算失败'
+      this.setData({
+        priceLoading: false,
+        payOptionsError: `${message}，请重试价格计算`,
+      })
     }
+  },
+
+  retryPrice() {
+    return this.refreshPrice(this.data.selectedCouponId)
   },
 
   async submitOrder() {
     if (this._submitting) return
+    if (this.data.priceLoading) {
+      wx.showToast({ title: '价格计算中，请稍候', icon: 'none' })
+      return
+    }
+    if (this.data.payOptionsError && this.data.payType !== 'period_card') {
+      wx.showToast({ title: '请先重新计算价格', icon: 'none' })
+      return
+    }
     this._submitting = true
     this._payCompleted = false
     this.setData({ submitting: true })

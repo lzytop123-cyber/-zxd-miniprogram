@@ -24,6 +24,7 @@ Page({
     categoryTabs: PKG_CATEGORY_TABS,
     activeCategory: 'all',
     loading: false,
+    loadError: '',
     buying: false,
     detailVisible: false,
     detail: null,
@@ -77,6 +78,7 @@ Page({
   loadStores(options = {}) {
     const { force = false, silent = false } = options
     const hasStores = this.data.stores.length > 0
+    this.setData({ loadError: '' })
     return request({ url: '/store/list', silent: true, force })
       .then((stores) => {
         const list = stores || []
@@ -91,6 +93,11 @@ Page({
         if (store?.id) return this.loadPackages(store.id, { force, silent: silent || hasStores })
       })
       .catch(() => {
+        this.setData({
+          buyLoaded: true,
+          loading: false,
+          loadError: '门店加载失败，请检查网络后重试',
+        })
         if (!hasStores) wx.showToast({ title: '加载门店失败', icon: 'none' })
       })
   },
@@ -99,32 +106,55 @@ Page({
     const idx = Number(e.detail.value)
     const store = this.data.stores[idx]
     if (!store) return
-    this.setData({ storeId: store.id, storeName: store.name, activeCategory: 'all' })
-    this.loadPackages(store.id, { force: true })
+    this.setData({
+      storeId: store.id,
+      storeName: store.name,
+      activeCategory: 'all',
+      packages: [],
+      displayPackages: [],
+      loadError: '',
+    })
+    return this.loadPackages(store.id, { force: true })
   },
 
   loadPackages(storeId, options = {}) {
     const { force = false, silent = false } = options
+    const requestId = (this._packageRequestId || 0) + 1
+    this._packageRequestId = requestId
     const hasPackages = this.data.packages.length > 0 && this.data.storeId === storeId
     if (!hasPackages || force) {
       if (!silent || !hasPackages) {
         this.setData({ loading: !hasPackages, packages: hasPackages ? this.data.packages : [], displayPackages: hasPackages ? this.data.displayPackages : [] })
       }
     }
+    this.setData({ loadError: '' })
     return request({ url: `/card/packages?store_id=${storeId}`, silent: true, force })
       .then((data) => {
+        if (requestId !== this._packageRequestId || this.data.storeId !== storeId) return
         const packages = (data.items || []).map(enrichPackage)
         this.setData({
           packages,
           displayPackages: filterPackages(packages, this.data.activeCategory),
           storeName: data.store_name || this.data.storeName,
           loading: false,
+          loadError: '',
         })
       })
       .catch(() => {
-        this.setData({ loading: false })
+        if (requestId !== this._packageRequestId || this.data.storeId !== storeId) return
+        this.setData({
+          loading: false,
+          packages: [],
+          displayPackages: [],
+          loadError: '套餐加载失败，请检查网络后重试',
+        })
         if (!hasPackages) wx.showToast({ title: '加载套餐失败', icon: 'none' })
       })
+  },
+
+  retryPackages() {
+    if (!this.data.storeId) return this.loadStores({ force: true })
+    return this.loadPackages(this.data.storeId, { force: true })
   },
 
   switchCategory(e) {

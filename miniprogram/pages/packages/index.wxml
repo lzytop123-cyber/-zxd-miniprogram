@@ -22,6 +22,12 @@
   <view class="buy-body">
     <view class="loading" wx:if="{{loading}}">加载中...</view>
 
+    <view class="buy-error" wx:elif="{{loadError}}">
+      <view class="buy-error-title">内容加载失败</view>
+      <view class="buy-error-hint">{{loadError}}</view>
+      <view class="buy-error-action" bindtap="retryPackages">重新加载套餐</view>
+    </view>
+
     <view class="pkg-list" wx:elif="{{displayPackages.length}}">
       <view class="pkg-ticket" wx:for="{{displayPackages}}" wx:key="pricing_rule_id">
         <view class="pkg-deco"></view>

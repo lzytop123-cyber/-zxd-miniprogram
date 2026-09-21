@@ -54,6 +54,8 @@ Page({
     summary: null,
     leaderboard: [],
     daily: [],
+    reportLoading: false,
+    reportError: '',
     days: 7,
     scopeLabel: '全平台',
     storeId: null,
@@ -142,17 +144,44 @@ Page({
 
   load(options = {}) {
     const { force = false } = options
+    this.setData({ reportLoading: true, reportError: '' })
     return Promise.all([
       request({ url: '/report/summary', silent: true, force }).then((summary) => {
         this.setData({ summary })
-      }).catch(() => {}),
+      }),
       this.loadLeaderboard({ force }),
       this.loadDaily({ force }),
-    ])
+    ]).then(() => {
+      this.setData({ reportLoading: false, reportError: '' })
+    }).catch(() => {
+      this.setData({
+        reportLoading: false,
+        reportError: '学习报告加载失败，请检查网络后重试',
+      })
+    })
+  },
+
+  retryReport() {
+    if (this.data.scopeLabel === '本店' && !this.data.storeId) {
+      this.setData({ reportLoading: true, reportError: '' })
+      return this.resolveStoreId()
+        .then((storeId) => {
+          if (!storeId) throw new Error('未找到可用门店')
+          this.setData({ storeId })
+          return this.load({ force: true })
+        })
+        .catch(() => this.setData({
+          reportLoading: false,
+          reportError: '本店信息加载失败，请检查网络后重试',
+        }))
+    }
+    return this.load({ force: true })
   },
 
   loadLeaderboard(options = {}) {
     const { force = false } = options
+    const requestId = (this._leaderboardRequestId || 0) + 1
+    this._leaderboardRequestId = requestId
     const params = this.data.storeId ? `?store_id=${this.data.storeId}` : ''
     return request({ url: `/report/leaderboard${params}`, silent: true, force }).then(async (leaderboard) => {
       const list = await Promise.all(
@@ -162,14 +191,18 @@ Page({
           avatar_url: await resolveLeaderboardAvatar(item.avatar_url),
         }))
       )
+      if (requestId !== this._leaderboardRequestId) return
       this.setData({ leaderboard: list })
-    }).catch(() => {})
+    })
   },
 
   loadDaily(options = {}) {
     const { force = false } = options
+    const requestId = (this._dailyRequestId || 0) + 1
+    this._dailyRequestId = requestId
     return request({ url: `/report/daily?days=${this.data.days}`, silent: true, force })
       .then((rows) => {
+        if (requestId !== this._dailyRequestId) return
         const list = rows || []
         const max = list.reduce((m, r) => Math.max(m, r.total_minutes || 0), 0)
         const daily = list.map((r) => {
@@ -182,28 +215,62 @@ Page({
         })
         this.setData({ daily })
       })
-      .catch(() => {})
   },
 
   setDays(e) {
     const days = Number(e.currentTarget.dataset.d)
     if (days === this.data.days) return
-    this.setData({ days })
+    this.setData({ days, reportLoading: true, reportError: '' })
     this.loadDaily({ force: true })
+      .then(() => this.setData({ reportLoading: false }))
+      .catch(() => this.setData({
+        reportLoading: false,
+        reportError: '学习趋势加载失败，请检查网络后重试',
+      }))
   },
 
   onScopeChange(e) {
     const idx = Number(e.detail.value)
+    const requestId = (this._scopeRequestId || 0) + 1
+    this._scopeRequestId = requestId
     if (idx === 0) {
-      this.setData({ scopeLabel: '全平台', storeId: null })
-      this.loadLeaderboard({ force: true })
-      return
+      this.setData({ scopeLabel: '全平台', storeId: null, reportLoading: true, reportError: '' })
+      return this.loadLeaderboard({ force: true })
+        .then(() => {
+          if (requestId === this._scopeRequestId) this.setData({ reportLoading: false })
+        })
+        .catch(() => {
+          if (requestId !== this._scopeRequestId) return
+          this.setData({
+            reportLoading: false,
+            reportError: '排行榜加载失败，请检查网络后重试',
+          })
+        })
     }
-    this.setData({ scopeLabel: '本店' })
-    this.resolveStoreId().then((storeId) => {
-      this.setData({ storeId: storeId || null })
-      this.loadLeaderboard({ force: true })
+    this.setData({
+      scopeLabel: '本店',
+      storeId: null,
+      leaderboard: [],
+      reportLoading: true,
+      reportError: '',
     })
+    return this.resolveStoreId()
+      .then((storeId) => {
+        if (requestId !== this._scopeRequestId) return null
+        if (!storeId) throw new Error('未找到可用门店')
+        this.setData({ storeId })
+        return this.loadLeaderboard({ force: true })
+      })
+      .then(() => {
+        if (requestId === this._scopeRequestId) this.setData({ reportLoading: false })
+      })
+      .catch(() => {
+        if (requestId !== this._scopeRequestId) return
+        this.setData({
+          reportLoading: false,
+          reportError: '本店信息或排行榜加载失败，请重试',
+        })
+      })
   },
 
   /** 解析「本店」对应的门店 id（取门店列表首个，结果缓存）。 */
@@ -215,7 +282,6 @@ Page({
         this._storeId = first ? first.id : null
         return this._storeId
       })
-      .catch(() => null)
   },
 
   switchTab(e) {

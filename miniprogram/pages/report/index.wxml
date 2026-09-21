@@ -11,6 +11,11 @@
 
   <!-- ============ 学习报告 ============ -->
   <view wx:if="{{tab==='report'}}" class="report-body">
+    <view class="report-loading" wx:if="{{reportLoading && !summary && !daily.length && !leaderboard.length}}">正在加载学习报告…</view>
+    <view class="report-error" wx:if="{{reportError}}">
+      <view>{{reportError}}</view>
+      <view class="report-retry" bindtap="retryReport">重新加载报告</view>
+    </view>
     <!-- scope 切换靠右浮 -->
     <view class="report-scope-row">
       <picker mode="selector" range="{{['全平台','本店']}}" bindchange="onScopeChange">
@@ -19,7 +24,7 @@
     </view>
 
     <!-- 卡 A：个人成绩 -->
-    <view class="card report-card">
+    <view class="card report-card" wx:if="{{summary}}">
       <view class="my-rank" wx:if="{{summary}}">
         <view class="rank-no" wx:if="{{summary.rank}}">#{{summary.rank}}</view>
         <view class="title-badge">{{summary.title}}</view>
@@ -58,7 +63,7 @@
           <text class="daily-bar-label">{{item.label}}</text>
         </view>
       </view>
-      <view class="daily-empty" wx:else>近{{days}}日暂无学习记录</view>
+      <view class="daily-empty" wx:elif="{{!reportError}}">近{{days}}日暂无学习记录</view>
     </view>
 
     <!-- 卡 C：排行榜 -->
@@ -74,7 +79,7 @@
           <text class="name">{{item.nickname}}</text>
           <text class="mins">{{item.time_label}}</text>
         </view>
-        <view class="empty" wx:if="{{!leaderboard.length}}">暂无排行数据</view>
+        <view class="empty" wx:if="{{!leaderboard.length && !reportError}}">暂无排行数据</view>
       </view>
     </view>
   </view>
