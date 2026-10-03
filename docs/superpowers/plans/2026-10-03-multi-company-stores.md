@@ -1,118 +1,113 @@
-# Multi-Company Stores Implementation Plan
+# 两家公司共用小程序的门店隔离实施计划
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **供执行者使用：**按 `superpowers:subagent-driven-development` 或 `superpowers:executing-plans` 技能逐项实施；用 `- [ ]` 跟踪每一步。
 
-**Goal:** Run two independently operated stores in one mini program while isolating admin data and routing each reservation payment and refund to its owning company.
+**目标：**两家公司在同一个小程序里经营各自门店，后台数据隔离，预约收款与退款进入各自商户号。
 
-**Architecture:** Add a company owner to stores and admins, and snapshot the company and merchant profile on each reservation. Keep one public AppID and one database. Scope every admin operation on the server; route WeChat orders, callbacks, queries and refunds through the reservation's immutable merchant profile. The existing store-seat-map plan is a separate prerequisite for opening the new store.
+**方案：**门店和管理员增加公司归属；预约创建时固定记录所属公司与收款商户配置。继续使用一个小程序 AppID、一套后端和数据库。后台所有查询与操作在服务端校验公司归属；微信支付的下单、回调、查单和退款始终使用该订单所属商户。新店开业还需要先完成独立座位图计划。
 
-**Tech Stack:** FastAPI, SQLAlchemy 2, SQLite/MySQL, wechatpayv3, Vue 3/Element Plus, native WeChat mini program, Python `unittest`, Node `--test`.
+**技术：**FastAPI、SQLAlchemy 2、SQLite/MySQL、wechatpayv3、Vue 3、Element Plus、微信原生小程序、Python `unittest`、Node `--test`。
 
-**Spec:** `docs/superpowers/specs/2026-10-03-multi-company-stores-design.md`
+**设计说明：**`docs/superpowers/specs/2026-10-03-multi-company-stores-design.md`
 
-## Global Constraints
+## 全程约束
 
-- One mini program AppID; two ordinary WeChat Pay merchant accounts.
-- Existing stores, admins, reservations, recharges and card purchases migrate to the original company without changing balances or order numbers.
-- The sister's store stays closed until seat-map, permissions, payment binding, price and real refund acceptance all pass.
-- Sister-company reservations accept WeChat payment only; existing balance, cards, coupons, points and vouchers cannot be used or issued there.
-- Merchant credentials remain server-side. A missing profile fails payment closed; it never falls back to the original company's merchant account.
-- Normal customer flows show store names. Each store detail exposes a qualification link; first data transfer to the sister company uses a separate notice and consent.
-- No self-service merchant onboarding, subscriptions, cross-company cart or entitlement sharing.
+- 一个小程序 AppID；两家公司各使用自己的普通微信支付商户号。
+- 现有门店、管理员、预约、充值和购卡订单归入原公司；余额和订单号不改变。
+- 新店在座位图、后台权限、支付绑定、价格及真实退款均验收通过前保持停业。
+- 新店首版只接受微信支付；老店余额、次卡、优惠券、积分和团购券不能用于新店，也不在新店发放。
+- 商户密钥只保存在服务端。缺少新店支付配置时拒绝付款，绝不能回退到老店商户号。
+- 顾客正常操作只看门店名称；门店详情提供资质入口；首次将个人信息提供给姐姐公司时单独告知并取得同意。
+- 暂不做商家自助入驻、订阅收费、跨公司合单或权益互通。
 
-## Review Focus
+## 重点检查
 
-1. An admin changes `store_id`, order ID, export filters or a direct URL to another company's resource: return 403/404 without leaking data (Task 2 and Task 3 tests).
-2. A sister-store booking attempts an old global card, wallet balance, coupon or mock offline payment: reject before deducting or fulfilling anything (Task 4 tests).
-3. A callback signed by one merchant references another merchant's order, or has the wrong amount: do not mark paid or grant access (Task 5 tests).
-4. A paid reservation is refunded after its store's current merchant profile changes: refund through the original snapshotted profile (Task 5 test).
-5. A new store has no published seat map or approved payment profile: it remains unavailable to public booking (Task 6 acceptance test; seat-map plan test).
+1. 后台账号修改 `store_id`、订单 ID、导出条件或网址访问另一家公司数据时，返回 403/404，不泄露数据（任务 2、3）。
+2. 新店订单尝试使用老店余额、卡、券或后台模拟收款时，在扣减和履约前拒绝（任务 4）。
+3. 某商户签名的支付回调指向另一商户订单，或支付金额不符时，不得记为已付或开门（任务 5）。
+4. 门店以后更换商户配置，历史订单仍通过原商户退款（任务 5）。
+5. 新店没有已发布座位图或已验证支付配置时，不能对顾客开放预约（任务 6 及座位图计划）。
 
----
+## 文件分工
 
-## File Structure
+- `backend/app/models/__init__.py`、`backend/app/services/schema_migrate.py`：公司、门店、管理员、订单和顾客授权记录。
+- `backend/app/api/deps.py`、新增 `backend/app/services/company_access.py`：登录后的公司身份及资源授权。
+- `backend/app/api/routes/admin.py`、`admin_tools.py`、`admin_receipts.py`、`ble.py`、`notifications.py`、`admin_market.py`：后台业务接口隔离及全局模块限制。
+- `backend/app/services/wechat_pay.py`、`backend/app/api/routes/payment.py`、`reservation.py`、`card.py`、`report.py`：按公司商户号收款、查单、回调、退款和权益限制。
+- `backend/app/api/routes/store.py`、`backend/app/schemas/store.py`：门店资质和可用支付方式。
+- `admin-web/src/layouts/AdminLayout.vue`、`router/index.ts`、`views/Stores.vue`、新增 `views/Companies.vue`：按权限显示后台功能。
+- `miniprogram/pages/store/detail.*`、`pages/booking/order.*`、新增 `pages/store/qualification.*`：门店资质、付款方式和首次授权。
+- `backend/scripts/test_multi_company.py`、`miniprogram/tests/multiCompany.test.js`：公司隔离、支付和顾客流程测试。后端使用自带的 `unittest`；项目未安装 `pytest`。
 
-- `backend/app/models/__init__.py`, `backend/app/services/schema_migrate.py`: company, admin ownership, store ownership, reservation payment snapshot and consent persistence.
-- `backend/app/api/deps.py`, new `backend/app/services/company_access.py`: authenticated company context, resource authorization and list filters.
-- `backend/app/api/routes/admin.py`, `admin_tools.py`, `admin_receipts.py`, `ble.py`, `notifications.py`, `admin_market.py`: allowed business endpoints and explicit denial of global modules to sister-company admins.
-- `backend/app/services/wechat_pay.py`, `backend/app/api/routes/payment.py`, `reservation.py`, `card.py`, `report.py`: per-profile payment, notification, query, refund and entitlement restrictions.
-- `backend/app/api/routes/store.py`, `backend/app/schemas/store.py`: qualifications and customer payment capabilities.
-- `admin-web/src/layouts/AdminLayout.vue`, `admin-web/src/router/index.ts`, `admin-web/src/views/Stores.vue`, new `admin-web/src/views/Companies.vue`: role-aware navigation, company setup and store operations; server authorization remains authoritative.
-- `miniprogram/pages/store/detail.*`, `miniprogram/pages/booking/order.*`, new `miniprogram/pages/store/qualification.*`: per-store map/qualification/payment presentation and first-order consent.
-- `backend/scripts/test_multi_company.py`, `miniprogram/tests/multiCompany.test.js`: cross-company, payment and customer-flow regression tests. Run backend tests with the bundled `unittest` runner; this project does not install `pytest`.
+### 任务 1：保存公司归属并迁移旧数据
 
-### Task 1: Persist company ownership and preserve existing records
+**文件：**修改 `backend/app/models/__init__.py`、`backend/app/services/schema_migrate.py`、`backend/scripts/init_production.py`；新增 `backend/scripts/test_multi_company.py`。
 
-**Files:** Modify `backend/app/models/__init__.py`, `backend/app/services/schema_migrate.py`, `backend/scripts/init_production.py`; create `backend/scripts/test_multi_company.py`.
+**数据：**新增 `OperatingCompany`，含名称、状态、支付配置引用、支付绑定确认时间、营业执照图片、许可信息及联系方式；`Store`、`AdminUser` 增加 `company_id`，管理员增加 `role`；`Reservation` 增加 `company_id`、`payment_profile`、`pay_mchid`；新增 `UserCompanyConsent`，按用户、公司及告知版本唯一记录同意。
 
-**Interfaces:** Create `OperatingCompany(id, legal_name, status, payment_profile, payment_binding_verified_at, license_image_url, permit_info, contact)`; add `Store.company_id`, `AdminUser.company_id`, `AdminUser.role`, `Reservation.company_id`, `Reservation.payment_profile`, `Reservation.pay_mchid`; create `UserCompanyConsent(user_id, company_id, notice_version, granted_at)` with unique `(user_id, company_id, notice_version)`.
+- [ ] 先写 `test_legacy_backfill_idempotent`：旧库升级后建立原公司 ID 1，旧门店、管理员和预约都归原公司；余额、订单号和支付状态不变；重复升级无额外变化。
+- [ ] 运行 `cd backend && .venv\Scripts\python -m unittest scripts.test_multi_company -v`，确认新增测试因模型或迁移缺失而失败。
+- [ ] 按现有 `schema_migrate.py` 方式增加兼容 SQLite/MySQL 的字段、表和回填；旧充值与购卡逻辑归原公司。升级后服务端拒绝公司归属为空的业务数据。
+- [ ] 运行新增测试、`scripts/test_sprint1.py` 和 `scripts/test_card_rules.py`，确认通过。
+- [ ] 提交公司归属模型、迁移和测试。
 
-- [ ] **Step 1: Write `test_legacy_backfill_idempotent`** using a legacy SQLite fixture: startup creates original company ID 1, assigns old stores/admins/reservations to it, preserves balances/order numbers/paid states, and a second migration makes no further changes.
-- [ ] **Step 2: Run** `cd backend && .venv\Scripts\python -m unittest scripts.test_multi_company -v`; expect the new migration test to fail.
-- [ ] **Step 3: Add models and additive SQLite/MySQL-compatible migration/backfill in `schema_migrate.py`.** Backfill legacy card/recharge ownership logically to company 1; do not rename or rebuild existing payment records. Reject null company ownership at service boundaries after migration.
-- [ ] **Step 4: Run the test plus existing** `backend/scripts/test_sprint1.py` and `backend/scripts/test_card_rules.py`; expect pass.
-- [ ] **Step 5: Commit** `feat: add operating company ownership`.
+### 任务 2：统一后台公司权限
 
-### Task 2: Centralize backend company authorization
+**文件：**修改 `backend/app/api/deps.py`、`backend/app/api/routes/admin.py`；新增 `backend/app/services/company_access.py`；扩展后端测试。
 
-**Files:** Modify `backend/app/api/deps.py`; create `backend/app/services/company_access.py`; modify admin login and company provisioning endpoints in `backend/app/api/routes/admin.py`; extend `backend/scripts/test_multi_company.py`.
+**接口：**`require_company_store(db, admin, store_id)`、`require_company_reservation(db, admin, reservation_id)`、`company_store_ids(db, admin)`、`require_platform_config(admin)`。`GET /api/admin/me` 返回角色和公司 ID，不返回商户密钥。
 
-**Interfaces:** `require_company_store(db: Session, admin: AdminUser, store_id: int) -> Store`, `require_company_reservation(db: Session, admin: AdminUser, reservation_id: int) -> Reservation`, `company_store_ids(db: Session, admin: AdminUser) -> Select[int]`, `require_platform_config(admin: AdminUser) -> None`. `GET /api/admin/me` returns role and company ID, not merchant secrets.
+- [ ] 先写 `test_company_access_helpers` 和 `test_platform_config_cannot_browse_sister_orders`：两家公司管理员互相取不到门店、订单；停用账号无法访问；平台配置权限能建立公司，但日常经营数据仍按本公司隔离。
+- [ ] 运行新增测试，确认因权限函数缺失而失败。
+- [ ] 实现授权函数及公司名称、资质、状态、支付配置引用的管理接口；原管理员迁移为原公司平台管理员，姐姐公司的管理员由平台显式创建。密钥不经后台 API 配置。
+- [ ] 运行新增测试，通过后提交。
 
-- [ ] **Step 1: Add `test_company_access_helpers` and `test_platform_config_cannot_browse_sister_orders`:** assert original/sister admins cannot load the other's store or reservation, disabled admin is rejected, platform configuration can register a company but remains scoped to original-company business data.
-- [ ] **Step 2: Run the targeted test; expect failure.**
-- [ ] **Step 3: Implement the access helpers and company creation/status/payment-profile-reference management.** The existing admin becomes original-company platform admin; sister-company admin is provisioned explicitly. Payment secrets are configured outside the API.
-- [ ] **Step 4: Run targeted test; expect pass.**
-- [ ] **Step 5: Commit** `feat: add company admin context`.
+### 任务 3：后台所有业务接口按公司隔离
 
-### Task 3: Enforce company isolation on every admin route
+**文件：**修改 `backend/app/api/routes/admin.py`、`admin_tools.py`、`admin_receipts.py`、`ble.py`、`notifications.py`、`admin_market.py`；扩展后端测试。
 
-**Files:** Modify `backend/app/api/routes/admin.py`, `admin_tools.py`, `admin_receipts.py`, `ble.py`, `notifications.py`, `admin_market.py`; extend `backend/scripts/test_multi_company.py`.
+**规则：**列表从当前公司门店范围查询；详情与修改逐项核验门店或订单归属。姐姐公司账号不能访问全局余额、卡券、积分、团购、集市、AI 知识库、首页内容和系统配置。
 
-**Interfaces:** Business lists use `company_store_ids`; detail/mutations use `require_company_store` or `require_company_reservation`; sister admins receive 403 for global wallet, cards, points, coupons, deal mapping, marketplace, AI, banners, sitewide settings and admin provisioning.
+- [ ] 盘点上述文件中的后台接口；写 `test_admin_cross_company_isolation` 覆盖门店/订单列表、直接 ID、修改、导出和统计；写 `test_global_admin_modules_denied` 覆盖全局模块。
+- [ ] 对门店、座位、价格、日历、预约、顾客订单、门锁、收据和报表接口加服务端范围限制；姐姐后台的顾客资料只来自她店的订单，只返回履约所需字段。
+- [ ] 其余未明确授权的后台接口对姐姐公司默认拒绝；座位图计划新增的后台接口也加同样限制。
+- [ ] 运行跨公司测试及现有后台、收据、门锁测试，通过后提交。
 
-- [ ] **Step 1: Inventory each admin endpoint in the listed route files and add `test_admin_cross_company_isolation`:** for store/reservation lists, detail IDs, mutations, exports and stats, sister admin sees only sister rows or gets 403/404. Add `test_global_admin_modules_denied` for wallet, cards, points, coupons, market, knowledge, banners and site settings.
-- [ ] **Step 2: Scope store, seat, pricing, calendar, reservation, customer-by-order, lock, receipt and report endpoints.** Treat missing scope as denial; customer profile responses contain only fields needed for that company's orders.
-- [ ] **Step 3: Deny sister admins at server entry points for all global modules and any endpoint not explicitly scoped.** Apply the same guard to seat-map admin endpoints added by the prerequisite plan.
-- [ ] **Step 4: Run targeted cross-company tests and existing admin/receipt/lock tests; expect pass.**
-- [ ] **Step 5: Commit** `feat: isolate company admin data`.
+### 任务 4：老店权益不能用于新店
 
-### Task 4: Prevent old entitlements from crossing companies
+**文件：**修改 `backend/app/api/routes/reservation.py`、`card.py`、`report.py`、`exchange.py`、`user.py`、`store.py`、`backend/app/services/booking.py`、`points.py`、`backend/app/schemas/store.py`；扩展后端测试。
 
-**Files:** Modify `backend/app/api/routes/reservation.py`, `card.py`, `report.py`, `exchange.py`, `user.py`, `backend/app/services/booking.py`, `points.py`, `backend/app/api/routes/store.py`, `backend/app/schemas/store.py`; extend `backend/scripts/test_multi_company.py`.
+**接口：**门店详情返回服务端决定的 `payment_options` 和资质信息；`POST /api/user/company-consents` 记录当前告知版本的明确同意。姐姐店预约只接受 `PayType.wechat`；充值、购卡、团购核销和积分发放首版仅用于老店。
 
-**Interfaces:** `StoreDetail` exposes `payment_options` and qualification metadata; the server derives both from the store's company. `POST /api/user/company-consents` records `company_id` and current `notice_version` after explicit consent; booking requires it for sister company. New-company booking allows only `PayType.wechat`; recharge, card purchase, voucher redemption and points accrual are original-company-only in the first release.
+- [ ] 写 `test_sister_store_rejects_legacy_entitlements`：旧余额、全店通用卡（`store_id=None`）、券、积分或团购码不能用于姐姐店，拒绝后余额和卡次不变。写 `test_sister_booking_requires_consent`：未授权不能向姐姐店下单，同意记录按版本保存，不能替别的用户授权。
+- [ ] 运行新增测试，确认失败。
+- [ ] 在服务端预约和权益入口按门店所属公司限制；小程序隐藏按钮不能替代服务端校验。老店原有流程保持不变。
+- [ ] 运行新增和现有预约、卡规则测试，通过后提交。
 
-- [ ] **Step 1: Add `test_sister_store_rejects_legacy_entitlements`** for wallet/card/coupon/points/voucher attempts, including a `PeriodCard.store_id is None` legacy card; assert balances and card counts remain unchanged. Add `test_sister_booking_requires_consent` and assert consent records are versioned and cannot be forged for another user.
-- [ ] **Step 2: Run targeted tests; expect failure.**
-- [ ] **Step 3: Gate entitlement and booking paths on server-owned company.** Do not rely on hidden mini-program controls. Keep original-company behavior and existing customer history unchanged.
-- [ ] **Step 4: Run targeted and existing card/booking tests; expect pass.**
-- [ ] **Step 5: Commit** `feat: keep legacy entitlements in original company`.
+### 任务 5：微信支付按订单所属商户处理
 
-### Task 5: Route WeChat payment by immutable order merchant
+**文件：**修改 `backend/app/core/config.py`、`backend/app/services/wechat_pay.py`、`backend/app/api/routes/payment.py`、`reservation.py`、`card.py`、`report.py`、`backend/.env.production.example`、`docker-compose.prod.yml`；扩展后端测试。
 
-**Files:** Modify `backend/app/core/config.py`, `backend/app/services/wechat_pay.py`, `backend/app/api/routes/payment.py`, `reservation.py`, `card.py`, `report.py`, `backend/.env.production.example`, `docker-compose.prod.yml`; extend `backend/scripts/test_multi_company.py`.
+**接口：**`WechatPayService.create_jsapi_order(..., profile_key)`、`query_order(order_no, profile_key)`、`verify_notify(headers, body, profile_key)`、`refund(..., profile_key)`。新增 `/api/payment/wechat/{profile_key}/notify`；原回调地址保留给老店历史订单。支付配置引用在服务端对应商户号及密钥路径。
 
-**Interfaces:** `WechatPayService.create_jsapi_order(..., profile_key: str)`, `query_order(order_no: str, profile_key: str)`, `verify_notify(headers: dict, body: bytes, profile_key: str)`, `refund(..., profile_key: str)`; old card/recharge calls use explicit original profile. New callback path `/api/payment/wechat/{profile_key}/notify`; old `/api/payment/wechat/notify` remains as original-profile alias. Profile config resolves to `mchid` and secret paths server-side.
+- [ ] 写 `test_payment_profile_routing`、`test_wrong_merchant_callback_rejected`、`test_duplicate_callback_idempotent`、`test_refund_uses_order_profile`：新店选姐姐商户，旧充值和购卡仍选原商户；缺配置拒绝付款；错商户或金额不符不履约；重复回调不重复处理；历史退款不受门店新配置影响。
+- [ ] 运行新增测试，确认失败。
+- [ ] 把单一微信支付客户端改为按配置引用缓存；预约下单、查单和退款使用订单快照。回调验签后再次核对商户号、金额和订单状态；保留旧回调地址。
+- [ ] 运行新增及现有支付、收据测试；确认配置示例只有占位符，响应和日志不包含私钥。
+- [ ] 提交多商户支付与测试。
 
-- [ ] **Step 1: Add `test_payment_profile_routing`, `test_wrong_merchant_callback_rejected`, `test_duplicate_callback_idempotent` and `test_refund_uses_order_profile`:** assert sister reservation selects sister profile, old recharge/card select original profile, missing profile fails closed, merchant/amount mismatch does not fulfill, replay does not duplicate effects, and profile changes do not reroute historical refunds.
-- [ ] **Step 2: Run targeted tests; expect failure.**
-- [ ] **Step 3: Refactor the singleton payment client into a cache keyed by profile and route all reservation create/query/refund paths through the reservation snapshot.** Validate merchant ID and amount after verified callback before applying business effects; keep the legacy callback URL for historical orders.
-- [ ] **Step 4: Run targeted and existing payment/receipt tests; expect pass.** Check environment examples contain placeholders only and no private keys in responses or logs.
-- [ ] **Step 5: Commit** `feat: route payments by company merchant`.
+### 任务 6：后台、小程序及开店验收
 
-### Task 6: Complete store-facing UI and launch gates
+**文件：**修改 `admin-web/src/layouts/AdminLayout.vue`、`router/index.ts`、`views/Stores.vue`、`views/Admins.vue`、`miniprogram/pages/store/detail.*`、`pages/booking/order.*`、`miniprogram/app.json`；新增 `admin-web/src/views/Companies.vue`、`miniprogram/pages/store/qualification.*`、`miniprogram/tests/multiCompany.test.js`；修改 `docs/POST-DEPLOY.md`。
 
-**Files:** Modify `admin-web/src/layouts/AdminLayout.vue`, `admin-web/src/router/index.ts`, `admin-web/src/views/Stores.vue`, `admin-web/src/views/Admins.vue`, `miniprogram/pages/store/detail.*`, `miniprogram/pages/booking/order.*`, `miniprogram/app.json`; create `admin-web/src/views/Companies.vue`, `miniprogram/pages/store/qualification.*`, `miniprogram/tests/multiCompany.test.js`; modify `docs/POST-DEPLOY.md`.
+**界面：**后台按 `/api/admin/me` 返回的角色显示菜单；平台配置账号可录入公司资质与绑定状态。门店详情有“店铺资质”入口；顾客第一次在姐姐店下单时显示必要的信息告知并记录同意。平时选店和付款界面仍以门店名称为主。
 
-**Interfaces:** Admin UI calls `/api/admin/me` for menu/routing; store detail links to company qualification; booking page uses server `payment_options` and displays the sister-company data notice on its first booking, recording `UserCompanyConsent` before sending customer data to sister admin.
+- [ ] 写小程序测试：切换不同座位图、各店付款选项、姐姐店不显示老店权益、资质入口、首次授权。手工检查两家公司后台菜单与跳转。
+- [ ] 实现前台和后台界面；门店选择页及日常结算页不额外突出公司名称，但资质页和首次告知写明实际主体。
+- [ ] 运行 `cd admin-web && npm run build` 及 `cd miniprogram && npm test`；手工确认切店后不会显示上家门店的旧座位图。
+- [ ] 更新 `docs/POST-DEPLOY.md`：支付异主体绑定、真实小额支付退款、两家公司账单核对。座位图、价格、营业时间和权限都验收通过前，姐姐店不能开业。
+- [ ] 提交后台、小程序和上线检查说明。
 
-- [ ] **Step 1: Add `multiCompany.test.js` cases** for switching between two different store layouts, independent payment options, no old card/wallet/coupon in sister checkout, qualification link and first-booking consent. Add manual admin acceptance checks for company-specific menus, company setup and navigation.
-- [ ] **Step 2: Implement the UI and notice/consent endpoint flow.** Do not show legal company name in the routine store selection or checkout layout; display it in qualifications and the required first-transfer notice.
-- [ ] **Step 3: Run** `cd admin-web && npm run build` and `cd miniprogram && npm test`; expect pass. Manually verify switch-store layout cannot show a stale map from the other store.
-- [ ] **Step 4: Update `docs/POST-DEPLOY.md` with binding, real small-value payment/refund and separate ledger checks.** Require the existing seat-map plan, merchant binding, correct store hours/prices and all cross-company checks before opening sister store.
-- [ ] **Step 5: Commit** `feat: present separate stores in one mini program`.
+## 实施顺序
 
-## Execution Order
-
-Implement the already written `docs/superpowers/plans/2026-10-01-configurable-store-seat-maps.md` before opening the new store. Its map editor, per-store image/markers and publication gate satisfy the distinct-layout requirement; the current fixed layout remains for the original store. Tasks 1–6 above then add company ownership, isolation, merchant routing and release gates. Code from both plans may be developed in separate commits, but the sister store must stay closed until both plans pass their acceptance checks.
+先完成已有的 `docs/superpowers/plans/2026-10-01-configurable-store-seat-maps.md`：老店维持现有布局，新店上传并发布自己的图片和座位位置。再按本计划完成公司归属、后台隔离、不同商户收款和上线验收。两部分可以分别提交代码，但姐姐店必须在全部检查通过后才开放。
