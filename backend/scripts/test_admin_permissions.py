@@ -12,13 +12,6 @@ from pathlib import Path
 BACKEND = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(BACKEND))
 
-_GUARD_DB_PATH: str | None = None
-if os.environ.get("ADMIN_PERM_MIGRATION_TEST") != "1":
-    _fd, _GUARD_DB_PATH = tempfile.mkstemp(suffix=".db")
-    os.close(_fd)
-    os.environ["DATABASE_URL"] = f"sqlite:///{_GUARD_DB_PATH}"
-    os.environ["APP_ENV"] = "development"
-
 from app.services.admin_permissions import (  # noqa: E402
     STORE_DEFAULT_PERMISSIONS,
     normalize_permissions,
@@ -66,160 +59,57 @@ class PermissionsMigrationTests(unittest.TestCase):
             text=True,
         )
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        try:
+            os.remove(db_path)
+        except OSError:
+            pass
 
 
 class GuardMiddlewareTests(unittest.TestCase):
-    """API 守卫：模块权限 + 硬限制（TestClient）。"""
+    """API 守卫：模块权限 + 硬限制（子进程 + 独立 SQLite，避免污染 test_admin_roles）。"""
 
-    @classmethod
-    def setUpClass(cls):
-        from fastapi import APIRouter, Depends, FastAPI
-        from fastapi.testclient import TestClient
-        from sqlalchemy import select
-
-        from app.api.admin_role_guard import AdminRoleGuardMiddleware
-        from app.api.deps import get_current_admin
-        from app.api.routes import admin_receipts
-        from app.core.security import create_access_token
-        from app.db.session import Base, SessionLocal, engine, get_db
-        from app.models import AdminUser, Store
-        from app.schemas.common import ResponseModel
-
-        Base.metadata.create_all(bind=engine)
-        db = SessionLocal()
-        try:
-            for model in (AdminUser, Store):
-                for row in db.scalars(select(model)).all():
-                    db.delete(row)
-            db.commit()
-            store = Store(name="权限测店", status=1)
-            db.add(store)
-            db.flush()
-            cls.store_id = store.id
-            cls.hq = AdminUser(username="guard_hq", password_hash="x", role="hq", status=1)
-            cls.store_default = AdminUser(
-                username="guard_store_default",
-                password_hash="x",
-                role="store",
-                store_id=store.id,
-                status=1,
-                permissions=None,
-            )
-            cls.store_no_receipts = AdminUser(
-                username="guard_store_no_receipts",
-                password_hash="x",
-                role="store",
-                store_id=store.id,
-                status=1,
-                permissions=["dashboard", "stores", "pricing"],
-            )
-            cls.store_with_banners = AdminUser(
-                username="guard_store_banners",
-                password_hash="x",
-                role="store",
-                store_id=store.id,
-                status=1,
-                permissions=list(STORE_DEFAULT_PERMISSIONS) + ["banners"],
-            )
-            db.add_all([cls.hq, cls.store_default, cls.store_no_receipts, cls.store_with_banners])
-            db.commit()
-            for admin in (cls.hq, cls.store_default, cls.store_no_receipts, cls.store_with_banners):
-                db.refresh(admin)
-        finally:
-            db.close()
-
-        stub = APIRouter()
-
-        @stub.get("/admin/stats", response_model=ResponseModel)
-        def stub_stats(_: object = Depends(get_current_admin)):
-            return ResponseModel(data={"ok": True})
-
-        @stub.get("/admin/banners", response_model=ResponseModel)
-        def stub_banners(_: object = Depends(get_current_admin)):
-            return ResponseModel(data=[])
-
-        @stub.post("/admin/stores", response_model=ResponseModel)
-        def stub_create_store(_: object = Depends(get_current_admin)):
-            return ResponseModel(data={"id": 1})
-
-        @stub.post(
-            "/admin/stores/{source_id}/pricing/copy-to/{target_id}",
-            response_model=ResponseModel,
+    def _run_guard_case(self, case: str) -> None:
+        fd, db_path = tempfile.mkstemp(suffix=".db")
+        os.close(fd)
+        env = os.environ.copy()
+        env.pop("ADMIN_PERM_MIGRATION_TEST", None)
+        env.pop("ADMIN_PERM_GUARD_TEST", None)
+        env["DATABASE_URL"] = f"sqlite:///{db_path}"
+        env["APP_ENV"] = "development"
+        env["ADMIN_PERM_GUARD_TEST"] = case
+        result = subprocess.run(
+            [sys.executable, str(Path(__file__).resolve())],
+            env=env,
+            cwd=str(BACKEND),
+            capture_output=True,
+            text=True,
         )
-        def stub_copy_pricing(
-            source_id: int,
-            target_id: int,
-            _: object = Depends(get_current_admin),
-        ):
-            return ResponseModel(data={"source_id": source_id, "target_id": target_id})
-
-        app = FastAPI()
-        app.add_middleware(AdminRoleGuardMiddleware)
-        app.include_router(admin_receipts.router, prefix="/api")
-        app.include_router(stub, prefix="/api")
-
-        def _override_db():
-            session = SessionLocal()
-            try:
-                yield session
-            finally:
-                session.close()
-
-        # Route deps use whichever admin the test sets on the class.
-        app.dependency_overrides[get_db] = _override_db
-        app.dependency_overrides[get_current_admin] = lambda: cls._current_admin
-
-        cls.SessionLocal = SessionLocal
-        cls.create_access_token = staticmethod(create_access_token)
-        cls.client = TestClient(app)
-        cls._current_admin = cls.hq
-
-    @classmethod
-    def tearDownClass(cls):
-        if hasattr(cls, "client"):
-            cls.client.close()
-        if _GUARD_DB_PATH:
-            try:
-                os.remove(_GUARD_DB_PATH)
-            except OSError:
-                pass
-
-    def _auth(self, admin) -> dict[str, str]:
-        self.__class__._current_admin = admin
-        token = self.create_access_token(f"admin:{admin.id}")
-        return {"Authorization": f"Bearer {token}"}
+        try:
+            os.remove(db_path)
+        except OSError:
+            pass
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
     def test_store_without_receipts_forbidden(self):
-        res = self.client.get(
-            "/api/admin/receipts/summary",
-            params={"year": 2025},
-            headers=self._auth(self.store_no_receipts),
-        )
-        self.assertEqual(res.status_code, 403, res.text)
-        self.assertEqual(res.json()["message"], "无此模块权限")
+        self._run_guard_case("store_without_receipts_forbidden")
 
     def test_store_defaults_can_stats(self):
-        res = self.client.get("/api/admin/stats", headers=self._auth(self.store_default))
-        self.assertEqual(res.status_code, 200, res.text)
+        self._run_guard_case("store_defaults_can_stats")
 
     def test_store_with_banners_allowed(self):
-        res = self.client.get("/api/admin/banners", headers=self._auth(self.store_with_banners))
-        self.assertEqual(res.status_code, 200, res.text)
+        self._run_guard_case("store_with_banners_allowed")
 
     def test_store_cannot_create_store(self):
-        res = self.client.post("/api/admin/stores", headers=self._auth(self.store_default), json={})
-        self.assertEqual(res.status_code, 403, res.text)
+        self._run_guard_case("store_cannot_create_store")
 
     def test_store_cannot_copy_pricing(self):
-        res = self.client.post(
-            f"/api/admin/stores/{self.store_id}/pricing/copy-to/99",
-            headers=self._auth(self.store_default),
-        )
-        self.assertEqual(res.status_code, 403, res.text)
+        self._run_guard_case("store_cannot_copy_pricing")
+
+    def test_store_cannot_post_pay_accounts_even_with_permission(self):
+        self._run_guard_case("store_cannot_post_pay_accounts_even_with_permission")
 
     def test_hq_former_hq_only_still_ok(self):
-        res = self.client.get("/api/admin/banners", headers=self._auth(self.hq))
-        self.assertEqual(res.status_code, 200, res.text)
+        self._run_guard_case("hq_former_hq_only_still_ok")
 
 
 def _run_migration_test() -> None:
@@ -274,16 +164,198 @@ def _run_migration_test() -> None:
         db.close()
 
 
+def _build_guard_app():
+    from fastapi import APIRouter, Depends, FastAPI
+    from fastapi.testclient import TestClient
+    from sqlalchemy import select
+
+    from app.api.admin_role_guard import AdminRoleGuardMiddleware
+    from app.api.deps import get_current_admin
+    from app.api.routes import admin_receipts
+    from app.core.security import create_access_token
+    from app.db.session import Base, SessionLocal, engine, get_db
+    from app.models import AdminUser, Store
+    from app.schemas.common import ResponseModel
+
+    Base.metadata.create_all(bind=engine)
+    db = SessionLocal()
+    try:
+        for model in (AdminUser, Store):
+            for row in db.scalars(select(model)).all():
+                db.delete(row)
+        db.commit()
+        store = Store(name="权限测店", status=1)
+        db.add(store)
+        db.flush()
+        store_id = store.id
+        hq = AdminUser(username="guard_hq", password_hash="x", role="hq", status=1)
+        store_default = AdminUser(
+            username="guard_store_default",
+            password_hash="x",
+            role="store",
+            store_id=store.id,
+            status=1,
+            permissions=None,
+        )
+        store_no_receipts = AdminUser(
+            username="guard_store_no_receipts",
+            password_hash="x",
+            role="store",
+            store_id=store.id,
+            status=1,
+            permissions=["dashboard", "stores", "pricing"],
+        )
+        store_with_banners = AdminUser(
+            username="guard_store_banners",
+            password_hash="x",
+            role="store",
+            store_id=store.id,
+            status=1,
+            permissions=list(STORE_DEFAULT_PERMISSIONS) + ["banners"],
+        )
+        store_with_pay_accounts = AdminUser(
+            username="guard_store_pay_accounts",
+            password_hash="x",
+            role="store",
+            store_id=store.id,
+            status=1,
+            permissions=list(STORE_DEFAULT_PERMISSIONS) + ["pay_accounts"],
+        )
+        db.add_all(
+            [
+                hq,
+                store_default,
+                store_no_receipts,
+                store_with_banners,
+                store_with_pay_accounts,
+            ]
+        )
+        db.commit()
+        for admin in (
+            hq,
+            store_default,
+            store_no_receipts,
+            store_with_banners,
+            store_with_pay_accounts,
+        ):
+            db.refresh(admin)
+    finally:
+        db.close()
+
+    stub = APIRouter()
+    current_admin_holder: dict[str, AdminUser | None] = {"admin": hq}
+
+    @stub.get("/admin/stats", response_model=ResponseModel)
+    def stub_stats(_: object = Depends(get_current_admin)):
+        return ResponseModel(data={"ok": True})
+
+    @stub.get("/admin/banners", response_model=ResponseModel)
+    def stub_banners(_: object = Depends(get_current_admin)):
+        return ResponseModel(data=[])
+
+    @stub.post("/admin/stores", response_model=ResponseModel)
+    def stub_create_store(_: object = Depends(get_current_admin)):
+        return ResponseModel(data={"id": 1})
+
+    @stub.post("/admin/pay-accounts", response_model=ResponseModel)
+    def stub_create_pay_account(_: object = Depends(get_current_admin)):
+        return ResponseModel(data={"id": 1})
+
+    @stub.post(
+        "/admin/stores/{source_id}/pricing/copy-to/{target_id}",
+        response_model=ResponseModel,
+    )
+    def stub_copy_pricing(
+        source_id: int,
+        target_id: int,
+        _: object = Depends(get_current_admin),
+    ):
+        return ResponseModel(data={"source_id": source_id, "target_id": target_id})
+
+    app = FastAPI()
+    app.add_middleware(AdminRoleGuardMiddleware)
+    app.include_router(admin_receipts.router, prefix="/api")
+    app.include_router(stub, prefix="/api")
+
+    def _override_db():
+        session = SessionLocal()
+        try:
+            yield session
+        finally:
+            session.close()
+
+    app.dependency_overrides[get_db] = _override_db
+    app.dependency_overrides[get_current_admin] = lambda: current_admin_holder["admin"]
+
+    client = TestClient(app)
+
+    def auth(admin: AdminUser) -> dict[str, str]:
+        current_admin_holder["admin"] = admin
+        token = create_access_token(f"admin:{admin.id}")
+        return {"Authorization": f"Bearer {token}"}
+
+    return {
+        "client": client,
+        "auth": auth,
+        "store_id": store_id,
+        "hq": hq,
+        "store_default": store_default,
+        "store_no_receipts": store_no_receipts,
+        "store_with_banners": store_with_banners,
+        "store_with_pay_accounts": store_with_pay_accounts,
+    }
+
+
+def _run_guard_test(case: str) -> None:
+    ctx = _build_guard_app()
+    client = ctx["client"]
+    auth = ctx["auth"]
+    try:
+        if case == "store_without_receipts_forbidden":
+            res = client.get(
+                "/api/admin/receipts/summary",
+                params={"year": 2025},
+                headers=auth(ctx["store_no_receipts"]),
+            )
+            assert res.status_code == 403, res.text
+            assert res.json()["message"] == "无此模块权限"
+        elif case == "store_defaults_can_stats":
+            res = client.get("/api/admin/stats", headers=auth(ctx["store_default"]))
+            assert res.status_code == 200, res.text
+        elif case == "store_with_banners_allowed":
+            res = client.get("/api/admin/banners", headers=auth(ctx["store_with_banners"]))
+            assert res.status_code == 200, res.text
+        elif case == "store_cannot_create_store":
+            res = client.post("/api/admin/stores", headers=auth(ctx["store_default"]), json={})
+            assert res.status_code == 403, res.text
+        elif case == "store_cannot_copy_pricing":
+            res = client.post(
+                f"/api/admin/stores/{ctx['store_id']}/pricing/copy-to/99",
+                headers=auth(ctx["store_default"]),
+            )
+            assert res.status_code == 403, res.text
+        elif case == "store_cannot_post_pay_accounts_even_with_permission":
+            res = client.post(
+                "/api/admin/pay-accounts",
+                headers=auth(ctx["store_with_pay_accounts"]),
+                json={"name": "x", "mchid": "1", "serial_no": "1", "api_v3_key": "k", "key_path": "/k"},
+            )
+            assert res.status_code == 403, res.text
+            assert res.json()["message"] == "需要总部权限"
+        elif case == "hq_former_hq_only_still_ok":
+            res = client.get("/api/admin/banners", headers=auth(ctx["hq"]))
+            assert res.status_code == 200, res.text
+        else:
+            raise AssertionError(f"unknown guard case: {case}")
+    finally:
+        client.close()
+
+
 if __name__ == "__main__":
-    if os.environ.get("ADMIN_PERM_MIGRATION_TEST") == "1":
+    guard_case = os.environ.get("ADMIN_PERM_GUARD_TEST")
+    if guard_case:
+        _run_guard_test(guard_case)
+    elif os.environ.get("ADMIN_PERM_MIGRATION_TEST") == "1":
         _run_migration_test()
     else:
-        try:
-            unittest.main()
-        finally:
-            if _GUARD_DB_PATH:
-                try:
-                    os.remove(_GUARD_DB_PATH)
-                except OSError:
-                    pass
-
+        unittest.main()
