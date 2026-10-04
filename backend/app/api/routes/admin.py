@@ -10,7 +10,21 @@ from pydantic import BaseModel
 from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_current_admin, get_current_user
+from app.api.deps import get_current_admin, get_current_user, require_hq_admin
+from app.services.admin_access import (
+    ROLE_HQ,
+    ROLE_STORE,
+    assert_store_access,
+    admin_role,
+    is_hq,
+    scope_store_id,
+)
+from app.services.admin_permissions import (
+    STORE_DEFAULT_PERMISSIONS,
+    has_permission,
+    normalize_permissions,
+    permission_summary,
+)
 from app.core.config import settings
 from app.core.static_url import public_static_path, public_static_url
 from app.core.security import create_access_token, hash_password, verify_password
@@ -32,6 +46,7 @@ from app.models import (
     MeituanOrder,
     MeituanOrderStatus,
     PendingDealMapping,
+    PayAccount,
     PayType,
     PeriodCard,
     RechargeOrder,
@@ -105,6 +120,29 @@ class AdminLoginRequest(BaseModel):
 class AdminLoginResponse(BaseModel):
     token: str
     username: str
+    role: str = ROLE_HQ
+    store_id: int | None = None
+    store_name: str | None = None
+    name: str | None = None
+    permissions: list[str] = []
+
+
+def _admin_profile(db: Session, admin: AdminUser) -> dict:
+    role = admin_role(admin)
+    store_name = None
+    if admin.store_id:
+        store = db.get(Store, admin.store_id)
+        store_name = store.name if store else None
+    perms = normalize_permissions(role, getattr(admin, "permissions", None))
+    return {
+        "id": admin.id,
+        "username": admin.username,
+        "name": admin.name,
+        "role": role,
+        "store_id": admin.store_id if role == ROLE_STORE else None,
+        "store_name": store_name if role == ROLE_STORE else None,
+        "permissions": perms,
+    }
 
 
 @router.post("/login", response_model=ResponseModel[AdminLoginResponse])
@@ -112,8 +150,26 @@ def admin_login(body: AdminLoginRequest, db: Session = Depends(get_db)):
     admin = db.scalar(select(AdminUser).where(AdminUser.username == body.username))
     if not admin or not verify_password(body.password, admin.password_hash):
         raise HTTPException(status_code=401, detail="用户名或密码错误")
+    if admin_role(admin) == ROLE_STORE and not admin.store_id:
+        raise HTTPException(status_code=403, detail="店长账号未绑定门店，请联系总部")
     token = create_access_token(f"admin:{admin.id}")
-    return ResponseModel(data=AdminLoginResponse(token=token, username=admin.username))
+    profile = _admin_profile(db, admin)
+    return ResponseModel(
+        data=AdminLoginResponse(
+            token=token,
+            username=profile["username"],
+            role=profile["role"],
+            store_id=profile["store_id"],
+            store_name=profile["store_name"],
+            name=profile["name"],
+            permissions=profile["permissions"],
+        )
+    )
+
+
+@router.get("/me", response_model=ResponseModel)
+def admin_me(admin: AdminUser = Depends(get_current_admin), db: Session = Depends(get_db)):
+    return ResponseModel(data=_admin_profile(db, admin))
 
 
 @router.get("/system/coupon", response_model=ResponseModel)
@@ -144,9 +200,10 @@ def admin_reservations(
     status: int | None = None,
     order_no: str | None = None,
     user_id: int | None = None,
-    _: object = Depends(get_current_admin),
+    admin: AdminUser = Depends(get_current_admin),
     db: Session = Depends(get_db),
 ):
+    store_id = scope_store_id(admin, store_id)
     query = select(Reservation)
     if store_id:
         query = query.where(Reservation.store_id == store_id)
@@ -195,16 +252,12 @@ class AdminCreateReservationBody(BaseModel):
 
 
 def _admin_available_seats(db: Session, store_id: int, start: datetime, end: datetime) -> list[dict]:
-    from app.services.seat_setup import expected_seat_codes
+    from app.services.store_seat_maps import list_bookable_seats
 
-    plan_codes = set(expected_seat_codes())
-    seats = [
-        s
-        for s in db.scalars(
-            select(Seat).where(Seat.store_id == store_id, Seat.is_buffer == 0, Seat.status == 1)
-        ).all()
-        if s.seat_code in plan_codes
-    ]
+    store = db.get(Store, store_id)
+    if not store:
+        return []
+    seats = list_bookable_seats(db, store)
     busy_ids = find_busy_seat_ids(db, [s.id for s in seats], start, end)
     zones = {z.id: z.name for z in db.scalars(select(Zone).where(Zone.store_id == store_id)).all()}
     items = []
@@ -307,44 +360,59 @@ async def admin_create_reservation(
 
 
 @router.get("/stats", response_model=ResponseModel)
-def admin_stats(_: object = Depends(get_current_admin), db: Session = Depends(get_db)):
+def admin_stats(
+    store_id: int | None = None,
+    admin: AdminUser = Depends(get_current_admin),
+    db: Session = Depends(get_db),
+):
     today = date.today()
     today_start = datetime.combine(today, datetime.min.time())
     today_end = datetime.combine(today, datetime.max.time())
+    sid = scope_store_id(admin, store_id)
+    res_filters = [Reservation.pay_status == 1]
+    if sid:
+        res_filters.append(Reservation.store_id == sid)
     today_revenue = db.scalar(
         select(func.coalesce(func.sum(Reservation.final_price), 0)).where(
-            Reservation.pay_status == 1,
+            *res_filters,
             Reservation.created_at >= today_start,
             Reservation.created_at <= today_end,
         )
     )
-    active_count = db.scalar(
-        select(func.count()).where(Reservation.status == 1, Reservation.pay_status == 1)
-    )
-    store_count = db.scalar(select(func.count()).select_from(Store).where(Store.status == 1))
-    total_seats = db.scalar(
-        select(func.count()).select_from(Seat).where(Seat.is_buffer == 0, Seat.status == 1)
-    )
+    active_q = [Reservation.status == 1, Reservation.pay_status == 1]
+    if sid:
+        active_q.append(Reservation.store_id == sid)
+    active_count = db.scalar(select(func.count()).where(*active_q))
+    if sid:
+        store_count = 1
+        total_seats = db.scalar(
+            select(func.count()).select_from(Seat).where(
+                Seat.store_id == sid, Seat.is_buffer == 0, Seat.status == 1
+            )
+        )
+    else:
+        store_count = db.scalar(select(func.count()).select_from(Store).where(Store.status == 1))
+        total_seats = db.scalar(
+            select(func.count()).select_from(Seat).where(Seat.is_buffer == 0, Seat.status == 1)
+        )
     month_start = datetime.combine(today.replace(day=1), datetime.min.time())
     month_revenue = db.scalar(
         select(func.coalesce(func.sum(Reservation.final_price), 0)).where(
-            Reservation.pay_status == 1,
+            *res_filters,
             Reservation.created_at >= month_start,
         )
     )
+    verify_filters = [
+        MeituanOrder.status == MeituanOrderStatus.verified,
+        MeituanOrder.verified_at >= month_start,
+    ]
+    if sid:
+        verify_filters.append(MeituanOrder.store_id == sid)
     month_verify_amount = db.scalar(
-        select(func.coalesce(func.sum(MeituanOrder.deal_price), 0)).where(
-            MeituanOrder.status == MeituanOrderStatus.verified,
-            MeituanOrder.verified_at >= month_start,
-        )
+        select(func.coalesce(func.sum(MeituanOrder.deal_price), 0)).where(*verify_filters)
     )
-    month_verify_count = db.scalar(
-        select(func.count()).where(
-            MeituanOrder.status == MeituanOrderStatus.verified,
-            MeituanOrder.verified_at >= month_start,
-        )
-    ) or 0
-    new_users = db.scalar(
+    month_verify_count = db.scalar(select(func.count()).where(*verify_filters)) or 0
+    new_users = 0 if sid else db.scalar(
         select(func.count()).select_from(User).where(User.created_at >= today_start)
     )
     occupancy = round((active_count or 0) / max(total_seats or 1, 1) * 100, 1)
@@ -366,17 +434,25 @@ def admin_stats(_: object = Depends(get_current_admin), db: Session = Depends(ge
 @router.get("/stats/revenue", response_model=ResponseModel)
 def revenue_stats(
     days: int = Query(7, ge=1, le=30),
-    _: object = Depends(get_current_admin),
+    store_id: int | None = None,
+    admin: AdminUser = Depends(get_current_admin),
     db: Session = Depends(get_db),
 ):
     since = date.today() - timedelta(days=days - 1)
+    sid = scope_store_id(admin, store_id)
+    filters = [
+        Reservation.pay_status == 1,
+        Reservation.created_at >= datetime.combine(since, datetime.min.time()),
+    ]
+    if sid:
+        filters.append(Reservation.store_id == sid)
     rows = db.execute(
         select(
             func.date(Reservation.created_at).label("day"),
             func.coalesce(func.sum(Reservation.final_price), 0).label("revenue"),
             func.count().label("orders"),
         )
-        .where(Reservation.pay_status == 1, Reservation.created_at >= datetime.combine(since, datetime.min.time()))
+        .where(*filters)
         .group_by(func.date(Reservation.created_at))
         .order_by(func.date(Reservation.created_at))
     ).all()
@@ -449,6 +525,8 @@ class AdminStoreItem(BaseModel):
     floor_plan: str | None = None
     cover_images: list[str] = []
     meituan_shop_id: str | None = None
+    pay_account_id: int | None = None
+    benefits_isolated: int = 0
     status: int
 
     model_config = {"from_attributes": True}
@@ -466,6 +544,8 @@ class AdminStoreUpdateRequest(BaseModel):
     floor_plan: str | None = None
     cover_images: list[str] | None = None
     meituan_shop_id: str | None = None
+    pay_account_id: int | None = None
+    benefits_isolated: int | None = None
     status: int | None = None
 
 
@@ -541,7 +621,27 @@ def _store_to_admin_item(store: Store) -> dict:
         "floor_plan": store.floor_plan,
         "cover_images": _cover_images_admin(store),
         "meituan_shop_id": store.meituan_shop_id,
+        "pay_account_id": store.pay_account_id,
+        "benefits_isolated": int(getattr(store, "benefits_isolated", 0) or 0),
+        "seat_map_mode": getattr(store, "seat_map_mode", None) or "legacy",
         "status": store.status,
+    }
+
+
+def _pay_account_public(acc: PayAccount) -> dict:
+    """列表/详情不返回 api_v3_key 明文。"""
+    return {
+        "id": acc.id,
+        "name": acc.name,
+        "mchid": acc.mchid,
+        "serial_no": acc.serial_no,
+        "cert_path": acc.cert_path,
+        "key_path": acc.key_path,
+        "public_key_id": acc.public_key_id,
+        "public_key_path": acc.public_key_path,
+        "has_api_v3_key": bool((acc.api_v3_key or "").strip()),
+        "status": acc.status,
+        "created_at": acc.created_at.isoformat() if acc.created_at else None,
     }
 
 
@@ -566,10 +666,14 @@ def _pricing_to_dict(rule: PricingRule) -> dict:
 @router.get("/deal-mappings", response_model=ResponseModel)
 def list_deal_mappings(
     platform: int | None = Query(None, ge=1, le=2),
-    _: object = Depends(get_current_admin),
+    store_id: int | None = None,
+    admin: AdminUser = Depends(get_current_admin),
     db: Session = Depends(get_db),
 ):
+    store_id = scope_store_id(admin, store_id)
     query = select(MeituanDealMapping).order_by(MeituanDealMapping.id.desc())
+    if store_id:
+        query = query.where(MeituanDealMapping.store_id == store_id)
     if platform is not None:
         query = query.where(MeituanDealMapping.platform == platform)
     rows = db.scalars(query).all()
@@ -829,9 +933,11 @@ def delete_coupon(
 @router.get("/seats", response_model=ResponseModel)
 def list_seats(
     store_id: int = Query(1),
-    _: object = Depends(get_current_admin),
+    admin: AdminUser = Depends(get_current_admin),
     db: Session = Depends(get_db),
 ):
+    store_id = scope_store_id(admin, store_id) or store_id
+    assert_store_access(admin, store_id)
     zones = {
         z.id: z.name
         for z in db.scalars(select(Zone).where(Zone.store_id == store_id)).all()
@@ -890,12 +996,15 @@ def admin_store_seats_summary(
 @router.post("/stores/{store_id}/ensure-seats", response_model=ResponseModel)
 def admin_ensure_store_seats(
     store_id: int,
-    _: object = Depends(get_current_admin),
+    admin: AdminUser = Depends(get_current_admin),
     db: Session = Depends(get_db),
 ):
+    assert_store_access(admin, store_id)
     store = db.get(Store, store_id)
     if not store:
         raise HTTPException(status_code=404, detail="门店不存在")
+    if getattr(store, "seat_map_mode", "legacy") != "legacy":
+        raise HTTPException(status_code=400, detail="图片座位图门店不能补全标准 1–28 座，请在座位图编辑器中配置")
     result = migrate_store_seat_codes(db, store)
     db.commit()
     summary = store_seat_summary(db, store_id)
@@ -906,17 +1015,22 @@ def admin_ensure_store_seats(
 
 
 @router.get("/stores", response_model=ResponseModel)
-def list_stores_admin(_: object = Depends(get_current_admin), db: Session = Depends(get_db)):
-    stores = db.scalars(select(Store).order_by(Store.id)).all()
+def list_stores_admin(admin: AdminUser = Depends(get_current_admin), db: Session = Depends(get_db)):
+    q = select(Store).order_by(Store.id)
+    sid = scope_store_id(admin, None)
+    if sid:
+        q = q.where(Store.id == sid)
+    stores = db.scalars(q).all()
     return ResponseModel(data=[_store_to_admin_item(s) for s in stores])
 
 
 @router.get("/stores/{store_id}", response_model=ResponseModel)
 def get_store_admin(
     store_id: int,
-    _: object = Depends(get_current_admin),
+    admin: AdminUser = Depends(get_current_admin),
     db: Session = Depends(get_db),
 ):
+    assert_store_access(admin, store_id)
     store = db.get(Store, store_id)
     if not store:
         raise HTTPException(status_code=404, detail="门店不存在")
@@ -927,14 +1041,19 @@ def get_store_admin(
 def update_store_admin(
     store_id: int,
     body: AdminStoreUpdateRequest,
-    _: object = Depends(get_current_admin),
+    admin: AdminUser = Depends(get_current_admin),
     db: Session = Depends(get_db),
 ):
+    assert_store_access(admin, store_id)
     store = db.get(Store, store_id)
     if not store:
         raise HTTPException(status_code=404, detail="门店不存在")
 
     data = body.model_dump(exclude_unset=True)
+    # 店长不可改收款账户绑定 / 权益隔离（总部财务配置）
+    if not is_hq(admin):
+        data.pop("pay_account_id", None)
+        data.pop("benefits_isolated", None)
     for field in ("open_time", "close_time"):
         if field in data:
             try:
@@ -943,6 +1062,12 @@ def update_store_admin(
                 raise HTTPException(status_code=400, detail=str(e))
     if "cover_images" in data:
         data["cover_images"] = _cover_images_to_store(data["cover_images"])
+    if "pay_account_id" in data and data["pay_account_id"] is not None:
+        acc = db.get(PayAccount, data["pay_account_id"])
+        if not acc or acc.status != 1:
+            raise HTTPException(status_code=400, detail="收款账户不存在或已停用")
+    if "benefits_isolated" in data:
+        data["benefits_isolated"] = 1 if data["benefits_isolated"] else 0
 
     for key, value in data.items():
         if key in ("latitude", "longitude") and value is not None:
@@ -958,9 +1083,10 @@ def update_store_admin(
 @router.get("/stores/{store_id}/pricing", response_model=ResponseModel)
 def list_store_pricing(
     store_id: int,
-    _: object = Depends(get_current_admin),
+    admin: AdminUser = Depends(get_current_admin),
     db: Session = Depends(get_db),
 ):
+    assert_store_access(admin, store_id)
     store = db.get(Store, store_id)
     if not store:
         raise HTTPException(status_code=404, detail="门店不存在")
@@ -976,9 +1102,10 @@ def list_store_pricing(
 def create_store_pricing(
     store_id: int,
     body: AdminPricingCreateRequest,
-    _: object = Depends(get_current_admin),
+    admin: AdminUser = Depends(get_current_admin),
     db: Session = Depends(get_db),
 ):
+    assert_store_access(admin, store_id)
     store = db.get(Store, store_id)
     if not store:
         raise HTTPException(status_code=404, detail="门店不存在")
@@ -1127,12 +1254,13 @@ def _sync_reservation_rows_on_read(db: Session, rows: list[Reservation]) -> None
 @router.post("/reservations/{reservation_id}/cancel", response_model=ResponseModel)
 def admin_cancel_reservation(
     reservation_id: int,
-    _: object = Depends(get_current_admin),
+    admin: AdminUser = Depends(get_current_admin),
     db: Session = Depends(get_db),
 ):
     reservation = db.get(Reservation, reservation_id)
     if not reservation:
         raise HTTPException(status_code=404, detail="订单不存在")
+    assert_store_access(admin, reservation.store_id)
     if reservation.status == 3:
         raise HTTPException(status_code=400, detail="订单已取消")
     if reservation.status == 2:
@@ -1159,8 +1287,15 @@ def admin_cancel_reservation(
             )
             reservation.pay_status = 2
         elif reservation.pay_type == PayType.wechat and amount > 0:
+            from app.services.wechat_pay import resolve_account_for_mchid
+
+            pay_acc = resolve_account_for_mchid(db, reservation.pay_mchid)
             WechatPayService.refund(
-                reservation.order_no, amount, amount, "管理员取消预约",
+                reservation.order_no,
+                amount,
+                amount,
+                "管理员取消预约",
+                pay_account=pay_acc,
             )
             reservation.pay_status = 2
         elif reservation.pay_type == PayType.period_card:
@@ -1519,10 +1654,14 @@ def list_period_cards_admin(
     page_size: int = Query(20, ge=1, le=100),
     user_id: int | None = None,
     status: int | None = None,
-    _: object = Depends(get_current_admin),
+    store_id: int | None = None,
+    admin: AdminUser = Depends(get_current_admin),
     db: Session = Depends(get_db),
 ):
+    store_id = scope_store_id(admin, store_id)
     query = select(PeriodCard)
+    if store_id:
+        query = query.where(PeriodCard.store_id == store_id)
     if user_id:
         query = query.where(PeriodCard.user_id == user_id)
     if status is not None:
@@ -1636,9 +1775,10 @@ def list_card_purchase_orders_admin(
     store_id: int | None = None,
     pay_status: int | None = None,
     order_no: str | None = None,
-    _: object = Depends(get_current_admin),
+    admin: AdminUser = Depends(get_current_admin),
     db: Session = Depends(get_db),
 ):
+    store_id = scope_store_id(admin, store_id)
     query = select(CardPurchaseOrder)
     if user_id:
         query = query.where(CardPurchaseOrder.user_id == user_id)
@@ -1682,11 +1822,13 @@ def list_card_purchase_orders_admin(
 @router.get("/stats/verify-by-source", response_model=ResponseModel)
 def verify_by_source(
     range: str = Query("30", description="7/30/90/365/month/all"),
-    _: object = Depends(get_current_admin),
+    store_id: int | None = None,
+    admin: AdminUser = Depends(get_current_admin),
     db: Session = Depends(get_db),
 ):
     """按来源统计核销/入账金额：美团(含大众点评) / 抖音 / 微信支付(买卡+预约+充值)。"""
     today = date.today()
+    sid = scope_store_id(admin, store_id)
     if range == "all":
         since = datetime(1970, 1, 1)
     elif range == "month":
@@ -1699,6 +1841,12 @@ def verify_by_source(
         since = datetime.combine(today - timedelta(days=days - 1), datetime.min.time())
 
     # 团购券核销 + 退款：join PeriodCard 拿 source
+    mt_filters = [
+        MeituanOrder.status.in_([MeituanOrderStatus.verified, MeituanOrderStatus.refunded]),
+        MeituanOrder.verified_at >= since,
+    ]
+    if sid:
+        mt_filters.append(MeituanOrder.store_id == sid)
     rows = db.execute(
         select(
             PeriodCard.source,
@@ -1707,10 +1855,7 @@ def verify_by_source(
             func.count(MeituanOrder.id),
         )
         .join(PeriodCard, PeriodCard.meituan_receipt == MeituanOrder.coupon_code, isouter=True)
-        .where(
-            MeituanOrder.status.in_([MeituanOrderStatus.verified, MeituanOrderStatus.refunded]),
-            MeituanOrder.verified_at >= since,
-        )
+        .where(*mt_filters)
         .group_by(PeriodCard.source, MeituanOrder.status)
     ).all()
     meituan_amt = meituan_ref = 0.0
@@ -1732,18 +1877,27 @@ def verify_by_source(
             meituan_amt += amt_f; meituan_cnt += cnt_i
 
     # 微信支付：买卡 + 预约 + 充值（pay_status: 1=已付, 2=已退）
-    def _sum(model, amt_col, wechat_only=False):
+    def _sum(model, amt_col, wechat_only=False, store_col=None):
         base = select(func.coalesce(func.sum(amt_col), 0), func.count()).where(
             model.created_at >= since
         )
         if wechat_only:
             base = base.where(model.pay_type == PayType.wechat)
+        if sid and store_col is not None:
+            base = base.where(store_col == sid)
+        elif sid and model is RechargeOrder:
+            # 充值无门店字段：按店筛选时不计入
+            return (0.0, 0, 0.0, 0)
         paid = db.execute(base.where(model.pay_status == 1)).one()
         refunded = db.execute(base.where(model.pay_status == 2)).one()
         return (float(paid[0] or 0), int(paid[1] or 0), float(refunded[0] or 0), int(refunded[1] or 0))
 
-    card_amt, card_cnt, card_ref, card_ref_cnt = _sum(CardPurchaseOrder, CardPurchaseOrder.amount)
-    resv_amt, resv_cnt, resv_ref, resv_ref_cnt = _sum(Reservation, Reservation.final_price, wechat_only=True)
+    card_amt, card_cnt, card_ref, card_ref_cnt = _sum(
+        CardPurchaseOrder, CardPurchaseOrder.amount, store_col=CardPurchaseOrder.store_id
+    )
+    resv_amt, resv_cnt, resv_ref, resv_ref_cnt = _sum(
+        Reservation, Reservation.final_price, wechat_only=True, store_col=Reservation.store_id
+    )
     recharge_amt, recharge_cnt, recharge_ref, recharge_ref_cnt = _sum(RechargeOrder, RechargeOrder.amount)
     wechat_amt = card_amt + resv_amt + recharge_amt
     wechat_cnt = card_cnt + resv_cnt + recharge_cnt
@@ -1782,10 +1936,14 @@ def list_exchange_records_admin(
     page_size: int = Query(20, ge=1, le=100),
     user_id: int | None = None,
     status: str | None = None,
-    _: object = Depends(get_current_admin),
+    store_id: int | None = None,
+    admin: AdminUser = Depends(get_current_admin),
     db: Session = Depends(get_db),
 ):
+    store_id = scope_store_id(admin, store_id)
     query = select(MeituanOrder)
+    if store_id:
+        query = query.where(MeituanOrder.store_id == store_id)
     if user_id:
         query = query.where(MeituanOrder.user_id == user_id)
     if status:
@@ -2425,6 +2583,32 @@ class AdminStoreCreateRequest(BaseModel):
     wifi_password: str | None = None
     cover_images: list[str] | None = None
     meituan_shop_id: str | None = None
+    pay_account_id: int | None = None
+    benefits_isolated: int = 0
+
+
+class AdminPayAccountCreateRequest(BaseModel):
+    name: str
+    mchid: str
+    serial_no: str
+    api_v3_key: str
+    key_path: str
+    cert_path: str | None = None
+    public_key_id: str | None = None
+    public_key_path: str | None = None
+    status: int = 1
+
+
+class AdminPayAccountUpdateRequest(BaseModel):
+    name: str | None = None
+    mchid: str | None = None
+    serial_no: str | None = None
+    api_v3_key: str | None = None  # 空或省略表示不修改
+    key_path: str | None = None
+    cert_path: str | None = None
+    public_key_id: str | None = None
+    public_key_path: str | None = None
+    status: int | None = None
 
 
 class AdminBannerCreateRequest(BaseModel):
@@ -2459,6 +2643,26 @@ class AdminCreateRequest(BaseModel):
     username: str
     password: str
     name: str | None = None
+    role: str = ROLE_HQ
+    store_id: int | None = None
+    permissions: list[str] | None = None
+
+
+class AdminUpdateRequest(BaseModel):
+    name: str | None = None
+    role: str | None = None
+    store_id: int | None = None
+    password: str | None = None
+    permissions: list[str] | None = None
+    status: int | None = None
+
+
+def _persist_permissions_for_role(role: str, raw: list[str] | None) -> list[str] | None:
+    if role == ROLE_HQ:
+        return None
+    if raw is None:
+        return list(STORE_DEFAULT_PERMISSIONS)
+    return normalize_permissions(ROLE_STORE, raw)
 
 
 def _banner_dict(row: HomeBanner) -> dict:
@@ -2491,6 +2695,11 @@ def create_store_admin(
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
+    if body.pay_account_id:
+        acc = db.get(PayAccount, body.pay_account_id)
+        if not acc or acc.status != 1:
+            raise HTTPException(status_code=400, detail="收款账户不存在或已停用")
+
     store = Store(
         name=body.name.strip(),
         address=body.address,
@@ -2502,12 +2711,73 @@ def create_store_admin(
         wifi_password=body.wifi_password,
         cover_images=_cover_images_to_store(body.cover_images or []),
         meituan_shop_id=body.meituan_shop_id,
-        status=1,
+        pay_account_id=body.pay_account_id,
+        benefits_isolated=1 if body.benefits_isolated else 0,
+        seat_map_mode="image",
+        status=0,
     )
     db.add(store)
     db.commit()
     db.refresh(store)
     return ResponseModel(message="门店已创建", data=_store_to_admin_item(store))
+
+
+@router.get("/pay-accounts", response_model=ResponseModel)
+def list_pay_accounts_admin(_: object = Depends(get_current_admin), db: Session = Depends(get_db)):
+    rows = db.scalars(select(PayAccount).order_by(PayAccount.id)).all()
+    return ResponseModel(data=[_pay_account_public(a) for a in rows])
+
+
+@router.post("/pay-accounts", response_model=ResponseModel)
+def create_pay_account_admin(
+    body: AdminPayAccountCreateRequest,
+    _: object = Depends(get_current_admin),
+    db: Session = Depends(get_db),
+):
+    acc = PayAccount(
+        name=body.name.strip(),
+        mchid=body.mchid.strip(),
+        serial_no=body.serial_no.strip(),
+        api_v3_key=body.api_v3_key.strip(),
+        key_path=body.key_path.strip(),
+        cert_path=(body.cert_path or "").strip() or None,
+        public_key_id=(body.public_key_id or "").strip() or None,
+        public_key_path=(body.public_key_path or "").strip() or None,
+        status=1 if body.status else 0,
+    )
+    if not acc.mchid or not acc.serial_no or not acc.api_v3_key or not acc.key_path:
+        raise HTTPException(status_code=400, detail="商户号、证书序列号、APIv3密钥、私钥路径为必填")
+    db.add(acc)
+    db.commit()
+    db.refresh(acc)
+    return ResponseModel(message="收款账户已创建", data=_pay_account_public(acc))
+
+
+@router.put("/pay-accounts/{account_id}", response_model=ResponseModel)
+def update_pay_account_admin(
+    account_id: int,
+    body: AdminPayAccountUpdateRequest,
+    _: object = Depends(get_current_admin),
+    db: Session = Depends(get_db),
+):
+    acc = db.get(PayAccount, account_id)
+    if not acc:
+        raise HTTPException(status_code=404, detail="收款账户不存在")
+    data = body.model_dump(exclude_unset=True)
+    if "api_v3_key" in data:
+        key = (data.pop("api_v3_key") or "").strip()
+        if key:
+            acc.api_v3_key = key
+    for k, v in data.items():
+        if k in ("name", "mchid", "serial_no", "key_path") and isinstance(v, str):
+            setattr(acc, k, v.strip())
+        elif k in ("cert_path", "public_key_id", "public_key_path"):
+            setattr(acc, k, (v or "").strip() or None)
+        elif k == "status":
+            acc.status = 1 if v else 0
+    db.commit()
+    db.refresh(acc)
+    return ResponseModel(message="已保存", data=_pay_account_public(acc))
 
 
 @router.post("/stores/upload-cover", response_model=ResponseModel)
@@ -2737,26 +3007,35 @@ def list_invites_admin(
 
 
 @router.get("/admins", response_model=ResponseModel)
-def list_admins(_: object = Depends(get_current_admin), db: Session = Depends(get_db)):
+def list_admins(_: AdminUser = Depends(require_hq_admin), db: Session = Depends(get_db)):
     rows = db.scalars(select(AdminUser).order_by(AdminUser.id)).all()
-    return ResponseModel(
-        data=[
-            {
-                "id": a.id,
-                "username": a.username,
-                "name": a.name,
-                "status": a.status,
-                "created_at": a.created_at.isoformat() if a.created_at else None,
-            }
-            for a in rows
-        ]
-    )
+    items = []
+    for a in rows:
+        store_name = None
+        if a.store_id:
+            st = db.get(Store, a.store_id)
+            store_name = st.name if st else None
+        role = admin_role(a)
+        perms = normalize_permissions(role, getattr(a, "permissions", None))
+        items.append({
+            "id": a.id,
+            "username": a.username,
+            "name": a.name,
+            "role": role,
+            "store_id": a.store_id,
+            "store_name": store_name,
+            "status": a.status,
+            "permissions": perms,
+            "permission_summary": permission_summary(perms),
+            "created_at": a.created_at.isoformat() if a.created_at else None,
+        })
+    return ResponseModel(data=items)
 
 
 @router.post("/admins", response_model=ResponseModel)
 def create_admin_user(
     body: AdminCreateRequest,
-    _: object = Depends(get_current_admin),
+    _: AdminUser = Depends(require_hq_admin),
     db: Session = Depends(get_db),
 ):
     if len(body.password) < 6:
@@ -2764,10 +3043,24 @@ def create_admin_user(
     exists = db.scalar(select(AdminUser).where(AdminUser.username == body.username))
     if exists:
         raise HTTPException(status_code=400, detail="用户名已存在")
+    role = (body.role or ROLE_HQ).strip()
+    if role not in (ROLE_HQ, ROLE_STORE):
+        raise HTTPException(status_code=400, detail="角色无效")
+    store_id = body.store_id
+    if role == ROLE_STORE:
+        if not store_id:
+            raise HTTPException(status_code=400, detail="店长必须绑定门店")
+        if not db.get(Store, store_id):
+            raise HTTPException(status_code=400, detail="门店不存在")
+    else:
+        store_id = None
     admin = AdminUser(
         username=body.username.strip(),
         password_hash=hash_password(body.password),
         name=body.name,
+        role=role,
+        store_id=store_id,
+        permissions=_persist_permissions_for_role(role, body.permissions),
         status=1,
     )
     db.add(admin)
@@ -2775,7 +3068,67 @@ def create_admin_user(
     db.refresh(admin)
     return ResponseModel(
         message="管理员已创建",
-        data={"id": admin.id, "username": admin.username, "name": admin.name},
+        data=_admin_profile(db, admin),
+    )
+
+
+@router.patch("/admins/{admin_id}", response_model=ResponseModel)
+def update_admin_user(
+    admin_id: int,
+    body: AdminUpdateRequest,
+    actor: AdminUser = Depends(get_current_admin),
+    db: Session = Depends(get_db),
+):
+    # Task 5 tightens store-actor rules; HQ always has admins via normalize_permissions.
+    if not has_permission(actor, "admins"):
+        raise HTTPException(status_code=403, detail="无此模块权限")
+    admin = db.get(AdminUser, admin_id)
+    if not admin:
+        raise HTTPException(status_code=404, detail="管理员不存在")
+    fields_set = body.model_fields_set
+
+    role = admin_role(admin)
+    if "role" in fields_set and body.role is not None:
+        role = body.role.strip()
+        if role not in (ROLE_HQ, ROLE_STORE):
+            raise HTTPException(status_code=400, detail="角色无效")
+        admin.role = role
+
+    if "store_id" in fields_set:
+        store_id = body.store_id
+    else:
+        store_id = admin.store_id
+    if role == ROLE_STORE:
+        if not store_id:
+            raise HTTPException(status_code=400, detail="店长必须绑定门店")
+        if not db.get(Store, store_id):
+            raise HTTPException(status_code=400, detail="门店不存在")
+        admin.store_id = store_id
+    else:
+        admin.store_id = None
+
+    if "name" in fields_set:
+        admin.name = body.name
+    if "status" in fields_set and body.status is not None:
+        admin.status = body.status
+    if "password" in fields_set and body.password is not None:
+        if len(body.password) < 6:
+            raise HTTPException(status_code=400, detail="密码至少 6 位")
+        admin.password_hash = hash_password(body.password)
+
+    if role == ROLE_HQ:
+        admin.permissions = None
+    elif "permissions" in fields_set:
+        admin.permissions = _persist_permissions_for_role(role, body.permissions)
+    elif "role" in fields_set:
+        # Newly switched to store without explicit permissions → defaults.
+        admin.permissions = _persist_permissions_for_role(role, None)
+
+    db.commit()
+    db.refresh(admin)
+    return ResponseModel(
+        message="管理员已更新",
+        data=_admin_profile(db, admin),
     )
 
 
