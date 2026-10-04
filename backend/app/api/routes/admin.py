@@ -10,14 +10,17 @@ from pydantic import BaseModel
 from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_current_admin, get_current_user, require_hq_admin
+from app.api.deps import get_current_admin, get_current_user
 from app.services.admin_access import (
     ROLE_HQ,
     ROLE_STORE,
     assert_store_access,
     admin_role,
     is_hq,
+    is_store_admin,
+    require_store_bound,
     scope_store_id,
+    store_related_user_ids,
 )
 from app.services.admin_permissions import (
     STORE_DEFAULT_PERMISSIONS,
@@ -866,11 +869,19 @@ def dismiss_pending_deal_mapping(
 @router.get("/coupons", response_model=ResponseModel)
 def list_coupons(
     user_id: int | None = None,
-    _: object = Depends(get_current_admin),
+    admin: AdminUser = Depends(get_current_admin),
     db: Session = Depends(get_db),
 ):
     query = select(Coupon)
+    related: set[int] | None = None
+    if is_store_admin(admin):
+        related = store_related_user_ids(db, require_store_bound(admin))
+        if not related:
+            return ResponseModel(data=[])
+        query = query.where(Coupon.user_id.in_(related))
     if user_id:
+        if related is not None and user_id not in related:
+            return ResponseModel(data=[])
         query = query.where(Coupon.user_id == user_id)
     rows = db.scalars(query.order_by(Coupon.id.desc()).limit(100)).all()
     return ResponseModel(
@@ -1487,10 +1498,17 @@ def list_users_admin(
     page_size: int = Query(20, ge=1, le=100),
     keyword: str | None = None,
     study_goal: str | None = Query(None, description="kaoyan|kaogong|other|unset"),
-    _: object = Depends(get_current_admin),
+    admin: AdminUser = Depends(get_current_admin),
     db: Session = Depends(get_db),
 ):
     query = select(User)
+    if is_store_admin(admin):
+        related = store_related_user_ids(db, require_store_bound(admin))
+        if not related:
+            return ResponseModel(
+                data=PageResult(items=[], total=0, page=page, page_size=page_size)
+            )
+        query = query.where(User.id.in_(related))
     if keyword:
         kw = keyword.strip()
         if kw.isdigit():
@@ -2066,11 +2084,23 @@ def list_wallet_logs_admin(
     page_size: int = Query(20, ge=1, le=100),
     user_id: int | None = None,
     log_type: str | None = None,
-    _: object = Depends(get_current_admin),
+    admin: AdminUser = Depends(get_current_admin),
     db: Session = Depends(get_db),
 ):
     query = select(WalletLog)
+    related: set[int] | None = None
+    if is_store_admin(admin):
+        related = store_related_user_ids(db, require_store_bound(admin))
+        if not related:
+            return ResponseModel(
+                data=PageResult(items=[], total=0, page=page, page_size=page_size)
+            )
+        query = query.where(WalletLog.user_id.in_(related))
     if user_id:
+        if related is not None and user_id not in related:
+            return ResponseModel(
+                data=PageResult(items=[], total=0, page=page, page_size=page_size)
+            )
         query = query.where(WalletLog.user_id == user_id)
     if log_type:
         query = query.where(WalletLog.type == log_type)
@@ -2723,7 +2753,17 @@ def create_store_admin(
 
 
 @router.get("/pay-accounts", response_model=ResponseModel)
-def list_pay_accounts_admin(_: object = Depends(get_current_admin), db: Session = Depends(get_db)):
+def list_pay_accounts_admin(
+    admin: AdminUser = Depends(get_current_admin),
+    db: Session = Depends(get_db),
+):
+    if is_store_admin(admin):
+        sid = require_store_bound(admin)
+        store = db.get(Store, sid)
+        if not store or not store.pay_account_id:
+            return ResponseModel(data=[])
+        acc = db.get(PayAccount, store.pay_account_id)
+        return ResponseModel(data=[_pay_account_public(acc)] if acc else [])
     rows = db.scalars(select(PayAccount).order_by(PayAccount.id)).all()
     return ResponseModel(data=[_pay_account_public(a) for a in rows])
 
@@ -2926,11 +2966,23 @@ def list_point_logs_admin(
     page_size: int = Query(20, ge=1, le=100),
     user_id: int | None = None,
     log_type: str | None = None,
-    _: object = Depends(get_current_admin),
+    admin: AdminUser = Depends(get_current_admin),
     db: Session = Depends(get_db),
 ):
     query = select(PointLog)
+    related: set[int] | None = None
+    if is_store_admin(admin):
+        related = store_related_user_ids(db, require_store_bound(admin))
+        if not related:
+            return ResponseModel(
+                data=PageResult(items=[], total=0, page=page, page_size=page_size)
+            )
+        query = query.where(PointLog.user_id.in_(related))
     if user_id:
+        if related is not None and user_id not in related:
+            return ResponseModel(
+                data=PageResult(items=[], total=0, page=page, page_size=page_size)
+            )
         query = query.where(PointLog.user_id == user_id)
     if log_type:
         query = query.where(PointLog.type == log_type)
@@ -2966,10 +3018,24 @@ def list_point_logs_admin(
 def list_invites_admin(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
-    _: object = Depends(get_current_admin),
+    admin: AdminUser = Depends(get_current_admin),
     db: Session = Depends(get_db),
 ):
     query = select(User).where(User.invited_by.isnot(None))
+    related: set[int] | None = None
+    if is_store_admin(admin):
+        related = store_related_user_ids(db, require_store_bound(admin))
+        if not related:
+            return ResponseModel(
+                data={
+                    "stats": {"total_invites": 0, "inviter_count": 0},
+                    "items": [],
+                    "total": 0,
+                    "page": page,
+                    "page_size": page_size,
+                }
+            )
+        query = query.where(or_(User.id.in_(related), User.invited_by.in_(related)))
     total = db.scalar(select(func.count()).select_from(query.subquery()))
     rows = db.scalars(
         query.order_by(User.created_at.desc()).offset((page - 1) * page_size).limit(page_size)
@@ -2987,10 +3053,19 @@ def list_invites_admin(
             "inviter_code": inviter.invite_code if inviter else None,
         })
 
-    total_invites = db.scalar(select(func.count()).where(User.invited_by.isnot(None))) or 0
-    inviter_count = db.scalar(
-        select(func.count(func.distinct(User.invited_by))).where(User.invited_by.isnot(None))
-    ) or 0
+    if related is None:
+        total_invites = db.scalar(select(func.count()).where(User.invited_by.isnot(None))) or 0
+        inviter_count = db.scalar(
+            select(func.count(func.distinct(User.invited_by))).where(User.invited_by.isnot(None))
+        ) or 0
+    else:
+        total_invites = total or 0
+        inviter_count = db.scalar(
+            select(func.count(func.distinct(User.invited_by))).where(
+                User.invited_by.isnot(None),
+                or_(User.id.in_(related), User.invited_by.in_(related)),
+            )
+        ) or 0
 
     return ResponseModel(
         data={
@@ -3007,8 +3082,14 @@ def list_invites_admin(
 
 
 @router.get("/admins", response_model=ResponseModel)
-def list_admins(_: AdminUser = Depends(require_hq_admin), db: Session = Depends(get_db)):
-    rows = db.scalars(select(AdminUser).order_by(AdminUser.id)).all()
+def list_admins(actor: AdminUser = Depends(get_current_admin), db: Session = Depends(get_db)):
+    if not has_permission(actor, "admins"):
+        raise HTTPException(status_code=403, detail="无此模块权限")
+    query = select(AdminUser)
+    if is_store_admin(actor):
+        sid = require_store_bound(actor)
+        query = query.where(AdminUser.role == ROLE_STORE, AdminUser.store_id == sid)
+    rows = db.scalars(query.order_by(AdminUser.id)).all()
     items = []
     for a in rows:
         store_name = None
@@ -3035,9 +3116,11 @@ def list_admins(_: AdminUser = Depends(require_hq_admin), db: Session = Depends(
 @router.post("/admins", response_model=ResponseModel)
 def create_admin_user(
     body: AdminCreateRequest,
-    _: AdminUser = Depends(require_hq_admin),
+    actor: AdminUser = Depends(get_current_admin),
     db: Session = Depends(get_db),
 ):
+    if not has_permission(actor, "admins"):
+        raise HTTPException(status_code=403, detail="无此模块权限")
     if len(body.password) < 6:
         raise HTTPException(status_code=400, detail="密码至少 6 位")
     exists = db.scalar(select(AdminUser).where(AdminUser.username == body.username))
@@ -3047,6 +3130,10 @@ def create_admin_user(
     if role not in (ROLE_HQ, ROLE_STORE):
         raise HTTPException(status_code=400, detail="角色无效")
     store_id = body.store_id
+    if is_store_admin(actor):
+        if role == ROLE_HQ:
+            raise HTTPException(status_code=403, detail="店长不能创建总部账号")
+        store_id = require_store_bound(actor)
     if role == ROLE_STORE:
         if not store_id:
             raise HTTPException(status_code=400, detail="店长必须绑定门店")
@@ -3079,13 +3166,19 @@ def update_admin_user(
     actor: AdminUser = Depends(get_current_admin),
     db: Session = Depends(get_db),
 ):
-    # Task 5 tightens store-actor rules; HQ always has admins via normalize_permissions.
     if not has_permission(actor, "admins"):
         raise HTTPException(status_code=403, detail="无此模块权限")
     admin = db.get(AdminUser, admin_id)
     if not admin:
         raise HTTPException(status_code=404, detail="管理员不存在")
     fields_set = body.model_fields_set
+
+    if is_store_admin(actor):
+        actor_sid = require_store_bound(actor)
+        if admin_role(admin) != ROLE_STORE or int(admin.store_id or 0) != actor_sid:
+            raise HTTPException(status_code=403, detail="无权编辑其他门店或总部账号")
+        if "role" in fields_set and body.role is not None and body.role.strip() == ROLE_HQ:
+            raise HTTPException(status_code=403, detail="店长不能将账号改为总部")
 
     role = admin_role(admin)
     if "role" in fields_set and body.role is not None:
@@ -3094,7 +3187,9 @@ def update_admin_user(
             raise HTTPException(status_code=400, detail="角色无效")
         admin.role = role
 
-    if "store_id" in fields_set:
+    if is_store_admin(actor):
+        store_id = require_store_bound(actor)
+    elif "store_id" in fields_set:
         store_id = body.store_id
     else:
         store_id = admin.store_id

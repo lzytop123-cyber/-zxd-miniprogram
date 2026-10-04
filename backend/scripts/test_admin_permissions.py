@@ -72,6 +72,7 @@ def _run_isolated_case(env_key: str, case: str) -> None:
     env.pop("ADMIN_PERM_MIGRATION_TEST", None)
     env.pop("ADMIN_PERM_GUARD_TEST", None)
     env.pop("ADMIN_PERM_CRUD_TEST", None)
+    env.pop("ADMIN_PERM_SCOPE_TEST", None)
     env["DATABASE_URL"] = f"sqlite:///{db_path}"
     env["APP_ENV"] = "development"
     env[env_key] = case
@@ -138,6 +139,38 @@ class AdminCrudPermissionTests(unittest.TestCase):
 
     def test_patch_updates_permissions(self):
         self._run_crud_case("patch_updates_permissions")
+
+
+class StoreScopeTests(unittest.TestCase):
+    """店长扩展模块数据范围（子进程隔离）。"""
+
+    def _run_scope_case(self, case: str) -> None:
+        _run_isolated_case("ADMIN_PERM_SCOPE_TEST", case)
+
+    def test_store_related_user_ids(self):
+        self._run_scope_case("store_related_user_ids")
+
+    def test_store_admin_create_same_store_ok(self):
+        self._run_scope_case("store_admin_create_same_store_ok")
+
+    def test_store_admin_cannot_create_hq(self):
+        self._run_scope_case("store_admin_cannot_create_hq")
+
+    def test_store_admin_list_only_same_store(self):
+        self._run_scope_case("store_admin_list_only_same_store")
+
+    def test_store_admin_cannot_patch_other_store(self):
+        self._run_scope_case("store_admin_cannot_patch_other_store")
+
+    def test_store_pay_accounts_get_filtered(self):
+        self._run_scope_case("store_pay_accounts_get_filtered")
+
+    def test_store_users_list_filtered(self):
+        self._run_scope_case("store_users_list_filtered")
+
+    def test_store_wallet_logs_filtered(self):
+        self._run_scope_case("store_wallet_logs_filtered")
+
 
 def _run_migration_test() -> None:
     from sqlalchemy import inspect, select
@@ -571,13 +604,357 @@ def _run_crud_test(case: str) -> None:
         client.close()
 
 
+def _build_scope_app():
+    from decimal import Decimal
+
+    from fastapi import FastAPI
+    from fastapi.testclient import TestClient
+    from sqlalchemy import select
+
+    from app.api.admin_role_guard import AdminRoleGuardMiddleware
+    from app.api.routes import admin as admin_routes
+    from app.core.security import hash_password
+    from app.db.session import Base, SessionLocal, engine, get_db
+    from app.models import (
+        AdminUser,
+        BillType,
+        CardPurchaseOrder,
+        MeituanOrder,
+        PayAccount,
+        PayType,
+        Store,
+        User,
+        WalletLog,
+    )
+    from app.services.admin_permissions import STORE_DEFAULT_PERMISSIONS
+    from app.services.schema_migrate import run_schema_migrations
+
+    Base.metadata.create_all(bind=engine)
+    db = SessionLocal()
+    try:
+        for model in (
+            WalletLog,
+            CardPurchaseOrder,
+            MeituanOrder,
+            AdminUser,
+            User,
+            Store,
+            PayAccount,
+        ):
+            for row in db.scalars(select(model)).all():
+                db.delete(row)
+        db.commit()
+        run_schema_migrations(db)
+        db.commit()
+
+        pay_a = PayAccount(
+            name="A账户",
+            mchid="mch_a",
+            serial_no="ser_a",
+            api_v3_key="key_a",
+            key_path="/k/a",
+            status=1,
+        )
+        pay_b = PayAccount(
+            name="B账户",
+            mchid="mch_b",
+            serial_no="ser_b",
+            api_v3_key="key_b",
+            key_path="/k/b",
+            status=1,
+        )
+        db.add_all([pay_a, pay_b])
+        db.flush()
+
+        store_a = Store(name="A店", status=1, pay_account_id=pay_a.id)
+        store_b = Store(name="B店", status=1, pay_account_id=pay_b.id)
+        db.add_all([store_a, store_b])
+        db.flush()
+
+        hq = AdminUser(
+            username="scope_hq",
+            password_hash=hash_password("hq-pass-1"),
+            role="hq",
+            status=1,
+            permissions=None,
+        )
+        store_mgr = AdminUser(
+            username="scope_mgr",
+            password_hash=hash_password("mgr-pass-1"),
+            role="store",
+            store_id=store_a.id,
+            status=1,
+            permissions=list(STORE_DEFAULT_PERMISSIONS)
+            + ["admins", "pay_accounts", "users", "wallet_logs"],
+        )
+        other_store_mgr = AdminUser(
+            username="scope_other",
+            password_hash=hash_password("other-pass-1"),
+            role="store",
+            store_id=store_b.id,
+            status=1,
+            permissions=list(STORE_DEFAULT_PERMISSIONS) + ["admins"],
+        )
+        peer_mgr = AdminUser(
+            username="scope_peer",
+            password_hash=hash_password("peer-pass-1"),
+            role="store",
+            store_id=store_a.id,
+            status=1,
+            permissions=list(STORE_DEFAULT_PERMISSIONS),
+        )
+        db.add_all([hq, store_mgr, other_store_mgr, peer_mgr])
+
+        user_related = User(openid="o_related", nickname="本店用户", invite_code="REL001")
+        user_other = User(openid="o_other", nickname="他店用户", invite_code="OTH001")
+        user_orphan = User(openid="o_orphan", nickname="无关用户", invite_code="ORP001")
+        db.add_all([user_related, user_other, user_orphan])
+        db.flush()
+
+        db.add(
+            CardPurchaseOrder(
+                order_no="CARD_A_1",
+                user_id=user_related.id,
+                store_id=store_a.id,
+                bill_type=BillType.monthly,
+                amount=Decimal("99.00"),
+                pay_type=PayType.wechat,
+                pay_status=1,
+            )
+        )
+        db.add(
+            MeituanOrder(
+                user_id=user_other.id,
+                store_id=store_b.id,
+                coupon_code="MT_B_1",
+            )
+        )
+        db.add(
+            WalletLog(
+                user_id=user_related.id,
+                type="recharge",
+                amount=Decimal("10.00"),
+                balance_after=Decimal("10.00"),
+                remark="本店",
+            )
+        )
+        db.add(
+            WalletLog(
+                user_id=user_orphan.id,
+                type="recharge",
+                amount=Decimal("5.00"),
+                balance_after=Decimal("5.00"),
+                remark="无关",
+            )
+        )
+        db.commit()
+        for row in (hq, store_mgr, other_store_mgr, peer_mgr, store_a, store_b, pay_a, pay_b):
+            db.refresh(row)
+        for row in (user_related, user_other, user_orphan):
+            db.refresh(row)
+        ctx_ids = {
+            "store_a_id": store_a.id,
+            "store_b_id": store_b.id,
+            "pay_a_id": pay_a.id,
+            "pay_b_id": pay_b.id,
+            "hq_id": hq.id,
+            "store_mgr_id": store_mgr.id,
+            "other_store_mgr_id": other_store_mgr.id,
+            "peer_mgr_id": peer_mgr.id,
+            "user_related_id": user_related.id,
+            "user_other_id": user_other.id,
+            "user_orphan_id": user_orphan.id,
+        }
+    finally:
+        db.close()
+
+    app = FastAPI()
+    app.add_middleware(AdminRoleGuardMiddleware)
+    app.include_router(admin_routes.router, prefix="/api")
+
+    def _override_db():
+        session = SessionLocal()
+        try:
+            yield session
+        finally:
+            session.close()
+
+    app.dependency_overrides[get_db] = _override_db
+    client = TestClient(app)
+    return {"client": client, **ctx_ids}
+
+
+def _scope_headers(client, username: str, password: str) -> dict[str, str]:
+    res = client.post("/api/admin/login", json={"username": username, "password": password})
+    assert res.status_code == 200, res.text
+    return {"Authorization": f"Bearer {res.json()['data']['token']}"}
+
+
+def _run_scope_test(case: str) -> None:
+    from sqlalchemy import select
+
+    from app.db.session import SessionLocal
+    from app.models import AdminUser, CardPurchaseOrder, MeituanOrder, Store
+
+    if case == "store_related_user_ids":
+        from app.services.admin_access import store_related_user_ids
+
+        # Helper-only: still need schema from build.
+        ctx = _build_scope_app()
+        ctx["client"].close()
+        db = SessionLocal()
+        try:
+            store_a = db.get(Store, ctx["store_a_id"])
+            assert store_a is not None
+            ids = store_related_user_ids(db, store_a.id)
+            assert ctx["user_related_id"] in ids
+            assert ctx["user_other_id"] not in ids
+            assert ctx["user_orphan_id"] not in ids
+            # reservation-less: card order alone is enough; meituan on B not included
+            card_uids = {
+                r
+                for (r,) in db.execute(
+                    select(CardPurchaseOrder.user_id).where(
+                        CardPurchaseOrder.store_id == store_a.id,
+                        CardPurchaseOrder.user_id.isnot(None),
+                    )
+                )
+            }
+            mei_uids = {
+                r
+                for (r,) in db.execute(
+                    select(MeituanOrder.user_id).where(
+                        MeituanOrder.store_id == store_a.id,
+                        MeituanOrder.user_id.isnot(None),
+                    )
+                )
+            }
+            assert ids == card_uids | mei_uids
+        finally:
+            db.close()
+        return
+
+    ctx = _build_scope_app()
+    client = ctx["client"]
+    try:
+        headers = _scope_headers(client, "scope_mgr", "mgr-pass-1")
+        if case == "store_admin_create_same_store_ok":
+            res = client.post(
+                "/api/admin/admins",
+                headers=headers,
+                json={
+                    "username": "new_by_mgr",
+                    "password": "pass1234",
+                    "role": "store",
+                    "store_id": ctx["store_b_id"],  # should be forced to A
+                },
+            )
+            assert res.status_code == 200, res.text
+            data = res.json()["data"]
+            assert data["role"] == "store"
+            assert data["store_id"] == ctx["store_a_id"], data
+            db = SessionLocal()
+            try:
+                row = db.scalar(select(AdminUser).where(AdminUser.username == "new_by_mgr"))
+                assert row is not None
+                assert row.store_id == ctx["store_a_id"]
+                assert row.role == "store"
+            finally:
+                db.close()
+        elif case == "store_admin_cannot_create_hq":
+            res = client.post(
+                "/api/admin/admins",
+                headers=headers,
+                json={
+                    "username": "hq_by_mgr",
+                    "password": "pass1234",
+                    "role": "hq",
+                },
+            )
+            assert res.status_code == 403, res.text
+        elif case == "store_admin_list_only_same_store":
+            res = client.get("/api/admin/admins", headers=headers)
+            assert res.status_code == 200, res.text
+            items = res.json()["data"]
+            usernames = {i["username"] for i in items}
+            assert "scope_mgr" in usernames
+            assert "scope_peer" in usernames
+            assert "scope_hq" not in usernames
+            assert "scope_other" not in usernames
+            assert all(i["role"] == "store" for i in items)
+            assert all(i["store_id"] == ctx["store_a_id"] for i in items)
+        elif case == "store_admin_cannot_patch_other_store":
+            res = client.patch(
+                f"/api/admin/admins/{ctx['other_store_mgr_id']}",
+                headers=headers,
+                json={"name": "hacked"},
+            )
+            assert res.status_code == 403, res.text
+            res_hq = client.patch(
+                f"/api/admin/admins/{ctx['hq_id']}",
+                headers=headers,
+                json={"name": "hacked-hq"},
+            )
+            assert res_hq.status_code == 403, res_hq.text
+            res_role = client.patch(
+                f"/api/admin/admins/{ctx['peer_mgr_id']}",
+                headers=headers,
+                json={"role": "hq"},
+            )
+            assert res_role.status_code == 403, res_role.text
+        elif case == "store_pay_accounts_get_filtered":
+            res = client.get("/api/admin/pay-accounts", headers=headers)
+            assert res.status_code == 200, res.text
+            items = res.json()["data"]
+            ids = {i["id"] for i in items}
+            assert ids == {ctx["pay_a_id"]}, items
+            post = client.post(
+                "/api/admin/pay-accounts",
+                headers=headers,
+                json={
+                    "name": "x",
+                    "mchid": "1",
+                    "serial_no": "1",
+                    "api_v3_key": "k",
+                    "key_path": "/k",
+                },
+            )
+            assert post.status_code == 403, post.text
+        elif case == "store_users_list_filtered":
+            res = client.get("/api/admin/users", headers=headers, params={"page": 1, "page_size": 50})
+            assert res.status_code == 200, res.text
+            page = res.json()["data"]
+            ids = {i["id"] for i in page["items"]}
+            assert ctx["user_related_id"] in ids
+            assert ctx["user_other_id"] not in ids
+            assert ctx["user_orphan_id"] not in ids
+        elif case == "store_wallet_logs_filtered":
+            res = client.get(
+                "/api/admin/wallet-logs",
+                headers=headers,
+                params={"page": 1, "page_size": 50},
+            )
+            assert res.status_code == 200, res.text
+            page = res.json()["data"]
+            user_ids = {i["user_id"] for i in page["items"]}
+            assert ctx["user_related_id"] in user_ids
+            assert ctx["user_orphan_id"] not in user_ids
+        else:
+            raise AssertionError(f"unknown scope case: {case}")
+    finally:
+        client.close()
+
+
 if __name__ == "__main__":
     guard_case = os.environ.get("ADMIN_PERM_GUARD_TEST")
     crud_case = os.environ.get("ADMIN_PERM_CRUD_TEST")
+    scope_case = os.environ.get("ADMIN_PERM_SCOPE_TEST")
     if guard_case:
         _run_guard_test(guard_case)
     elif crud_case:
         _run_crud_test(crud_case)
+    elif scope_case:
+        _run_scope_test(scope_case)
     elif os.environ.get("ADMIN_PERM_MIGRATION_TEST") == "1":
         _run_migration_test()
     else:
