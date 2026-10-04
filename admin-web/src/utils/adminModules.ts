@@ -58,3 +58,41 @@ export function pathToModule(path: string): string | null {
   const p = path.split('?')[0]
   return PATH_MODULE[p] ?? null
 }
+
+/** Sidebar menu order — used for “first allowed page” redirects. */
+export const NAV_PATH_ORDER: string[] = [
+  '/dashboard',
+  '/receipts',
+  '/live-board',
+  '/banners',
+  '/announcements',
+  '/notifications',
+  '/contact-setting',
+  '/stores',
+  '/pay-accounts',
+  '/store-calendar',
+  '/pricing',
+  '/booking-setting',
+  '/seats',
+  '/reservations',
+  '/locks',
+  '/door-logs',
+  '/card-purchase-orders',
+  '/period-cards',
+  '/deal-mappings',
+  '/exchange-records',
+  '/coupons',
+  '/users',
+  '/wallet-logs',
+  '/point-logs',
+  '/invites',
+  '/study-data',
+  '/assistant-usage',
+  '/knowledge',
+  '/wrongbook',
+  '/market-listings',
+  '/market-ops',
+  '/system-status',
+  '/operation-logs',
+  '/admins',
+]

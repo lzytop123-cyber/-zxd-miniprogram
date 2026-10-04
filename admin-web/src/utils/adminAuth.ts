@@ -1,5 +1,7 @@
 import { ref } from 'vue'
-import { STORE_DEFAULT_PERMISSIONS, pathToModule } from './adminModules'
+import { NAV_PATH_ORDER, STORE_DEFAULT_PERMISSIONS, pathToModule } from './adminModules'
+
+const DASHBOARD_SHELL_PATH = '/dashboard'
 
 export type AdminRole = 'hq' | 'store'
 
@@ -94,10 +96,31 @@ export function setAdminPermissions(permissions: string[]) {
   bumpSession()
 }
 
+function normalizePath(path: string): string {
+  return path.split('?')[0]
+}
+
+/** Menu / module gate — requires explicit permission. */
 export function canAccessPath(path: string): boolean {
   if (isHqAdmin()) return true
-  const mod = pathToModule(path.split('?')[0])
+  const mod = pathToModule(normalizePath(path))
   if (!mod) return false
   const perms = getAdminPermissions()
   return Array.isArray(perms) && perms.includes(mod)
+}
+
+/** Router gate — dashboard shell always reachable for logged-in store admins. */
+export function canAccessRoute(path: string): boolean {
+  if (isHqAdmin()) return true
+  const p = normalizePath(path)
+  if (p === DASHBOARD_SHELL_PATH) return true
+  return canAccessPath(p)
+}
+
+/** First menu-order path the user may open; falls back to dashboard shell. */
+export function firstAccessiblePath(): string {
+  for (const path of NAV_PATH_ORDER) {
+    if (canAccessPath(path)) return path
+  }
+  return DASHBOARD_SHELL_PATH
 }

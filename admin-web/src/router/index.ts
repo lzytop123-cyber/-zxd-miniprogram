@@ -54,8 +54,12 @@ router.beforeEach(async (to) => {
   const token = localStorage.getItem('admin_token')
   if (!PUBLIC.has(to.path) && !token) return '/login'
   if (token && !PUBLIC.has(to.path)) {
-    const { canAccessPath } = await import('../utils/adminAuth')
-    if (!canAccessPath(to.path)) return '/dashboard'
+    const { canAccessRoute, firstAccessiblePath } = await import('../utils/adminAuth')
+    const path = to.path.split('?')[0]
+    if (!canAccessRoute(path)) {
+      const fallback = firstAccessiblePath()
+      if (path !== fallback) return fallback
+    }
   }
 })
 
