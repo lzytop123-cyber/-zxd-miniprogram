@@ -178,7 +178,24 @@ async function onSubmit() {
   loading.value = true
   try {
     const res = await http.post('/admin/login', form)
-    localStorage.setItem('admin_token', res.data.token)
+    const { saveAdminSession, setAdminPermissions } = await import('../utils/adminAuth')
+    saveAdminSession({
+      token: res.data.token,
+      username: res.data.username,
+      name: res.data.name,
+      role: res.data.role || 'hq',
+      store_id: res.data.store_id,
+      store_name: res.data.store_name,
+      permissions: Array.isArray(res.data.permissions) ? res.data.permissions : undefined,
+    })
+    try {
+      const me = await http.get('/admin/me')
+      if (Array.isArray(me.data?.permissions)) {
+        setAdminPermissions(me.data.permissions)
+      }
+    } catch {
+      /* login permissions already stored */
+    }
     ElMessage.success('登录成功')
     router.push('/dashboard')
   } catch (e: any) {

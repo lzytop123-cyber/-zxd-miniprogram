@@ -53,6 +53,22 @@
           </div>
         </div>
         <div class="tr">
+          <div class="store-switch" v-if="isHq">
+            <span class="store-switch-label">当前门店</span>
+            <el-select
+              v-model="workingStore"
+              size="small"
+              style="width: 168px"
+              @change="onWorkingStorePick"
+            >
+              <el-option label="全部门店" :value="0" />
+              <el-option v-for="s in storeOptions" :key="s.id" :label="s.name" :value="s.id" />
+            </el-select>
+          </div>
+          <div class="store-switch store-switch--locked" v-else-if="boundStoreName">
+            <span class="store-switch-label">本店</span>
+            <span class="store-locked-name">{{ boundStoreName }}</span>
+          </div>
           <button class="search-btn" @click="openSearch">
             <el-icon><Search /></el-icon>
             <span>搜索页面 / 用户 / 订单</span>
@@ -76,7 +92,7 @@
           <el-dropdown trigger="click" @command="onUserAction">
             <div class="user-chip">
               <span class="avatar">A</span>
-              <span class="uname">管理员</span>
+              <span class="uname">{{ roleLabel }}</span>
               <el-icon><ArrowDown /></el-icon>
             </div>
             <template #dropdown>
@@ -116,7 +132,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref, shallowRef } from 'vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import {
@@ -124,6 +140,9 @@ import {
   Menu, Monitor, Reading, Search, Setting, ShoppingBag, SwitchButton,
   Ticket, TrendCharts, User, Wallet, Warning,
 } from '@element-plus/icons-vue'
+import { adminSessionTick, canAccessPath, clearAdminSession, isHqAdmin } from '../utils/adminAuth'
+import { getWorkingStoreId, setWorkingStoreId } from '../utils/workingStore'
+import http from '../api/http'
 
 const route = useRoute()
 const router = useRouter()
@@ -134,9 +153,35 @@ const searchOpen = ref(false)
 const searchQuery = ref('')
 const version = '2.0'
 const macLike = /Mac|iPhone|iPad/.test(navigator.platform)
+const isHq = computed(() => isHqAdmin())
+const storeOptions = ref<{ id: number; name: string }[]>([])
+const workingStore = ref<number>(0)
+const boundStoreName = computed(() => localStorage.getItem('admin_store_name') || '')
+
+function onWorkingStorePick(val: number) {
+  setWorkingStoreId(val === 0 ? null : val)
+}
+
+async function loadStoreOptions() {
+  if (!isHqAdmin()) return
+  try {
+    const res = await http.get('/admin/stores')
+    storeOptions.value = res.data || []
+    const cur = getWorkingStoreId()
+    workingStore.value = cur || 0
+  } catch {
+    storeOptions.value = []
+  }
+}
+
+const roleLabel = computed(() => {
+  if (isHqAdmin()) return '总部'
+  const name = localStorage.getItem('admin_store_name')
+  return name ? `店长 · ${name}` : '店长'
+})
 
 // ============ 菜单（top-level icon + subs） ============
-const menu = shallowRef([
+const allMenu = [
   { title: '数据总览', path: '/dashboard', icon: TrendCharts },
   { title: '收款管理', path: '/receipts', icon: Wallet },
   { title: '实时占座', path: '/live-board', icon: Monitor },
@@ -148,6 +193,7 @@ const menu = shallowRef([
       { title: '站内消息', path: '/notifications' },
       { title: '联系店长', path: '/contact-setting' },
       { title: '门店管理', path: '/stores' },
+      { title: '收款账户', path: '/pay-accounts' },
       { title: '营业日历', path: '/store-calendar' },
     ],
   },
@@ -205,12 +251,26 @@ const menu = shallowRef([
       { title: '管理员', path: '/admins' },
     ],
   },
-])
+]
+
+const menu = computed(() => {
+  void adminSessionTick.value
+  return allMenu
+    .map((item) => {
+      if (!item.children) {
+        return canAccessPath(item.path!) ? item : null
+      }
+      const children = item.children.filter((c) => canAccessPath(c.path))
+      if (!children.length) return null
+      return { ...item, children }
+    })
+    .filter(Boolean) as typeof allMenu
+})
 
 // ============ 面包屑 ============
 const pathIndex = computed(() => {
   const idx = new Map<string, { group: string; page: string; icon?: any }>()
-  for (const m of menu.value) {
+  for (const m of menu.value as any[]) {
     if (m.path) idx.set(m.path, { group: '总览', page: m.title, icon: m.icon })
     for (const c of m.children || []) idx.set(c.path, { group: m.title, page: c.title, icon: m.icon })
   }
@@ -229,7 +289,7 @@ function onNotify(n: any) { router.push(n.link); notifications.value = notificat
 
 // ============ 用户操作 ============
 function onUserAction(cmd: string) {
-  if (cmd === 'logout') { localStorage.removeItem('admin_token'); router.push('/login'); return }
+  if (cmd === 'logout') { clearAdminSession(); router.push('/login'); return }
   if (cmd === 'landing') { router.push('/landing'); return }
   if (cmd === 'profile' || cmd === 'password') ElMessage.info('功能开发中，请稍候')
 }
@@ -257,7 +317,10 @@ function onKey(e: KeyboardEvent) {
   if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); openSearch() }
   if (e.key === 'Escape' && searchOpen.value) searchOpen.value = false
 }
-onMounted(() => window.addEventListener('keydown', onKey))
+onMounted(() => {
+  window.addEventListener('keydown', onKey)
+  void loadStoreOptions()
+})
 onUnmounted(() => window.removeEventListener('keydown', onKey))
 </script>
 
@@ -270,6 +333,27 @@ onUnmounted(() => window.removeEventListener('keydown', onKey))
   transition: grid-template-columns 0.25s cubic-bezier(0.16, 1, 0.3, 1);
 }
 .shell.collapsed { grid-template-columns: 68px 1fr; }
+
+.store-switch {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-right: 4px;
+}
+.store-switch-label {
+  font-size: 12px;
+  color: #8a8b93;
+  white-space: nowrap;
+}
+.store-switch--locked .store-locked-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: #16171d;
+  max-width: 140px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 
 /* ============ 侧栏 ============ */
 .aside {

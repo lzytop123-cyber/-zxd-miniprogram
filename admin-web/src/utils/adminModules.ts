@@ -1,0 +1,60 @@
+/** 与 backend `app.services.admin_permissions` 模块 key 对齐 */
+
+export const STORE_DEFAULT_PERMISSIONS = [
+  'dashboard',
+  'receipts',
+  'live_board',
+  'stores',
+  'calendar',
+  'pricing',
+  'seats',
+  'reservations',
+  'locks',
+  'door_logs',
+  'card_orders',
+  'period_cards',
+  'deal_mappings',
+  'exchange',
+] as const
+
+export const PATH_MODULE: Record<string, string> = {
+  '/dashboard': 'dashboard',
+  '/receipts': 'receipts',
+  '/live-board': 'live_board',
+  '/stores': 'stores',
+  '/store-calendar': 'calendar',
+  '/pricing': 'pricing',
+  '/seats': 'seats',
+  '/reservations': 'reservations',
+  '/locks': 'locks',
+  '/door-logs': 'door_logs',
+  '/card-purchase-orders': 'card_orders',
+  '/period-cards': 'period_cards',
+  '/deal-mappings': 'deal_mappings',
+  '/exchange-records': 'exchange',
+  '/admins': 'admins',
+  '/pay-accounts': 'pay_accounts',
+  '/users': 'users',
+  '/wallet-logs': 'wallet_logs',
+  '/point-logs': 'point_logs',
+  '/invites': 'invites',
+  '/coupons': 'coupons',
+  '/banners': 'banners',
+  '/announcements': 'announcements',
+  '/notifications': 'notifications',
+  '/contact-setting': 'contact',
+  '/booking-setting': 'booking_setting',
+  '/study-data': 'study',
+  '/assistant-usage': 'study',
+  '/knowledge': 'knowledge',
+  '/wrongbook': 'wrongbook',
+  '/market-listings': 'market',
+  '/market-ops': 'market',
+  '/system-status': 'system',
+  '/operation-logs': 'operation_logs',
+}
+
+export function pathToModule(path: string): string | null {
+  const p = path.split('?')[0]
+  return PATH_MODULE[p] ?? null
+}

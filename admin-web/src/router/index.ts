@@ -14,6 +14,7 @@ const router = createRouter({
         { path: 'receipts', component: () => import('../views/Receipts.vue') },
         { path: 'live-board', component: () => import('../views/LiveBoard.vue') },
         { path: 'stores', component: () => import('../views/Stores.vue') },
+        { path: 'pay-accounts', component: () => import('../views/PayAccounts.vue') },
         { path: 'pricing', component: () => import('../views/Pricing.vue') },
         { path: 'booking-setting', component: () => import('../views/BookingSetting.vue') },
         { path: 'seats', component: () => import('../views/Seats.vue') },
@@ -49,9 +50,13 @@ const router = createRouter({
 })
 
 const PUBLIC = new Set(['/login', '/landing'])
-router.beforeEach((to) => {
+router.beforeEach(async (to) => {
   const token = localStorage.getItem('admin_token')
   if (!PUBLIC.has(to.path) && !token) return '/login'
+  if (token && !PUBLIC.has(to.path)) {
+    const { canAccessPath } = await import('../utils/adminAuth')
+    if (!canAccessPath(to.path)) return '/dashboard'
+  }
 })
 
 export default router
