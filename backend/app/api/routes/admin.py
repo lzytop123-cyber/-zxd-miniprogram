@@ -1207,6 +1207,14 @@ def _needs_profile_setup(user: User) -> bool:
     return not user.avatar_url or user.nickname in (None, "", DEFAULT_NICKNAME)
 
 
+def _assert_store_related_user(db: Session, admin: AdminUser, user_id: int) -> None:
+    if not is_store_admin(admin):
+        return
+    related = store_related_user_ids(db, require_store_bound(admin))
+    if int(user_id) not in related:
+        raise HTTPException(status_code=403, detail="无权访问其他门店用户")
+
+
 def _user_admin_item(user: User) -> dict:
     goal = user.study_goal if user.study_goal in STUDY_GOAL_LABELS else None
     return {
@@ -1537,14 +1545,22 @@ def list_users_admin(
 
 @router.get("/users/study-goal-stats", response_model=ResponseModel)
 def user_study_goal_stats(
-    _: object = Depends(get_current_admin),
+    admin: AdminUser = Depends(get_current_admin),
     db: Session = Depends(get_db),
 ):
-    total = db.scalar(select(func.count()).select_from(User)) or 0
+    query = select(func.count()).select_from(User)
+    goal_query = select(func.count())
+    if is_store_admin(admin):
+        related = store_related_user_ids(db, require_store_bound(admin))
+        if not related:
+            raise HTTPException(status_code=403, detail="无权访问其他门店用户")
+        query = query.where(User.id.in_(related))
+        goal_query = goal_query.where(User.id.in_(related))
+    total = db.scalar(query) or 0
     breakdown = []
     filled = 0
     for key, label in STUDY_GOAL_LABELS.items():
-        count = db.scalar(select(func.count()).where(User.study_goal == key)) or 0
+        count = db.scalar(goal_query.where(User.study_goal == key)) or 0
         filled += count
         breakdown.append({"key": key, "label": label, "count": count})
     unset = total - filled
@@ -1562,9 +1578,10 @@ def user_study_goal_stats(
 @router.get("/users/{user_id}", response_model=ResponseModel)
 def get_user_admin(
     user_id: int,
-    _: object = Depends(get_current_admin),
+    admin: AdminUser = Depends(get_current_admin),
     db: Session = Depends(get_db),
 ):
+    _assert_store_related_user(db, admin, user_id)
     user = db.get(User, user_id)
     if not user:
         raise HTTPException(status_code=404, detail="用户不存在")
@@ -1583,9 +1600,10 @@ def get_user_admin(
 @router.get("/users/{user_id}/overview", response_model=ResponseModel)
 def get_user_overview_admin(
     user_id: int,
-    _: object = Depends(get_current_admin),
+    admin: AdminUser = Depends(get_current_admin),
     db: Session = Depends(get_db),
 ):
+    _assert_store_related_user(db, admin, user_id)
     try:
         data = user_overview(db, user_id)
     except ValueError as e:
@@ -1605,9 +1623,10 @@ def get_user_overview_admin(
 def adjust_user_balance(
     user_id: int,
     body: AdminBalanceAdjustRequest,
-    _: object = Depends(get_current_admin),
+    admin: AdminUser = Depends(get_current_admin),
     db: Session = Depends(get_db),
 ):
+    _assert_store_related_user(db, admin, user_id)
     user = db.get(User, user_id)
     if not user:
         raise HTTPException(status_code=404, detail="用户不存在")
@@ -1630,9 +1649,10 @@ def adjust_user_balance(
 def update_user_study_goal(
     user_id: int,
     body: AdminStudyGoalUpdateRequest,
-    _: object = Depends(get_current_admin),
+    admin: AdminUser = Depends(get_current_admin),
     db: Session = Depends(get_db),
 ):
+    _assert_store_related_user(db, admin, user_id)
     user = db.get(User, user_id)
     if not user:
         raise HTTPException(status_code=404, detail="用户不存在")
@@ -1650,10 +1670,11 @@ def update_user_study_goal(
 @router.delete("/users/{user_id}", response_model=ResponseModel)
 def delete_user_admin(
     user_id: int,
-    _: object = Depends(get_current_admin),
+    admin: AdminUser = Depends(get_current_admin),
     db: Session = Depends(get_db),
 ):
     """永久删除用户及预约/卡券/流水等关联数据（团购核销记录保留，仅解绑用户）。"""
+    _assert_store_related_user(db, admin, user_id)
     try:
         summary = delete_user_cascade(db, user_id)
         db.commit()

@@ -168,6 +168,9 @@ class StoreScopeTests(unittest.TestCase):
     def test_store_users_list_filtered(self):
         self._run_scope_case("store_users_list_filtered")
 
+    def test_store_user_detail_scoped(self):
+        self._run_scope_case("store_user_detail_scoped")
+
     def test_store_wallet_logs_filtered(self):
         self._run_scope_case("store_wallet_logs_filtered")
 
@@ -928,6 +931,14 @@ def _run_scope_test(case: str) -> None:
             assert ctx["user_related_id"] in ids
             assert ctx["user_other_id"] not in ids
             assert ctx["user_orphan_id"] not in ids
+        elif case == "store_user_detail_scoped":
+            other = client.get(f"/api/admin/users/{ctx['user_other_id']}", headers=headers)
+            assert other.status_code == 403, other.text
+            related = client.get(f"/api/admin/users/{ctx['user_related_id']}", headers=headers)
+            assert related.status_code == 200, related.text
+            stats = client.get("/api/admin/users/study-goal-stats", headers=headers)
+            assert stats.status_code == 200, stats.text
+            assert stats.json()["data"]["total"] == 1
         elif case == "store_wallet_logs_filtered":
             res = client.get(
                 "/api/admin/wallet-logs",
