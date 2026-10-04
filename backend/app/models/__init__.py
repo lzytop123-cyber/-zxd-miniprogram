@@ -130,6 +130,27 @@ class AdminUser(Base):
     username: Mapped[str] = mapped_column(String(50), unique=True, nullable=False)
     password_hash: Mapped[str] = mapped_column(String(200), nullable=False)
     name: Mapped[str | None] = mapped_column(String(50))
+    role: Mapped[str] = mapped_column(String(20), default="hq")  # hq | store
+    store_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("stores.id"))
+    permissions: Mapped[list | None] = mapped_column(JSON, nullable=True)
+    status: Mapped[int] = mapped_column(Integer, default=1)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
+
+
+class PayAccount(Base):
+    """门店可绑定的微信支付收款账户（对应不同对公结算户）。"""
+
+    __tablename__ = "pay_accounts"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    name: Mapped[str] = mapped_column(String(100), nullable=False)
+    mchid: Mapped[str] = mapped_column(String(32), nullable=False)
+    serial_no: Mapped[str] = mapped_column(String(64), nullable=False, default="")
+    api_v3_key: Mapped[str] = mapped_column(String(64), nullable=False, default="")
+    cert_path: Mapped[str | None] = mapped_column(String(500))
+    key_path: Mapped[str] = mapped_column(String(500), nullable=False, default="")
+    public_key_id: Mapped[str | None] = mapped_column(String(128))
+    public_key_path: Mapped[str | None] = mapped_column(String(500))
     status: Mapped[int] = mapped_column(Integer, default=1)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
 
@@ -150,11 +171,30 @@ class Store(Base):
     wifi_password: Mapped[str | None] = mapped_column(String(100))
     meituan_shop_id: Mapped[str | None] = mapped_column(String(100))
     meituan_auth_token: Mapped[str | None] = mapped_column(String(500))
+    pay_account_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("pay_accounts.id"))
+    benefits_isolated: Mapped[int] = mapped_column(Integer, default=0)
+    seat_map_mode: Mapped[str] = mapped_column(String(20), default="legacy")
     status: Mapped[int] = mapped_column(Integer, default=1)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
 
     zones: Mapped[list["Zone"]] = relationship(back_populates="store")
     seats: Mapped[list["Seat"]] = relationship(back_populates="store")
+
+
+class StoreSeatMap(Base):
+    """门店座位图版本：草稿 / 已发布 / 归档。"""
+
+    __tablename__ = "store_seat_maps"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    store_id: Mapped[int] = mapped_column(Integer, ForeignKey("stores.id"), nullable=False, index=True)
+    version: Mapped[int] = mapped_column(Integer, default=1)
+    state: Mapped[str] = mapped_column(String(20), nullable=False, default="draft")
+    image_path: Mapped[str | None] = mapped_column(String(500))
+    aspect_ratio: Mapped[Decimal | None] = mapped_column(Numeric(10, 4))
+    markers: Mapped[list | None] = mapped_column(JSON)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
+    published_at: Mapped[datetime | None] = mapped_column(DateTime)
 
 
 class Zone(Base):
@@ -237,6 +277,7 @@ class Reservation(Base):
     refund_remark: Mapped[str | None] = mapped_column(String(200))
     refunded_at: Mapped[datetime | None] = mapped_column(DateTime)
     paid_at: Mapped[datetime | None] = mapped_column(DateTime)
+    pay_mchid: Mapped[str | None] = mapped_column(String(32))
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
 
 
@@ -279,6 +320,7 @@ class CardPurchaseOrder(Base):
     pay_type: Mapped[PayType] = mapped_column(Enum(PayType), nullable=False)
     pay_status: Mapped[int] = mapped_column(Integer, default=0)
     paid_at: Mapped[datetime | None] = mapped_column(DateTime)
+    pay_mchid: Mapped[str | None] = mapped_column(String(32))
     period_card_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("period_cards.id"))
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
 

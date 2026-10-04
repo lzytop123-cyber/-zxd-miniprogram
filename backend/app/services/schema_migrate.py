@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import logging
 
 from sqlalchemy import inspect, select, text
@@ -36,6 +37,14 @@ MIGRATION_STATEMENTS = [
     "ALTER TABLE period_cards ADD COLUMN expire_reminded_at DATETIME",
     "ALTER TABLE meituan_deal_mapping ADD COLUMN limit_per_user INTEGER DEFAULT 0",
     "ALTER TABLE meituan_orders ADD COLUMN deal_price NUMERIC(10, 2)",
+    "ALTER TABLE stores ADD COLUMN pay_account_id INTEGER",
+    "ALTER TABLE stores ADD COLUMN benefits_isolated INTEGER DEFAULT 0",
+    "ALTER TABLE reservations ADD COLUMN pay_mchid VARCHAR(32)",
+    "ALTER TABLE card_purchase_orders ADD COLUMN pay_mchid VARCHAR(32)",
+    "ALTER TABLE admin_users ADD COLUMN role VARCHAR(20) DEFAULT 'hq'",
+    "ALTER TABLE admin_users ADD COLUMN store_id INTEGER",
+    "ALTER TABLE stores ADD COLUMN seat_map_mode VARCHAR(20) DEFAULT 'legacy'",
+    "ALTER TABLE admin_users ADD COLUMN permissions JSON",
 ]
 
 # 性能索引（存量库补建；已存在时忽略）
@@ -88,6 +97,48 @@ def run_schema_migrations(db: Session) -> dict:
             except Exception as exc:
                 errors.append(f"backfill total_hours: {exc.__class__.__name__}")
 
+        if inspector.has_table("admin_users"):
+            try:
+                conn.execute(
+                    text(
+                        "UPDATE admin_users SET role = 'hq' "
+                        "WHERE role IS NULL OR role = ''"
+                    )
+                )
+            except Exception as exc:
+                errors.append(f"backfill admin role: {exc.__class__.__name__}")
+            try:
+                from app.services.admin_permissions import STORE_DEFAULT_PERMISSIONS
+
+                conn.execute(
+                    text(
+                        "UPDATE admin_users SET permissions = :perms "
+                        "WHERE role = 'store' AND "
+                        "(permissions IS NULL OR permissions = 'null')"
+                    ),
+                    {"perms": json.dumps(STORE_DEFAULT_PERMISSIONS)},
+                )
+            except Exception as exc:
+                errors.append(f"backfill admin permissions: {exc.__class__.__name__}")
+
+        if inspector.has_table("stores"):
+            try:
+                conn.execute(
+                    text(
+                        "UPDATE stores SET seat_map_mode = 'legacy' "
+                        "WHERE seat_map_mode IS NULL OR seat_map_mode = ''"
+                    )
+                )
+                # 非首店（理工大等分店）默认走图片座位图，首店保持固定布局
+                conn.execute(
+                    text(
+                        "UPDATE stores SET seat_map_mode = 'image' "
+                        "WHERE id != 1 AND (seat_map_mode IS NULL OR seat_map_mode = 'legacy')"
+                    )
+                )
+            except Exception as exc:
+                errors.append(f"backfill seat_map_mode: {exc.__class__.__name__}")
+
     created_tables: list[str] = []
     try:
         from app.models.receipts import Receipt, ReceiptRefund
@@ -108,16 +159,20 @@ def run_schema_migrations(db: Session) -> dict:
             MarketSensitiveWord,
             Notification,
             NotificationRead,
+            PayAccount,
             RechargeOrder,
             WrongbookSubject,
             WrongQuestion,
             SiteBookingSetting,
             SiteContactSetting,
             StoreCalendarDay,
+            StoreSeatMap,
             SystemAnnouncement,
         )
 
         for model in (
+            PayAccount,
+            StoreSeatMap,
             AdminOperationLog,
             SystemAnnouncement,
             StoreCalendarDay,
@@ -174,6 +229,8 @@ def run_schema_migrations(db: Session) -> dict:
 
         if inspector.has_table("stores") and inspector.has_table("seats"):
             for store in db.scalars(select(Store)).all():
+                if getattr(store, "seat_map_mode", "legacy") != "legacy":
+                    continue
                 has_seat_28 = db.scalar(
                     select(Seat.id).where(
                         Seat.store_id == store.id,
