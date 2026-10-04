@@ -11,6 +11,7 @@
           </el-radio-group>
         </div>
       </template>
+      <GlobalConfigHint />
       <el-table :data="items" v-loading="loading" stripe>
         <el-table-column prop="id" label="ID" width="70" />
         <el-table-column label="封面" width="96">
@@ -100,6 +101,7 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import GlobalConfigHint from '../../components/GlobalConfigHint.vue'
 import http from '../../api/http'
 import { parsePageResult } from '../../utils/pageData'
 

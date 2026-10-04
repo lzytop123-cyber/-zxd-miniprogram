@@ -6,6 +6,7 @@
         <el-button type="primary" @click="openCreate">新建公告</el-button>
       </div>
     </template>
+    <GlobalConfigHint />
 
     <el-alert
       type="info"
@@ -65,6 +66,7 @@
 <script setup lang="ts">
 import { onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import GlobalConfigHint from '../components/GlobalConfigHint.vue'
 import http from '../api/http'
 
 const list = ref<any[]>([])

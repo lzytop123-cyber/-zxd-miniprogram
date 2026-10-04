@@ -6,6 +6,7 @@
         <el-button type="primary" :loading="saving" @click="save">保存</el-button>
       </div>
     </template>
+    <GlobalConfigHint />
 
     <el-alert
       type="info"
@@ -40,6 +41,7 @@
 <script setup lang="ts">
 import { onMounted, reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
+import GlobalConfigHint from '../components/GlobalConfigHint.vue'
 import http from '../api/http'
 
 const loading = ref(false)

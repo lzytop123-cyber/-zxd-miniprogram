@@ -6,6 +6,7 @@
         <el-button type="primary" @click="openAdd">新增活动</el-button>
       </div>
     </template>
+    <GlobalConfigHint />
     <p class="hint">
       启用中的活动组成首页轮播，每条可独立选布局。「排序」越小越靠前。
       全屏铺满模式下图片直接覆盖 Hero 绿色区域，高度统一不跳动。
@@ -163,6 +164,7 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
+import GlobalConfigHint from '../components/GlobalConfigHint.vue'
 import http from '../api/http'
 
 const list = ref<any[]>([])

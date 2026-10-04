@@ -1,5 +1,6 @@
 <template>
   <div class="page">
+    <GlobalConfigHint />
     <el-row :gutter="16" class="stats">
       <el-col :span="6" v-for="item in statCards" :key="item.label">
         <el-card><div class="stat-val">{{ item.value }}</div><div class="stat-label">{{ item.label }}</div></el-card>
@@ -79,6 +80,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { ElMessage } from 'element-plus'
+import GlobalConfigHint from '../../components/GlobalConfigHint.vue'
 import http from '../../api/http'
 import { parsePageResult } from '../../utils/pageData'
 

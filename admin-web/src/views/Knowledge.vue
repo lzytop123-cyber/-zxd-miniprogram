@@ -15,6 +15,7 @@
         </div>
       </div>
     </template>
+    <GlobalConfigHint />
 
     <p class="hint">
       上传多份 Word / Markdown 文档后，AI 会按用户问题自动检索相关片段回答。
@@ -87,6 +88,7 @@
 import { onMounted, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import type { UploadRequestOptions } from 'element-plus'
+import GlobalConfigHint from '../components/GlobalConfigHint.vue'
 import http from '../api/http'
 import { formatWallClock } from '../utils/datetime'
 
