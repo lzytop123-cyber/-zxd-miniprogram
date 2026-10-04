@@ -53,6 +53,7 @@ PATH_RULES: list[PathRule] = [
     (lambda p: bool(re.match(rf"^/api/admin/stores/{_STORE_ID}/pricing/copy-to", p)), "pricing"),
     ("/api/admin/stores/upload-cover", "stores"),
     (lambda p: bool(re.match(rf"^/api/admin/stores/{_STORE_ID}/live-board", p)), "live_board"),
+    (lambda p: bool(re.match(rf"^/api/admin/stores/{_STORE_ID}/expiring-cards", p)), "live_board"),
     (lambda p: bool(re.match(rf"^/api/admin/stores/{_STORE_ID}/calendar", p)), "calendar"),
     (lambda p: bool(re.match(rf"^/api/admin/stores/{_STORE_ID}/seat-map", p)), "seats"),
     (lambda p: bool(re.match(rf"^/api/admin/stores/{_STORE_ID}/zones", p)), "seats"),

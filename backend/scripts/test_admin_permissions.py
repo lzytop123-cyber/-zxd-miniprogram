@@ -30,6 +30,12 @@ class PermissionCatalogTests(unittest.TestCase):
     def test_path_maps_receipts(self):
         self.assertEqual(module_for_admin_path("GET", "/api/admin/receipts/summary"), "receipts")
 
+    def test_path_maps_store_expiring_cards_to_live_board(self):
+        self.assertEqual(
+            module_for_admin_path("GET", "/api/admin/stores/1/expiring-cards"),
+            "live_board",
+        )
+
     def test_unknown_admin_path_returns_none(self):
         self.assertIsNone(module_for_admin_path("GET", "/api/admin/login"))
 
