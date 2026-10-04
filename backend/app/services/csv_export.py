@@ -69,10 +69,20 @@ def export_reservations_csv(
     )
 
 
-def export_wallet_logs_csv(db: Session, *, user_id: int | None = None) -> tuple[str, str]:
+def export_wallet_logs_csv(
+    db: Session, *, user_id: int | None = None, user_ids: set[int] | None = None
+) -> tuple[str, str]:
     query = select(WalletLog)
     if user_id:
         query = query.where(WalletLog.user_id == user_id)
+    elif user_ids is not None:
+        if not user_ids:
+            return _csv_response(
+                "wallet_logs.csv",
+                [],
+                ["ID", "用户ID", "昵称", "类型", "金额", "余额后", "备注", "时间"],
+            )
+        query = query.where(WalletLog.user_id.in_(user_ids))
     rows_db = db.scalars(query.order_by(WalletLog.created_at.desc()).limit(10000)).all()
     rows = []
     for log in rows_db:

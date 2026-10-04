@@ -166,12 +166,12 @@ function resetForm() {
 async function load() {
   loading.value = true
   try {
-    const [adminsRes, storesRes] = await Promise.all([
-      http.get('/admin/admins'),
-      http.get('/admin/stores'),
-    ])
+    const adminsRes = await http.get('/admin/admins')
     list.value = adminsRes.data
-    stores.value = storesRes.data || []
+    if (!isStoreActor) {
+      const storesRes = await http.get('/admin/stores')
+      stores.value = storesRes.data || []
+    }
   } finally {
     loading.value = false
   }

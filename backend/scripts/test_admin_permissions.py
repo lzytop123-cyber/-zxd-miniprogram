@@ -115,6 +115,9 @@ class GuardMiddlewareTests(unittest.TestCase):
     def test_store_cannot_post_pay_accounts_even_with_permission(self):
         self._run_guard_case("store_cannot_post_pay_accounts_even_with_permission")
 
+    def test_store_cannot_migrate(self):
+        self._run_guard_case("store_cannot_migrate")
+
     def test_hq_former_hq_only_still_ok(self):
         self._run_guard_case("hq_former_hq_only_still_ok")
 
@@ -173,6 +176,15 @@ class StoreScopeTests(unittest.TestCase):
 
     def test_store_wallet_logs_filtered(self):
         self._run_scope_case("store_wallet_logs_filtered")
+
+    def test_store_cannot_create_foreign_reservation(self):
+        self._run_scope_case("store_cannot_create_foreign_reservation")
+
+    def test_store_cannot_patch_foreign_pricing(self):
+        self._run_scope_case("store_cannot_patch_foreign_pricing")
+
+    def test_store_coupon_unrelated_user_forbidden(self):
+        self._run_scope_case("store_coupon_unrelated_user_forbidden")
 
 
 def _run_migration_test() -> None:
@@ -324,6 +336,10 @@ def _build_guard_app():
     def stub_create_pay_account(_: object = Depends(get_current_admin)):
         return ResponseModel(data={"id": 1})
 
+    @stub.post("/admin/system/migrate", response_model=ResponseModel)
+    def stub_migrate(_: object = Depends(get_current_admin)):
+        return ResponseModel(data={"ok": True})
+
     @stub.post(
         "/admin/stores/{source_id}/pricing/copy-to/{target_id}",
         response_model=ResponseModel,
@@ -403,6 +419,10 @@ def _run_guard_test(case: str) -> None:
                 headers=auth(ctx["store_with_pay_accounts"]),
                 json={"name": "x", "mchid": "1", "serial_no": "1", "api_v3_key": "k", "key_path": "/k"},
             )
+            assert res.status_code == 403, res.text
+            assert res.json()["message"] == "需要总部权限"
+        elif case == "store_cannot_migrate":
+            res = client.post("/api/admin/system/migrate", headers=auth(ctx["store_default"]))
             assert res.status_code == 403, res.text
             assert res.json()["message"] == "需要总部权限"
         elif case == "hq_former_hq_only_still_ok":
@@ -625,6 +645,7 @@ def _build_scope_app():
         MeituanOrder,
         PayAccount,
         PayType,
+        PricingRule,
         Store,
         User,
         WalletLog,
@@ -639,6 +660,7 @@ def _build_scope_app():
             WalletLog,
             CardPurchaseOrder,
             MeituanOrder,
+            PricingRule,
             AdminUser,
             User,
             Store,
@@ -688,7 +710,7 @@ def _build_scope_app():
             store_id=store_a.id,
             status=1,
             permissions=list(STORE_DEFAULT_PERMISSIONS)
-            + ["admins", "pay_accounts", "users", "wallet_logs"],
+            + ["admins", "pay_accounts", "users", "wallet_logs", "coupons"],
         )
         other_store_mgr = AdminUser(
             username="scope_other",
@@ -750,8 +772,14 @@ def _build_scope_app():
                 remark="无关",
             )
         )
+        rule_b = PricingRule(
+            store_id=store_b.id,
+            bill_type=BillType.hourly,
+            price=Decimal("10.00"),
+        )
+        db.add(rule_b)
         db.commit()
-        for row in (hq, store_mgr, other_store_mgr, peer_mgr, store_a, store_b, pay_a, pay_b):
+        for row in (hq, store_mgr, other_store_mgr, peer_mgr, store_a, store_b, pay_a, pay_b, rule_b):
             db.refresh(row)
         for row in (user_related, user_other, user_orphan):
             db.refresh(row)
@@ -767,6 +795,7 @@ def _build_scope_app():
             "user_related_id": user_related.id,
             "user_other_id": user_other.id,
             "user_orphan_id": user_orphan.id,
+            "rule_b_id": rule_b.id,
         }
     finally:
         db.close()
@@ -950,6 +979,40 @@ def _run_scope_test(case: str) -> None:
             user_ids = {i["user_id"] for i in page["items"]}
             assert ctx["user_related_id"] in user_ids
             assert ctx["user_orphan_id"] not in user_ids
+        elif case == "store_cannot_create_foreign_reservation":
+            res = client.post(
+                "/api/admin/reservations/create",
+                headers=headers,
+                json={
+                    "user_id": ctx["user_related_id"],
+                    "store_id": ctx["store_b_id"],
+                    "bill_type": "hourly",
+                    "start_time": "2026-10-04T10:00:00",
+                    "seat_id": 1,
+                },
+            )
+            assert res.status_code == 403, res.text
+        elif case == "store_cannot_patch_foreign_pricing":
+            res = client.patch(
+                f"/api/admin/pricing/{ctx['rule_b_id']}",
+                headers=headers,
+                json={"price": 1},
+            )
+            assert res.status_code == 403, res.text
+        elif case == "store_coupon_unrelated_user_forbidden":
+            res = client.post(
+                "/api/admin/coupons",
+                headers=headers,
+                json={
+                    "user_id": ctx["user_orphan_id"],
+                    "coupon_name": "试券",
+                    "discount_type": "amount",
+                    "discount_val": 5,
+                    "min_amount": 0,
+                    "expire_days": 7,
+                },
+            )
+            assert res.status_code == 403, res.text
         else:
             raise AssertionError(f"unknown scope case: {case}")
     finally:

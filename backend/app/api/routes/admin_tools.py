@@ -12,6 +12,14 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_admin
 from app.db.session import get_db
+from app.services.admin_access import (
+    assert_store_access,
+    assert_store_related_user,
+    is_store_admin,
+    require_store_bound,
+    scope_store_id,
+    store_related_user_ids,
+)
 from app.models import (
     AdminOperationLog,
     AdminUser,
@@ -170,25 +178,35 @@ def _calendar_dict(row: StoreCalendarDay) -> dict:
 
 @router.get("/stats/todos", response_model=ResponseModel)
 def admin_stats_todos(
-    _: object = Depends(get_current_admin),
+    store_id: int | None = None,
+    admin: object = Depends(get_current_admin),
     db: Session = Depends(get_db),
 ):
-    unpaid_count = db.scalar(
-        select(func.count()).where(
-            Reservation.pay_status == 0,
-            Reservation.status != 3,
-        )
-    ) or 0
+    sid = scope_store_id(admin, store_id)
+    unpaid_q = [
+        Reservation.pay_status == 0,
+        Reservation.status != 3,
+    ]
+    if sid:
+        unpaid_q.append(Reservation.store_id == sid)
+    unpaid_count = db.scalar(select(func.count()).where(*unpaid_q)) or 0
+    # pending_deal_mapping 无 store_id，仍返回全局待配置数
     pending_deals = db.scalar(
         select(func.count()).where(PendingDealMapping.status == "pending")
     ) or 0
-    from app.models import BleBatteryAlert
+    from app.models import BleBatteryAlert, BleLock
 
-    low_battery = db.scalar(
-        select(func.count()).where(BleBatteryAlert.is_read == 0)
-    ) or 0
+    low_q = [BleBatteryAlert.is_read == 0]
+    if sid:
+        low_q.append(
+            BleBatteryAlert.lock_id.in_(select(BleLock.id).where(BleLock.store_id == sid))
+        )
+    low_battery = db.scalar(select(func.count()).where(*low_q)) or 0
     incomplete_stores: list[dict] = []
-    for store in db.scalars(select(Store).where(Store.status == 1)).all():
+    store_q = select(Store).where(Store.status == 1)
+    if sid:
+        store_q = store_q.where(Store.id == sid)
+    for store in db.scalars(store_q).all():
         summary = store_seat_summary(db, store.id)
         if not summary["is_complete"]:
             incomplete_stores.append(summary)
@@ -217,6 +235,7 @@ def post_import_deal_templates(
     admin: AdminUser = Depends(get_current_admin),
     db: Session = Depends(get_db),
 ):
+    assert_store_access(admin, body.store_id)
     try:
         result = import_deal_templates(
             db, body.store_id, platform=body.platform, overwrite=body.overwrite
@@ -241,6 +260,7 @@ def create_seat_admin(
     admin: AdminUser = Depends(get_current_admin),
     db: Session = Depends(get_db),
 ):
+    assert_store_access(admin, body.store_id)
     store = db.get(Store, body.store_id)
     if not store:
         raise HTTPException(status_code=404, detail="门店不存在")
@@ -280,6 +300,7 @@ def update_seat_admin(
     seat = db.get(Seat, seat_id)
     if not seat:
         raise HTTPException(status_code=404, detail="座位不存在")
+    assert_store_access(admin, seat.store_id)
     data = body.model_dump(exclude_unset=True)
     if "zone_id" in data:
         zone = db.get(Zone, data["zone_id"])
@@ -312,6 +333,7 @@ def delete_seat_admin(
     seat = db.get(Seat, seat_id)
     if not seat:
         raise HTTPException(status_code=404, detail="座位不存在")
+    assert_store_access(admin, seat.store_id)
     used = db.scalar(select(func.count()).where(Reservation.seat_id == seat_id)) or 0
     if used:
         raise HTTPException(status_code=400, detail="该座位有关联订单，请改为停用而非删除")
@@ -380,10 +402,11 @@ def _format_period(bill_type: "BillType", start: datetime, end: datetime) -> str
 @router.get("/stores/{store_id}/live-board", response_model=ResponseModel)
 def store_live_board(
     store_id: int,
-    _: object = Depends(get_current_admin),
+    admin: AdminUser = Depends(get_current_admin),
     db: Session = Depends(get_db),
 ):
     """实时占座大屏数据：每个座位当前状态 + 汇总。"""
+    assert_store_access(admin, store_id)
     store = db.get(Store, store_id)
     if not store:
         raise HTTPException(status_code=404, detail="门店不存在")
@@ -551,6 +574,7 @@ def remind_period_card(
     card = db.get(PeriodCard, card_id)
     if not card:
         raise HTTPException(status_code=404, detail="期限卡不存在")
+    assert_store_access(admin, card.store_id)
     user = db.get(User, card.user_id)
     if not user or not user.openid:
         raise HTTPException(status_code=400, detail="用户未绑定微信")
@@ -646,9 +670,10 @@ def copy_pricing_to_store(
 @router.get("/export/reservations")
 def export_reservations(
     store_id: int | None = None,
-    _: object = Depends(get_current_admin),
+    admin: AdminUser = Depends(get_current_admin),
     db: Session = Depends(get_db),
 ):
+    store_id = scope_store_id(admin, store_id)
     filename, content = export_reservations_csv(db, store_id=store_id)
     return Response(
         content=content,
@@ -660,10 +685,17 @@ def export_reservations(
 @router.get("/export/wallet-logs")
 def export_wallet_logs(
     user_id: int | None = None,
-    _: object = Depends(get_current_admin),
+    admin: AdminUser = Depends(get_current_admin),
     db: Session = Depends(get_db),
 ):
-    filename, content = export_wallet_logs_csv(db, user_id=user_id)
+    user_ids = None
+    if is_store_admin(admin):
+        related = store_related_user_ids(db, require_store_bound(admin))
+        if user_id is not None:
+            assert_store_related_user(db, admin, user_id)
+        else:
+            user_ids = related
+    filename, content = export_wallet_logs_csv(db, user_id=user_id, user_ids=user_ids)
     return Response(
         content=content,
         media_type="text/csv; charset=utf-8",
@@ -694,6 +726,7 @@ def mark_reservation_refund(
     reservation = db.get(Reservation, reservation_id)
     if not reservation:
         raise HTTPException(status_code=404, detail="订单不存在")
+    assert_store_access(admin, reservation.store_id)
     if reservation.pay_status != 1:
         raise HTTPException(status_code=400, detail="仅已付款订单可登记退款")
     reservation.pay_status = 2
@@ -720,6 +753,7 @@ def admin_adjust_points(
     admin: AdminUser = Depends(get_current_admin),
     db: Session = Depends(get_db),
 ):
+    assert_store_related_user(db, admin, user_id)
     user = db.get(User, user_id)
     if not user:
         raise HTTPException(status_code=404, detail="用户不存在")
@@ -835,9 +869,10 @@ def list_store_calendar(
     store_id: int,
     from_day: date | None = None,
     to_day: date | None = None,
-    _: object = Depends(get_current_admin),
+    admin: AdminUser = Depends(get_current_admin),
     db: Session = Depends(get_db),
 ):
+    assert_store_access(admin, store_id)
     store = db.get(Store, store_id)
     if not store:
         raise HTTPException(status_code=404, detail="门店不存在")
@@ -858,6 +893,7 @@ def upsert_store_calendar_day(
     admin: AdminUser = Depends(get_current_admin),
     db: Session = Depends(get_db),
 ):
+    assert_store_access(admin, store_id)
     store = db.get(Store, store_id)
     if not store:
         raise HTTPException(status_code=404, detail="门店不存在")

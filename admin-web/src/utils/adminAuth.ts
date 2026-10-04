@@ -61,7 +61,10 @@ export function clearAdminSession() {
 }
 
 export function getAdminRole(): AdminRole {
-  return localStorage.getItem(KEYS.role) === 'store' ? 'store' : 'hq'
+  const role = localStorage.getItem(KEYS.role)
+  if (role === 'store') return 'store'
+  if (role === 'hq') return 'hq'
+  return localStorage.getItem(KEYS.storeId) ? 'store' : 'hq'
 }
 
 export function getAdminStoreId(): number | null {

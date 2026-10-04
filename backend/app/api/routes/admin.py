@@ -15,6 +15,7 @@ from app.services.admin_access import (
     ROLE_HQ,
     ROLE_STORE,
     assert_store_access,
+    assert_store_related_user,
     admin_role,
     is_hq,
     is_store_admin,
@@ -280,11 +281,12 @@ def _admin_available_seats(db: Session, store_id: int, start: datetime, end: dat
 @router.post("/reservations/preview", response_model=ResponseModel)
 def admin_preview_reservation(
     body: AdminReservationPreviewBody,
-    _: AdminUser = Depends(get_current_admin),
+    admin: AdminUser = Depends(get_current_admin),
     db: Session = Depends(get_db),
 ):
     from app.api.routes.reservation import _prepare_booking
 
+    assert_store_access(admin, body.store_id)
     start, end, duration, seat, price = _prepare_booking(db, body, require_seat=False)
     return ResponseModel(
         data={
@@ -310,6 +312,7 @@ async def admin_create_reservation(
 ):
     from app.api.routes.reservation import _prepare_booking, _seat_lock
 
+    assert_store_access(admin, body.store_id)
     user = db.get(User, body.user_id)
     if not user:
         raise HTTPException(status_code=404, detail="用户不存在，请先让同学在小程序登录")
@@ -701,11 +704,12 @@ def list_deal_mappings(
 @router.post("/deal-mappings", response_model=ResponseModel)
 def create_deal_mapping(
     body: DealMappingCreateRequest,
-    _: object = Depends(get_current_admin),
+    admin: AdminUser = Depends(get_current_admin),
     db: Session = Depends(get_db),
 ):
     from app.services.deal_mapping_service import guess_limit_per_user_from_name
 
+    assert_store_access(admin, body.store_id)
     limit = body.limit_per_user
     if not limit and body.deal_name:
         limit = guess_limit_per_user_from_name(body.deal_name)
@@ -730,12 +734,13 @@ def create_deal_mapping(
 def update_deal_mapping(
     mapping_id: int,
     body: DealMappingUpdateRequest,
-    _: object = Depends(get_current_admin),
+    admin: AdminUser = Depends(get_current_admin),
     db: Session = Depends(get_db),
 ):
     row = db.get(MeituanDealMapping, mapping_id)
     if not row:
         raise HTTPException(status_code=404, detail="映射不存在")
+    assert_store_access(admin, row.store_id)
     if body.deal_name is not None:
         row.deal_name = body.deal_name.strip() or row.deal_name
     if body.reward_type is not None:
@@ -766,12 +771,13 @@ def update_deal_mapping(
 def update_deal_mapping_limit(
     mapping_id: int,
     limit_per_user: int = Query(1, ge=0, le=10),
-    _: object = Depends(get_current_admin),
+    admin: AdminUser = Depends(get_current_admin),
     db: Session = Depends(get_db),
 ):
     row = db.get(MeituanDealMapping, mapping_id)
     if not row:
         raise HTTPException(status_code=404, detail="映射不存在")
+    assert_store_access(admin, row.store_id)
     row.limit_per_user = limit_per_user
     db.commit()
     return ResponseModel(
@@ -813,12 +819,13 @@ def list_pending_deal_mappings(
 def resolve_pending_deal_mapping(
     pending_id: int,
     body: PendingDealResolveRequest,
-    _: object = Depends(get_current_admin),
+    admin: AdminUser = Depends(get_current_admin),
     db: Session = Depends(get_db),
 ):
     pending = db.get(PendingDealMapping, pending_id)
     if not pending or pending.status != "pending":
         raise HTTPException(status_code=404, detail="待配置项不存在")
+    assert_store_access(admin, body.store_id)
     try:
         from app.services.deal_mapping_service import guess_limit_per_user_from_name, resolve_pending_deal
 
@@ -904,9 +911,10 @@ def list_coupons(
 @router.post("/coupons", response_model=ResponseModel)
 def create_coupon(
     body: CouponCreateRequest,
-    _: object = Depends(get_current_admin),
+    admin: AdminUser = Depends(get_current_admin),
     db: Session = Depends(get_db),
 ):
+    _assert_store_related_user(db, admin, body.user_id)
     user = db.get(User, body.user_id)
     if not user:
         raise HTTPException(status_code=404, detail="用户不存在")
@@ -928,12 +936,13 @@ def create_coupon(
 @router.delete("/coupons/{coupon_id}", response_model=ResponseModel)
 def delete_coupon(
     coupon_id: int,
-    _: object = Depends(get_current_admin),
+    admin: AdminUser = Depends(get_current_admin),
     db: Session = Depends(get_db),
 ):
     coupon = db.get(Coupon, coupon_id)
     if not coupon:
         raise HTTPException(status_code=404, detail="优惠券不存在")
+    _assert_store_related_user(db, admin, coupon.user_id)
     if coupon.status == 1:
         raise HTTPException(status_code=400, detail="已使用的优惠券不可删除")
     db.delete(coupon)
@@ -981,12 +990,13 @@ def list_seats(
 def update_seat_status(
     seat_id: int,
     status: int = Query(..., ge=0, le=1),
-    _: object = Depends(get_current_admin),
+    admin: AdminUser = Depends(get_current_admin),
     db: Session = Depends(get_db),
 ):
     seat = db.get(Seat, seat_id)
     if not seat:
         raise HTTPException(status_code=404, detail="座位不存在")
+    assert_store_access(admin, seat.store_id)
     seat.status = status
     db.commit()
     return ResponseModel(message="已更新")
@@ -1151,12 +1161,13 @@ def create_store_pricing(
 def update_pricing_rule(
     rule_id: int,
     body: AdminPricingUpdateRequest,
-    _: object = Depends(get_current_admin),
+    admin: AdminUser = Depends(get_current_admin),
     db: Session = Depends(get_db),
 ):
     rule = db.get(PricingRule, rule_id)
     if not rule:
         raise HTTPException(status_code=404, detail="价格规则不存在")
+    assert_store_access(admin, rule.store_id)
 
     data = body.model_dump(exclude_unset=True)
     for field in ("night_start", "night_end"):
@@ -1180,12 +1191,13 @@ def update_pricing_rule(
 @router.delete("/pricing/{rule_id}", response_model=ResponseModel)
 def delete_pricing_rule(
     rule_id: int,
-    _: object = Depends(get_current_admin),
+    admin: AdminUser = Depends(get_current_admin),
     db: Session = Depends(get_db),
 ):
     rule = db.get(PricingRule, rule_id)
     if not rule:
         raise HTTPException(status_code=404, detail="价格规则不存在")
+    assert_store_access(admin, rule.store_id)
     db.delete(rule)
     db.commit()
     return ResponseModel(message="已删除")
@@ -1208,11 +1220,7 @@ def _needs_profile_setup(user: User) -> bool:
 
 
 def _assert_store_related_user(db: Session, admin: AdminUser, user_id: int) -> None:
-    if not is_store_admin(admin):
-        return
-    related = store_related_user_ids(db, require_store_bound(admin))
-    if int(user_id) not in related:
-        raise HTTPException(status_code=403, detail="无权访问其他门店用户")
+    assert_store_related_user(db, admin, user_id)
 
 
 def _user_admin_item(user: User) -> dict:
@@ -1747,9 +1755,10 @@ class AdminUpdatePeriodCardRequest(BaseModel):
 @router.post("/period-cards", response_model=ResponseModel)
 def issue_period_card_admin(
     body: AdminIssuePeriodCardRequest,
-    _: object = Depends(get_current_admin),
+    admin: AdminUser = Depends(get_current_admin),
     db: Session = Depends(get_db),
 ):
+    store_id = scope_store_id(admin, body.store_id)
     try:
         card_type = CardType(body.card_type)
     except ValueError as e:
@@ -1760,7 +1769,7 @@ def issue_period_card_admin(
             user_id=body.user_id,
             card_type=card_type,
             reward_value=body.reward_value,
-            store_id=body.store_id,
+            store_id=store_id,
             card_name=body.card_name,
             remark=body.remark,
         )
@@ -1775,12 +1784,13 @@ def issue_period_card_admin(
 def update_period_card_admin(
     card_id: int,
     body: AdminUpdatePeriodCardRequest,
-    _: object = Depends(get_current_admin),
+    admin: AdminUser = Depends(get_current_admin),
     db: Session = Depends(get_db),
 ):
     card = db.get(PeriodCard, card_id)
     if not card:
         raise HTTPException(status_code=404, detail="期限卡不存在")
+    assert_store_access(admin, card.store_id)
     try:
         card_type = CardType(body.card_type) if body.card_type else None
     except ValueError as e:
@@ -2708,12 +2718,19 @@ class AdminUpdateRequest(BaseModel):
     status: int | None = None
 
 
-def _persist_permissions_for_role(role: str, raw: list[str] | None) -> list[str] | None:
+def _persist_permissions_for_role(
+    role: str, raw: list[str] | None, actor: AdminUser | None = None
+) -> list[str] | None:
     if role == ROLE_HQ:
         return None
     if raw is None:
-        return list(STORE_DEFAULT_PERMISSIONS)
-    return normalize_permissions(ROLE_STORE, raw)
+        perms = list(STORE_DEFAULT_PERMISSIONS)
+    else:
+        perms = normalize_permissions(ROLE_STORE, raw)
+    if actor is not None and is_store_admin(actor):
+        allowed = set(normalize_permissions(admin_role(actor), getattr(actor, "permissions", None)))
+        perms = [key for key in perms if key in allowed]
+    return perms
 
 
 def _banner_dict(row: HomeBanner) -> dict:
@@ -3168,7 +3185,7 @@ def create_admin_user(
         name=body.name,
         role=role,
         store_id=store_id,
-        permissions=_persist_permissions_for_role(role, body.permissions),
+        permissions=_persist_permissions_for_role(role, body.permissions, actor),
         status=1,
     )
     db.add(admin)
@@ -3235,10 +3252,10 @@ def update_admin_user(
     if role == ROLE_HQ:
         admin.permissions = None
     elif "permissions" in fields_set:
-        admin.permissions = _persist_permissions_for_role(role, body.permissions)
+        admin.permissions = _persist_permissions_for_role(role, body.permissions, actor)
     elif "role" in fields_set:
         # Newly switched to store without explicit permissions → defaults.
-        admin.permissions = _persist_permissions_for_role(role, None)
+        admin.permissions = _persist_permissions_for_role(role, None, actor)
 
     db.commit()
     db.refresh(admin)

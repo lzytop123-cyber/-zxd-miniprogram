@@ -3,7 +3,7 @@
     <template #header>
       <div class="header-row">
         <span>收款账户</span>
-        <el-button type="primary" @click="openCreate">新增账户</el-button>
+        <el-button v-if="isHq" type="primary" @click="openCreate">新增账户</el-button>
       </div>
     </template>
 
@@ -33,7 +33,7 @@
       </el-table-column>
       <el-table-column label="操作" width="100" fixed="right">
         <template #default="{ row }">
-          <el-button link type="primary" @click="openEdit(row)">编辑</el-button>
+          <el-button v-if="isHq" link type="primary" @click="openEdit(row)">编辑</el-button>
         </template>
       </el-table-column>
     </el-table>
@@ -76,9 +76,12 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import http from '../api/http'
+import { isHqAdmin } from '../utils/adminAuth'
+
+const isHq = computed(() => isHqAdmin())
 
 const list = ref<any[]>([])
 const loading = ref(false)

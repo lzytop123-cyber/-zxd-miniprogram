@@ -23,6 +23,8 @@ def _is_hard_denied(method: str, path: str) -> bool:
     if path == "/api/admin/pay-accounts" or path.startswith("/api/admin/pay-accounts/"):
         if method in ("POST", "PUT", "PATCH", "DELETE"):
             return True
+    if path.rstrip("/") == "/api/admin/system/migrate" and method == "POST":
+        return True
     return False
 
 

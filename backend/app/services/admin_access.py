@@ -72,3 +72,12 @@ def require_store_bound(admin: AdminUser) -> int:
     if not admin.store_id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="店长未绑定门店")
     return int(admin.store_id)
+
+
+def assert_store_related_user(db, admin: AdminUser, user_id: int) -> None:
+    """店长只能操作本店关联用户；总部放行。"""
+    if is_hq(admin):
+        return
+    related = store_related_user_ids(db, require_store_bound(admin))
+    if int(user_id) not in related:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="无权访问其他门店用户")
