@@ -41,6 +41,7 @@ app = FastAPI(
     lifespan=lifespan,
 )
 _cors_origins = settings.cors_origin_list
+app.add_middleware(AdminRoleGuardMiddleware)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=_cors_origins,
@@ -49,7 +50,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-app.add_middleware(AdminRoleGuardMiddleware)
 
 app.include_router(user.router, prefix="/api")
 app.include_router(store.router, prefix="/api")
