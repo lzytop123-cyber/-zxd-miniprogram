@@ -100,6 +100,8 @@
 import { computed, onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import http from '../api/http'
+import { useRequiredStoreId } from '../composables/useWorkingStore'
+import { resolveRequiredStoreId } from '../utils/workingStore'
 
 const list = ref<any[]>([])
 const pendingList = ref<any[]>([])
@@ -139,7 +141,9 @@ async function load() {
   form.store_id = storeId.value
   try {
     const [mappings, pending] = await Promise.all([
-      http.get('/admin/deal-mappings', { params: { platform: currentPlatform.value } }),
+      http.get('/admin/deal-mappings', {
+        params: { platform: currentPlatform.value, store_id: storeId.value || undefined },
+      }),
       http.get('/admin/deal-mappings/pending', { params: { platform: currentPlatform.value } }),
     ])
     list.value = mappings.data
@@ -246,10 +250,12 @@ async function dismiss(row: any) {
   load()
 }
 
+useRequiredStoreId(storeId, () => stores.value[0]?.id, load)
+
 onMounted(async () => {
   const res = await http.get('/admin/stores')
   stores.value = res.data
-  if (stores.value.length) storeId.value = stores.value[0].id
+  if (stores.value.length) storeId.value = resolveRequiredStoreId(stores.value[0].id) || stores.value[0].id
   load()
 })
 </script>

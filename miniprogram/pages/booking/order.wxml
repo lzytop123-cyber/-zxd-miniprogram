@@ -43,9 +43,15 @@
     <view class="section-title inner">支付方式</view>
     <view class="pay-types">
       <view class="pay-item {{payType==='wechat'?'active':''}}" bindtap="setPay" data-type="wechat">微信支付</view>
-      <view class="pay-item {{payType==='balance'?'active':''}}" bindtap="setPay" data-type="balance">余额支付</view>
+      <view
+        class="pay-item {{payType==='balance'?'active':''}}"
+        wx:if="{{!benefitsIsolated}}"
+        bindtap="setPay"
+        data-type="balance"
+      >余额支付</view>
       <view class="pay-item {{payType==='period_card'?'active':''}}" wx:if="{{usableCards.length}}" bindtap="setPay" data-type="period_card">期限卡</view>
     </view>
+    <view class="field-hint" wx:if="{{benefitsIsolated}}" style="padding:0 24rpx 12rpx;color:#888;font-size:24rpx;">本店仅支持微信支付与本店期限卡</view>
 
     <picker wx:if="{{payType==='period_card' && usableCards.length}}" mode="selector" range="{{usableCards}}" range-key="card_name" bindchange="selectCard">
       <view class="picker-row">{{selectedCardName || '选择期限卡'}}</view>

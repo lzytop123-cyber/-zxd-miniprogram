@@ -33,6 +33,11 @@ class PermissionCatalogTests(unittest.TestCase):
     def test_path_maps_receipts(self):
         self.assertEqual(module_for_admin_path("GET", "/api/admin/receipts/summary"), "receipts")
 
+    def test_store_directory_read_does_not_require_store_management(self):
+        self.assertIsNone(module_for_admin_path("GET", "/api/admin/stores"))
+        self.assertEqual(module_for_admin_path("POST", "/api/admin/stores"), "stores")
+        self.assertEqual(module_for_admin_path("PUT", "/api/admin/stores/2"), "stores")
+
     def test_path_maps_store_expiring_cards_to_live_board(self):
         self.assertEqual(
             module_for_admin_path("GET", "/api/admin/stores/1/expiring-cards"),

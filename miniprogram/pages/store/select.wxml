@@ -1,0 +1,40 @@
+<view class="store-select-page">
+  <view class="location-hint" wx:if="{{locationHint && !loading && !loadError}}" bindtap="openLocationSetting">
+    <view class="mi-glyph icon-map-pin location-icon"></view>
+    <text class="location-copy">{{locationHint}}</text>
+    <text class="location-action">{{locationHint === '开启定位可查看距离' ? '去设置 ›' : '重试 ›'}}</text>
+  </view>
+
+  <block wx:if="{{loading}}">
+    <view class="loading-card" wx:for="{{[1, 2]}}" wx:key="*this">
+      <view class="loading-cover"></view>
+      <view class="loading-lines">
+        <view class="loading-line loading-line--title"></view>
+        <view class="loading-line"></view>
+        <view class="loading-line loading-line--short"></view>
+      </view>
+    </view>
+  </block>
+
+  <view class="state" wx:elif="{{loadError}}">
+    <view class="state-title">暂时没能找到门店</view>
+    <view class="state-copy">{{loadError}}</view>
+    <button class="retry-button" bindtap="loadStores">重新加载</button>
+  </view>
+
+  <view class="state" wx:elif="{{!stores.length}}">
+    <view class="state-title">暂无可预约门店</view>
+    <view class="state-copy">请稍后再来看看</view>
+  </view>
+
+  <block wx:else>
+    <view class="list-heading">附近门店 <text>共 {{stores.length}} 家</text></view>
+    <store-card
+      wx:for="{{stores}}"
+      wx:key="id"
+      store="{{item}}"
+      showLocationHint="{{!!locationHint}}"
+      bind:select="selectStore"
+    />
+  </block>
+</view>

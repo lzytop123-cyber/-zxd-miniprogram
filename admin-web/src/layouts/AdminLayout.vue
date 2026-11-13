@@ -140,8 +140,8 @@ import {
   Menu, Monitor, Reading, Search, Setting, ShoppingBag, SwitchButton,
   Ticket, TrendCharts, User, Wallet, Warning,
 } from '@element-plus/icons-vue'
-import { adminSessionTick, canAccessPath, clearAdminSession, isHqAdmin } from '../utils/adminAuth'
-import { getWorkingStoreId, setWorkingStoreId } from '../utils/workingStore'
+import { adminSessionTick, canAccessPath, clearAdminSession, isHqAdmin, setAdminPermissions } from '../utils/adminAuth'
+import { getWorkingStoreId, onWorkingStoreChange, setWorkingStoreId } from '../utils/workingStore'
 import http from '../api/http'
 
 const route = useRoute()
@@ -156,14 +156,17 @@ const macLike = /Mac|iPhone|iPad/.test(navigator.platform)
 const isHq = computed(() => isHqAdmin())
 const storeOptions = ref<{ id: number; name: string }[]>([])
 const workingStore = ref<number>(0)
-const boundStoreName = computed(() => localStorage.getItem('admin_store_name') || '')
+const boundStoreName = computed(() => {
+  void adminSessionTick.value
+  return storeOptions.value.find((store) => store.id === getWorkingStoreId())?.name
+    || localStorage.getItem('admin_store_name') || ''
+})
 
 function onWorkingStorePick(val: number) {
   setWorkingStoreId(val === 0 ? null : val)
 }
 
 async function loadStoreOptions() {
-  if (!isHqAdmin()) return
   try {
     const res = await http.get('/admin/stores')
     storeOptions.value = res.data || []
@@ -176,7 +179,7 @@ async function loadStoreOptions() {
 
 const roleLabel = computed(() => {
   if (isHqAdmin()) return '总部'
-  const name = localStorage.getItem('admin_store_name')
+  const name = boundStoreName.value
   return name ? `店长 · ${name}` : '店长'
 })
 
@@ -317,11 +320,28 @@ function onKey(e: KeyboardEvent) {
   if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); openSearch() }
   if (e.key === 'Escape' && searchOpen.value) searchOpen.value = false
 }
+async function refreshSessionPermissions() {
+  try {
+    const res = await http.get('/admin/me')
+    if (Array.isArray(res.data?.permissions)) {
+      setAdminPermissions(res.data.permissions)
+    }
+  } catch {
+    /* keep cached permissions */
+  }
+}
+
+let stopWorkingStoreSync: (() => void) | undefined
 onMounted(() => {
   window.addEventListener('keydown', onKey)
+  stopWorkingStoreSync = onWorkingStoreChange((id) => { workingStore.value = id || 0 })
   void loadStoreOptions()
+  void refreshSessionPermissions()
 })
-onUnmounted(() => window.removeEventListener('keydown', onKey))
+onUnmounted(() => {
+  window.removeEventListener('keydown', onKey)
+  stopWorkingStoreSync?.()
+})
 </script>
 
 <style scoped>

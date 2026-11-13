@@ -2,6 +2,8 @@ const { request, formatRequestError } = require('../../utils/request')
 const auth = require('../../utils/auth')
 const routes = require('../../utils/routes')
 const { getLayout } = require('../../utils/seat-layout')
+const { seatDisplayImage } = require('../../utils/seat-map-image')
+const { resolveStaticUrl } = require('../../config')
 const { debounce } = require('./utils/debounce')
 const {
   dailyPassDays,
@@ -171,6 +173,11 @@ Page({
     previewLoading: false,
     seatTipDismissed: false,
     showSeatMap: false,
+    seatMapMode: 'legacy',
+    seatMapImage: '',
+    seatMapMarkers: [],
+    seatMapAspect: 1.4,
+    seatMapReady: true,
     userCards: [],
     activePeriodCard: null,
     periodCardHint: '',
@@ -220,14 +227,21 @@ Page({
       quickHours: 2,
       planSeatCount: this._layout.planSeatCount,
       showSeatMap: true,
+      seats: [],
+      seatMapMode: 'legacy',
+      seatMapImage: '',
+      seatMapMarkers: [],
+      seatMapReady: false,
       ...this._typeUiPatch(options.billType || 'hourly', false),
     }, () => {
-      const billType = options.billType || this.data.billType || 'hourly'
-      if (billType !== 'hourly') {
-        this.switchType({ currentTarget: { dataset: { type: billType } } })
-      } else {
-        this.refreshPreview({ immediate: true })
-      }
+      this._loadSeatMap(options.storeId).then(() => {
+        const billType = options.billType || this.data.billType || 'hourly'
+        if (billType !== 'hourly') {
+          this.switchType({ currentTarget: { dataset: { type: billType } } })
+        } else {
+          this.refreshPreview({ immediate: true })
+        }
+      })
     })
 
     request({ url: `/store/${options.storeId}`, silent: true }).then((s) => {
@@ -1036,10 +1050,62 @@ Page({
     return Promise.all([seatPromise, previewPromise])
   },
 
+  _loadSeatMap(storeId) {
+    return request({ url: `/store/${storeId}/seat-map`, silent: true, force: true })
+      .then((data) => {
+        if (Number(this.data.storeId) !== Number(storeId)) return
+        const mode = (data && data.mode) || 'legacy'
+        if (mode === 'image') {
+          const published = !!(data && data.published && data.image_url && (data.markers || []).length)
+          this.setData({
+            seatMapMode: 'image',
+            seatMapImage: published ? resolveStaticUrl(data.image_url) : '',
+            seatMapMarkers: published ? (data.markers || []) : [],
+            seatMapAspect: Number(data.aspect_ratio) || 1.4,
+            seatMapReady: published,
+            planSeatCount: published ? (data.markers || []).length : 0,
+            seatLoadError: published ? '' : '本店座位图尚未发布，暂不可预约',
+            showSeatMap: published,
+          })
+        } else {
+          this.setData({
+            seatMapMode: 'legacy',
+            seatMapImage: '',
+            seatMapMarkers: [],
+            seatMapReady: true,
+            planSeatCount: this._layout.planSeatCount,
+            seatLoadError: '',
+          })
+        }
+      })
+      .catch(() => {
+        if (Number(this.data.storeId) !== Number(storeId)) return
+        this.setData({
+          seatMapMode: 'legacy',
+          seatMapReady: true,
+          planSeatCount: this._layout.planSeatCount,
+        })
+      })
+  },
+
   loadSeats(start, end, options = {}) {
     const { force = false } = options
-    const { storeId } = this.data
+    const { storeId, seatMapMode, seatMapReady } = this.data
     if (!storeId) return Promise.resolve()
+    // Pricing can trigger a refresh before the store's map mode has loaded.
+    // Wait for onLoad's map callback so image seats never use the legacy 28-slot layout.
+    if (!seatMapReady && seatMapMode === 'legacy') return Promise.resolve()
+    if (seatMapMode === 'image' && !seatMapReady) {
+      this.setData({
+        seats: [],
+        seatGroups: [],
+        availableSeatCount: 0,
+        seatsLoading: false,
+        seatLoadError: '本店座位图尚未发布，暂不可预约',
+        showSeatMap: false,
+      })
+      return Promise.resolve()
+    }
 
     const range = `${start}~${end}`
     if (!force && range === this._seatRange && this._hasSeatAvailability()) {
@@ -1062,19 +1128,28 @@ Page({
     })
       .then((seats) => {
         if (requestId !== this._seatRequestId) return
-        const applied = this._layout.applySeats(seats)
-        // 只统计平面图 1–28（避免旧 A01 与新编号并存时虚高到 50+）
-        const availableSlots = new Set()
-        applied.forEach((s) => {
-          if (s.status === 'available' && s.map_slot) availableSlots.add(s.map_slot)
-        })
-        const availableSeatCount = availableSlots.size
+        const imageMode = this.data.seatMapMode === 'image'
+        const applied = imageMode
+          ? (seats || []).map((s) => ({ ...s, map_label: s.seat_code, map_slot: s.id }))
+          : this._layout.applySeats(seats)
+        // legacy：只统计平面图 1–28；image：按本店已发布座位
+        let availableSeatCount = 0
+        if (imageMode) {
+          availableSeatCount = applied.filter((s) => s.status === 'available').length
+        } else {
+          const availableSlots = new Set()
+          applied.forEach((s) => {
+            if (s.status === 'available' && s.map_slot) availableSlots.add(s.map_slot)
+          })
+          availableSeatCount = availableSlots.size
+        }
         const patch = {
           seats: applied,
           seatGroups: this.buildSeatGroups(applied),
           availableSeatCount,
           seatsLoading: false,
           seatLoadError: '',
+          showSeatMap: true,
         }
         if (this.data.seatId) {
           const current = applied.find((s) => s.id === this.data.seatId)
@@ -1107,12 +1182,19 @@ Page({
       })
   },
 
+  _seatDisplay(seat) {
+    if (this.data.seatMapMode === 'image') {
+      return seatDisplayImage(seat, this.data.seatMapMarkers)
+    }
+    return this._layout.seatDisplay(seat)
+  },
+
   buildSeatGroups(seats) {
     const groups = []
     const byName = new Map()
     ;(seats || []).forEach((seat) => {
       if (!seat || seat.status !== 'available') return
-      const display = this._layout.seatDisplay(seat)
+      const display = this._seatDisplay(seat)
       const name = display.zoneName || '其他区域'
       let group = byName.get(name)
       if (!group) {
@@ -1154,7 +1236,7 @@ Page({
       return
     }
     const seat = this.data.seats.find((s) => s.id === Number(id))
-    const display = this._layout.seatDisplay(seat)
+    const display = this._seatDisplay(seat)
     const patch = {
       seatId: Number(id),
       seatCode: code,

@@ -15,6 +15,7 @@ from app.models import (
     MeituanOrder,
     MeituanOrderStatus,
     PeriodCard,
+    Store,
     User,
 )
 from app.schemas.common import ResponseModel
@@ -34,7 +35,11 @@ from app.services.yunlaoban import YunlaobanService, parse_voucher_expire_date
 router = APIRouter(prefix="/exchange", tags=["兑换"])
 
 
-async def _prepare(platform: int, code: str) -> tuple[dict, dict | None]:
+async def _prepare(
+    platform: int,
+    code: str,
+    shop_id: str | None = None,
+) -> tuple[dict, dict | None]:
     """验券准备（不核销）。返回 (yunlaoban 形态 prepared, 抖音原始 prepared 或 None)。"""
     if platform == 2 and use_douyin_official():
         import httpx
@@ -49,11 +54,17 @@ async def _prepare(platform: int, code: str) -> tuple[dict, dict | None]:
             "ticketData": raw.get("ticketData") or {},
         }
         return shape, raw
-    prepared = await YunlaobanService.prepare(platform, code)
+    prepared = await YunlaobanService.prepare(platform, code, shop_id=shop_id)
     return prepared, None
 
 
-async def _consume(platform: int, code: str, prepared: dict, douyin_raw: dict | None) -> str:
+async def _consume(
+    platform: int,
+    code: str,
+    prepared: dict,
+    douyin_raw: dict | None,
+    shop_id: str | None = None,
+) -> str:
     """正式核销。"""
     if platform == 2 and use_douyin_official():
         import httpx
@@ -65,7 +76,9 @@ async def _consume(platform: int, code: str, prepared: dict, douyin_raw: dict | 
         async with httpx.AsyncClient(timeout=timeout) as client:
             verified = await DouyinService._verify_with_client(client, douyin_raw)
         return json.dumps(verified, ensure_ascii=False)
-    return await YunlaobanService.consume(platform, code, prepared["ticketInfo"])
+    return await YunlaobanService.consume(
+        platform, code, prepared["ticketInfo"], shop_id=shop_id
+    )
 
 
 def _parse_voucher_expire(ticket_data: dict | None, platform: int):
@@ -121,6 +134,13 @@ async def _exchange(
     source: CardSource,
 ):
     code = body.code.strip()
+    if not body.store_id:
+        raise HTTPException(status_code=400, detail="请选择门店后再兑换")
+    store = db.get(Store, body.store_id)
+    if not store or store.status != 1:
+        raise HTTPException(status_code=404, detail="门店不存在或已停业")
+    # 云老板：本店 meituan_shop_id 优先，否则用全局默认（老店兼容）
+    yunlaoban_shop_id = (store.meituan_shop_id or "").strip() or None
     existing = db.scalar(select(MeituanOrder).where(MeituanOrder.coupon_code == code))
     if existing and existing.status == MeituanOrderStatus.verified:
         raise HTTPException(status_code=400, detail="该券码已兑换")
@@ -144,7 +164,7 @@ async def _exchange(
 
     # 1) 仅 prepare，拿到 deal 信息后再决定是否正式核销（避免限兑用户把券核废）
     try:
-        prepared, douyin_raw = await _prepare(platform, code)
+        prepared, douyin_raw = await _prepare(platform, code, shop_id=yunlaoban_shop_id)
     except ValueError as e:
         db.delete(order)
         db.commit()
@@ -157,6 +177,10 @@ async def _exchange(
     deal_id = str((prepared.get("ticketData") or {}).get("dealId", ""))
     ticket_name = prepared.get("ticketName") or (prepared.get("ticketData") or {}).get("dealTitle", "")
     mapping = get_mapping_by_deal_id(db, deal_id)
+    if mapping and mapping.store_id and mapping.store_id != body.store_id:
+        db.delete(order)
+        db.commit()
+        raise HTTPException(status_code=400, detail="该团购券不适用于当前门店，请切换到对应门店兑换")
     if not mapping:
         reward_type, reward_value = guess_reward_from_name(ticket_name)
         mapping = MeituanDealMapping(
@@ -199,9 +223,11 @@ async def _exchange(
                 detail="该优惠每人限兑 1 次，您已兑换过。换手机号购买的券也无法重复兑换到同一微信账号。",
             )
 
-    # 2) 正式核销
+    # 2) 正式核销（须与 prepare 使用同一 shopId）
     try:
-        consume_result = await _consume(platform, code, prepared, douyin_raw)
+        consume_result = await _consume(
+            platform, code, prepared, douyin_raw, shop_id=yunlaoban_shop_id
+        )
     except ValueError as e:
         db.delete(order)
         db.commit()

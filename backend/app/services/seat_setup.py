@@ -95,6 +95,8 @@ def _sort_seats(seats: list[Seat]) -> list[Seat]:
 
 def ensure_store_seats(db: Session, store: Store) -> int:
     """补全门店 1–28 号座位（已有则同步区域与坐标；停用旧 A01 等编号）。"""
+    if getattr(store, "seat_map_mode", "legacy") != "legacy":
+        return 0
     zones: dict[str, Zone] = {}
     for zone_name in ZONE_ORDER:
         zone = db.scalar(select(Zone).where(Zone.store_id == store.id, Zone.name == zone_name))
@@ -210,8 +212,6 @@ def store_seat_summary(db: Session, store_id: int) -> dict:
     if not store:
         raise ValueError("门店不存在")
 
-    expected = expected_seat_codes()
-    expected_set = set(expected)
     seats = _sort_seats(
         list(
             db.scalars(
@@ -219,6 +219,28 @@ def store_seat_summary(db: Session, store_id: int) -> dict:
             ).all()
         )
     )
+    mode = getattr(store, "seat_map_mode", "legacy") or "legacy"
+    if mode == "image":
+        from app.services.store_seat_maps import get_published_map, published_image_seat_ids
+
+        enabled = sum(1 for s in seats if s.status == 1)
+        pub_ids = published_image_seat_ids(db, store_id)
+        published = get_published_map(db, store_id)
+        return {
+            "store_id": store_id,
+            "store_name": store.name,
+            "seat_map_mode": mode,
+            "expected_count": len(pub_ids) or enabled,
+            "actual_count": len(seats),
+            "enabled_count": enabled,
+            "published_marker_count": len(pub_ids),
+            "has_published_map": bool(published),
+            "missing_codes": [],
+            "is_complete": bool(published) and len(pub_ids) > 0,
+        }
+
+    expected = expected_seat_codes()
+    expected_set = set(expected)
     plan_seats = [s for s in seats if s.seat_code in expected_set]
     codes = {s.seat_code for s in plan_seats}
     missing = [c for c in expected if c not in codes]
@@ -227,6 +249,7 @@ def store_seat_summary(db: Session, store_id: int) -> dict:
     return {
         "store_id": store_id,
         "store_name": store.name,
+        "seat_map_mode": mode,
         "expected_count": EXPECTED_SEAT_COUNT,
         "actual_count": len(plan_seats),
         "enabled_count": enabled,

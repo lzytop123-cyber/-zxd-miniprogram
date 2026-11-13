@@ -83,7 +83,7 @@
       </template>
     </el-dialog>
 
-    <el-dialog v-model="copyVisible" title="复制定价到其他门店" width="420px">
+    <el-dialog v-model="copyVisible" :title="`从「${storeLabel}」复制定价`" width="420px">
       <el-form label-width="100px">
         <el-form-item label="源门店">
           <el-input :model-value="stores.find(s => s.id === storeId)?.name || ''" disabled />
@@ -114,6 +114,8 @@
 import { computed, onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import http from '../api/http'
+import { useRequiredStoreId } from '../composables/useWorkingStore'
+import { resolveRequiredStoreId } from '../utils/workingStore'
 
 const billTypes = [
   { value: 'hourly', label: '按小时' },
@@ -141,7 +143,8 @@ const copyOverwrite = ref(false)
 const copying = ref(false)
 const form = reactive<any>({})
 
-const dialogTitle = computed(() => (editingId.value ? '编辑价格规则' : '新增价格规则'))
+const storeLabel = computed(() => stores.value.find((store) => store.id === storeId.value)?.name || `门店 #${storeId.value}`)
+const dialogTitle = computed(() => `${editingId.value ? '编辑价格规则' : '新增价格规则'} · ${storeLabel.value}`)
 
 function billLabel(v: string) {
   return billLabelMap[v] || v
@@ -166,19 +169,26 @@ function resetForm() {
 async function loadStores() {
   const res = await http.get('/admin/stores')
   stores.value = res.data
-  if (!storeId.value && stores.value.length) {
-    storeId.value = stores.value[0].id
-  }
+  storeId.value = resolveRequiredStoreId(stores.value[0]?.id)
 }
 
+useRequiredStoreId(storeId, () => stores.value[0]?.id, load)
+
+let pricingRequest = 0
 async function load() {
-  if (!storeId.value) return
+  const id = storeId.value
+  if (!id) return
+  const requestId = ++pricingRequest
+  list.value = []
+  showDialog.value = false
+  copyVisible.value = false
   loading.value = true
   try {
-    const res = await http.get(`/admin/stores/${storeId.value}/pricing`)
+    const res = await http.get(`/admin/stores/${id}/pricing`)
+    if (requestId !== pricingRequest || id !== storeId.value) return
     list.value = res.data
   } finally {
-    loading.value = false
+    if (requestId === pricingRequest) loading.value = false
   }
 }
 
@@ -264,7 +274,9 @@ async function submitCopy() {
 }
 
 async function removeRule(row: any) {
-  await ElMessageBox.confirm(`确定删除「${billLabel(row.bill_type)} / ${row.seat_type}」价格规则吗？`, '删除确认', { type: 'warning' })
+  const id = storeId.value
+  await ElMessageBox.confirm(`确定删除「${storeLabel.value}」的「${billLabel(row.bill_type)} / ${row.seat_type}」价格规则吗？`, '删除确认', { type: 'warning' })
+  if (id !== storeId.value) return
   await http.delete(`/admin/pricing/${row.id}`)
   ElMessage.success('已删除')
   load()

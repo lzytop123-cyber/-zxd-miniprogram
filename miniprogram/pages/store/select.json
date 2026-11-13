@@ -1,0 +1,8 @@
+{
+  "usingComponents": {
+    "store-card": "../../components/store-card/index"
+  },
+  "navigationBarTitleText": "选择自习室",
+  "enablePullDownRefresh": true,
+  "backgroundTextStyle": "dark"
+}

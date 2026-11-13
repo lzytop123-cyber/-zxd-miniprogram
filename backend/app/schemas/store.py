@@ -13,6 +13,8 @@ class StoreListItem(BaseModel):
     cover_images: list | None = None
     distance: float | None = None
     status: int
+    benefits_isolated: int = 0
+    seat_map_mode: str = "legacy"
 
     model_config = {"from_attributes": True}
 

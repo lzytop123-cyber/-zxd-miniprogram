@@ -6,7 +6,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy.orm import Session
 
-from app.api.routes import admin, admin_market, admin_tools, admin_wrongbook, assistant, ble, card, exchange, home, market, notifications, payment, report, reservation, store, user, wrongbook
+from app.api.admin_role_guard import AdminRoleGuardMiddleware
+from app.api.routes import admin, admin_market, admin_seat_maps, admin_tools, admin_wrongbook, assistant, ble, card, exchange, home, market, notifications, payment, report, reservation, store, user, wrongbook
 from app.core.config import settings
 from app.db.session import get_db
 from app.services.health import run_health_checks
@@ -48,6 +49,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+app.add_middleware(AdminRoleGuardMiddleware)
 
 app.include_router(user.router, prefix="/api")
 app.include_router(store.router, prefix="/api")
@@ -62,6 +64,7 @@ app.include_router(home.router, prefix="/api")
 app.include_router(market.router, prefix="/api")
 app.include_router(wrongbook.router, prefix="/api")
 app.include_router(admin.router, prefix="/api")
+app.include_router(admin_seat_maps.router, prefix="/api")
 app.include_router(admin_market.router, prefix="/api")
 app.include_router(admin_tools.router, prefix="/api")
 app.include_router(admin_wrongbook.router, prefix="/api")

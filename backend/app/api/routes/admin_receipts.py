@@ -15,6 +15,7 @@ from app.db.session import get_db
 from app.models import AdminUser, MeituanOrder
 from app.models.receipts import Receipt, ReceiptRefund
 from app.schemas.common import PageResult, ResponseModel
+from app.services.admin_access import scope_store_id
 from app.services.admin_audit import log_admin_action
 from app.services import receipts as svc
 from app.services import platform_receipts as platform_svc
@@ -85,16 +86,30 @@ def refund_retry(row: ReceiptRefund, receipt: Receipt, body: RefundBody):
 @router.get("/summary", response_model=ResponseModel)
 def summary(
     year: int = Query(..., ge=2000, le=9998), month: int | None = Query(None, ge=1, le=12),
-    channel: Channel | None = None, _: AdminUser = Depends(get_current_admin), db: Session = Depends(get_db),
+    channel: Channel | None = None, store_id: int | None = None,
+    admin: AdminUser = Depends(get_current_admin), db: Session = Depends(get_db),
 ):
+    sid = scope_store_id(admin, store_id)
     start, end = svc.period(year, month)
+    missing_q = select(func.count()).select_from(Receipt).where(Receipt.received_on.is_(None))
+    review_q = select(func.count()).select_from(Receipt).where(
+        Receipt.source_refunded == True, Receipt.refunded_amount < Receipt.amount
+    )
+    missing_q = svc.apply_store_scope(missing_q, sid)
+    review_q = svc.apply_store_scope(review_q, sid)
+    platforms = platform_svc.candidates(db)
+    if sid:
+        platforms = [item for item in platforms if item.get("store_id") == sid]
     return ResponseModel(data={
-        "month": svc.totals(db, start, end, channel),
-        "year": svc.totals(db, *svc.period(year), channel),
-        "channels": [{"channel": key, **svc.totals(db, start, end, key)} for key in svc.CHANNELS if not channel or key == channel],
-        "missing_dates": db.scalar(select(func.count()).select_from(Receipt).where(Receipt.received_on.is_(None))) or 0,
-        "refunds_to_review": db.scalar(select(func.count()).select_from(Receipt).where(Receipt.source_refunded == True, Receipt.refunded_amount < Receipt.amount)) or 0,
-        "platforms_to_review": len(platform_svc.candidates(db)),
+        "month": svc.totals(db, start, end, channel, sid),
+        "year": svc.totals(db, *svc.period(year), channel, sid),
+        "channels": [
+            {"channel": key, **svc.totals(db, start, end, key, sid)}
+            for key in svc.CHANNELS if not channel or key == channel
+        ],
+        "missing_dates": db.scalar(missing_q) or 0,
+        "refunds_to_review": db.scalar(review_q) or 0,
+        "platforms_to_review": len(platforms),
     })
 
 
@@ -235,11 +250,13 @@ def filtered(query, date_col, year, month, channel, keyword):
 def listing(
     year: int | None = Query(None, ge=2000, le=9998), month: int | None = Query(None, ge=1, le=12),
     channel: Channel | None = None, keyword: str | None = Query(None, max_length=100),
-    needs_date: bool = False, needs_refund: bool = False,
+    needs_date: bool = False, needs_refund: bool = False, store_id: int | None = None,
     page: int = Query(1, ge=1), page_size: int = Query(20, ge=1, le=100),
-    _: AdminUser = Depends(get_current_admin), db: Session = Depends(get_db),
+    admin: AdminUser = Depends(get_current_admin), db: Session = Depends(get_db),
 ):
+    sid = scope_store_id(admin, store_id)
     query = filtered(select(Receipt), Receipt.received_on, None if needs_date else year, None if needs_date else month, channel, keyword)
+    query = svc.apply_store_scope(query, sid)
     if needs_date:
         query = query.where(Receipt.received_on.is_(None))
     if needs_refund:
@@ -253,10 +270,13 @@ def listing(
 def refunds(
     year: int | None = Query(None, ge=2000, le=9998), month: int | None = Query(None, ge=1, le=12),
     channel: Channel | None = None, keyword: str | None = Query(None, max_length=100),
-    receipt_id: int | None = None, page: int = Query(1, ge=1), page_size: int = Query(20, ge=1, le=100),
-    _: AdminUser = Depends(get_current_admin), db: Session = Depends(get_db),
+    receipt_id: int | None = None, store_id: int | None = None,
+    page: int = Query(1, ge=1), page_size: int = Query(20, ge=1, le=100),
+    admin: AdminUser = Depends(get_current_admin), db: Session = Depends(get_db),
 ):
+    sid = scope_store_id(admin, store_id)
     query = filtered(select(ReceiptRefund, Receipt).join(Receipt), ReceiptRefund.refunded_on, year, month, channel, keyword)
+    query = svc.apply_store_scope(query, sid)
     if receipt_id:
         query = query.where(ReceiptRefund.receipt_id == receipt_id)
     count = db.scalar(select(func.count()).select_from(query.subquery()))

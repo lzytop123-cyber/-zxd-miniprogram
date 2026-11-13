@@ -34,6 +34,7 @@ from app.core.static_url import public_static_path, public_static_url
 from app.core.security import create_access_token, hash_password, verify_password
 from app.db.session import get_db
 from app.models import (
+    AdminOperationLog,
     AdminUser,
     AssistantChatLog,
     AssistantUsageDaily,
@@ -201,6 +202,7 @@ def admin_reservations(
     page_size: int = Query(20, ge=1, le=100),
     store_id: int | None = None,
     pay_status: int | None = None,
+    refund_pending: bool = False,
     status: int | None = None,
     order_no: str | None = None,
     user_id: int | None = None,
@@ -213,6 +215,12 @@ def admin_reservations(
         query = query.where(Reservation.store_id == store_id)
     if pay_status is not None:
         query = query.where(Reservation.pay_status == pay_status)
+        if pay_status == 0:
+            query = query.where(or_(Reservation.status != 3, Reservation.paid_at.is_(None)))
+    if refund_pending:
+        query = query.where(
+            Reservation.status == 3, Reservation.pay_status == 0, Reservation.paid_at.is_not(None)
+        )
     if status is not None:
         query = query.where(Reservation.status == status)
     if order_no:
@@ -226,10 +234,18 @@ def admin_reservations(
 
     _sync_reservation_rows_on_read(db, rows)
 
+    refunded_order_nos = [row.order_no for row in rows if row.pay_status == 2]
+    manual_refunds = set(db.scalars(select(AdminOperationLog.target_id).where(
+        AdminOperationLog.action == "mark_refund",
+        AdminOperationLog.target_type == "reservation",
+        AdminOperationLog.target_id.in_(refunded_order_nos),
+    ))) if refunded_order_nos else set()
     items = []
     for r in rows:
         base = _reservation_admin_item(db, r)
         if base:
+            if r.order_no in manual_refunds:
+                base["refund_state"] = "manual"
             items.append(base)
 
     return ResponseModel(
@@ -1042,6 +1058,16 @@ def list_stores_admin(admin: AdminUser = Depends(get_current_admin), db: Session
     if sid:
         q = q.where(Store.id == sid)
     stores = db.scalars(q).all()
+    if not is_hq(admin) and not has_permission(admin, "stores"):
+        return ResponseModel(data=[
+            {
+                "id": store.id,
+                "name": store.name,
+                "seat_map_mode": store.seat_map_mode or "legacy",
+                "status": store.status,
+            }
+            for store in stores
+        ])
     return ResponseModel(data=[_store_to_admin_item(s) for s in stores])
 
 
@@ -1253,6 +1279,13 @@ def _reservation_admin_item(db: Session, r: Reservation) -> dict | None:
     base["user_nickname"] = user.nickname if user else None
     base["user_phone"] = user.phone if user else None
     base["pay_type"] = r.pay_type.value if r.pay_type else None
+    base["refund_remark"] = r.refund_remark
+    base["refund_state"] = (
+        "pending" if r.status == 3 and r.pay_status == 0 and r.paid_at
+        else "wechat_confirmed" if r.pay_status == 2 and r.refund_remark == "预约冲突或取消后到账，已原路退款"
+        else "recorded" if r.pay_status == 2
+        else None
+    )
     return base
 
 

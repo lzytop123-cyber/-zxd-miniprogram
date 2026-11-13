@@ -166,8 +166,9 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, onUnmounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { onWorkingStoreChange, workingStoreParams } from '../utils/workingStore'
 import http from '../api/http'
 
 type Channel = 'meituan' | 'douyin' | 'wechat_pay' | 'wechat_transfer'
@@ -221,7 +222,13 @@ function message(err: any) {
   const detail = err?.response?.data?.detail
   return typeof detail === 'string' ? detail : Array.isArray(detail) ? detail.map((d: any) => d.msg).join('；') : err?.message || '请求失败，请重试'
 }
-function params() { return { year: applied.year, month: applied.month || undefined, channel: applied.channel || undefined } }
+function params() {
+  return workingStoreParams({
+    year: applied.year,
+    month: applied.month || undefined,
+    channel: applied.channel || undefined,
+  })
+}
 let summaryRequest = 0, listRequest = 0
 async function loadSummary() {
   const id = ++summaryRequest
@@ -233,7 +240,9 @@ async function loadSummary() {
 }
 async function loadCurrent() {
   const today = chinaDate()
-  currentSummary.value = (await http.get<Summary>('/admin/receipts/summary', { params: { year: Number(today.slice(0, 4)), month: Number(today.slice(5, 7)) } })).data
+  currentSummary.value = (await http.get<Summary>('/admin/receipts/summary', {
+    params: workingStoreParams({ year: Number(today.slice(0, 4)), month: Number(today.slice(5, 7)) }),
+  })).data
 }
 async function loadList() {
   const id = ++listRequest, currentTab = tab.value
@@ -321,7 +330,12 @@ async function saveDate() {
   try { await http.patch(`/admin/receipts/${activeReceipt.value.id}/date`, { received_on: confirmedDate.value }); dateVisible.value = false; ElMessage.success('收款日期已补全'); await refresh() }
   catch (err) { ElMessage.error(message(err)) } finally { saving.value = false }
 }
-onMounted(refresh)
+let offWorkingStore: (() => void) | undefined
+onMounted(() => {
+  refresh()
+  offWorkingStore = onWorkingStoreChange(() => { page.value = 1; void refresh() })
+})
+onUnmounted(() => offWorkingStore?.())
 </script>
 
 <style scoped>

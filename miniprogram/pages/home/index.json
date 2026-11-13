@@ -1,7 +1,4 @@
 {
-  "usingComponents": {
-    "store-card": "../../components/store-card/index"
-  },
   "navigationBarTitleText": "首页",
   "enablePullDownRefresh": true,
   "backgroundTextStyle": "dark"

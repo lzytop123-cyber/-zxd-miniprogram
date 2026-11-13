@@ -3,6 +3,7 @@ const {
   useProdApi,
   DEV_LAN_HOST,
   DEV_LOCAL_HOST,
+  isWechatDevtools,
 } = require('../config')
 
 const IMAGE_CACHE_META_KEY = 'image_cache_meta_v1'
@@ -71,19 +72,19 @@ function readDiskCache(fullUrl) {
 }
 
 function isLocalPath(url) {
+  if (!url) return true
   return (
-    !url
-    || url.startsWith('wxfile://')
+    url.startsWith('wxfile://')
     || url.startsWith('http://tmp/')
     || url.startsWith('https://tmp/')
-    || (!url.startsWith('http://') && !url.startsWith('https://'))
   )
 }
 
-/** 生产 HTTPS 在真机可直接用于 <image>（需配置 downloadFile 域名） */
+/** 开发者工具可直接用 http(s)；真机生产环境用 https（需配置 download 域名） */
 function canUseRemoteDirectly(url) {
-  if (!url.startsWith('https://')) return false
-  return useProdApi()
+  if (!url.startsWith('http://') && !url.startsWith('https://')) return false
+  if (isWechatDevtools()) return true
+  return url.startsWith('https://') && useProdApi()
 }
 
 function downloadHttpsImage(fullUrl) {
@@ -138,6 +139,7 @@ function downloadViaRequest(fullUrl) {
         fs.writeFile({
           filePath: target,
           data: res.data,
+          encoding: 'binary',
           success() {
             markDiskCache(fullUrl, target)
             resolve(target)
@@ -249,15 +251,19 @@ async function resolveStoreList(stores) {
   return Promise.all(
     list.map(async (store) => {
       if (!store?.cover_images?.length) return store
-      try {
-        const cover_images = await Promise.all(
-          store.cover_images.map((url) => resolveImageForDisplay(url))
-        )
-        return { ...store, cover_images }
-      } catch (err) {
-        console.error('[media] store cover fail', store.id, err)
-        return store
-      }
+      const cover_images = await Promise.all(
+        store.cover_images.map(async (url) => {
+          const full = resolveStaticUrl(url)
+          if (!full) return ''
+          try {
+            return await resolveImageForDisplay(full)
+          } catch (err) {
+            console.error('[media] store cover fail', store.id, err)
+            return full
+          }
+        })
+      )
+      return { ...store, cover_images: cover_images.filter(Boolean) }
     })
   )
 }

@@ -31,6 +31,7 @@ from app.models import (
     RechargeOrder,
     Reservation,
     RewardType,
+    Store,
     StudyStat,
     User,
     WalletLog,
@@ -83,6 +84,7 @@ CARD_TYPE_TO_REWARD: dict[CardType, RewardType] = {
 def period_card_admin_dict(db: Session, card: PeriodCard, today: date | None = None) -> dict:
     today = today or date.today()
     user = db.get(User, card.user_id)
+    store = db.get(Store, card.store_id) if card.store_id else None
     validity = card_validity_api_fields(card, today)
     span = period_pass_days(card) or None
     face = card_face_validity_days(card)
@@ -92,6 +94,7 @@ def period_card_admin_dict(db: Session, card: PeriodCard, today: date | None = N
         "user_nickname": user.nickname if user else None,
         "user_phone": user.phone if user else None,
         "store_id": card.store_id,
+        "store_name": store.name if store else None,
         "card_name": card.card_name,
         "card_type": card.card_type.value,
         "remaining_hours": float(card.remaining_hours) if card.remaining_hours is not None else None,
@@ -306,6 +309,9 @@ def user_overview(db: Session, user_id: int) -> dict:
             }
         )
 
+    store_ids = {e.store_id for e in exchanges if e.store_id}
+    stores = {s.id: s.name for s in db.scalars(select(Store).where(Store.id.in_(store_ids))).all()} if store_ids else {}
+
     return {
         "orders": order_items,
         "cards": card_items,
@@ -315,6 +321,8 @@ def user_overview(db: Session, user_id: int) -> dict:
                 "coupon_code": e.coupon_code,
                 "deal_name": e.deal_name,
                 "status": e.status.value if e.status else None,
+                "store_id": e.store_id,
+                "store_name": stores.get(e.store_id) if e.store_id else None,
                 "created_at": e.created_at.isoformat() if e.created_at else None,
             }
             for e in exchanges

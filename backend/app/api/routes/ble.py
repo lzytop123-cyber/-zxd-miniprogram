@@ -6,6 +6,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_admin, get_current_user
+from app.services.admin_access import assert_store_access, scope_store_id
 from app.core.redis_client import cache_get
 from app.db.session import get_db
 from app.models import BleBatteryAlert, BleKey, BleLock, DoorLog, OpenType, Reservation, User
@@ -223,9 +224,10 @@ def _lock_to_dict(lock: BleLock) -> dict:
 @router.get("/admin/locks", response_model=ResponseModel)
 def admin_list_locks(
     store_id: int | None = None,
-    _: object = Depends(get_current_admin),
+    admin=Depends(get_current_admin),
     db: Session = Depends(get_db),
 ):
+    store_id = scope_store_id(admin, store_id)
     query = select(BleLock)
     if store_id:
         query = query.where(BleLock.store_id == store_id)
@@ -244,17 +246,23 @@ _OPEN_TYPE_LABELS = {
 @router.get("/admin/door-logs", response_model=ResponseModel)
 def admin_list_door_logs(
     lock_id: int | None = None,
+    store_id: int | None = None,
     result: int | None = Query(None, description="1成功 0失败"),
     date_from: str | None = Query(None, description="YYYY-MM-DD"),
     date_to: str | None = Query(None, description="YYYY-MM-DD"),
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
-    _: object = Depends(get_current_admin),
+    admin=Depends(get_current_admin),
     db: Session = Depends(get_db),
 ):
+    sid = scope_store_id(admin, store_id)
     query = select(DoorLog)
     if lock_id is not None:
         query = query.where(DoorLog.lock_id == lock_id)
+    elif sid:
+        query = query.where(
+            DoorLog.lock_id.in_(select(BleLock.id).where(BleLock.store_id == sid))
+        )
     if result is not None:
         query = query.where(DoorLog.result == result)
     if date_from:
@@ -307,9 +315,10 @@ def admin_list_door_logs(
 @router.post("/admin/locks", response_model=ResponseModel)
 def admin_create_lock(
     body: BleLockCreate,
-    _: object = Depends(get_current_admin),
+    admin=Depends(get_current_admin),
     db: Session = Depends(get_db),
 ):
+    assert_store_access(admin, body.store_id)
     lock = BleLock(**body.model_dump())
     db.add(lock)
     db.commit()
@@ -321,12 +330,13 @@ def admin_create_lock(
 def admin_update_lock(
     lock_id: int,
     body: BleLockUpdate,
-    _: object = Depends(get_current_admin),
+    admin=Depends(get_current_admin),
     db: Session = Depends(get_db),
 ):
     lock = db.get(BleLock, lock_id)
     if not lock:
         raise HTTPException(status_code=404, detail="门锁不存在")
+    assert_store_access(admin, lock.store_id)
     for field, value in body.model_dump(exclude_unset=True).items():
         setattr(lock, field, value)
     db.commit()
@@ -335,13 +345,14 @@ def admin_update_lock(
 
 
 @router.get("/admin/locks/alerts", response_model=ResponseModel)
-def admin_lock_alerts(_: object = Depends(get_current_admin), db: Session = Depends(get_db)):
-    rows = db.scalars(
-        select(BleBatteryAlert)
-        .where(BleBatteryAlert.is_read == 0)
-        .order_by(BleBatteryAlert.created_at.desc())
-        .limit(20)
-    ).all()
+def admin_lock_alerts(store_id: int | None = None, admin=Depends(get_current_admin), db: Session = Depends(get_db)):
+    store_id = scope_store_id(admin, store_id)
+    query = select(BleBatteryAlert).where(BleBatteryAlert.is_read == 0)
+    if store_id is not None:
+        query = query.where(
+            BleBatteryAlert.lock_id.in_(select(BleLock.id).where(BleLock.store_id == store_id))
+        )
+    rows = db.scalars(query.order_by(BleBatteryAlert.created_at.desc()).limit(20)).all()
     data = []
     for alert in rows:
         lock = db.get(BleLock, alert.lock_id)
@@ -361,12 +372,14 @@ def admin_lock_alerts(_: object = Depends(get_current_admin), db: Session = Depe
 @router.post("/admin/locks/alerts/{alert_id}/read", response_model=ResponseModel)
 def read_lock_alert(
     alert_id: int,
-    _: object = Depends(get_current_admin),
+    admin=Depends(get_current_admin),
     db: Session = Depends(get_db),
 ):
     alert = db.get(BleBatteryAlert, alert_id)
     if not alert:
         raise HTTPException(status_code=404, detail="告警不存在")
+    lock = db.get(BleLock, alert.lock_id)
+    assert_store_access(admin, lock.store_id if lock else None)
     alert.is_read = 1
     db.commit()
     return ResponseModel(message="已标记已读")
@@ -375,13 +388,14 @@ def read_lock_alert(
 @router.post("/admin/locks/{lock_id}/refresh-battery", response_model=ResponseModel)
 async def refresh_battery(
     lock_id: int,
-    _: object = Depends(get_current_admin),
+    admin=Depends(get_current_admin),
     db: Session = Depends(get_db),
 ):
     lock = db.get(BleLock, lock_id)
     if not lock:
         raise HTTPException(status_code=404, detail="门锁不存在")
     # 生产环境调用 TTLock API 查询电量
+    assert_store_access(admin, lock.store_id)
     lock.battery_level = lock.battery_level or 100
     db.commit()
     return ResponseModel(data={"battery_level": lock.battery_level})

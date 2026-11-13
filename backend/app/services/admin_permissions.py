@@ -135,7 +135,9 @@ def has_permission(admin, key: str) -> bool:
 
 
 def module_for_admin_path(method: str, path: str) -> str | None:
-    del method  # reserved for future method-specific rules
+    # Authenticated pages share this scoped directory for their store selectors.
+    if method.upper() == "GET" and path.rstrip("/") == "/api/admin/stores":
+        return None
     for prefix in _ALWAYS_ALLOWED_PREFIXES:
         if path == prefix or path.startswith(prefix + "/"):
             return None

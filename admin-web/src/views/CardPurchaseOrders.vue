@@ -65,8 +65,9 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, reactive, ref } from 'vue'
+import { onMounted, onUnmounted, reactive, ref } from 'vue'
 import http from '../api/http'
+import { onWorkingStoreChange, workingStoreParams } from '../utils/workingStore'
 
 const payTypeMap: Record<string, string> = {
   wechat: '微信支付',
@@ -91,7 +92,11 @@ const filters = reactive<{ order_no: string; user_id: number | null; pay_status:
 async function load() {
   loading.value = true
   try {
-    const params: Record<string, unknown> = { page: page.value, page_size: 20 }
+    const params: Record<string, unknown> = {
+      page: page.value,
+      page_size: 20,
+      ...workingStoreParams(),
+    }
     if (filters.order_no) params.order_no = filters.order_no
     if (filters.user_id) params.user_id = filters.user_id
     if (filters.pay_status !== null && filters.pay_status !== undefined) params.pay_status = filters.pay_status
@@ -115,7 +120,12 @@ function reset() {
   search()
 }
 
-onMounted(load)
+let offWorkingStore: (() => void) | undefined
+onMounted(() => {
+  load()
+  offWorkingStore = onWorkingStoreChange(() => { page.value = 1; load() })
+})
+onUnmounted(() => offWorkingStore?.())
 </script>
 
 <style scoped>

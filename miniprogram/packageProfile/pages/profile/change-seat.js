@@ -1,5 +1,7 @@
 const { request, invalidateCache } = require('../../../utils/request')
 const { getLayout } = require('../../../utils/seat-layout')
+const { seatDisplayImage } = require('../../../utils/seat-map-image')
+const { resolveStaticUrl } = require('../../../config')
 
 function mapOptionToSeat(opt) {
   let status = 'reserved'
@@ -12,6 +14,7 @@ function mapOptionToSeat(opt) {
     id: opt.id,
     seat_code: opt.seat_code,
     status,
+    zone_name: opt.zone_name,
     _reason: opt.reason,
   }
 }
@@ -30,6 +33,12 @@ Page({
     availableSeatCount: 0,
     pageLoading: true,
     submitting: false,
+    seatMapMode: 'legacy',
+    seatMapImage: '',
+    seatMapMarkers: [],
+    seatMapAspect: 1.4,
+    seatMapReady: true,
+    seatMapError: '',
   },
 
   onLoad(options) {
@@ -44,21 +53,56 @@ Page({
     this.loadOptions()
   },
 
+  _loadSeatMap(storeId) {
+    return request({ url: `/store/${storeId}/seat-map`, silent: true, force: true })
+      .then((data) => {
+        const mode = (data && data.mode) || 'legacy'
+        if (mode === 'image') {
+          const published = !!(data && data.published && data.image_url && (data.markers || []).length)
+          this.setData({
+            seatMapMode: 'image',
+            seatMapImage: published ? resolveStaticUrl(data.image_url) : '',
+            seatMapMarkers: published ? (data.markers || []) : [],
+            seatMapAspect: Number(data.aspect_ratio) || 1.4,
+            seatMapReady: published,
+            planSeatCount: published ? (data.markers || []).length : 0,
+            seatMapError: published ? '' : '本店座位图尚未发布',
+          })
+        } else {
+          this.setData({
+            seatMapMode: 'legacy',
+            seatMapReady: true,
+            planSeatCount: this._layout.planSeatCount,
+            seatMapError: '',
+          })
+        }
+      })
+      .catch(() => {
+        this.setData({ seatMapMode: 'legacy', seatMapReady: true })
+      })
+  },
+
   loadOptions() {
     const { reservationId } = this.data
     this.setData({ pageLoading: true })
     return request({ url: `/reservation/${reservationId}/seat-options`, silent: true })
-      .then((data) => {
+      .then(async (data) => {
+        if (data.store_id) {
+          await this._loadSeatMap(data.store_id)
+        }
         const seats = (data.seats || []).map(mapOptionToSeat)
-        const applied = this._layout.applySeats(seats).map((seat) => {
-          if (seat._reason === '当前座位') {
-            return { ...seat, status: 'occupied' }
-          }
-          if (seat._reason === '时段冲突') {
-            return { ...seat, status: 'reserved' }
-          }
-          return seat
-        })
+        const imageMode = this.data.seatMapMode === 'image'
+        const applied = imageMode
+          ? seats.map((seat) => ({ ...seat, map_label: seat.seat_code, map_slot: seat.id }))
+          : this._layout.applySeats(seats).map((seat) => {
+            if (seat._reason === '当前座位') {
+              return { ...seat, status: 'occupied' }
+            }
+            if (seat._reason === '时段冲突') {
+              return { ...seat, status: 'reserved' }
+            }
+            return seat
+          })
         this.setData({
           currentSeatCode: data.current_seat_code || '',
           orderNo: data.order_no || '',
@@ -86,7 +130,9 @@ Page({
       return
     }
     const seat = this.data.seats.find((s) => s.id === Number(id))
-    const display = this._layout.seatDisplay(seat)
+    const display = this.data.seatMapMode === 'image'
+      ? seatDisplayImage(seat, this.data.seatMapMarkers)
+      : this._layout.seatDisplay(seat)
     this.setData({
       selectedId: Number(id),
       selectedCode: code,

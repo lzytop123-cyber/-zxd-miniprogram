@@ -1,0 +1,23 @@
+
+test_01_foreign_door_logs_leak_via_lock_id_http (__main__.AuditReproductions.test_01_foreign_door_logs_leak_via_lock_id_http) ... F:\zxd-pro\backend\.venv\Lib\site-packages\jose\jwt.py:311: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+  now = timegm(datetime.utcnow().utctimetuple())
+ok
+test_02_user_refund_failure_marked_refunded (__main__.AuditReproductions.test_02_user_refund_failure_marked_refunded) ... ok
+test_03_admin_refund_failure_marked_refunded (__main__.AuditReproductions.test_03_admin_refund_failure_marked_refunded) ... ok
+test_04_one_coupon_discounts_two_orders_without_consumption (__main__.AuditReproductions.test_04_one_coupon_discounts_two_orders_without_consumption) ... ok
+test_05_isolated_store_accepts_discount_if_coupon_omitted_at_pay (__main__.AuditReproductions.test_05_isolated_store_accepts_discount_if_coupon_omitted_at_pay) ... ok
+test_06_monthly_price_buys_365_days (__main__.AuditReproductions.test_06_monthly_price_buys_365_days) ... ok
+test_07_closed_store_and_calendar_closure_do_not_block_booking (__main__.AuditReproductions.test_07_closed_store_and_calendar_closure_do_not_block_booking) ... ok
+test_08_store_specific_hours_ignored (__main__.AuditReproductions.test_08_store_specific_hours_ignored) ... ok
+test_09_one_hour_card_spent_twice_with_stale_sessions (__main__.AuditReproductions.test_09_one_hour_card_spent_twice_with_stale_sessions) ... ok
+test_10_recharge_duplicate_credit_with_stale_sessions (__main__.AuditReproductions.test_10_recharge_duplicate_credit_with_stale_sessions) ... ok
+test_11_payment_success_without_key_has_no_retry (__main__.AuditReproductions.test_11_payment_success_without_key_has_no_retry) ... ok
+test_12_same_order_balance_debited_twice_with_stale_sessions (__main__.AuditReproductions.test_12_same_order_balance_debited_twice_with_stale_sessions) ... ok
+test_13_same_order_balance_refunded_twice_with_stale_sessions (__main__.AuditReproductions.test_13_same_order_balance_refunded_twice_with_stale_sessions) ... ok
+test_14_foreign_platform_review_and_confirm_allowed_http (__main__.AuditReproductions.test_14_foreign_platform_review_and_confirm_allowed_http) ... ok
+test_15_manual_receipt_disappears_from_store_list_http (__main__.AuditReproductions.test_15_manual_receipt_disappears_from_store_list_http) ... ok
+
+----------------------------------------------------------------------
+Ran 15 tests in 0.876s
+
+OK

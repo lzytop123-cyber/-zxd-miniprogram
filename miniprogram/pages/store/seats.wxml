@@ -17,8 +17,13 @@
       </view>
     </view>
 
-    <view class="seat-map-frame seat-map-frame--premium">
+    <view class="seat-map-error" wx:if="{{seatMapError}}">{{seatMapError}}</view>
+    <view class="seat-map-frame seat-map-frame--premium {{seatMapMode==='image'?'seat-map-frame--image':''}}" wx:elif="{{seatMapReady}}">
       <floor-plan-map
+        mode="{{seatMapMode}}"
+        imageUrl="{{seatMapImage}}"
+        aspectRatio="{{seatMapAspect}}"
+        mapMarkers="{{seatMapMarkers}}"
         seats="{{seats}}"
         selectedId="{{selectedId}}"
         bind:select="selectSeat"

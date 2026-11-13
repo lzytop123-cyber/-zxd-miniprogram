@@ -134,6 +134,9 @@
           <el-tab-pane label="订单" name="orders">
             <el-table :data="overview.orders || []" size="small" stripe max-height="360">
               <el-table-column prop="order_no" label="订单号" width="150" />
+              <el-table-column prop="store_name" label="门店" min-width="110" show-overflow-tooltip>
+                <template #default="{ row }">{{ row.store_name || '-' }}</template>
+              </el-table-column>
               <el-table-column prop="seat_code" label="座位" width="70" />
               <el-table-column label="套餐" min-width="100" show-overflow-tooltip>
                 <template #default="{ row }">{{ row.usage_label || row.bill_type_label || row.bill_type }}</template>
@@ -152,6 +155,9 @@
             </div>
             <el-table :data="overview.cards || []" size="small" stripe max-height="360">
               <el-table-column prop="card_name" label="名称" min-width="120" />
+              <el-table-column prop="store_name" label="门店" min-width="100" show-overflow-tooltip>
+                <template #default="{ row }">{{ row.store_name || (row.store_id ? `#${row.store_id}` : '未绑定') }}</template>
+              </el-table-column>
               <el-table-column prop="card_type" label="类型" width="90" />
               <el-table-column label="效期" min-width="160" show-overflow-tooltip>
                 <template #default="{ row }">{{ row.validity_range || (row.start_date && row.end_date ? `${row.start_date} ~ ${row.end_date}` : '-') }}</template>
@@ -172,6 +178,9 @@
           <el-tab-pane label="兑换记录" name="exchanges">
             <el-table :data="overview.exchanges || []" size="small" stripe max-height="360">
               <el-table-column prop="coupon_code" label="券码" width="120" />
+              <el-table-column prop="store_name" label="门店" min-width="100" show-overflow-tooltip>
+                <template #default="{ row }">{{ row.store_name || '-' }}</template>
+              </el-table-column>
               <el-table-column prop="deal_name" label="团购" min-width="140" />
               <el-table-column prop="status" label="状态" width="90" />
               <el-table-column prop="created_at" label="时间" min-width="140" />

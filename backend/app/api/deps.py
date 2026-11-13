@@ -55,3 +55,10 @@ def get_current_admin(
     if not admin or admin.status != 1:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="管理员不存在")
     return admin
+
+
+def require_hq_admin(admin: AdminUser = Depends(get_current_admin)) -> AdminUser:
+    from app.services.admin_access import require_hq
+
+    require_hq(admin)
+    return admin

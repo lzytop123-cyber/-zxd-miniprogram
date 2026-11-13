@@ -165,10 +165,18 @@ def resolve_booking_window(
 
 
 def validate_seat_for_booking(db: Session, seat: Seat | None, store_id: int, start: datetime, end: datetime) -> Seat:
+    from app.models import Store
+    from app.services.store_seat_maps import SeatMapError, assert_seat_bookable
+
     if not seat:
         raise ValueError("请选择座位")
-    if seat.store_id != store_id or seat.is_buffer or seat.status != 1:
-        raise ValueError("座位不可用")
+    store = db.get(Store, store_id)
+    if not store:
+        raise ValueError("门店不存在")
+    try:
+        assert_seat_bookable(db, store, seat)
+    except SeatMapError as e:
+        raise ValueError(str(e)) from e
     conflict = find_seat_conflict(db, seat.id, start, end)
     if conflict:
         raise ValueError("该座位时段已被预约")
@@ -206,8 +214,16 @@ def change_reservation_seat(db: Session, reservation: Reservation, new_seat_id: 
         raise ValueError("目标座位不存在")
     if new_seat.id == reservation.seat_id:
         raise ValueError("已是该座位，无需更换")
-    if new_seat.store_id != reservation.store_id or new_seat.is_buffer or new_seat.status != 1:
-        raise ValueError("目标座位不可用")
+    from app.models import Store
+    from app.services.store_seat_maps import SeatMapError, assert_seat_bookable
+
+    store = db.get(Store, reservation.store_id)
+    if not store:
+        raise ValueError("门店不存在")
+    try:
+        assert_seat_bookable(db, store, new_seat)
+    except SeatMapError as e:
+        raise ValueError(str(e)) from e
 
     conflict = seat_conflict_excluding(
         db,
@@ -287,9 +303,17 @@ def swap_reservation_seats(
 
 
 def seat_options_for_change(db: Session, reservation: Reservation, *, for_admin: bool = False) -> list[dict]:
-    from app.services.seat_setup import expected_seat_codes, seat_code_to_slot, zone_name_by_slot
+    from app.models import Store, Zone
+    from app.services.seat_setup import seat_code_to_slot, zone_name_by_slot
+    from app.services.store_seat_maps import is_image_mode, published_image_seat_ids
 
-    plan_codes = set(expected_seat_codes())
+    store = db.get(Store, reservation.store_id)
+    image_mode = is_image_mode(store)
+    allowed_ids = published_image_seat_ids(db, reservation.store_id) if image_mode else None
+    zone_names = {
+        z.id: z.name
+        for z in db.scalars(select(Zone).where(Zone.store_id == reservation.store_id)).all()
+    }
     seats = sorted(
         db.scalars(
             select(Seat)
@@ -300,9 +324,18 @@ def seat_options_for_change(db: Session, reservation: Reservation, *, for_admin:
 
     options: list[dict] = []
     for seat in seats:
-        if seat.seat_code not in plan_codes:
-            continue
-        zone_name = zone_name_by_slot(seat_code_to_slot(seat.seat_code)) or "-"
+        if image_mode:
+            if allowed_ids is not None and seat.id not in allowed_ids and seat.id != reservation.seat_id:
+                continue
+        else:
+            from app.services.seat_setup import expected_seat_codes
+
+            if seat.seat_code not in set(expected_seat_codes()) and seat.id != reservation.seat_id:
+                continue
+        if image_mode:
+            zone_name = zone_names.get(seat.zone_id) or "-"
+        else:
+            zone_name = zone_name_by_slot(seat_code_to_slot(seat.seat_code)) or zone_names.get(seat.zone_id) or "-"
         base = {
             "id": seat.id,
             "seat_code": seat.seat_code,
@@ -710,10 +743,14 @@ def reservation_status_display(
     now: datetime | None = None,
 ) -> tuple[str, str | None]:
     now = now or datetime.now()
+    if reservation.status == 3:
+        if reservation.pay_status == 2:
+            return "已退款", None
+        if reservation.pay_status == 0 and reservation.paid_at:
+            return "退款待确认", reservation.refund_remark
+        return "已取消", None
     if reservation.pay_status != 1:
         return "待支付", "请完成支付后使用"
-    if reservation.status == 3:
-        return "已取消", None
     if reservation.status == 2:
         hint = None
         if reservation.actual_end_time:

@@ -68,6 +68,8 @@
 import { onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import http from '../api/http'
+import { useRequiredStoreId } from '../composables/useWorkingStore'
+import { resolveRequiredStoreId } from '../utils/workingStore'
 
 const stores = ref<any[]>([])
 const storeId = ref<number | null>(null)
@@ -133,11 +135,13 @@ async function remove(row: any) {
   load()
 }
 
+useRequiredStoreId(storeId, () => stores.value[0]?.id, load)
+
 onMounted(async () => {
   const res = await http.get('/admin/stores')
   stores.value = res.data
   if (stores.value.length) {
-    storeId.value = stores.value[0].id
+    storeId.value = resolveRequiredStoreId(stores.value[0].id)
     await load()
   }
 })

@@ -99,7 +99,6 @@ Page({
       Promise.all([
         this.loadBanners({ silent, force }),
         this.loadAnnouncements({ force }),
-        this.loadStores({ silent, force }),
         this.loadUser({ force }),
         this.loadCardCount({ force }),
       ])
@@ -163,7 +162,6 @@ Page({
   loadBootstrap(options = {}) {
     const { force = false } = options
     const { getUserLocation, isLocationDenied, formatDistance } = require('../../utils/location')
-    const { resolveStoreList } = require('../../utils/media')
     const hasBanners = this.data.banners.length > 0
     const hasStores = this.data.stores.length > 0
 
@@ -194,14 +192,8 @@ Page({
       await this._applyBannersFromRaw(data.banners?.items || [], carousel)
 
       if (token !== this._storeFetchToken) return
-      const list = await resolveStoreList(data.stores || [])
-      if (token !== this._storeFetchToken) return
-      const withDistance = list.map((s) => ({
-        ...s,
-        distanceLabel: formatDistance(s.distance),
-      }))
       this.setData({
-        stores: withDistance,
+        stores: data.stores || [],
         storesLoading: false,
         locationHint: hint || '',
       })
@@ -252,13 +244,7 @@ Page({
           return fetchWithoutLocation(denied ? '开启定位查看距离' : '定位失败，点击重试')
         })
 
-    return isLocationDenied().then((denied) => {
-      if (token !== this._storeFetchToken) return
-      if (denied) {
-        return fetchWithoutLocation('开启定位查看距离')
-      }
-      return fetchWithLocation()
-    })
+    return fetchWithoutLocation('')
   },
 
   _hydrateBannerCache() {
@@ -454,30 +440,8 @@ Page({
     })
   },
 
-  goStore(e) {
-    const id = e.detail?.id ?? e.currentTarget.dataset.id
-    const bookingUrl = `${routes.bookingIndex}?storeId=${id}`
-    if (!auth.requireLogin(bookingUrl)) return
-    wx.navigateTo({ url: bookingUrl })
-  },
-
-  goNearestStore() {
-    const { stores } = this.data
-    const storeId = stores && stores[0] ? stores[0].id : ''
-    const bookingUrl = storeId ? `${routes.bookingIndex}?storeId=${storeId}` : routes.profileLogin
-
-    if (!auth.isLoggedIn()) {
-      auth.goLogin(storeId ? bookingUrl : '')
-      return
-    }
-
-    if (!storeId) {
-      wx.showToast({ title: '正在获取门店…', icon: 'none' })
-      this.refreshHome({ force: true })
-      return
-    }
-
-    wx.navigateTo({ url: bookingUrl })
+  goSelectStore() {
+    wx.navigateTo({ url: routes.storeSelect })
   },
 
   onBannerImageError(e) {
@@ -512,7 +476,7 @@ Page({
     }
     if (layoutType === 'image') return
     if (ctaText) {
-      this.goNearestStore()
+      this.goSelectStore()
     }
   },
 

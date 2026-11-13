@@ -51,7 +51,7 @@
       </el-table-column>
     </el-table>
 
-    <el-dialog v-model="dialogVisible" :title="editingId ? '编辑门锁' : '添加门锁'" width="480px">
+    <el-dialog v-model="dialogVisible" :title="`${editingId ? '编辑门锁' : '添加门锁'} · ${stores.find(s => s.id === form.store_id)?.name || '门店 #' + form.store_id}`" width="480px">
       <el-form :model="form" label-width="88px">
         <el-form-item label="门店">
           <el-select v-model="form.store_id" style="width:100%">
@@ -75,9 +75,10 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, reactive, ref } from 'vue'
+import { onMounted, onUnmounted, reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import http from '../api/http'
+import { onWorkingStoreChange, resolveFilterStoreId } from '../utils/workingStore'
 
 const list = ref<any[]>([])
 const stores = ref<any[]>([])
@@ -133,12 +134,18 @@ async function loadStores() {
   stores.value = res.data || []
 }
 
+let locksRequest = 0
 async function load() {
+  const requestId = ++locksRequest
+  list.value = []
+  alerts.value = []
+  dialogVisible.value = false
   const params = storeFilter.value ? { store_id: storeFilter.value } : {}
   const [locksRes, alertsRes] = await Promise.all([
     http.get('/admin/locks', { params }),
-    http.get('/admin/locks/alerts'),
+    http.get('/admin/locks/alerts', { params }),
   ])
+  if (requestId !== locksRequest) return
   list.value = locksRes.data
   alerts.value = alertsRes.data
 }
@@ -179,10 +186,19 @@ async function refreshBattery(id: number) {
   load()
 }
 
+let offWorkingStore: (() => void) | undefined
+
 onMounted(async () => {
   await loadStores()
+  storeFilter.value = resolveFilterStoreId()
+  offWorkingStore = onWorkingStoreChange((sid) => {
+    storeFilter.value = sid
+    load()
+  })
   await load()
 })
+
+onUnmounted(() => offWorkingStore?.())
 </script>
 
 <style scoped>

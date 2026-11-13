@@ -114,10 +114,11 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { onMounted, onUnmounted, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { QuestionFilled } from '@element-plus/icons-vue'
 import http from '../api/http'
+import { onWorkingStoreChange, workingStoreParams } from '../utils/workingStore'
 
 const list = ref<any[]>([])
 const loading = ref(false)
@@ -135,7 +136,9 @@ const statsLoading = ref(false)
 async function loadStats() {
   statsLoading.value = true
   try {
-    const res = await http.get('/admin/stats/verify-by-source', { params: { range: statsRange.value } })
+    const res = await http.get('/admin/stats/verify-by-source', {
+      params: workingStoreParams({ range: statsRange.value }),
+    })
     stats.value = res.data || {}
   } finally {
     statsLoading.value = false
@@ -145,7 +148,11 @@ async function loadStats() {
 async function load() {
   loading.value = true
   try {
-    const params: Record<string, unknown> = { page: page.value, page_size: 20 }
+    const params: Record<string, unknown> = {
+      page: page.value,
+      page_size: 20,
+      ...workingStoreParams(),
+    }
     if (userId.value) params.user_id = userId.value
     if (status.value) params.status = status.value
     const res = await http.get('/admin/exchange-records', { params })
@@ -176,10 +183,17 @@ function search() {
   load()
 }
 
+let offWorkingStore: (() => void) | undefined
 onMounted(() => {
   load()
   loadStats()
+  offWorkingStore = onWorkingStoreChange(() => {
+    page.value = 1
+    load()
+    loadStats()
+  })
 })
+onUnmounted(() => offWorkingStore?.())
 </script>
 
 <style scoped>

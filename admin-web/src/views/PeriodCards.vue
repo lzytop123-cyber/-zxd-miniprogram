@@ -129,7 +129,8 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, reactive, ref } from 'vue'
+import { onMounted, onUnmounted, reactive, ref } from 'vue'
+import { onWorkingStoreChange, resolveFilterStoreId, workingStoreParams } from '../utils/workingStore'
 import { useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import http from '../api/http'
@@ -208,7 +209,11 @@ const route = useRoute()
 async function load() {
   loading.value = true
   try {
-    const params: Record<string, unknown> = { page: page.value, page_size: 20 }
+    const params: Record<string, unknown> = {
+      page: page.value,
+      page_size: 20,
+      ...workingStoreParams(),
+    }
     if (userId.value) params.user_id = userId.value
     if (status.value !== null && status.value !== undefined) params.status = status.value
     const res = await http.get('/admin/period-cards', { params })
@@ -228,6 +233,7 @@ function search() { page.value = 1; load() }
 
 function openIssue() {
   issueForm.user_id = userId.value
+  issueForm.store_id = resolveFilterStoreId()
   issueVisible.value = true
 }
 
@@ -295,11 +301,14 @@ async function revoke(row: any) {
   load()
 }
 
+let offWorkingStore: (() => void) | undefined
 onMounted(() => {
   const q = route.query.userId
   if (q) userId.value = Number(q)
   load()
+  offWorkingStore = onWorkingStoreChange(() => { page.value = 1; load() })
 })
+onUnmounted(() => offWorkingStore?.())
 </script>
 
 <style scoped>

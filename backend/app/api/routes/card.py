@@ -17,7 +17,8 @@ from app.services.card_service import (
     PURCHASABLE_BILL_TYPES,
     fulfill_card_purchase,
 )
-from app.services.wechat_pay import WechatPayService
+from app.services.pay_account import assert_store_allows_pay_type, resolve_pay_account
+from app.services.wechat_pay import WechatPayService, resolve_account_for_mchid
 
 router = APIRouter(prefix="/card", tags=["期限卡"])
 
@@ -105,6 +106,11 @@ def purchase_card(
     if not rule:
         raise HTTPException(status_code=404, detail="该门店暂无此套餐定价")
 
+    try:
+        assert_store_allows_pay_type(store, body.pay_type.value)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+
     amount = Decimal(str(rule.price))
     order_no = f"CRD{datetime.now().strftime('%Y%m%d%H%M%S')}{user.id}"
     order = CardPurchaseOrder(
@@ -146,24 +152,34 @@ def purchase_card(
         raise HTTPException(status_code=400, detail="暂不支持该支付方式")
 
     try:
+        pay_account = resolve_pay_account(db, store)
+    except ValueError as e:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    order.pay_mchid = pay_account.mchid
+
+    try:
         pay_params = WechatPayService.create_jsapi_order(
             order_no,
             amount,
             user.openid,
             description,
             attach=f"card_purchase={order.id}",
+            pay_account=pay_account,
         )
     except RuntimeError as e:
         db.rollback()
         raise HTTPException(status_code=502, detail=str(e)) from e
 
     db.commit()
+    # 前端不需要 mchid
+    client_pay = {k: v for k, v in pay_params.items() if k != "mchid"}
     return ResponseModel(
         data={
             "order_no": order_no,
             "amount": float(amount),
             "pay_type": PayType.wechat.value,
-            "wechat_pay": pay_params,
+            "wechat_pay": client_pay,
             "label": label,
         }
     )
@@ -224,7 +240,8 @@ def confirm_purchase_card(
             },
         )
 
-    query = WechatPayService.query_order(order.order_no)
+    pay_acc = resolve_account_for_mchid(db, order.pay_mchid)
+    query = WechatPayService.query_order(order.order_no, pay_account=pay_acc)
     if not query or query.get("trade_state") != "SUCCESS":
         raise HTTPException(status_code=400, detail="支付尚未到账，请稍后再试")
 

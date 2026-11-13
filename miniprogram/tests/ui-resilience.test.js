@@ -179,6 +179,14 @@ test('a failed active-order request is not represented as an empty order list', 
   assert.equal(navigatedTo, '/packageProfile/pages/profile/contact')
 })
 
+const bookingExtraStubs = {
+  '../../utils/seat-map-image': {
+    buildImageMarkers: () => [],
+    seatDisplayImage: () => ({ mapLabel: '', zoneName: '', seatCode: '' }),
+  },
+  '../../config': { resolveStaticUrl: (url) => url },
+}
+
 test('a failed seat refresh clears stale availability and exposes retry state', async () => {
   const request = async () => { throw new Error('offline') }
   const definition = loadPage('pages/booking/index.js', {
@@ -186,6 +194,7 @@ test('a failed seat refresh clears stale availability and exposes retry state', 
     '../../utils/auth': {},
     '../../utils/routes': {},
     '../../utils/seat-layout': { getLayout: () => ({}) },
+    ...bookingExtraStubs,
     './utils/debounce': { debounce: (fn) => fn },
     '../../utils/cardDisplay': {
       dailyPassDays: () => 1, isOfficeNightMonthlyCard: () => false, isCardUsable: () => false,
@@ -217,6 +226,11 @@ test('a failed seat refresh clears stale availability and exposes retry state', 
   page._layout = { applySeats: (seats) => seats }
   page._hasSeatAvailability = () => true
 
+  page.data.seatMapReady = false
+  await page.loadSeats('2026-09-21 08:00:00', '2026-09-21 10:00:00', { force: true })
+  assert.equal(page.data.seatId, 9, 'availability must wait for the store map mode')
+  page.data.seatMapReady = true
+
   await page.loadSeats('2026-09-21 08:00:00', '2026-09-21 10:00:00', { force: true })
 
   assert.deepEqual(JSON.parse(JSON.stringify(page.data.seats)), [])
@@ -234,6 +248,7 @@ test('a late booking preview cannot overwrite a newer time range', async () => {
       formatRequestError: (error) => error.message,
     },
     '../../utils/auth': {}, '../../utils/routes': {}, '../../utils/seat-layout': { getLayout: () => ({}) },
+    ...bookingExtraStubs,
     './utils/debounce': { debounce: (fn) => fn },
     '../../utils/cardDisplay': {
       dailyPassDays: () => 1, isOfficeNightMonthlyCard: () => false, isCardUsable: () => false,
@@ -273,6 +288,7 @@ test('available seats are grouped by zone for the one-handed list picker', () =>
   const definition = loadPage('pages/booking/index.js', {
     '../../utils/request': { request: async () => [], formatRequestError: (error) => error.message },
     '../../utils/auth': {}, '../../utils/routes': {}, '../../utils/seat-layout': { getLayout: () => ({}) },
+    ...bookingExtraStubs,
     './utils/debounce': { debounce: (fn) => fn },
     '../../utils/cardDisplay': {
       dailyPassDays: () => 1, isOfficeNightMonthlyCard: () => false, isCardUsable: () => false,

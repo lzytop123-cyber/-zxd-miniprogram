@@ -5,7 +5,6 @@
       class="cover"
       src="{{store.cover_images[0]}}"
       mode="aspectFill"
-      lazy-load
       binderror="onCoverError"
     />
     <view wx:else class="cover cover-placeholder">

@@ -410,14 +410,15 @@ def get_seat_status(db: Session, seat_id: int, at: datetime | None = None) -> st
 def find_available_seat(
     db: Session, store_id: int, start: datetime, end: datetime, seat_type: str | None = None
 ) -> Seat | None:
-    query = select(Seat).where(
-        Seat.store_id == store_id,
-        Seat.status == 1,
-        Seat.is_buffer == 0,
-    )
+    from app.models import Store
+    from app.services.store_seat_maps import list_bookable_seats
+
+    store = db.get(Store, store_id)
+    if not store:
+        return None
+    seats = list_bookable_seats(db, store)
     if seat_type:
-        query = query.where(Seat.seat_type == seat_type)
-    seats = db.scalars(query).all()
+        seats = [s for s in seats if s.seat_type == seat_type]
     if not seats:
         return None
 

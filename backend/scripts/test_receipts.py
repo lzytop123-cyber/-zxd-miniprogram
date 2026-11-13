@@ -237,6 +237,51 @@ class ReceiptsTests(unittest.TestCase):
             finally:
                 engine.dispose()
 
+    def test_hq_store_id_filters_associated_receipts(self):
+        from datetime import date
+        from app.models.receipts import Receipt
+
+        self.db.add_all([
+            CardPurchaseOrder(
+                order_no="CA", user_id=1, store_id=1, bill_type=BillType.daily,
+                amount=Decimal("40"), pay_status=1, pay_type=PayType.wechat,
+            ),
+            CardPurchaseOrder(
+                order_no="CB", user_id=1, store_id=2, bill_type=BillType.daily,
+                amount=Decimal("60"), pay_status=1, pay_type=PayType.wechat,
+            ),
+            Receipt(
+                source_key="card:CA", channel="wechat_pay", amount=Decimal("40"),
+                received_on=date(2025, 8, 1), reference="CA",
+            ),
+            Receipt(
+                source_key="card:CB", channel="wechat_pay", amount=Decimal("60"),
+                received_on=date(2025, 8, 1), reference="CB",
+            ),
+            Receipt(
+                source_key="manual:hq-only", channel="wechat_transfer", amount=Decimal("10"),
+                received_on=date(2025, 8, 1), reference="manual-hq",
+            ),
+        ])
+        self.db.commit()
+        all_rows = self.client.get("/admin/receipts", params={"year": 2025, "month": 8}).json()["data"]
+        self.assertEqual(all_rows["total"], 3)
+        store1 = self.client.get(
+            "/admin/receipts", params={"year": 2025, "month": 8, "store_id": 1}
+        ).json()["data"]
+        self.assertEqual(store1["total"], 1)
+        self.assertEqual(store1["items"][0]["reference"], "CA")
+        sum1 = self.client.get(
+            "/admin/receipts/summary", params={"year": 2025, "month": 8, "store_id": 1}
+        ).json()["data"]
+        self.assertEqual(Decimal(sum1["month"]["received"]), Decimal("40"))
+        mgr = AdminUser(username="mgr", password_hash="x", role="store", store_id=1)
+        self.app.dependency_overrides[get_current_admin] = lambda: mgr
+        forbidden = self.client.get("/admin/receipts", params={"year": 2025, "month": 8, "store_id": 2})
+        self.assertEqual(forbidden.status_code, 403)
+        forced = self.client.get("/admin/receipts", params={"year": 2025, "month": 8}).json()["data"]
+        self.assertEqual(forced["total"], 1)
+
     def test_sync_excludes_balance_falls_back_to_created_at_and_is_idempotent(self):
         from app.models.receipts import Receipt
         self.db.add_all([

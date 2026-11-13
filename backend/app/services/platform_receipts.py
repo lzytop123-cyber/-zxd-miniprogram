@@ -125,6 +125,7 @@ def candidates(db: Session) -> list[dict]:
             "deal_name": order.deal_name or "", "reason": "；".join(reasons),
             "existing_receipt_id": duplicate, "ready": not reasons,
             "source_refunded": order.status == MeituanOrderStatus.refunded,
+            "store_id": order.store_id,
         })
     return result
 

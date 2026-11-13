@@ -18,7 +18,7 @@
         <el-input-number v-model="filters.user_id" :min="1" controls-position="right" style="width:110px" />
       </el-form-item>
       <el-form-item label="门店">
-        <el-select v-model="filters.store_id" clearable placeholder="全部" style="width:130px">
+        <el-select v-model="filters.store_id" clearable placeholder="全部" style="width:130px" @change="reloadForStore">
           <el-option v-for="s in stores" :key="s.id" :label="s.name" :value="s.id" />
         </el-select>
       </el-form-item>
@@ -27,6 +27,7 @@
           <el-option label="待付款" :value="0" />
           <el-option label="已付款" :value="1" />
           <el-option label="已退款" :value="2" />
+          <el-option label="退款待确认" value="refund_pending" />
         </el-select>
       </el-form-item>
       <el-form-item label="状态">
@@ -87,8 +88,9 @@
       <el-table-column label="支付" width="78">
         <template #default="{ row }">
           <el-tag :type="row.pay_status === 1 ? 'success' : row.pay_status === 2 ? 'info' : 'warning'" size="small">
-            {{ ['待付', '已付', '退款'][row.pay_status] || row.pay_status }}
+            {{ refundLabels[row.refund_state] || ['待付', '已付', '退款'][row.pay_status] || row.pay_status }}
           </el-tag>
+          <div v-if="row.refund_remark" class="sub">{{ row.refund_remark }}</div>
         </template>
       </el-table-column>
       <el-table-column label="状态" width="78">
@@ -281,7 +283,7 @@
     </el-dialog>
 
     <el-dialog v-model="refundVisible" title="登记退款" width="420px">
-      <p v-if="refundRow" class="sub">订单 {{ refundRow.order_no }} · ¥{{ refundRow.final_price ?? 0 }}</p>
+      <p v-if="refundRow" class="sub">{{ reservationStoreName(refundRow) }} · 订单 {{ refundRow.order_no }} · ¥{{ refundRow.final_price ?? 0 }}</p>
       <el-input v-model="refundRemark" type="textarea" :rows="3" placeholder="退款原因/备注（人工登记，非微信自动退款）" />
       <template #footer>
         <el-button @click="refundVisible = false">取消</el-button>
@@ -306,6 +308,7 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { onWorkingStoreChange, resolveFilterStoreId } from '../utils/workingStore'
 import http from '../api/http'
 
 const billTypeMap: Record<string, string> = {
@@ -372,7 +375,13 @@ function onResize() {
   viewportH.value = window.innerHeight
 }
 
-const filters = reactive<{ order_no: string; user_id: number | null; store_id: number | null; pay_status: number | null; status: number | null }>({
+const refundLabels: Record<string, string> = {
+  pending: '退款待确认',
+  wechat_confirmed: '微信已确认退款',
+  manual: '人工登记退款',
+  recorded: '已退款（来源未核实）',
+}
+const filters = reactive<{ order_no: string; user_id: number | null; store_id: number | null; pay_status: number | 'refund_pending' | null; status: number | null }>({
   order_no: '',
   user_id: null,
   store_id: null,
@@ -505,24 +514,29 @@ async function submitCreate() {
   }
 }
 
+let listRequest = 0
 async function load() {
+  const requestId = ++listRequest
   loading.value = true
   try {
     const params: Record<string, unknown> = { page: page.value, page_size: pageSize.value }
     if (filters.order_no) params.order_no = filters.order_no
     if (filters.user_id) params.user_id = filters.user_id
     if (filters.store_id) params.store_id = filters.store_id
-    if (filters.pay_status !== null && filters.pay_status !== undefined) params.pay_status = filters.pay_status
+    if (filters.pay_status === 'refund_pending') params.refund_pending = true
+    else if (typeof filters.pay_status === 'number') params.pay_status = filters.pay_status
     if (filters.status !== null && filters.status !== undefined) params.status = filters.status
     const res = await http.get('/admin/reservations', { params })
+    if (requestId !== listRequest) return
     list.value = res.data.items || []
     total.value = res.data.total || 0
   } catch (e: any) {
+    if (requestId !== listRequest) return
     list.value = []
     total.value = 0
     ElMessage.error(e?.response?.data?.detail || e?.message || '加载订单失败')
   } finally {
-    loading.value = false
+    if (requestId === listRequest) loading.value = false
   }
 }
 
@@ -539,7 +553,7 @@ function onPageSizeChange() {
 function reset() {
   filters.order_no = ''
   filters.user_id = null
-  filters.store_id = null
+  filters.store_id = resolveFilterStoreId()
   filters.pay_status = null
   filters.status = null
   search()
@@ -563,7 +577,9 @@ async function cancelOrder(row: any) {
     : row.pay_type === 'admin'
       ? `确定取消订单 ${row.order_no} 吗？前台收款不退款，仅释放座位。`
       : `确定取消订单 ${row.order_no} 吗？已付款将尝试退款。`
-  await ElMessageBox.confirm(msg, '取消订单', { type: 'warning' })
+  const storeId = filters.store_id
+  await ElMessageBox.confirm(`「${reservationStoreName(row)}」${msg}`, '取消订单', { type: 'warning' })
+  if (storeId !== filters.store_id) return
   await http.post(`/admin/reservations/${row.id}/cancel`)
   ElMessage.success('已取消')
   load()
@@ -671,6 +687,7 @@ async function openChangeSeat(row: any) {
   seatOptionsLoading.value = true
   try {
     const res = await http.get(`/admin/reservations/${row.id}/seat-options`)
+    if (!changeSeatVisible.value || changeSeatRow.value !== row) return
     seatOptions.current_seat_code = res.data.current_seat_code
     seatOptions.current_seat_id = res.data.current_seat_id
     seatOptions.start_time = res.data.start_time
@@ -678,15 +695,18 @@ async function openChangeSeat(row: any) {
     seatOptions.hint = res.data.hint || ''
     seatOptions.seats = res.data.seats || []
   } catch (e: any) {
+    if (!changeSeatVisible.value || changeSeatRow.value !== row) return
     ElMessage.error(e?.response?.data?.detail || '加载座位失败')
     changeSeatVisible.value = false
   } finally {
-    seatOptionsLoading.value = false
+    if (changeSeatRow.value === row) seatOptionsLoading.value = false
   }
 }
 
 async function submitChangeSeat() {
   if (!changeSeatRow.value || !changeSeatTargetId.value) return
+  const row = changeSeatRow.value
+  const seatId = changeSeatTargetId.value
   const target = selectedSeat.value
   const occupiedBy = target?.occupied_by
   const swapping = !!(target?.can_swap && occupiedBy)
@@ -694,14 +714,15 @@ async function submitChangeSeat() {
     ? `确定将 ${changeSeatRow.value.seat_code} 与 ${target.seat_code}（${occupiedBy?.nickname} ID ${occupiedBy?.user_id}，${occupiedBy?.end_label}）对调吗？两人只换座位，订单还在各自名下。对方若是月卡，整段都会换到当前座位。`
     : `确定将订单 ${changeSeatRow.value.order_no} 从 ${changeSeatRow.value.seat_code} 换到 ${target?.seat_code || changeSeatTargetId.value} 吗？`
   await ElMessageBox.confirm(tip, swapping ? '确认对调' : '确认换座', { type: 'warning' })
+  if (!changeSeatVisible.value || changeSeatRow.value !== row) return
   changeSeatSubmitting.value = true
   try {
     const res = swapping && occupiedBy
-      ? await http.post(`/admin/reservations/${changeSeatRow.value.id}/swap-seats`, {
+      ? await http.post(`/admin/reservations/${row.id}/swap-seats`, {
           other_reservation_id: occupiedBy.reservation_id,
         })
-      : await http.post(`/admin/reservations/${changeSeatRow.value.id}/change-seat`, {
-          seat_id: changeSeatTargetId.value,
+      : await http.post(`/admin/reservations/${row.id}/change-seat`, {
+          seat_id: seatId,
         })
     ElMessage.success(res.message || '换座成功')
     changeSeatVisible.value = false
@@ -715,6 +736,10 @@ const refundVisible = ref(false)
 const refundRow = ref<any>(null)
 const refundRemark = ref('')
 const refundSubmitting = ref(false)
+
+function reservationStoreName(row: any) {
+  return row.store_name || stores.value.find((store) => store.id === row.store_id)?.name || `门店 #${row.store_id}`
+}
 
 function openRefund(row: any) {
   refundRow.value = row
@@ -740,15 +765,34 @@ async function submitRefund() {
   }
 }
 
+let offWorkingStore: (() => void) | undefined
+
+function reloadForStore() {
+  list.value = []
+  total.value = 0
+  refundVisible.value = false
+  changeSeatVisible.value = false
+  changeSeatRow.value = null
+  createVisible.value = false
+  page.value = 1
+  void load()
+}
+
 onMounted(async () => {
   window.addEventListener('resize', onResize)
   const res = await http.get('/admin/stores')
   stores.value = res.data || []
+  filters.store_id = resolveFilterStoreId()
+  offWorkingStore = onWorkingStoreChange((sid) => {
+    filters.store_id = sid
+    reloadForStore()
+  })
   load()
 })
 
 onUnmounted(() => {
   window.removeEventListener('resize', onResize)
+  offWorkingStore?.()
 })
 </script>
 

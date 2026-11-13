@@ -170,9 +170,11 @@ function explainCardMismatch(cards, ctx) {
 
 function isUsableCard(card, ctx) {
   const {
-    storeId, billType, startTime, endTime, sessionDays, bookingH,
+    storeId, billType, startTime, endTime, sessionDays, bookingH, benefitsIsolated,
   } = ctx
-  if (card.store_id && card.store_id !== storeId) return false
+  if (card.store_id && Number(card.store_id) !== Number(storeId)) return false
+  if (benefitsIsolated && !card.store_id) return false
+  if (benefitsIsolated && Number(card.store_id) !== Number(storeId)) return false
 
   if (card.card_type === 'hourly') {
     if (billType !== 'hourly') return false
@@ -320,6 +322,7 @@ Page({
     priceLoading: false,
     cardMismatchHint: '',
     submitting: false,
+    benefitsIsolated: false,
   },
 
   onLoad(options) {
@@ -352,6 +355,17 @@ Page({
       durationDisplay: formatDurationDisplay(billType, startTime, endTime),
       cardUsageText: formatCardUsage(billType, startTime, endTime),
     })
+    if (options.storeId) {
+      request({ url: `/store/${options.storeId}`, silent: true })
+        .then((store) => {
+          const isolated = !!(store && store.benefits_isolated)
+          const patch = { benefitsIsolated: isolated }
+          if (isolated && this.data.payType === 'balance') patch.payType = 'wechat'
+          this.setData(patch)
+          return this.loadPayOptions({ silent: true })
+        })
+        .catch(() => {})
+    }
   },
 
   onShow() {
@@ -372,15 +386,18 @@ Page({
       ])
       const storeId = Number(this.data.storeId)
       const billType = this.data.billType
+      const benefitsIsolated = !!this.data.benefitsIsolated
       const { startTime, endTime } = this.data
       const sessionDays = billType === 'session' ? countSessionDays(startTime, endTime) : 0
       const bookingH = billType === 'hourly' ? bookingHours(startTime, endTime) : 0
-      const ctx = { storeId, billType, startTime, endTime, sessionDays, bookingH }
+      const ctx = { storeId, billType, startTime, endTime, sessionDays, bookingH, benefitsIsolated }
       const usableCards = (cards || []).filter((c) => isUsableCard(c, ctx))
       const originalPrice = Number(this.data.originalPrice)
-      const usableCoupons = (coupons || []).filter(
-        (c) => c.status === 0 && originalPrice >= (c.min_amount || 0)
-      )
+      const usableCoupons = benefitsIsolated
+        ? []
+        : (coupons || []).filter(
+          (c) => c.status === 0 && originalPrice >= (c.min_amount || 0)
+        )
       const patch = {
         cards,
         usableCards,

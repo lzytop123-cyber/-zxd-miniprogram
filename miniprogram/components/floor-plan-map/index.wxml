@@ -1,4 +1,4 @@
-<view class="plan-canvas">
+<view class="plan-canvas {{mode==='image'?'plan-canvas--image':''}}">
   <movable-area class="plan-area" scale-area>
     <movable-view
       class="plan-move"
@@ -10,7 +10,16 @@
       inertia
       bindscale="onScale"
     >
-      <view class="floor">
+      <view class="floor {{mode==='image'?'floor--image':''}} {{drawnFloor?'floor--drawn':''}}" style="{{floorStyle}}">
+        <block wx:if="{{mode==='image'}}">
+          <block wx:if="{{drawnFloor}}">
+            <view wx:for="{{lines}}" wx:key="style" class="drawn-line drawn-line--{{item.kind}}" style="{{item.style}}" />
+            <text wx:for="{{labels}}" wx:key="style" class="drawn-label {{item.zone?'drawn-label--zone drawn-label--'+item.zone:''}}" style="{{item.style}}">{{item.text}}</text>
+          </block>
+          <image wx:elif="{{imageUrl}}" class="floor-bg" src="{{imageUrl}}" mode="aspectFit" />
+          <view wx:else class="floor-bg floor-bg--empty">座位图未配置</view>
+        </block>
+        <block wx:else>
         <!-- 区域底色 -->
         <view class="room room--a"></view>
         <view class="room room--b"></view>
@@ -66,6 +75,7 @@
         <text class="lbl lbl--svc lbl--tea">茶水间</text>
         <text class="lbl lbl--svc lbl--dine">餐厅</text>
         <text class="lbl lbl--entry">入口</text>
+        </block>
 
         <!-- 座位层（可点击，交互逻辑保持不变） -->
         <view class="seats-layer">
@@ -80,7 +90,7 @@
             data-code="{{seat.seat_code}}"
             data-status="{{seat.status}}"
           >
-            <view wx:if="{{seat.status !== 'empty'}}" class="seat-unit">
+            <view wx:if="{{seat.status !== 'empty'}}" class="seat-unit {{seat.has_curtain?'seat-unit--curtain':''}}">
               <view class="desk-bar"></view>
               <view class="seat-chip {{seat.status}} {{selectedId===seat.id?'is-selected':''}}">
                 <text wx:if="{{seat.map_label}}" class="seat-chip-label {{selectedId===seat.id ? 'seat-chip-label--active' : ''}}">{{seat.map_label}}</text>
@@ -94,7 +104,6 @@
   </movable-area>
   <view class="zoom-controls">
     <view class="zoom-btn" aria-role="button" aria-label="缩小座位图" catchtap="zoomOut">－</view>
-    <view class="zoom-btn zoom-reset" aria-role="button" aria-label="复位座位图" catchtap="zoomReset">复位</view>
     <view class="zoom-btn" aria-role="button" aria-label="放大座位图" catchtap="zoomIn">＋</view>
   </view>
 </view>

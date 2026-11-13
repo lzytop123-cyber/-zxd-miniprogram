@@ -11,6 +11,7 @@ from app.models import (
     MeituanDealMapping,
     PeriodCard,
     RewardType,
+    Store,
 )
 from app.services.pass_days_parser import parse_pass_days_from_name
 from app.services.store_hours import (
@@ -455,6 +456,12 @@ def validate_period_card_for_reservation(
         raise ValueError("期限卡已过期")
     if card.store_id and card.store_id != store_id:
         raise ValueError("该卡不适用于当前门店")
+    store = db.get(Store, store_id)
+    if store and getattr(store, "benefits_isolated", 0):
+        if not card.store_id:
+            raise ValueError("该门店仅可使用本店期限卡")
+        if card.store_id != store_id:
+            raise ValueError("该卡不适用于当前门店")
 
     if card.card_type == CardType.hourly:
         if reservation_bill_type != BillType.hourly:

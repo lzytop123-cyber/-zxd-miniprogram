@@ -5,12 +5,18 @@ from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.core.static_url import public_static_path
+from app.core.static_url import public_static_path, public_static_url
 from app.db.session import get_db
 from app.models import PricingRule, Reservation, Seat, Store, Zone
 from app.schemas.common import ResponseModel
 from app.schemas.store import PricingItem, SeatItem, StoreDetail, StoreListItem
 from app.services.business import calc_distance, find_busy_seat_ids, get_seat_status
+from app.services.store_seat_maps import (
+    get_published_map,
+    is_image_mode,
+    list_bookable_seats,
+    map_summary,
+)
 
 router = APIRouter(prefix="/store", tags=["门店"])
 
@@ -46,6 +52,68 @@ class AvailabilityQuery(BaseModel):
     end_time: datetime
 
 
+@router.get("/{store_id}/seat-map", response_model=ResponseModel)
+def get_store_seat_map(store_id: int, db: Session = Depends(get_db)):
+    store = db.get(Store, store_id)
+    if not store or store.status != 1:
+        raise HTTPException(status_code=404, detail="门店不存在")
+    if not is_image_mode(store):
+        return ResponseModel(data={"mode": "legacy", "store_id": store_id})
+
+    published = get_published_map(db, store_id)
+    if not published or not published.image_path or not published.markers:
+        return ResponseModel(
+            data={
+                "mode": "image",
+                "store_id": store_id,
+                "published": False,
+                "image_url": None,
+                "aspect_ratio": None,
+                "markers": [],
+            }
+        )
+    summary = map_summary(published) or {}
+    seat_ids = [int(m["seat_id"]) for m in (published.markers or []) if m.get("seat_id") is not None]
+    seats = {
+        s.id: s
+        for s in db.scalars(select(Seat).where(Seat.id.in_(seat_ids))).all()
+        if s.store_id == store_id
+    }
+    zones = {
+        z.id: z.name
+        for z in db.scalars(select(Zone).where(Zone.store_id == store_id)).all()
+    }
+    markers = []
+    for m in published.markers or []:
+        seat = seats.get(int(m["seat_id"]))
+        if not seat or seat.status != 1:
+            continue
+        markers.append(
+            {
+                "seat_id": seat.id,
+                "seat_code": seat.seat_code,
+                "zone_id": seat.zone_id,
+                "zone_name": zones.get(seat.zone_id) or "",
+                "x_pct": m.get("x_pct"),
+                "y_pct": m.get("y_pct"),
+                "orient": m.get("orient") or "up",
+                "has_outlet": seat.has_outlet,
+                "has_curtain": seat.has_curtain,
+                "seat_type": seat.seat_type,
+            }
+        )
+    return ResponseModel(
+        data={
+            "mode": "image",
+            "store_id": store_id,
+            "published": True,
+            "image_url": public_static_url(summary.get("image_path")),
+            "aspect_ratio": summary.get("aspect_ratio"),
+            "markers": markers,
+        }
+    )
+
+
 @router.get("/{store_id}/availability", response_model=ResponseModel[list[SeatItem]])
 def get_availability(
     store_id: int,
@@ -53,16 +121,10 @@ def get_availability(
     end_time: datetime = Query(...),
     db: Session = Depends(get_db),
 ):
-    from app.services.seat_setup import expected_seat_codes
-
-    plan_codes = set(expected_seat_codes())
-    seats = [
-        s
-        for s in db.scalars(
-            select(Seat).where(Seat.store_id == store_id, Seat.is_buffer == 0, Seat.status == 1)
-        ).all()
-        if s.seat_code in plan_codes
-    ]
+    store = db.get(Store, store_id)
+    if not store:
+        raise HTTPException(status_code=404, detail="门店不存在")
+    seats = list_bookable_seats(db, store)
     busy_ids = find_busy_seat_ids(db, [s.id for s in seats], start_time, end_time)
     items = []
     for s in seats:
@@ -120,16 +182,10 @@ def get_store(store_id: int, db: Session = Depends(get_db)):
 
 @router.get("/{store_id}/seats", response_model=ResponseModel[list[SeatItem]])
 def get_seats(store_id: int, db: Session = Depends(get_db)):
-    from app.services.seat_setup import expected_seat_codes
-
-    plan_codes = set(expected_seat_codes())
-    seats = [
-        s
-        for s in db.scalars(
-            select(Seat).where(Seat.store_id == store_id, Seat.is_buffer == 0, Seat.status == 1)
-        ).all()
-        if s.seat_code in plan_codes
-    ]
+    store = db.get(Store, store_id)
+    if not store:
+        raise HTTPException(status_code=404, detail="门店不存在")
+    seats = list_bookable_seats(db, store)
     now = datetime.now()
     items = [
         SeatItem(

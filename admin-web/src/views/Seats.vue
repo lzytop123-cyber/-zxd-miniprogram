@@ -4,17 +4,28 @@
       <div class="header">
         <div class="left">
           <span>座位管理</span>
-          <el-select v-model="storeId" style="width: 200px; margin-left: 12px" @change="onStoreChange">
-            <el-option v-for="s in stores" :key="s.id" :label="s.name" :value="s.id" />
+          <el-select v-model="storeId" style="width: 220px; margin-left: 12px" @change="onStoreChange">
+            <el-option
+              v-for="s in stores"
+              :key="s.id"
+              :label="`${s.name}${s.seat_map_mode === 'image' ? ' · 图片图' : ''}`"
+              :value="s.id"
+            />
           </el-select>
+          <el-tag v-if="currentStore" size="small" :type="isImageMode ? 'warning' : 'info'">
+            {{ isImageMode ? '图片座位图' : '固定布局' }}
+          </el-tag>
         </div>
         <div class="right">
           <el-button @click="openCreate">新增座位</el-button>
-          <el-button :loading="ensuring" type="primary" @click="ensureSeats">补全标准座位</el-button>
+          <el-button v-if="!isImageMode" :loading="ensuring" type="primary" @click="ensureSeats">补全标准座位</el-button>
         </div>
       </div>
     </template>
 
+    <SeatMapEditor v-if="storeId && isImageMode" :key="storeId" :store-id="storeId" :store-name="currentStore?.name" @published="load" />
+
+    <template v-if="!isImageMode">
     <el-alert
       v-if="summary && missingCount > 0"
       type="warning"
@@ -57,6 +68,9 @@
         </div>
       </div>
     </el-card>
+    </template>
+
+    <el-divider v-if="isImageMode" content-position="left">座位列表（编号/启停）</el-divider>
 
     <el-table :data="list" v-loading="loading" stripe>
       <el-table-column prop="seat_code" label="编号" width="90" />
@@ -128,6 +142,9 @@
 import { computed, onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import http from '../api/http'
+import SeatMapEditor from '../components/SeatMapEditor.vue'
+import { useRequiredStoreId } from '../composables/useWorkingStore'
+import { resolveRequiredStoreId } from '../utils/workingStore'
 
 const list = ref<any[]>([])
 const layoutSeats = ref<any[]>([])
@@ -137,6 +154,8 @@ const loading = ref(false)
 const ensuring = ref(false)
 const storeId = ref<number | null>(null)
 const summary = ref<any>(null)
+const currentStore = computed(() => stores.value.find((s) => s.id === storeId.value) || null)
+const isImageMode = computed(() => (currentStore.value?.seat_map_mode || 'legacy') === 'image')
 const showDialog = ref(false)
 const editingId = ref<number | null>(null)
 const form = reactive({
@@ -173,28 +192,31 @@ function mapSeatStyle(seat: { pos_x?: number; pos_y?: number }) {
   }
 }
 
-async function loadSummary() {
-  if (!storeId.value) return
-  const res = await http.get(`/admin/stores/${storeId.value}/seats/summary`)
-  summary.value = res.data
-}
-
-async function loadLayout() {
-  if (!storeId.value) return
-  const res = await http.get(`/admin/stores/${storeId.value}/seats/layout`)
-  zones.value = res.data.zones || []
-  layoutSeats.value = (res.data.seats || []).filter((s: any) => s.pos_x != null && s.pos_y != null)
-}
-
+let seatRequest = 0
 async function load() {
-  if (!storeId.value) return
+  const id = storeId.value
+  if (!id) return
+  const requestId = ++seatRequest
+  const imageMode = isImageMode.value
+  list.value = []
+  summary.value = null
+  zones.value = []
+  layoutSeats.value = []
+  showDialog.value = false
   loading.value = true
   try {
-    const seatsRes = await http.get('/admin/seats', { params: { store_id: storeId.value } })
+    const [seatsRes, summaryRes, layoutRes] = await Promise.all([
+      http.get('/admin/seats', { params: { store_id: id } }),
+      http.get(`/admin/stores/${id}/seats/summary`),
+      http.get(`/admin/stores/${id}/${imageMode ? 'zones' : 'seats/layout'}`),
+    ])
+    if (requestId !== seatRequest || id !== storeId.value) return
     list.value = seatsRes.data
-    await Promise.all([loadSummary(), loadLayout()])
+    summary.value = summaryRes.data
+    zones.value = imageMode ? layoutRes.data || [] : layoutRes.data.zones || []
+    layoutSeats.value = imageMode ? [] : (layoutRes.data.seats || []).filter((s: any) => s.pos_x != null && s.pos_y != null)
   } finally {
-    loading.value = false
+    if (requestId === seatRequest) loading.value = false
   }
 }
 
@@ -280,11 +302,13 @@ async function removeSeat(row: any) {
   }
 }
 
+useRequiredStoreId(storeId, () => stores.value[0]?.id, load)
+
 onMounted(async () => {
   const res = await http.get('/admin/stores')
   stores.value = res.data
   if (stores.value.length) {
-    storeId.value = stores.value[0].id
+    storeId.value = resolveRequiredStoreId(stores.value[0].id)
     await load()
   }
 })

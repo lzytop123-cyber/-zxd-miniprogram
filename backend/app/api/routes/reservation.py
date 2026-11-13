@@ -52,7 +52,8 @@ from app.services.card_service import (
 )
 from app.api.routes.payment import complete_reservation_wechat_payment
 from app.services.coupon_service import apply_coupon, mark_coupon_used
-from app.services.wechat_pay import WechatPayService
+from app.services.pay_account import assert_store_allows_pay_type, resolve_pay_account
+from app.services.wechat_pay import WechatPayService, resolve_account_for_mchid
 
 router = APIRouter(prefix="/reservation", tags=["预约"])
 logger = logging.getLogger(__name__)
@@ -228,6 +229,8 @@ def _sync_user_active_reservations(
 
 
 def _assert_seat_available_for_pay(db: Session, reservation: Reservation) -> None:
+    if reservation.status == 3 or reservation.pay_status == 2:
+        raise HTTPException(status_code=409, detail="预约已取消，请重新预约")
     conflict = seat_conflict_excluding(
         db,
         reservation.seat_id,
@@ -339,6 +342,16 @@ async def pay(
 
     _assert_seat_available_for_pay(db, reservation)
 
+    store = db.get(Store, reservation.store_id)
+    if not store:
+        raise HTTPException(status_code=404, detail="门店不存在")
+    try:
+        assert_store_allows_pay_type(store, body.pay_type.value)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    if getattr(store, "benefits_isolated", 0) and body.coupon_id:
+        raise HTTPException(status_code=400, detail="该门店不可使用全局优惠券")
+
     # 夜读不售单次票：无 night 价格时只能用晚自习月卡支付
     if reservation.bill_type == BillType.night and body.pay_type != PayType.period_card:
         has_night_price = db.scalar(
@@ -414,7 +427,12 @@ async def pay(
         )
 
     if body.pay_type == PayType.wechat:
+        try:
+            pay_account = resolve_pay_account(db, store)
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e)) from e
         reservation.pay_type = PayType.wechat
+        reservation.pay_mchid = pay_account.mchid
         db.commit()
         attach = f"coupon_id={body.coupon_id}" if body.coupon_id else None
         try:
@@ -424,14 +442,17 @@ async def pay(
                 user.openid,
                 f"知行岛自习室-{reservation.order_no}",
                 attach=attach,
+                pay_account=pay_account,
             )
         except RuntimeError as e:
             raise HTTPException(status_code=502, detail=str(e))
+        # WechatPayParams 可能不含 mchid 字段，剔除额外键
+        wp = {k: v for k, v in pay_params.items() if k in WechatPayParams.model_fields}
         return ResponseModel(
             data=ReservationPayResponse(
                 order_no=body.order_no,
                 pay_type=PayType.wechat,
-                wechat_pay=WechatPayParams(**pay_params),
+                wechat_pay=WechatPayParams(**wp),
             )
         )
 
@@ -453,7 +474,8 @@ async def confirm_pay(
     if reservation.pay_type != PayType.wechat:
         raise HTTPException(status_code=400, detail="订单尚未支付")
 
-    query = WechatPayService.query_order(reservation.order_no)
+    pay_acc = resolve_account_for_mchid(db, reservation.pay_mchid)
+    query = WechatPayService.query_order(reservation.order_no, pay_account=pay_acc)
     if not query or query.get("trade_state") != "SUCCESS":
         raise HTTPException(status_code=400, detail="支付尚未到账，请稍后再试")
 
@@ -685,7 +707,14 @@ def cancel(
             return ResponseModel(message="已取消，前台收款订单不退款")
         if reservation.pay_type == PayType.wechat:
             if amount > 0:
-                WechatPayService.refund(reservation.order_no, amount, amount, "用户取消预约")
+                pay_acc = resolve_account_for_mchid(db, reservation.pay_mchid)
+                WechatPayService.refund(
+                    reservation.order_no,
+                    amount,
+                    amount,
+                    "用户取消预约",
+                    pay_account=pay_acc,
+                )
             reservation.pay_status = 2
         elif reservation.pay_type == PayType.balance:
             if amount > 0:

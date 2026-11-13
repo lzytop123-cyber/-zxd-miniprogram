@@ -1,0 +1,178 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="700" viewBox="0 0 900 700" role="img" aria-label="知行岛自习室座位平面示意图">
+<defs>
+  <pattern id="floor" width="18" height="18" patternUnits="userSpaceOnUse"><path d="M18 0H0V18" fill="none" stroke="#DCE9DF" stroke-width=".65"/></pattern>
+  <pattern id="service" width="12" height="12" patternUnits="userSpaceOnUse"><path d="M-2 12L12 -2 M4 18L18 4" stroke="#DCE4DD" stroke-width="2"/></pattern>
+</defs>
+<rect width="900" height="700" rx="18" fill="#F8FBF8"/>
+<rect x="31" y="27" width="838" height="648" rx="12" fill="url(#floor)"/>
+<!-- Rooms and service areas: based on the product's fixed floor layout -->
+<path d="M48 44H295V324H48Z" fill="#EDF7EF"/>
+<path d="M295 44H546V324H295Z" fill="#F1F8F1"/>
+<path d="M546 44H852V507H546Z" fill="#E6F3E9"/>
+<path d="M48 374H295V656H48Z" fill="#EBF6EE"/>
+<path d="M295 374H546V587H295Z" fill="#F0F2EF" stroke="#BAC8BE" stroke-width="2"/>
+<path d="M295 587H546V656H295Z" fill="url(#service)" stroke="#BAC8BE" stroke-width="2"/>
+<path d="M421 587V656" stroke="#BAC8BE" stroke-width="2"/>
+<path d="M48 324H546V374H48Z" fill="#FFFFFF"/>
+<path d="M546 507H852V596H665V656H546Z" fill="#F8FBF8"/>
+<!-- Architectural lines, with corridor openings -->
+<path d="M48 44H852V596H665V656H48V44Z" fill="none" stroke="#4E6758" stroke-width="5" stroke-linejoin="round"/>
+<path d="M295 44V324 M295 374V656 M546 44V324 M546 374V656" fill="none" stroke="#667F6D" stroke-width="3.5"/>
+<path d="M48 324H221 M300 324H427 M507 324H546 M48 374H191 M270 374H368 M447 374H546" fill="none" stroke="#667F6D" stroke-width="3.5"/>
+<path d="M556 656H665" stroke="#F8FBF8" stroke-width="9"/>
+<path d="M596 656V615M625 656V615" stroke="#8AA497" stroke-width="2"/>
+<path d="M596 615q29 0 29 41" fill="none" stroke="#AABDB0" stroke-width="1.5"/>
+<!-- Windows -->
+<path d="M134 44H215 M384 44H465 M661 44H742 M95 656H174" stroke="#A9D9C3" stroke-width="9"/>
+<path d="M134 44H215 M384 44H465 M661 44H742 M95 656H174" stroke="#4E6758" stroke-width="2"/>
+<text x="168" y="77" font-family="Microsoft YaHei,Arial" font-size="17" fill="#719581" font-weight="700" text-anchor="middle">沉浸区 A</text>
+<text x="421" y="77" font-family="Microsoft YaHei,Arial" font-size="17" fill="#719581" font-weight="700" text-anchor="middle">沉浸区 B</text>
+<text x="700" y="79" font-family="Microsoft YaHei,Arial" font-size="18" fill="#5F9274" font-weight="800" text-anchor="middle">标准区</text>
+<text x="168" y="411" font-family="Microsoft YaHei,Arial" font-size="17" fill="#719581" font-weight="700" text-anchor="middle">沉浸区 C</text>
+<text x="420" y="487" font-family="Microsoft YaHei,Arial" font-size="20" fill="#88998D" font-weight="700" text-anchor="middle">卫生间</text>
+<text x="357" y="625" font-family="Microsoft YaHei,Arial" font-size="16" fill="#88998D" text-anchor="middle">茶水间</text>
+<text x="483" y="625" font-family="Microsoft YaHei,Arial" font-size="16" fill="#88998D" text-anchor="middle">餐厅</text>
+<text x="421" y="355" font-family="Microsoft YaHei,Arial" font-size="15" fill="#A1B4A5" letter-spacing="3" text-anchor="middle">通 道</text>
+<text x="611" y="686" font-family="Microsoft YaHei,Arial" font-size="17" fill="#526F5D" font-weight="800" text-anchor="middle">入口 ↑</text>
+<g transform="translate(734 542)" aria-label="01号座位 available">
+    <path d="M-31 -11v22 M31 -11v22" stroke="#9AACA0" stroke-width="4" stroke-linecap="round"/>
+    <rect x="-24" y="-17" width="48" height="34" rx="9" fill="#D4EEDF" stroke="#2B6748" stroke-width="1.5"/>
+    <text x="0" y="6" fill="#2F8A5F" font-size="17" font-weight="800" text-anchor="middle">01</text>
+    
+  </g><g transform="translate(808 542)" aria-label="02号座位 available">
+    <path d="M-31 -11v22 M31 -11v22" stroke="#9AACA0" stroke-width="4" stroke-linecap="round"/>
+    <rect x="-24" y="-17" width="48" height="34" rx="9" fill="#D4EEDF" stroke="#2B6748" stroke-width="1.5"/>
+    <text x="0" y="6" fill="#2F8A5F" font-size="17" font-weight="800" text-anchor="middle">02</text>
+    
+  </g><g transform="translate(811 406)" aria-label="03号座位 reserved">
+    <path d="M-13 -25h26 M-13 25h26" stroke="#9AACA0" stroke-width="4" stroke-linecap="round"/>
+    <rect x="-24" y="-17" width="48" height="34" rx="9" fill="#F4E5BB" stroke="#D0B275" stroke-width="1.5"/>
+    <text x="0" y="6" fill="#8B6524" font-size="17" font-weight="800" text-anchor="middle">03</text>
+    
+  </g><g transform="translate(811 346)" aria-label="04号座位 available">
+    <path d="M-13 -25h26 M-13 25h26" stroke="#9AACA0" stroke-width="4" stroke-linecap="round"/>
+    <rect x="-24" y="-17" width="48" height="34" rx="9" fill="#D4EEDF" stroke="#2B6748" stroke-width="1.5"/>
+    <text x="0" y="6" fill="#2F8A5F" font-size="17" font-weight="800" text-anchor="middle">04</text>
+    
+  </g><g transform="translate(811 287)" aria-label="05号座位 available">
+    <path d="M-13 -25h26 M-13 25h26" stroke="#9AACA0" stroke-width="4" stroke-linecap="round"/>
+    <rect x="-24" y="-17" width="48" height="34" rx="9" fill="#D4EEDF" stroke="#2B6748" stroke-width="1.5"/>
+    <text x="0" y="6" fill="#2F8A5F" font-size="17" font-weight="800" text-anchor="middle">05</text>
+    
+  </g><g transform="translate(811 227)" aria-label="06号座位 available">
+    <path d="M-13 -25h26 M-13 25h26" stroke="#9AACA0" stroke-width="4" stroke-linecap="round"/>
+    <rect x="-24" y="-17" width="48" height="34" rx="9" fill="#D4EEDF" stroke="#2B6748" stroke-width="1.5"/>
+    <text x="0" y="6" fill="#2F8A5F" font-size="17" font-weight="800" text-anchor="middle">06</text>
+    
+  </g><g transform="translate(811 168)" aria-label="07号座位 available">
+    <path d="M-13 -25h26 M-13 25h26" stroke="#9AACA0" stroke-width="4" stroke-linecap="round"/>
+    <rect x="-24" y="-17" width="48" height="34" rx="9" fill="#D4EEDF" stroke="#2B6748" stroke-width="1.5"/>
+    <text x="0" y="6" fill="#2F8A5F" font-size="17" font-weight="800" text-anchor="middle">07</text>
+    
+  </g><g transform="translate(811 108)" aria-label="08号座位 selected">
+    <path d="M-13 -25h26 M-13 25h26" stroke="#9AACA0" stroke-width="4" stroke-linecap="round"/>
+    <rect x="-24" y="-17" width="48" height="34" rx="9" fill="#205A3D" stroke="#174731" stroke-width="3"/>
+    <text x="0" y="6" fill="#FFFFFF" font-size="17" font-weight="800" text-anchor="middle">08</text>
+    <circle cx="27" cy="-18" r="6" fill="#65CA91" stroke="#FFFFFF" stroke-width="2"/>
+  </g><g transform="translate(584 108)" aria-label="09号座位 available">
+    <path d="M-13 -25h26 M-13 25h26" stroke="#9AACA0" stroke-width="4" stroke-linecap="round"/>
+    <rect x="-24" y="-17" width="48" height="34" rx="9" fill="#D4EEDF" stroke="#2B6748" stroke-width="1.5"/>
+    <text x="0" y="6" fill="#2F8A5F" font-size="17" font-weight="800" text-anchor="middle">09</text>
+    
+  </g><g transform="translate(584 168)" aria-label="10号座位 available">
+    <path d="M-13 -25h26 M-13 25h26" stroke="#9AACA0" stroke-width="4" stroke-linecap="round"/>
+    <rect x="-24" y="-17" width="48" height="34" rx="9" fill="#D4EEDF" stroke="#2B6748" stroke-width="1.5"/>
+    <text x="0" y="6" fill="#2F8A5F" font-size="17" font-weight="800" text-anchor="middle">10</text>
+    
+  </g><g transform="translate(584 227)" aria-label="11号座位 occupied">
+    <path d="M-13 -25h26 M-13 25h26" stroke="#9AACA0" stroke-width="4" stroke-linecap="round"/>
+    <rect x="-24" y="-17" width="48" height="34" rx="9" fill="#E3E9E3" stroke="#BCC7BE" stroke-width="1.5"/>
+    <text x="0" y="6" fill="#7E8F83" font-size="17" font-weight="800" text-anchor="middle">11</text>
+    
+  </g><g transform="translate(584 408)" aria-label="12号座位 available">
+    <path d="M-13 -25h26 M-13 25h26" stroke="#9AACA0" stroke-width="4" stroke-linecap="round"/>
+    <rect x="-24" y="-17" width="48" height="34" rx="9" fill="#D4EEDF" stroke="#2B6748" stroke-width="1.5"/>
+    <text x="0" y="6" fill="#2F8A5F" font-size="17" font-weight="800" text-anchor="middle">12</text>
+    
+  </g><g transform="translate(584 468)" aria-label="13号座位 available">
+    <path d="M-13 -25h26 M-13 25h26" stroke="#9AACA0" stroke-width="4" stroke-linecap="round"/>
+    <rect x="-24" y="-17" width="48" height="34" rx="9" fill="#D4EEDF" stroke="#2B6748" stroke-width="1.5"/>
+    <text x="0" y="6" fill="#2F8A5F" font-size="17" font-weight="800" text-anchor="middle">13</text>
+    
+  </g><g transform="translate(502 168)" aria-label="14号座位 available">
+    <path d="M-13 -25h26 M-13 25h26" stroke="#9AACA0" stroke-width="4" stroke-linecap="round"/>
+    <rect x="-24" y="-17" width="48" height="34" rx="9" fill="#D4EEDF" stroke="#2B6748" stroke-width="1.5"/>
+    <text x="0" y="6" fill="#2F8A5F" font-size="17" font-weight="800" text-anchor="middle">14</text>
+    
+  </g><g transform="translate(502 108)" aria-label="15号座位 available">
+    <path d="M-13 -25h26 M-13 25h26" stroke="#9AACA0" stroke-width="4" stroke-linecap="round"/>
+    <rect x="-24" y="-17" width="48" height="34" rx="9" fill="#D4EEDF" stroke="#2B6748" stroke-width="1.5"/>
+    <text x="0" y="6" fill="#2F8A5F" font-size="17" font-weight="800" text-anchor="middle">15</text>
+    
+  </g><g transform="translate(337 108)" aria-label="16号座位 available">
+    <path d="M-13 -25h26 M-13 25h26" stroke="#9AACA0" stroke-width="4" stroke-linecap="round"/>
+    <rect x="-24" y="-17" width="48" height="34" rx="9" fill="#D4EEDF" stroke="#2B6748" stroke-width="1.5"/>
+    <text x="0" y="6" fill="#2F8A5F" font-size="17" font-weight="800" text-anchor="middle">16</text>
+    
+  </g><g transform="translate(337 168)" aria-label="17号座位 available">
+    <path d="M-13 -25h26 M-13 25h26" stroke="#9AACA0" stroke-width="4" stroke-linecap="round"/>
+    <rect x="-24" y="-17" width="48" height="34" rx="9" fill="#D4EEDF" stroke="#2B6748" stroke-width="1.5"/>
+    <text x="0" y="6" fill="#2F8A5F" font-size="17" font-weight="800" text-anchor="middle">17</text>
+    
+  </g><g transform="translate(337 227)" aria-label="18号座位 available">
+    <path d="M-13 -25h26 M-13 25h26" stroke="#9AACA0" stroke-width="4" stroke-linecap="round"/>
+    <rect x="-24" y="-17" width="48" height="34" rx="9" fill="#D4EEDF" stroke="#2B6748" stroke-width="1.5"/>
+    <text x="0" y="6" fill="#2F8A5F" font-size="17" font-weight="800" text-anchor="middle">18</text>
+    
+  </g><g transform="translate(258 168)" aria-label="19号座位 reserved">
+    <path d="M-13 -25h26 M-13 25h26" stroke="#9AACA0" stroke-width="4" stroke-linecap="round"/>
+    <rect x="-24" y="-17" width="48" height="34" rx="9" fill="#F4E5BB" stroke="#D0B275" stroke-width="1.5"/>
+    <text x="0" y="6" fill="#8B6524" font-size="17" font-weight="800" text-anchor="middle">19</text>
+    
+  </g><g transform="translate(258 108)" aria-label="20号座位 available">
+    <path d="M-13 -25h26 M-13 25h26" stroke="#9AACA0" stroke-width="4" stroke-linecap="round"/>
+    <rect x="-24" y="-17" width="48" height="34" rx="9" fill="#D4EEDF" stroke="#2B6748" stroke-width="1.5"/>
+    <text x="0" y="6" fill="#2F8A5F" font-size="17" font-weight="800" text-anchor="middle">20</text>
+    
+  </g><g transform="translate(92 108)" aria-label="21号座位 available">
+    <path d="M-13 -25h26 M-13 25h26" stroke="#9AACA0" stroke-width="4" stroke-linecap="round"/>
+    <rect x="-24" y="-17" width="48" height="34" rx="9" fill="#D4EEDF" stroke="#2B6748" stroke-width="1.5"/>
+    <text x="0" y="6" fill="#2F8A5F" font-size="17" font-weight="800" text-anchor="middle">21</text>
+    
+  </g><g transform="translate(92 168)" aria-label="22号座位 available">
+    <path d="M-13 -25h26 M-13 25h26" stroke="#9AACA0" stroke-width="4" stroke-linecap="round"/>
+    <rect x="-24" y="-17" width="48" height="34" rx="9" fill="#D4EEDF" stroke="#2B6748" stroke-width="1.5"/>
+    <text x="0" y="6" fill="#2F8A5F" font-size="17" font-weight="800" text-anchor="middle">22</text>
+    
+  </g><g transform="translate(92 227)" aria-label="23号座位 available">
+    <path d="M-13 -25h26 M-13 25h26" stroke="#9AACA0" stroke-width="4" stroke-linecap="round"/>
+    <rect x="-24" y="-17" width="48" height="34" rx="9" fill="#D4EEDF" stroke="#2B6748" stroke-width="1.5"/>
+    <text x="0" y="6" fill="#2F8A5F" font-size="17" font-weight="800" text-anchor="middle">23</text>
+    
+  </g><g transform="translate(92 287)" aria-label="24号座位 available">
+    <path d="M-13 -25h26 M-13 25h26" stroke="#9AACA0" stroke-width="4" stroke-linecap="round"/>
+    <rect x="-24" y="-17" width="48" height="34" rx="9" fill="#D4EEDF" stroke="#2B6748" stroke-width="1.5"/>
+    <text x="0" y="6" fill="#2F8A5F" font-size="17" font-weight="800" text-anchor="middle">24</text>
+    
+  </g><g transform="translate(92 599)" aria-label="25号座位 available">
+    <path d="M-13 -25h26 M-13 25h26" stroke="#9AACA0" stroke-width="4" stroke-linecap="round"/>
+    <rect x="-24" y="-17" width="48" height="34" rx="9" fill="#D4EEDF" stroke="#2B6748" stroke-width="1.5"/>
+    <text x="0" y="6" fill="#2F8A5F" font-size="17" font-weight="800" text-anchor="middle">25</text>
+    
+  </g><g transform="translate(92 515)" aria-label="26号座位 available">
+    <path d="M-13 -25h26 M-13 25h26" stroke="#9AACA0" stroke-width="4" stroke-linecap="round"/>
+    <rect x="-24" y="-17" width="48" height="34" rx="9" fill="#D4EEDF" stroke="#2B6748" stroke-width="1.5"/>
+    <text x="0" y="6" fill="#2F8A5F" font-size="17" font-weight="800" text-anchor="middle">26</text>
+    
+  </g><g transform="translate(92 431)" aria-label="27号座位 available">
+    <path d="M-13 -25h26 M-13 25h26" stroke="#9AACA0" stroke-width="4" stroke-linecap="round"/>
+    <rect x="-24" y="-17" width="48" height="34" rx="9" fill="#D4EEDF" stroke="#2B6748" stroke-width="1.5"/>
+    <text x="0" y="6" fill="#2F8A5F" font-size="17" font-weight="800" text-anchor="middle">27</text>
+    
+  </g><g transform="translate(258 599)" aria-label="28号座位 available">
+    <path d="M-13 -25h26 M-13 25h26" stroke="#9AACA0" stroke-width="4" stroke-linecap="round"/>
+    <rect x="-24" y="-17" width="48" height="34" rx="9" fill="#D4EEDF" stroke="#2B6748" stroke-width="1.5"/>
+    <text x="0" y="6" fill="#2F8A5F" font-size="17" font-weight="800" text-anchor="middle">28</text>
+    
+  </g>
+</svg>

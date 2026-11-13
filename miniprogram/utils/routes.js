@@ -4,6 +4,7 @@ module.exports = {
   bookingIndex: '/pages/booking/index',
   bookingOrder: '/pages/booking/order',
   storeDetail: '/pages/store/detail',
+  storeSelect: '/pages/store/select',
   storeSeats: '/pages/store/seats',
   exchangeIndex: '/pages/exchange/index',
   exchangeRecords: '/pages/exchange/records',

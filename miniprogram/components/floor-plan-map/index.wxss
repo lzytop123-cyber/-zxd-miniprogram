@@ -39,9 +39,8 @@
   font-weight: 700;
 }
 
-.zoom-reset {
-  min-width: 88rpx;
-  font-size: 22rpx;
+.plan-canvas--image {
+  background: #f7f9f7;
 }
 
 .plan-area {
@@ -58,6 +57,41 @@
   position: relative;
 }
 
+.plan-canvas--image .plan-area {
+  bottom: 68rpx;
+  width: auto;
+  height: auto;
+}
+
+.plan-canvas--image .zoom-controls {
+  bottom: 4rpx;
+  right: 12rpx;
+  gap: 0;
+  padding: 0;
+  border: 1rpx solid #d9e3dc;
+  border-radius: 12rpx;
+  overflow: hidden;
+  box-shadow: none;
+}
+
+.plan-canvas--image .zoom-btn {
+  min-width: 64rpx;
+  height: 58rpx;
+  line-height: 58rpx;
+  border-radius: 0;
+  background: #fff;
+  color: #285244;
+  font-weight: 500;
+}
+
+.plan-canvas--image .zoom-btn + .zoom-btn {
+  border-left: 1rpx solid #d9e3dc;
+}
+
+.plan-canvas--image .zoom-btn:active {
+  background: #e8f0eb;
+}
+
 /* 0~900 (x) / 0~700 (y) 逻辑画布映射到此盒子 */
 .floor {
   position: absolute;
@@ -66,6 +100,29 @@
   background: linear-gradient(180deg, #fbfdfc 0%, #f3f9f5 100%);
   box-shadow: inset 0 1rpx 0 rgba(255, 255, 255, 0.9);
   overflow: hidden;
+}
+
+.floor--image {
+  right: auto;
+  bottom: auto;
+  overflow: visible;
+  border-radius: 0;
+  background: #eef3f0;
+}
+
+.floor-bg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.floor-bg--empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #7a8b80;
+  font-size: 26rpx;
 }
 
 /* ============ 区域底色 ============ */
@@ -555,6 +612,160 @@
 
 .seat-chip-label--active {
   color: var(--color-bg-card);
+}
+
+/* Raised seats keep the top-down map and its touch coordinates intact. */
+.floor--image:not(.floor--drawn) .seat-chip {
+  --seat-face: #287556;
+  --seat-edge: #164936;
+  border: 1rpx solid var(--seat-edge);
+  border-radius: 6rpx;
+  background: var(--seat-face);
+  box-shadow: inset 0 2rpx 0 rgba(255, 255, 255, 0.25), 0 3rpx 0 var(--seat-edge);
+  animation: none;
+}
+
+.floor--image:not(.floor--drawn) .seat-chip.reserved {
+  --seat-face: #f5dea7;
+  --seat-edge: #a88131;
+}
+
+.floor--image:not(.floor--drawn) .seat-chip.occupied {
+  --seat-face: #d8dfdb;
+  --seat-edge: #87978e;
+}
+
+.floor--image:not(.floor--drawn) .seat-chip.is-selected {
+  --seat-face: #153d31;
+  --seat-edge: #102f25;
+  border-color: #fff;
+  box-shadow: 0 2rpx 0 var(--seat-edge), 0 0 0 2rpx var(--seat-edge);
+  transform: none;
+}
+
+.floor--image:not(.floor--drawn) .seat-anchor:active .seat-chip.available {
+  transform: translateY(2rpx);
+  box-shadow: inset 0 2rpx 0 rgba(255, 255, 255, 0.25), 0 1rpx 0 var(--seat-edge);
+}
+
+.floor--image:not(.floor--drawn) .seat-chip-label {
+  font-variant-numeric: tabular-nums;
+  text-shadow: none;
+}
+
+.floor--drawn {
+  background: #f7f9f7;
+  box-shadow: none;
+}
+
+.drawn-line {
+  position: absolute;
+  min-width: 4rpx;
+  min-height: 4rpx;
+  border-radius: 2rpx;
+  background: #879e90;
+}
+
+.drawn-line--window {
+  min-height: 2rpx;
+  background: #c8d9d0;
+}
+
+.drawn-label {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  white-space: nowrap;
+  font-size: 17rpx;
+  color: #456052;
+}
+
+.drawn-label--zone {
+  width: 1em;
+  padding: 4rpx 3rpx;
+  border-radius: 5rpx;
+  white-space: normal;
+  word-break: break-all;
+  text-align: center;
+  line-height: 1.12;
+  font-weight: 600;
+}
+
+.drawn-label--sun {
+  color: #76571d;
+  background: #f7edcf;
+}
+
+.drawn-label--curtain {
+  color: #37614e;
+  background: #e3f0e8;
+}
+
+.floor--drawn .seat-chip {
+  position: relative;
+  width: 32rpx;
+  height: 24rpx;
+  border-radius: 8rpx 8rpx 5rpx 5rpx;
+  border-bottom-width: 5rpx;
+  animation: none;
+}
+
+.floor--drawn .seat-chip.available {
+  border-bottom-color: #286a50;
+}
+
+.floor--drawn .seat-chip.is-selected {
+  border-bottom-color: #f3faf5;
+}
+
+.floor--drawn .seat-anchor {
+  min-width: 39rpx;
+  min-height: 29rpx;
+}
+
+.floor--drawn .seat-unit {
+  position: relative;
+  padding-top: 7rpx;
+}
+
+.floor--drawn .desk-bar:first-child {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  box-sizing: border-box;
+  width: 37rpx;
+  height: 5rpx;
+  border: 1rpx solid #927453;
+  border-radius: 4rpx;
+  background: #e6c8a4;
+}
+
+.floor--drawn .seat-unit--curtain .desk-bar:first-child {
+  border-left: 4rpx solid #466957;
+  border-right: 4rpx solid #466957;
+  background: #d8bd9c;
+}
+
+.floor--drawn .desk-bar:last-child {
+  position: absolute;
+  top: calc(100% + 3rpx);
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.floor--drawn .desk-bar:last-child {
+  box-sizing: border-box;
+  width: 30rpx;
+  height: 0;
+  border: 0;
+  border-top: 2rpx solid #678175;
+  border-radius: 0;
+  background: transparent;
+}
+
+.floor--drawn .seat-unit--curtain .desk-bar:last-child {
+  border-top-style: dashed;
+  border-top-color: #37614e;
 }
 
 @keyframes seat-pulse {

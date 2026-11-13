@@ -2,12 +2,17 @@
 from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal
 
-from sqlalchemy import func, or_, select
+from sqlalchemy import String, cast, func, literal, or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
+from sqlalchemy.sql import ColumnElement
 
-from app.models import CardPurchaseOrder, PayType, RechargeOrder, Reservation, User
+from app.models import CardPurchaseOrder, MeituanOrder, PayType, RechargeOrder, Reservation, User
 from app.models.receipts import Receipt, ReceiptRefund
+
+
+def _prefixed_keys(prefix: str, value_col, store_col, store_id: int):
+    return select(literal(prefix) + cast(value_col, String)).where(store_col == store_id)
 
 CHANNELS = {"meituan": "美团", "douyin": "抖音", "wechat_pay": "小程序微信支付", "wechat_transfer": "微信转账"}
 BEIJING = timezone(timedelta(hours=8))
@@ -58,7 +63,32 @@ def period(year: int, month: int | None = None) -> tuple[date, date]:
     return start, end
 
 
-def totals(db: Session, start: date, end: date, channel: str | None = None) -> dict:
+def store_scope_clause(store_id: int) -> ColumnElement[bool]:
+    """收款无 store_id：按关联预约/购卡/核销订单归属门店过滤。"""
+    return or_(
+        Receipt.source_key.in_(_prefixed_keys("platform:", MeituanOrder.id, MeituanOrder.store_id, store_id)),
+        Receipt.source_key.in_(
+            _prefixed_keys("reservation:", Reservation.order_no, Reservation.store_id, store_id)
+        ),
+        Receipt.source_key.in_(
+            _prefixed_keys("card:", CardPurchaseOrder.order_no, CardPurchaseOrder.store_id, store_id)
+        ),
+    )
+
+
+def apply_store_scope(query, store_id: int | None):
+    if store_id:
+        return query.where(store_scope_clause(store_id))
+    return query
+
+
+def totals(
+    db: Session,
+    start: date,
+    end: date,
+    channel: str | None = None,
+    store_id: int | None = None,
+) -> dict:
     """月汇总跟收款走：退款从原收款所在月份扣除，不记到退款当天。"""
     query = select(
         func.coalesce(func.sum(Receipt.amount), 0),
@@ -66,6 +96,7 @@ def totals(db: Session, start: date, end: date, channel: str | None = None) -> d
     ).where(Receipt.received_on >= start, Receipt.received_on < end)
     if channel:
         query = query.where(Receipt.channel == channel)
+    query = apply_store_scope(query, store_id)
     received, refunded = db.execute(query).one()
     return {"received": money(received), "refunded": money(refunded), "net": money(received - refunded)}
 

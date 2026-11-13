@@ -52,7 +52,9 @@ from app.services.admin_audit import log_admin_action
 from app.services.csv_export import export_reservations_csv, export_study_stats_csv, export_wallet_logs_csv
 from app.services.deal_template_service import import_deal_templates, list_deal_templates
 from app.services.points import adjust_points
+from app.core.static_url import public_static_url
 from app.services.seat_setup import seat_code_to_slot, store_seat_summary
+from app.services.store_seat_maps import get_published_map, is_image_mode
 from app.services.subscribe_notify import (
     _build_template_data,
     _card_type_label,
@@ -420,19 +422,30 @@ def store_live_board(
         .where(Seat.store_id == store_id, Seat.is_buffer == 0)
         .order_by(Seat.seat_code, Seat.id)
     ).all()
-    # ponytail: 历史 A01~D03 与新编号 1~28 指向同一 slot，按 slot 去重
+    image_mode = is_image_mode(store)
+    published = get_published_map(db, store_id) if image_mode else None
+    positions: dict[int, tuple[float, float]] = {}
+    for marker in (published.markers or []) if published else []:
+        try:
+            positions[int(marker["seat_id"])] = (float(marker["x_pct"]), float(marker["y_pct"]))
+        except (KeyError, TypeError, ValueError):
+            continue
+    # 历史 A01~D03 与新编号 1~28 指向同一 slot，按 slot 去重
     # 优先启用 + 有坐标的；无 slot 映射的直接丢弃（视为脏数据）
     def _score(s: Seat) -> int:
         return (2 if s.status == 1 else 0) + (1 if s.pos_x is not None and s.pos_y is not None else 0)
     dedup: dict[int, Seat] = {}
-    for s in seats_raw:
+    for s in ([] if image_mode else seats_raw):
         slot = seat_code_to_slot(s.seat_code)
         if slot is None:
             continue
         cur = dedup.get(slot)
         if cur is None or _score(s) > _score(cur):
             dedup[slot] = s
-    seats = [dedup[k] for k in sorted(dedup.keys())]
+    if image_mode:
+        seats = [s for s in seats_raw if not published or s.id in positions]
+    else:
+        seats = [dedup[k] for k in sorted(dedup.keys())]
     # 当前时刻有效的预约（已支付、未取消、未离座、时间窗口覆盖 now）
     rows = db.execute(
         select(Reservation, User)
@@ -482,17 +495,21 @@ def store_live_board(
             state = "free"
             info = None
         counts[state] += 1
+        left_pct, top_pct = positions.get(s.id, (None, None)) if image_mode else (
+            _pct(s.pos_x, 900), _pct(s.pos_y, 700)
+        )
         seat_items.append(
             {
                 "id": s.id,
                 "seat_code": s.seat_code,
                 "zone_name": zones.get(s.zone_id, "-"),
-                "left_pct": _pct(s.pos_x, 900),
-                "top_pct": _pct(s.pos_y, 700),
+                "left_pct": left_pct,
+                "top_pct": top_pct,
                 "state": state,
                 "info": info,
             }
         )
+
     total_active = counts["free"] + counts["booked"] + counts["occupied"]
     occupancy = round(
         (counts["occupied"] + counts["booked"]) / max(total_active, 1) * 100, 1
@@ -501,6 +518,9 @@ def store_live_board(
         data={
             "store_id": store_id,
             "store_name": store.name,
+            "map_mode": "image" if image_mode else "legacy",
+            "map_image_url": public_static_url(published.image_path) if published and published.image_path else None,
+            "map_aspect_ratio": float(published.aspect_ratio) if published and published.aspect_ratio is not None else None,
             "server_time": now.strftime("%Y-%m-%d %H:%M:%S"),
             "counts": counts,
             "occupancy_rate": occupancy,
@@ -513,10 +533,11 @@ def store_live_board(
 def store_expiring_cards(
     store_id: int,
     days: int = Query(7, ge=1, le=60, description="未来 N 天内到期"),
-    _: object = Depends(get_current_admin),
+    admin: AdminUser = Depends(get_current_admin),
     db: Session = Depends(get_db),
 ):
     """扫描即将到期的期限卡：按日期临期、次数临近、时长临近三种。"""
+    assert_store_access(admin, store_id)
     today = date.today()
     deadline = today + timedelta(days=days)
     cards = db.scalars(

@@ -100,11 +100,11 @@
 
   <!-- 两大主入口 -->
   <view class="entries">
-    <view class="entry entry-book" bindtap="goNearestStore">
+    <view class="entry entry-book" bindtap="goSelectStore">
       <view class="entry-deco"></view>
       <view class="entry-text">
         <view class="entry-cn">学习订座</view>
-        <view class="entry-desc">在线选座预约</view>
+        <view class="entry-desc">先选门店再预约</view>
       </view>
       <view class="mi-glyph glyph-lg icon-book mi-glyph--invert entry-icon"></view>
     </view>
@@ -170,41 +170,6 @@
     </view>
     <view class="promo-cta">去邀请</view>
   </view> -->
-
-  <!-- 附近门店 -->
-  <view class="section-row">
-    <view class="section-title">附近门店</view>
-    <text class="section-more" wx:if="{{stores.length && !storesLoading}}">共 {{stores.length}} 家</text>
-  </view>
-  <view class="location-hint" wx:if="{{locationHint && !storesLoading}}" bindtap="openLocationSetting">
-    <view class="mi-glyph icon-map-pin location-hint-icon"></view>
-    <text>{{locationHint}}</text>
-    <text class="location-hint-action">{{locationHint === '开启定位查看距离' ? '去设置 ›' : '重试 ›'}}</text>
-  </view>
-  <view class="store-list">
-    <block wx:if="{{storesLoading}}">
-      <view class="skeleton-store-card" wx:for="{{[1,2]}}" wx:key="*this">
-        <view class="skeleton-store-cover skeleton-shimmer"></view>
-        <view class="skeleton-store-body">
-          <view class="skeleton-line skeleton-line--lg skeleton-shimmer"></view>
-          <view class="skeleton-line skeleton-line--sm skeleton-shimmer"></view>
-        </view>
-      </view>
-    </block>
-    <block wx:else>
-      <store-card
-        wx:for="{{stores}}"
-        wx:key="id"
-        store="{{item}}"
-        showLocationHint="{{!!locationHint}}"
-        bind:select="goStore"
-      />
-      <view class="empty" wx:if="{{!stores.length}}">
-        <view class="mi-glyph glyph-xl icon-leaf empty-icon"></view>
-        <view>暂无门店信息</view>
-      </view>
-    </block>
-  </view>
 
   <view wx:if="{{showAnnouncementPopup && popupAnnouncement}}" class="announce-mask" catchtouchmove="true">
     <view class="announce-modal">

@@ -67,8 +67,34 @@
       <el-input v-model="form.wifi_password" />
     </el-form-item>
     <el-form-item label="美团门店 ID">
-      <el-input v-model="form.meituan_shop_id" placeholder="团购验券用，可留空" />
+      <el-input v-model="form.meituan_shop_id" placeholder="云老板 shopId，新店必填" />
+      <div class="field-hint">
+        与云老板开通的第二门店 shopId 一致；验券/核销按店走此 ID。留空则用系统默认（老店）。
+      </div>
     </el-form-item>
+    <template v-if="showFinanceFields">
+      <el-form-item label="收款账户">
+        <el-select v-model="form.pay_account_id" clearable placeholder="默认（全局商户/老对公）" style="width:100%">
+          <el-option
+            v-for="a in payAccountOptions"
+            :key="a.id"
+            :label="`${a.name}（${a.mchid}）`"
+            :value="a.id"
+          />
+        </el-select>
+        <div class="field-hint">绑定后该店微信预约/购卡进对应商户（新对公）。留空则用系统默认商户。</div>
+      </el-form-item>
+      <el-form-item label="权益隔离">
+        <el-switch
+          v-model="form.benefits_isolated"
+          :active-value="1"
+          :inactive-value="0"
+          active-text="开启"
+          inactive-text="关闭"
+        />
+        <div class="field-hint">开启后该店不可用余额与全局券，期限卡须本店发放（新店建议开启）。</div>
+      </el-form-item>
+    </template>
     <el-form-item v-if="showStatus" label="状态">
       <el-switch v-model="form.status" :active-value="1" :inactive-value="0" active-text="营业" inactive-text="停用" />
     </el-form-item>
@@ -76,13 +102,15 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import { ElMessage } from 'element-plus'
+import { isHqAdmin } from '../utils/adminAuth'
 
 const props = defineProps<{
   form: Record<string, any>
   uploading?: boolean
   showStatus?: boolean
+  payAccounts?: Array<{ id: number; name: string; mchid: string }>
 }>()
 
 defineEmits<{
@@ -90,6 +118,8 @@ defineEmits<{
   remove: [form: Record<string, any>, index: number]
 }>()
 
+const payAccountOptions = computed(() => props.payAccounts || [])
+const showFinanceFields = computed(() => isHqAdmin())
 const coordPaste = ref('')
 
 function applyCoordPaste() {

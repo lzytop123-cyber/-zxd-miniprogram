@@ -106,8 +106,9 @@
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, onUnmounted, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
+import { onWorkingStoreChange, workingStoreParams } from '../utils/workingStore'
 import {
   Refresh, ArrowRight, ArrowDown, Download,
   Money, TrendCharts, PieChart,
@@ -267,15 +268,15 @@ function shortDate(s: string) {
 }
 
 async function loadTodos() {
-  const res = await http.get('/admin/stats/todos')
+  const res = await http.get('/admin/stats/todos', { params: workingStoreParams() })
   todos.value = res.data
 }
 async function loadStats() {
-  const res = await http.get('/admin/stats')
+  const res = await http.get('/admin/stats', { params: workingStoreParams() })
   stats.value = res.data
 }
 async function loadRevenue() {
-  const res = await http.get('/admin/stats/revenue', { params: { days: 7 } })
+  const res = await http.get('/admin/stats/revenue', { params: workingStoreParams({ days: 7 }) })
   revenue.value = res.data
 }
 async function refreshAll() {
@@ -301,7 +302,12 @@ async function downloadExport(path: string) {
   } catch { ElMessage.error('导出失败') }
 }
 
-onMounted(refreshAll)
+let offWorkingStore: (() => void) | undefined
+onMounted(() => {
+  refreshAll()
+  offWorkingStore = onWorkingStoreChange(() => refreshAll())
+})
+onUnmounted(() => offWorkingStore?.())
 </script>
 
 <style scoped>

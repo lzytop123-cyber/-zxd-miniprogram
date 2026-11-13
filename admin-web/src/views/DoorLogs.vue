@@ -75,8 +75,9 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, reactive, ref } from 'vue'
+import { onMounted, onUnmounted, reactive, ref } from 'vue'
 import http from '../api/http'
+import { onWorkingStoreChange, resolveFilterStoreId, workingStoreParams } from '../utils/workingStore'
 
 const list = ref<any[]>([])
 const locks = ref<any[]>([])
@@ -95,14 +96,18 @@ const filters = reactive<{
 })
 
 async function loadLocks() {
-  const res = await http.get('/admin/locks')
+  const res = await http.get('/admin/locks', { params: workingStoreParams() })
   locks.value = res.data || []
 }
 
 async function load() {
   loading.value = true
   try {
-    const params: Record<string, unknown> = { page: page.value, page_size: pageSize }
+    const params: Record<string, unknown> = {
+      page: page.value,
+      page_size: pageSize,
+      ...workingStoreParams(),
+    }
     if (filters.lock_id != null) params.lock_id = filters.lock_id
     if (filters.result != null) params.result = filters.result
     if (dateRange.value?.[0]) params.date_from = dateRange.value[0]
@@ -128,10 +133,20 @@ function reset() {
   load()
 }
 
+let offWorkingStore: (() => void) | undefined
+
 onMounted(async () => {
   await loadLocks()
   await load()
+  offWorkingStore = onWorkingStoreChange(async () => {
+    filters.lock_id = null
+    page.value = 1
+    await loadLocks()
+    await load()
+  })
 })
+
+onUnmounted(() => offWorkingStore?.())
 </script>
 
 <style scoped>

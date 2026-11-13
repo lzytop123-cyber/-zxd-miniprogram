@@ -10,7 +10,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_current_admin, get_current_user
+from app.api.deps import get_current_user, require_hq_admin as get_current_admin
 from app.db.session import get_db
 from app.models import AdminUser, Notification, NotificationRead, Store, User
 from app.schemas.common import ResponseModel

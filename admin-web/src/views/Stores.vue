@@ -5,7 +5,7 @@
         <span>门店管理</span>
         <div class="actions">
           <el-tag type="info">修改后小程序即时生效</el-tag>
-          <el-button type="primary" @click="openCreate">新增门店</el-button>
+          <el-button v-if="isHq" type="primary" @click="openCreate">新增门店</el-button>
         </div>
       </div>
     </template>
@@ -30,6 +30,25 @@
         </template>
       </el-table-column>
       <el-table-column prop="wifi_name" label="WiFi" width="120" show-overflow-tooltip />
+      <el-table-column label="收款" width="100">
+        <template #default="{ row }">
+          {{ row.pay_account_id ? `账户#${row.pay_account_id}` : '默认' }}
+        </template>
+      </el-table-column>
+      <el-table-column label="权益隔离" width="90">
+        <template #default="{ row }">
+          <el-tag :type="row.benefits_isolated ? 'warning' : 'info'" size="small">
+            {{ row.benefits_isolated ? '已开' : '关' }}
+          </el-tag>
+        </template>
+      </el-table-column>
+      <el-table-column label="座位图" width="90">
+        <template #default="{ row }">
+          <el-tag :type="row.seat_map_mode === 'image' ? 'warning' : 'info'" size="small">
+            {{ row.seat_map_mode === 'image' ? '图片' : '固定' }}
+          </el-tag>
+        </template>
+      </el-table-column>
       <el-table-column prop="status" label="状态" width="80">
         <template #default="{ row }">
           <el-tag :type="row.status === 1 ? 'success' : 'info'">
@@ -48,6 +67,7 @@
       <StoreFormFields
         :form="createForm"
         :uploading="uploading"
+        :pay-accounts="payAccounts"
         @upload="(opt, f) => uploadCover(opt, f)"
         @remove="removeCover"
       />
@@ -61,6 +81,7 @@
       <StoreFormFields
         :form="form"
         :uploading="uploading"
+        :pay-accounts="payAccounts"
         show-status
         @upload="(opt, f) => uploadCover(opt, f)"
         @remove="removeCover"
@@ -74,13 +95,17 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import type { UploadRequestOptions } from 'element-plus'
 import http from '../api/http'
 import StoreFormFields from '../components/StoreFormFields.vue'
+import { isHqAdmin } from '../utils/adminAuth'
+
+const isHq = computed(() => isHqAdmin())
 
 const list = ref<any[]>([])
+const payAccounts = ref<any[]>([])
 const loading = ref(false)
 const saving = ref(false)
 const uploading = ref(false)
@@ -100,6 +125,8 @@ function emptyForm() {
     wifi_name: '',
     wifi_password: '',
     meituan_shop_id: '',
+    pay_account_id: null,
+    benefits_isolated: 0,
     cover_images: [] as string[],
     status: 1,
   }
@@ -136,6 +163,8 @@ function buildPayload(data: any) {
     wifi_name: data.wifi_name,
     wifi_password: data.wifi_password,
     meituan_shop_id: data.meituan_shop_id || null,
+    pay_account_id: data.pay_account_id ?? null,
+    benefits_isolated: data.benefits_isolated ? 1 : 0,
     cover_images: data.cover_images || [],
     ...(data.status !== undefined ? { status: data.status } : {}),
   }
@@ -144,8 +173,15 @@ function buildPayload(data: any) {
 async function load() {
   loading.value = true
   try {
-    const res = await http.get('/admin/stores')
-    list.value = res.data
+    const storesRes = await http.get('/admin/stores')
+    list.value = storesRes.data || []
+    try {
+      const accRes = await http.get('/admin/pay-accounts')
+      payAccounts.value = accRes.data || []
+    } catch {
+      // 旧后端无收款账户接口时仍展示门店列表
+      payAccounts.value = []
+    }
   } finally {
     loading.value = false
   }
@@ -177,6 +213,8 @@ function openEdit(row: any) {
     ...row,
     cover_images: [...(row.cover_images || [])],
     meituan_shop_id: row.meituan_shop_id || '',
+    pay_account_id: row.pay_account_id ?? null,
+    benefits_isolated: row.benefits_isolated ? 1 : 0,
   })
   showEdit.value = true
 }

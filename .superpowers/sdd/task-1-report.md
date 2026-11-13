@@ -1,52 +1,99 @@
-# Task 1 Report — Text-free Study Room Background
+# Task 1 Report: Permission catalog + unit tests
 
-## Generation
+## Status
 
-- Mode: built-in `image_gen` generation mode (not CLI fallback)
-- Intent: new image generation with a reference; the existing image was used only as a style/composition reference, not as an edit target
-- Reference: `F:/zxd-pro/assets/marketing/home-carousel/sources/source-02-calm-space.png`
-- Built-in generated source: `C:/Users/Administrator/.codex/generated_images/019f7e91-b18a-7981-be0d-c8a16afeb876/exec-7bc8ab40-2ac2-4376-85f3-d0fafb79f2ba.png`
-- Final output: `F:/zxd-pro/assets/marketing/home-carousel/sources/source-05-review-reward.png`
+**DONE**
 
-## Final prompt
+## Commit
 
-```text
-Use case: photorealistic-natural
-Asset type: background image for a WeChat Mini Program homepage carousel, designed for a safe near-square 1500:1360 crop
-Input images: Image 1 is a style and composition reference only. Generate a wholly new original photograph; do not edit, copy, or reproduce the reference.
-Primary request: Modern quiet study room, photorealistic premium lifestyle photography, visually full and edge-to-edge.
-Scene/backdrop: Calm contemporary self-study room with natural daylight, a matte deep forest-green architectural wall, light wood desks and chairs, and restrained indoor greenery.
-Subject: The main study-room detail is concentrated on the right side: elegant light-oak desks and chairs with subtle natural variation, one or two understated leafy plants, and warm ivory architectural accents. The room is empty and serene.
-Style/medium: Photorealistic editorial interior lifestyle photography with believable material grain, realistic furniture proportions, natural imperfections, gentle depth, and no artificial CGI sheen.
-Composition/framing: Near-square 1500:1360 composition. Reserve the broad left 55–60% as continuous dark forest-green negative space suitable for later typography, with very low visual detail and no objects intruding. Keep the primary furniture, window light, and greenery on the right 40–45%. Balanced eye-level wide interior view, safe to crop to 1500x1360, no borders or empty canvas margins.
-Lighting/mood: Soft natural daylight entering from the right, delicate window-light falloff and restrained soft shadows, calm premium contemplative mood, bright enough to show wood texture while keeping the left side dark and usable.
-Color palette: Warm ivory, pale natural wood, muted leaf green, and rich forest green; restrained and sophisticated.
-Materials/textures: Matte painted wall, authentic light-oak grain, subtle woven upholstery, softly textured ivory fabric or plaster, healthy natural leaves.
-Text: none.
-Constraints: No text, letters, numbers, logos, signs, labels, posters, books with visible writing, UI, phones, tablets, screens, status bars, icons, people, human figures, faces, watermarks, sale stickers, red envelopes, emojis, branded objects, or typographic marks. No clutter. No bright red accents. No duplicate or distorted furniture. Preserve broad clean dark-green negative space on the left and all main scene detail on the right.
+- `ded87cf` — feat: admin permission catalog and path map
+
+## TDD workflow
+
+1. Added `backend/scripts/test_admin_permissions.py` with the five cases from the task brief.
+2. Ran `python -m unittest scripts.test_admin_permissions -v` — failed with `ModuleNotFoundError` (expected).
+3. Implemented `backend/app/services/admin_permissions.py`.
+4. Re-ran tests — 5 passed.
+
+## Deliverables
+
+### `admin_permissions.py`
+
+- **Constants:** `STORE_DEFAULT_PERMISSIONS`, `EXTENDED_PERMISSIONS`, `ALL_PERMISSIONS` — values match the brief verbatim.
+- **`normalize_permissions(role, raw)`**
+  - `hq` → full `ALL_PERMISSIONS` (ignores `raw`).
+  - `store` + `None` → `STORE_DEFAULT_PERMISSIONS`.
+  - `store` + list → intersection with `ALL_PERMISSIONS`, order preserved from `ALL_PERMISSIONS`.
+  - `store` + `[]` → `[]`.
+- **`has_permission(admin, key)`** — uses `admin.role` and `getattr(admin, "permissions", None)` so it works before the model column lands in Task 2.
+- **`module_for_admin_path(method, path)`** — `login` / `me` return `None`; otherwise first matching rule in `PATH_RULES` (longest/specific rules listed first). String prefixes use segment-safe matching; store sub-routes use regex for numeric `store_id`. `method` is accepted but unused (reserved).
+- **`permission_summary(keys)`** — UI helper: `无` / `标准` / `标准+N` / `N项` per design doc list labels.
+
+### Path coverage
+
+Rules align with admin-web menus and current FastAPI routes under `/api/admin/*`, including:
+
+- Receipts, dashboard stats/todos, store-scoped live-board/calendar/pricing/seats/seat-map/zones
+- Reservations, locks, door-logs, card/period/deal/exchange modules
+- Extended modules (admins, pay-accounts, users, logs, market, wrongbook, etc.)
+- Exports (`wallet-logs`, `reservations`, `study-stats`)
+- `exchange-records` mapped to `exchange` (actual API path; brief example used `/exchange`)
+
+### Tests
+
+`PermissionCatalogTests`: null defaults, empty list, HQ full access, receipts path, login unmapped.
+
+## Self-review
+
+| Area | Notes |
+|------|--------|
+| Scope | Only catalog + unit tests; no model, migration, or middleware (later tasks). |
+| `has_permission` import in tests | Imported per brief but not asserted yet — fine for Task 1. |
+| Unknown admin paths | Return `None` (middleware will treat as allow or separate handling in Task 3). |
+| `system/coupon` | Mapped to `coupons` module (HQ-style coupon config endpoint). |
+| Git commit | Wrapper `git commit` failed on `--trailer`; used `G:\code\git\Git\bin\git.exe` as instructed. |
+
+## Verification command
+
+```bash
+cd backend
+.\.venv\Scripts\python.exe -m unittest scripts.test_admin_permissions -v
 ```
 
-## Dimensions and processing
-
-- Native built-in generation: 1254 × 1254 px PNG
-- Composition normalization: centered crop from 1254 × 1254 to 1254 × 1137, removing only excess upper/lower wall and floor area
-- Final delivery: 1500 × 1360 px PNG, high-quality bicubic resize
-- Final aspect ratio: 1.102941, exactly matching 1500:1360
-- Final pixel format: 24-bit RGB
-- Final file size: 3,273,892 bytes
-- SHA-256: `AA0136C937AF27D20E9EB0A1581E5DADB1FCDDACF7A1E8852822B9F7CB40C75D`
-
-## Validation notes
-
-- File validation: opened successfully through the image decoder after saving; PNG signature is valid (`89 50 4E 47 0D 0A 1A 0A`).
-- Visual validation: natural daylight enters from the right and produces believable soft falloff and restrained shadows.
-- Furniture/material validation: light-oak study desks and chairs have visible wood grain and plausible proportions; ivory upholstery is restrained.
-- Greenery validation: two understated plant groupings support the quiet study-room mood without creating clutter.
-- Composition validation: approximately the left 55–60% remains a continuous, low-detail dark forest-green field; the primary furniture, plants, and bright window are concentrated on the right.
-- Content-safety validation: no text, letters, numbers, logos, signs, UI, phones, status bars, icons, people, watermarks, sale stickers, red envelopes, or emojis were found on visual inspection.
-- Crop validation: the final centered 1500:1360 composition retains the full usable left negative-space field and all essential right-side scene detail.
+Result: **5 tests, OK**
 
 ## Concerns
 
-- Minor: the built-in generator returned a 1254 × 1254 native image, so the exact 1500 × 1360 delivery required a centered aspect crop and approximately 1.20× enlargement. The final file was visually inspected at full canvas size; no obvious interpolation artifacts or composition damage were observed.
-- No other concerns.
+None blocking. Future tasks should add tests for `permission_summary`, `has_permission`, and broader path-rule regression once middleware exists.
+
+---
+
+## Review fix: expiring-cards → live_board
+
+**Status:** DONE  
+**Commit:** `9f25ed2` — fix: map store expiring-cards API to live_board
+
+**Change:** Added `PATH_RULE` for `^/api/admin/stores/{id}/expiring-cards` → `live_board`, immediately after the existing `live-board` rule and before the `/api/admin/stores` catch-all (which had incorrectly mapped this endpoint to `stores`).
+
+**Regression test:** `test_path_maps_store_expiring_cards_to_live_board` asserts  
+`module_for_admin_path("GET", "/api/admin/stores/1/expiring-cards") == "live_board"`.
+
+**Verification:**
+
+```bash
+cd backend
+.\.venv\Scripts\python.exe -m unittest scripts.test_admin_permissions -v
+```
+
+```
+test_empty_store_gets_none ... ok
+test_hq_ignores_raw ... ok
+test_null_store_gets_defaults ... ok
+test_path_maps_receipts ... ok
+test_path_maps_store_expiring_cards_to_live_board ... ok
+test_unknown_admin_path_returns_none ... ok
+
+Ran 6 tests in 0.001s
+
+OK
+```

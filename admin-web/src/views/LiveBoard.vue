@@ -1,13 +1,15 @@
 <template>
   <div class="board" :class="{ fullscreen: isFull }" ref="boardEl">
     <div class="top-bar">
-      <div class="brand">实时占座 · {{ data?.store_name || '' }}</div>
+      <div class="brand">实时占座<span v-if="storeName"> · {{ storeName }}</span></div>
       <div class="tools">
         <el-select
           v-model="storeId"
           size="small"
           style="width: 180px"
-          @change="onStoreChange"
+          placeholder="选择门店"
+          :disabled="!isHq || !stores.length"
+          @change="pickStore"
         >
           <el-option v-for="s in stores" :key="s.id" :label="s.name" :value="s.id" />
         </el-select>
@@ -74,10 +76,10 @@
       </el-table>
     </div>
 
-    <div class="stat-bar">
+    <div v-if="data" class="stat-bar">
       <div class="rate">
         <div class="rate-num">{{ data?.occupancy_rate ?? 0 }}<span class="rate-suffix">%</span></div>
-        <div class="rate-lbl">入座率</div>
+        <div class="rate-lbl">占用率</div>
       </div>
       <div class="bar-wrap">
         <div class="bar">
@@ -99,8 +101,28 @@
       </div>
     </div>
 
-    <div class="map-wrap">
-      <div class="floor-map">
+    <div v-if="boardError" class="board-notice" role="status">
+      <span>{{ boardError }}</span>
+      <el-button size="small" @click="reload">重试</el-button>
+    </div>
+    <div v-if="!data && !boardError" class="board-notice" role="status">正在加载门店座位…</div>
+    <div v-if="seats.length" class="map-wrap">
+      <div
+        class="floor-map"
+        :class="{ 'floor-map--image': isImageMap }"
+        :style="floorMapStyle"
+      >
+        <img v-if="mapImageUrl && !imageFailed" class="floor-bg" :src="mapImageUrl" alt="门店平面图" @error="imageFailed = true" />
+        <svg v-else-if="data?.map_mode === 'legacy'" class="floor-bg legacy-plan" viewBox="0 0 900 700" preserveAspectRatio="none" aria-label="固定布局平面图">
+          <path d="M48 656V44H852V597H665 M48 656H604 M665 597V656 M295 44V324 M295 374V656 M549 44V324 M549 374V656 M48 324H221 M300 324H428 M510 324H549 M48 374H191 M270 374H366 M448 374H549" />
+          <g>
+            <text x="176" y="161">沉浸区 A</text>
+            <text x="433" y="161">沉浸区 B</text>
+            <text x="694" y="334">标准区</text>
+            <text x="171" y="515">沉浸区 C</text>
+            <text x="599" y="604">入口</text>
+          </g>
+        </svg>
         <div
           v-for="seat in seats"
           :key="seat.id"
@@ -141,6 +163,19 @@
         </div>
       </div>
     </div>
+    <div v-if="imageFailed && mapImageUrl" class="board-notice">
+      平面图图片加载失败，座位状态仍按已发布坐标显示。
+      <el-button size="small" @click="reload">重试</el-button>
+    </div>
+    <div v-if="data && !seats.length" class="board-notice">
+      {{ data.map_mode === 'image' ? '暂无可显示的已发布座位图，请到座位管理检查发布状态。' : '该门店暂无带坐标的座位，请到座位管理检查布局。' }}
+    </div>
+    <div v-if="unplacedSeats.length" class="unplaced">
+      <div>未定位座位</div>
+      <span v-for="seat in unplacedSeats" :key="seat.id" :class="'s-' + seat.state">
+        {{ seat.seat_code }} · {{ stateLabels[seat.state] || seat.state }}
+      </span>
+    </div>
 
     <div class="legend">
       <span class="refresh">每 10 秒自动刷新 · 服务器 {{ data?.server_time || '-' }}</span>
@@ -152,10 +187,18 @@
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import http from '../api/http'
+import { useRequiredStoreId } from '../composables/useWorkingStore'
+import { resolveRequiredStoreId, setWorkingStoreId } from '../utils/workingStore'
+import { isHqAdmin } from '../utils/adminAuth'
 
 const stores = ref<any[]>([])
 const storeId = ref<number | null>(null)
 const data = ref<any>(null)
+const boardError = ref('')
+const imageFailed = ref(false)
+const isHq = isHqAdmin()
+const storeName = computed(() => stores.value.find((store) => store.id === storeId.value)?.name || data.value?.store_name || '')
+const stateLabels: Record<string, string> = { free: '空闲', occupied: '在座', booked: '已预约未到', disabled: '停用' }
 const isFull = ref(false)
 const boardEl = ref<HTMLElement | null>(null)
 const clock = ref('')
@@ -165,6 +208,19 @@ let clockTimer: number | undefined
 const seats = computed<any[]>(() =>
   (data.value?.seats || []).filter((s: any) => s.left_pct != null && s.top_pct != null)
 )
+const unplacedSeats = computed<any[]>(() =>
+  (data.value?.seats || []).filter((s: any) => s.left_pct == null || s.top_pct == null)
+)
+
+const isImageMap = computed(() => data.value?.map_mode === 'image' && !!data.value?.map_image_url)
+const mapImageUrl = computed(() => data.value?.map_image_url || '')
+const floorMapStyle = computed(() => {
+  const ratio = Number(data.value?.map_aspect_ratio)
+  if (isImageMap.value && ratio > 0) {
+    return { aspectRatio: String(ratio) }
+  }
+  return {}
+})
 
 const totalSeats = computed(() => {
   const c = data.value?.counts
@@ -208,19 +264,41 @@ const expiring = ref<any[]>([])
 const showExpiring = ref(false)
 const remindingId = ref<number | null>(null)
 
+let boardRequest = 0
+let expiringRequest = 0
 async function load() {
-  if (!storeId.value) return
-  const res = await http.get(`/admin/stores/${storeId.value}/live-board`)
-  data.value = res.data
-  loadExpiring()
+  const id = storeId.value
+  if (!id || !stores.value.some((store) => store.id === id)) return
+  const requestId = ++boardRequest
+  if (data.value?.store_id !== id) {
+    data.value = null
+    expiring.value = []
+    showExpiring.value = false
+    imageFailed.value = false
+  }
+  try {
+    const res = await http.get(`/admin/stores/${id}/live-board`)
+    if (requestId !== boardRequest || id !== storeId.value) return
+    if (data.value?.map_image_url !== res.data.map_image_url) imageFailed.value = false
+    data.value = res.data
+    boardError.value = ''
+    void loadExpiring()
+  } catch (e: any) {
+    if (requestId !== boardRequest || id !== storeId.value) return
+    boardError.value = e?.response?.data?.detail || '实时占座加载失败，请重试'
+  }
 }
 
 async function loadExpiring() {
-  if (!storeId.value) return
-  const res = await http.get(`/admin/stores/${storeId.value}/expiring-cards`, {
-    params: { days: 7 },
-  })
-  expiring.value = res.data.items || []
+  const id = storeId.value
+  if (!id) return
+  const requestId = ++expiringRequest
+  try {
+    const res = await http.get(`/admin/stores/${id}/expiring-cards`, { params: { days: 7 } })
+    if (requestId === expiringRequest && id === storeId.value) expiring.value = res.data.items || []
+  } catch {
+    if (requestId === expiringRequest && id === storeId.value) expiring.value = []
+  }
 }
 
 async function sendRemind(row: any) {
@@ -237,7 +315,13 @@ async function sendRemind(row: any) {
 }
 
 async function onStoreChange() {
+  boardError.value = ''
   await load()
+}
+
+function pickStore(id: number) {
+  setWorkingStoreId(id)
+  void onStoreChange()
 }
 
 function tickClock() {
@@ -262,13 +346,31 @@ function onFsChange() {
   isFull.value = !!document.fullscreenElement
 }
 
-onMounted(async () => {
-  const res = await http.get('/admin/stores')
-  stores.value = res.data
-  if (stores.value.length) {
-    storeId.value = stores.value[0].id
-    await load()
+useRequiredStoreId(storeId, () => stores.value[0]?.id, onStoreChange)
+
+async function reload() {
+  boardError.value = ''
+  if (!stores.value.length) {
+    try {
+      const res = await http.get('/admin/stores')
+      stores.value = res.data || []
+    } catch (e: any) {
+      boardError.value = e?.response?.data?.detail || '门店列表加载失败，请重试'
+      return
+    }
+    if (!stores.value.length) {
+      boardError.value = '当前账号没有可查看的门店，请核对门店绑定。'
+      return
+    }
+    const preferred = resolveRequiredStoreId(stores.value[0].id)
+    storeId.value = stores.value.some((store) => store.id === preferred) ? preferred : stores.value[0].id
   }
+  imageFailed.value = false
+  await load()
+}
+
+onMounted(() => {
+  void reload()
   timer = window.setInterval(load, 10000)
   clockTimer = window.setInterval(tickClock, 1000)
   tickClock()
@@ -296,7 +398,7 @@ onUnmounted(() => {
 .board.fullscreen { min-height: 100vh; margin: 0; }
 .top-bar { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
 .brand { font-size: 22px; font-weight: 700; letter-spacing: 1px; color: #FFD000; }
-.tools { display: flex; align-items: center; gap: 12px; }
+.tools { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
 .clock { font-variant-numeric: tabular-nums; font-size: 18px; color: #9aa5b1; }
 
 .stat-bar {
@@ -338,6 +440,9 @@ onUnmounted(() => {
 .chip .dot.s-disabled { background: #4b5563; }
 
 .map-wrap { flex: 1; display: flex; justify-content: center; align-items: flex-start; }
+.board-notice { display: flex; align-items: center; gap: 12px; padding: 16px; border: 1px solid #303946; border-radius: 8px; color: #d2dae4; }
+.unplaced { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; color: #c1c9d3; }
+.unplaced span { padding: 4px 8px; border-radius: 5px; }
 .floor-map {
   position: relative;
   width: 100%;
@@ -352,6 +457,28 @@ onUnmounted(() => {
   border-radius: 12px;
   overflow: hidden;
 }
+.floor-map--image {
+  background: #111;
+  max-width: 880px;
+}
+.floor-map--image .seat {
+  width: clamp(22px, 5.5cqw, 50px);
+  height: clamp(18px, 4.6cqw, 42px);
+  padding: 2px;
+}
+.floor-map--image .seat .time {
+  display: none;
+}
+.floor-bg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  pointer-events: none;
+}
+.legacy-plan path { fill: none; stroke: #52636f; stroke-width: 4px; stroke-linecap: round; }
+.legacy-plan text { fill: #aebdc9; font-size: 17px; text-anchor: middle; }
 .seat {
   position: absolute;
   width: clamp(40px, 5.5cqw, 66px);

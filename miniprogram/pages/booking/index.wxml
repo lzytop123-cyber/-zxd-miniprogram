@@ -211,8 +211,13 @@
       <view class="seat-legend-item"><view class="seat-dot selected"></view><text>已选</text></view>
       <view class="seat-legend-item"><view class="seat-dot reserved"></view><text>已约</text></view>
       <view class="seat-count">
-        <text class="seat-count-num">{{availableSeatCount}}</text>
-        <text>座可订</text>
+        <text wx:if="{{seatMapMode === 'image' && seatMapReady && seatMapMarkers.length}}">共 {{seatMapMarkers.length}} 座</text>
+        <text wx:if="{{seatMapMode === 'image' && seatMapReady && seatMapMarkers.length && !seatsLoading && !seatLoadError}}"> · </text>
+        <block wx:if="{{!seatsLoading && !seatLoadError}}">
+          <text>该时段可订 </text>
+          <text class="seat-count-num">{{availableSeatCount}}</text>
+          <text> 座</text>
+        </block>
       </view>
     </view>
 
@@ -221,8 +226,12 @@
       <view class="seat-retry" bindtap="retrySeatLoad">重新加载座位</view>
     </view>
 
-    <view class="seat-map-frame" wx:elif="{{showSeatMap}}">
+    <view class="seat-map-frame {{seatMapMode==='image'?'seat-map-frame--image':''}}" wx:elif="{{showSeatMap && seatMapReady}}">
       <floor-plan-map
+        mode="{{seatMapMode}}"
+        imageUrl="{{seatMapImage}}"
+        aspectRatio="{{seatMapAspect}}"
+        mapMarkers="{{seatMapMarkers}}"
         seats="{{seats}}"
         selectedId="{{selectedId}}"
         bind:select="selectSeat"

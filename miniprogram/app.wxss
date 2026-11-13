@@ -500,6 +500,10 @@ page {
     0 8rpx 24rpx rgba(45, 106, 79, 0.08);
 }
 
+.seat-map-frame--image {
+  padding-bottom: 90%;
+}
+
 .seat-map-empty {
   padding: 64rpx 32rpx;
   text-align: center;
