@@ -59,6 +59,9 @@ class AdminRoleGuardMiddleware(BaseHTTPMiddleware):
             return await call_next(request)
         if path in ("/api/admin/login", "/api/admin/me"):
             return await call_next(request)
+        # Browser CORS preflight has no Bearer token; never auth-check OPTIONS.
+        if request.method == "OPTIONS":
+            return await call_next(request)
 
         method = request.method
         hard_deny = _is_hard_denied(method, path)
