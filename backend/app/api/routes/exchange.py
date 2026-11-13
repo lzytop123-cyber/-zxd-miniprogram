@@ -30,6 +30,7 @@ from app.services.deal_mapping_service import (
     user_redeemed_deal_count,
 )
 from app.services.douyin import DouyinService, parse_douyin_voucher_expire_date, use_douyin_official
+from app.services.exchange_setting import resolve_exchange_store_id
 from app.services.yunlaoban import YunlaobanService, parse_voucher_expire_date
 
 router = APIRouter(prefix="/exchange", tags=["兑换"])
@@ -92,20 +93,6 @@ class ExchangeRequest(BaseModel):
     store_id: int | None = None
 
 
-def _resolve_exchange_store_id(db: Session, store_id: int | None) -> int:
-    """兑换必须落到营业门店。旧版小程序不传 store_id 时，仅一家营业店则自动使用。"""
-    if store_id:
-        return int(store_id)
-    open_ids = list(
-        db.scalars(select(Store.id).where(Store.status == 1).order_by(Store.id)).all()
-    )
-    if len(open_ids) == 1:
-        return int(open_ids[0])
-    if not open_ids:
-        raise HTTPException(status_code=404, detail="暂无营业门店，请稍后再试")
-    raise HTTPException(status_code=400, detail="请选择门店后再兑换")
-
-
 @router.post("/meituan/{code}", response_model=ResponseModel)
 async def exchange_meituan(
     code: str = Path(..., min_length=6, max_length=32, description="团购券码"),
@@ -148,7 +135,7 @@ async def _exchange(
     source: CardSource,
 ):
     code = body.code.strip()
-    store_id = _resolve_exchange_store_id(db, body.store_id)
+    store_id = resolve_exchange_store_id(db, body.store_id)
     store = db.get(Store, store_id)
     if not store or store.status != 1:
         raise HTTPException(status_code=404, detail="门店不存在或已停业")

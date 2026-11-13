@@ -23,6 +23,7 @@ const router = createRouter({
         { path: 'users', component: () => import('../views/Users.vue') },
         { path: 'period-cards', component: () => import('../views/PeriodCards.vue') },
         { path: 'exchange-records', component: () => import('../views/ExchangeRecords.vue') },
+        { path: 'exchange-setting', component: () => import('../views/ExchangeSetting.vue') },
         { path: 'wallet-logs', component: () => import('../views/WalletLogs.vue') },
         { path: 'study-data', component: () => import('../views/StudyData.vue') },
         { path: 'assistant-usage', component: () => import('../views/AssistantUsage.vue') },

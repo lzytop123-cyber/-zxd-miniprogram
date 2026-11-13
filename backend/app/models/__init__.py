@@ -638,6 +638,17 @@ class SiteBookingSetting(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now, onupdate=datetime.now)
 
 
+class SiteExchangeSetting(Base):
+    """团购兑换规则（单行配置）。"""
+
+    __tablename__ = "site_exchange_settings"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    # 小程序未传门店时的默认兑换门店；空则仅在「唯一营业店」时自动落入
+    default_store_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("stores.id"))
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now, onupdate=datetime.now)
+
+
 class AdminOperationLog(Base):
     __tablename__ = "admin_operation_logs"
 

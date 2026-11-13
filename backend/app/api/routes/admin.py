@@ -3442,3 +3442,39 @@ def update_booking_setting_admin(
     db.commit()
     db.refresh(row)
     return ResponseModel(message="预约规则已保存", data=_booking_setting_dict(row))
+
+
+class AdminExchangeSettingRequest(BaseModel):
+    default_store_id: int | None = None
+
+
+@router.get("/exchange-setting", response_model=ResponseModel)
+def get_exchange_setting_admin(_: object = Depends(get_current_admin), db: Session = Depends(get_db)):
+    from app.services.exchange_setting import exchange_setting_dict, get_or_create_exchange_setting
+
+    row = get_or_create_exchange_setting(db)
+    return ResponseModel(data=exchange_setting_dict(db, row))
+
+
+@router.put("/exchange-setting", response_model=ResponseModel)
+def update_exchange_setting_admin(
+    body: AdminExchangeSettingRequest,
+    _: object = Depends(get_current_admin),
+    db: Session = Depends(get_db),
+):
+    from app.services.exchange_setting import exchange_setting_dict, get_or_create_exchange_setting
+
+    store_id = body.default_store_id
+    if store_id is not None:
+        store = db.get(Store, int(store_id))
+        if not store:
+            raise HTTPException(status_code=404, detail="门店不存在")
+        if store.status != 1:
+            raise HTTPException(status_code=400, detail="默认兑换门店须为营业中门店")
+        store_id = int(store_id)
+
+    row = get_or_create_exchange_setting(db)
+    row.default_store_id = store_id
+    db.commit()
+    db.refresh(row)
+    return ResponseModel(message="兑换规则已保存", data=exchange_setting_dict(db, row))

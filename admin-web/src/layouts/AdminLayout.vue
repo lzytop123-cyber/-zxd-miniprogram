@@ -218,6 +218,7 @@ const allMenu = [
       { title: '期限卡', path: '/period-cards' },
       { title: '团购映射', path: '/deal-mappings' },
       { title: '兑换记录', path: '/exchange-records' },
+      { title: '兑换规则', path: '/exchange-setting' },
       { title: '优惠券', path: '/coupons' },
     ],
   },

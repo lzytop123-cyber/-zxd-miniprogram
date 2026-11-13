@@ -82,6 +82,7 @@ PATH_RULES: list[PathRule] = [
     ("/api/admin/card-purchase-orders", "card_orders"),
     ("/api/admin/period-cards", "period_cards"),
     ("/api/admin/exchange-records", "exchange"),
+    ("/api/admin/exchange-setting", "exchange"),
     ("/api/admin/wallet-logs", "wallet_logs"),
     ("/api/admin/point-logs", "point_logs"),
     ("/api/admin/invites", "invites"),
