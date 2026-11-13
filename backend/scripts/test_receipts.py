@@ -4,7 +4,6 @@ os.environ["DATABASE_URL"] = "sqlite://"
 
 import unittest
 from concurrent.futures import ThreadPoolExecutor
-from contextlib import nullcontext
 from datetime import datetime
 from decimal import Decimal
 from pathlib import Path
@@ -21,7 +20,7 @@ from sqlalchemy.pool import StaticPool
 
 from app.api.deps import get_current_admin
 from app.db.session import Base, get_db
-from app.models import AdminUser, BillType, CardPurchaseOrder, PayType, PricingRule, RechargeOrder, Reservation, User
+from app.models import AdminUser, BillType, CardPurchaseOrder, PayType, PricingRule, RechargeOrder, Reservation, Store, User
 
 
 class ReceiptsTests(unittest.TestCase):
@@ -31,7 +30,11 @@ class ReceiptsTests(unittest.TestCase):
         Base.metadata.create_all(self.engine)
         self.db = Session(self.engine)
         self.admin = AdminUser(username="test", password_hash="unused")
-        self.db.add_all([self.admin, User(id=1, openid="test")])
+        self.db.add_all([
+            self.admin,
+            User(id=1, openid="test"),
+            Store(id=1, name="知行岛自习室(千峰南路店)"),
+        ])
         self.db.commit()
         self.app = FastAPI()
         self.app.include_router(admin_receipts.router)
@@ -46,7 +49,7 @@ class ReceiptsTests(unittest.TestCase):
             self.engine.dispose()
 
     def receipt(self, **changes):
-        body = dict(channel="wechat_transfer", amount="100.00", received_on="2025-08-31", customer="小王", request_id=str(uuid4()))
+        body = dict(channel="wechat_transfer", amount="100.00", received_on="2025-08-31", customer="小王", store_id=1, request_id=str(uuid4()))
         body.update(changes)
         res = self.client.post("/admin/receipts", json=body)
         self.assertEqual(res.status_code, 200, res.text)
@@ -87,7 +90,7 @@ class ReceiptsTests(unittest.TestCase):
 
     def test_validation_and_auth(self):
         for amount in ["0", "-1", "0.001", "NaN", "100000000"]:
-            result = self.client.post("/admin/receipts", json=dict(channel="meituan", amount=amount, received_on="2025-01-01", request_id=str(uuid4())))
+            result = self.client.post("/admin/receipts", json=dict(channel="meituan", amount=amount, received_on="2025-01-01", store_id=1, request_id=str(uuid4())))
             self.assertEqual(result.status_code, 422, result.text)
         row = self.receipt()
         self.assertEqual(self.refund(row["id"], completed=False).status_code, 422)
@@ -99,7 +102,7 @@ class ReceiptsTests(unittest.TestCase):
     def test_request_key_cannot_silently_accept_different_amount(self):
         key = str(uuid4())
         row = self.receipt(request_id=key)
-        result = self.client.post("/admin/receipts", json=dict(channel="wechat_transfer", amount="200", received_on="2025-08-31", customer="小王", request_id=key))
+        result = self.client.post("/admin/receipts", json=dict(channel="wechat_transfer", amount="200", received_on="2025-08-31", customer="小王", store_id=1, request_id=key))
         self.assertEqual(result.status_code, 409)
         refund_key = str(uuid4())
         self.assertEqual(self.refund(row["id"], request_id=refund_key).status_code, 200)
@@ -107,7 +110,7 @@ class ReceiptsTests(unittest.TestCase):
 
     def test_channel_reference_uniqueness_and_annual_filter(self):
         self.receipt(channel="meituan", amount="12.30", reference="MT1")
-        result = self.client.post("/admin/receipts", json=dict(channel="meituan", amount="12.30", received_on="2025-08-31", reference="MT1", request_id=str(uuid4())))
+        result = self.client.post("/admin/receipts", json=dict(channel="meituan", amount="12.30", received_on="2025-08-31", reference="MT1", store_id=1, request_id=str(uuid4())))
         self.assertEqual(result.status_code, 409)
         self.receipt(channel="douyin", amount="0.10", received_on="2025-01-01")
         self.receipt(channel="douyin", amount="0.20", received_on="2025-12-31")
@@ -170,7 +173,16 @@ class ReceiptsTests(unittest.TestCase):
         self.db.add(order)
         self.db.commit()
         # Isolate Redis/door notification side effects; real payment state changes stay under test.
-        with patch.object(payment, "RedisLock", return_value=nullcontext()), patch.object(payment, "finalize_reservation_after_pay", new_callable=AsyncMock):
+        class _HeldLock:
+            acquired = True
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *exc):
+                return False
+
+        with patch.object(payment, "RedisLock", return_value=_HeldLock()), patch.object(payment, "finalize_reservation_after_pay", new_callable=AsyncMock):
             result = asyncio.run(payment.complete_reservation_wechat_payment(self.db, order, paid_fen=1800, success_time="2025-08-31T16:01:00Z"))
             self.assertEqual(result, "paid")
             self.assertEqual(order.paid_at, datetime(2025, 9, 1, 0, 1))
@@ -198,6 +210,8 @@ class ReceiptsTests(unittest.TestCase):
         self.assertTrue(inspector.has_table("receipt_refunds"))
         for table in ("reservations", "card_purchase_orders"):
             self.assertTrue(next(c for c in inspector.get_columns(table) if c["name"] == "paid_at")["nullable"])
+        store_col = next(c for c in inspector.get_columns("receipts") if c["name"] == "store_id")
+        self.assertTrue(store_col["nullable"])
 
     def test_concurrent_refunds_do_not_exceed_receipt(self):
         from app.api.routes import admin_receipts
@@ -209,6 +223,7 @@ class ReceiptsTests(unittest.TestCase):
                 factory = sessionmaker(bind=engine)
                 with factory() as db:
                     db.add(AdminUser(id=1, username="test", password_hash="unused"))
+                    db.add(Store(id=1, name="知行岛自习室(千峰南路店)"))
                     db.commit()
                 app = FastAPI()
                 app.include_router(admin_receipts.router)
@@ -219,7 +234,7 @@ class ReceiptsTests(unittest.TestCase):
                 app.dependency_overrides[get_current_admin] = lambda: AdminUser(id=1, username="test")
                 with TestClient(app) as client:
                     for same_key in (False, True):
-                        created = client.post("/admin/receipts", json=dict(channel="douyin", amount="100", received_on="2025-01-01", request_id=str(uuid4())))
+                        created = client.post("/admin/receipts", json=dict(channel="douyin", amount="100", received_on="2025-01-01", store_id=1, request_id=str(uuid4())))
                         self.assertEqual(created.status_code, 200, created.text)
                         receipt_id = created.json()["data"]["id"]
                         barrier = Barrier(2)
@@ -306,6 +321,213 @@ class ReceiptsTests(unittest.TestCase):
         orphan = self.db.scalar(select(Receipt).where(Receipt.source_key == "manual-orphan"))
         result = self.client.patch(f"/admin/receipts/{orphan.id}/date", json={"received_on": "2025-09-05"})
         self.assertEqual(result.status_code, 200, result.text)
+
+    def test_migration_adds_store_id_on_existing_receipts_table(self):
+        from app.models.receipts import Receipt, ReceiptRefund
+        from app.services import schema_migrate
+        self.db.commit()
+        ReceiptRefund.__table__.drop(self.engine)
+        Receipt.__table__.drop(self.engine)
+        with self.engine.begin() as conn:
+            conn.execute(text(
+                "CREATE TABLE receipts ("
+                "id INTEGER PRIMARY KEY, "
+                "source_key VARCHAR(100) NOT NULL UNIQUE, "
+                "channel VARCHAR(30) NOT NULL, "
+                "amount NUMERIC(10, 2) NOT NULL, "
+                "refunded_amount NUMERIC(10, 2) NOT NULL DEFAULT 0, "
+                "received_on DATE, customer VARCHAR(100), reference VARCHAR(100), "
+                "remark VARCHAR(500), source_refunded BOOLEAN NOT NULL DEFAULT 0, "
+                "created_at DATETIME)"
+            ))
+        with patch.object(schema_migrate, "engine", self.engine):
+            first = schema_migrate.run_schema_migrations(self.db)
+            second = schema_migrate.run_schema_migrations(self.db)
+        self.assertFalse(first["errors"], first["errors"])
+        self.assertFalse(second["errors"], second["errors"])
+        columns = {c["name"]: c for c in inspect(self.engine).get_columns("receipts")}
+        self.assertIn("store_id", columns)
+        self.assertTrue(columns["store_id"]["nullable"])
+
+    def test_manual_receipt_requires_store(self):
+        missing = self.client.post("/admin/receipts", json=dict(
+            channel="wechat_transfer", amount="10.00", received_on="2026-01-02", request_id=str(uuid4()),
+        ))
+        self.assertEqual(missing.status_code, 422, missing.text)
+        unknown = self.client.post("/admin/receipts", json=dict(
+            channel="wechat_transfer", amount="10.00", received_on="2026-01-02", store_id=999, request_id=str(uuid4()),
+        ))
+        self.assertEqual(unknown.status_code, 400, unknown.text)
+        self.db.add(Store(id=2, name="理工大店"))
+        mgr = AdminUser(username="mgr-store", password_hash="x", role="store", store_id=1)
+        self.db.add(mgr)
+        self.db.commit()
+        self.app.dependency_overrides[get_current_admin] = lambda: mgr
+        other = self.client.post("/admin/receipts", json=dict(
+            channel="wechat_transfer", amount="10.00", received_on="2026-01-02", store_id=2, request_id=str(uuid4()),
+        ))
+        self.assertEqual(other.status_code, 403, other.text)
+        own = self.receipt(amount="10.00", received_on="2026-01-02")
+        self.assertEqual(own["store_id"], 1)
+
+    def test_new_receipts_inherit_order_store(self):
+        from app.models import MeituanOrder, MeituanOrderStatus
+        from app.models.receipts import Receipt
+        self.db.add(Store(id=2, name="理工大店"))
+        self.db.add_all([
+            Reservation(
+                order_no="RES-S1", user_id=1, store_id=1, seat_id=1, bill_type=BillType.hourly,
+                start_time=datetime(2026, 11, 5, 10), end_time=datetime(2026, 11, 5, 11),
+                final_price=Decimal("62.70"), pay_type=PayType.wechat, pay_status=1,
+                paid_at=datetime(2026, 11, 5, 9),
+            ),
+            Reservation(
+                order_no="RES-S2", user_id=1, store_id=2, seat_id=2, bill_type=BillType.hourly,
+                start_time=datetime(2026, 11, 13, 15), end_time=datetime(2026, 11, 13, 16),
+                final_price=Decimal("17.00"), pay_type=PayType.wechat, pay_status=1,
+                paid_at=datetime(2026, 11, 13, 15),
+            ),
+            MeituanOrder(
+                coupon_code="MT-S2", user_id=1, store_id=2, status=MeituanOrderStatus.verified,
+                verified_at=datetime(2026, 11, 13, 16), deal_name="体验",
+                meituan_raw={"payAmount": 800, "receipt_channel": "douyin"},
+            ),
+            MeituanOrder(
+                coupon_code="MT-REVIEW", user_id=1, store_id=1, status=MeituanOrderStatus.verified,
+                verified_at=datetime(2026, 11, 2, 12), deal_name="待核", deal_price=Decimal("12"),
+                meituan_raw={"ticketData": {"dealPrice": 12}},
+            ),
+            RechargeOrder(
+                order_no="RCH-NOS", user_id=1, amount=Decimal("15.00"), pay_status=1,
+                pay_type=PayType.wechat, paid_at=datetime(2026, 11, 1, 12),
+            ),
+        ])
+        self.db.commit()
+        synced = self.client.post("/admin/receipts/sync")
+        self.assertEqual(synced.status_code, 200, synced.text)
+        rows = {row.reference: row for row in self.db.scalars(select(Receipt)).all()}
+        self.assertEqual(rows["RES-S1"].store_id, 1)
+        self.assertEqual(rows["RES-S2"].store_id, 2)
+        self.assertEqual(rows["MT-S2"].store_id, 2)
+        self.assertIsNone(rows["RCH-NOS"].store_id)
+        review = self.db.scalar(select(MeituanOrder).where(MeituanOrder.coupon_code == "MT-REVIEW"))
+        confirmed = self.client.post(
+            f"/admin/receipts/platform-review/{review.id}/confirm",
+            json={"channel": "meituan", "amount": "12.00", "received_on": "2026-11-02", "confirmed": True},
+        )
+        self.assertEqual(confirmed.status_code, 200, confirmed.text)
+        self.assertEqual(confirmed.json()["data"]["store_id"], 1)
+
+    def test_backfill_attributes_unscoped_history_without_double_count(self):
+        from datetime import date
+        from app.models import MeituanOrder, MeituanOrderStatus
+        from app.models.receipts import Receipt
+        from app.services.receipt_store_backfill import backfill_receipt_stores
+
+        self.db.add(Store(id=2, name="理工大店"))
+        self.db.add_all([
+            Reservation(
+                order_no="S1", user_id=1, store_id=1, seat_id=1, bill_type=BillType.hourly,
+                start_time=datetime(2026, 11, 5, 10), end_time=datetime(2026, 11, 5, 11),
+                final_price=Decimal("62.70"), pay_type=PayType.wechat, pay_status=1,
+            ),
+            Reservation(
+                order_no="S2", user_id=1, store_id=2, seat_id=2, bill_type=BillType.hourly,
+                start_time=datetime(2026, 11, 13, 15), end_time=datetime(2026, 11, 13, 16),
+                final_price=Decimal("17.00"), pay_type=PayType.wechat, pay_status=1,
+            ),
+        ])
+        self.db.flush()
+        unscoped = MeituanOrder(
+            coupon_code="MONTH", user_id=1, store_id=None, status=MeituanOrderStatus.verified,
+            verified_at=datetime(2026, 11, 8, 12), deal_name="月卡",
+        )
+        kept = MeituanOrder(
+            coupon_code="LGD", user_id=1, store_id=2, status=MeituanOrderStatus.verified,
+            verified_at=datetime(2026, 11, 13, 16), deal_name="理工大",
+        )
+        pending = MeituanOrder(
+            coupon_code="PEND", user_id=1, store_id=None, status=MeituanOrderStatus.pending,
+            deal_name="未核销",
+        )
+        self.db.add_all([unscoped, kept, pending])
+        self.db.flush()
+        self.db.add_all([
+            Receipt(source_key="reservation:S1", channel="wechat_pay", amount=Decimal("62.70"), received_on=date(2026, 11, 5), reference="S1"),
+            Receipt(source_key=f"platform:{unscoped.id}", channel="meituan", amount=Decimal("50.00"), received_on=date(2026, 11, 8), reference="MONTH"),
+            Receipt(source_key="manual:old", channel="wechat_transfer", amount=Decimal("30.00"), refunded_amount=Decimal("10.00"), received_on=date(2026, 8, 1), reference="MANUAL"),
+            Receipt(source_key="recharge:R1", channel="wechat_pay", amount=Decimal("20.00"), received_on=date(2026, 4, 2), reference="R1"),
+            Receipt(source_key="reservation:S2", channel="wechat_pay", amount=Decimal("17.00"), received_on=date(2026, 11, 13), reference="S2"),
+            Receipt(source_key="manual:lgd", channel="wechat_transfer", amount=Decimal("3.00"), received_on=date(2026, 8, 2), reference="LGD-MANUAL", store_id=2),
+        ])
+        self.db.commit()
+
+        def totals(month=None, store_id=None):
+            params = {"year": 2026}
+            if month:
+                params["month"] = month
+            if store_id:
+                params["store_id"] = store_id
+            data = self.client.get("/admin/receipts/summary", params=params).json()["data"]
+            return data["month"] if month else data["year"]
+
+        # 回填前，空门店的核销、手工和充值不进千峰南路；理工大店预约仍在本店。
+        self.assertEqual(Decimal(totals(11, 1)["received"]), Decimal("62.70"))
+        self.assertEqual(Decimal(totals(11, 2)["received"]), Decimal("17.00"))
+        before_all = totals()
+        self.assertEqual(Decimal(before_all["received"]), Decimal("182.70"))
+        self.assertEqual(Decimal(before_all["refunded"]), Decimal("10.00"))
+        self.assertEqual(Decimal(before_all["net"]), Decimal("172.70"))
+
+        stats = backfill_receipt_stores(self.db)
+        self.assertEqual(stats["orders_assigned"], 1)
+        self.assertEqual(stats["receipts_from_orders"], 3)
+        self.assertEqual(stats["receipts_legacy"], 2)
+        self.assertEqual(stats["legacy_store_id"], 1)
+        again = backfill_receipt_stores(self.db)
+        self.assertEqual((again["orders_assigned"], again["receipts_from_orders"], again["receipts_legacy"]), (0, 0, 0))
+
+        self.db.refresh(unscoped)
+        self.db.refresh(kept)
+        self.db.refresh(pending)
+        self.assertEqual(unscoped.store_id, 1)
+        self.assertEqual(kept.store_id, 2)
+        self.assertIsNone(pending.store_id)
+        by_ref = {row.reference: row.store_id for row in self.db.scalars(select(Receipt)).all()}
+        self.assertEqual(by_ref, {"S1": 1, "MONTH": 1, "MANUAL": 1, "R1": 1, "S2": 2, "LGD-MANUAL": 2})
+
+        store1, store2 = totals(store_id=1), totals(store_id=2)
+        after_all = totals()
+        self.assertEqual(after_all, before_all)
+        self.assertEqual(Decimal(store1["received"]), Decimal("162.70"))
+        self.assertEqual(Decimal(store1["refunded"]), Decimal("10.00"))
+        self.assertEqual(Decimal(store1["net"]), Decimal("152.70"))
+        self.assertEqual(Decimal(store2["received"]), Decimal("20.00"))
+        self.assertEqual(Decimal(store2["refunded"]), Decimal("0"))
+        self.assertEqual(Decimal(store1["received"]) + Decimal(store2["received"]), Decimal(after_all["received"]))
+        self.assertEqual(Decimal(store1["refunded"]) + Decimal(store2["refunded"]), Decimal(after_all["refunded"]))
+        self.assertEqual(Decimal(store1["net"]) + Decimal(store2["net"]), Decimal(after_all["net"]))
+        self.assertEqual(Decimal(totals(11, 1)["received"]), Decimal("112.70"))
+        self.assertEqual(Decimal(totals(11, 2)["received"]), Decimal("17.00"))
+        listed = self.client.get("/admin/receipts", params={"year": 2026, "store_id": 1, "page_size": 100}).json()["data"]
+        self.assertEqual({item["reference"] for item in listed["items"]}, {"S1", "MONTH", "MANUAL", "R1"})
+        everyone = self.client.get("/admin/receipts", params={"year": 2026, "page_size": 100}).json()["data"]
+        self.assertEqual(everyone["total"], 6)
+
+    def test_backfill_stops_when_qianfeng_store_is_missing(self):
+        from datetime import date
+        from app.models.receipts import Receipt
+        from app.services.receipt_store_backfill import backfill_receipt_stores
+        self.db.delete(self.db.get(Store, 1))
+        self.db.add(Receipt(
+            source_key="manual:x", channel="wechat_transfer", amount=Decimal("1.00"),
+            received_on=date(2026, 1, 1), reference="X",
+        ))
+        self.db.commit()
+        with self.assertRaises(RuntimeError):
+            backfill_receipt_stores(self.db)
+        row = self.db.scalar(select(Receipt).where(Receipt.source_key == "manual:x"))
+        self.assertIsNone(row.store_id)
 
 
 if __name__ == "__main__":

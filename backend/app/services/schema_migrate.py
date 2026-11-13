@@ -49,6 +49,7 @@ MIGRATION_STATEMENTS = [
 
 # 性能索引（存量库补建；已存在时忽略）
 INDEX_STATEMENTS = [
+    "CREATE INDEX ix_receipts_store_received ON receipts (store_id, received_on)",
     "CREATE INDEX ix_reservations_seat_time ON reservations (seat_id, start_time, end_time)",
     "CREATE INDEX ix_reservations_user ON reservations (user_id)",
     "CREATE INDEX ix_wallet_logs_user_created ON wallet_logs (user_id, created_at)",
@@ -83,6 +84,19 @@ def run_schema_migrations(db: Session) -> dict:
                 if "duplicate" in msg or "already exists" in msg:
                     continue
                 errors.append(f"{col_hint}: {exc.__class__.__name__}")
+
+        # 收款门店列：只加结构，不在启动时改历史归属。数据回填见
+        # scripts/backfill_receipt_stores.py，由运维在确认后单独执行。
+        if inspector.has_table("receipts"):
+            receipt_cols = {c["name"] for c in inspector.get_columns("receipts")}
+            if "store_id" not in receipt_cols:
+                try:
+                    conn.execute(text("ALTER TABLE receipts ADD COLUMN store_id INTEGER"))
+                    applied.append("receipts.store_id")
+                except Exception as exc:
+                    msg = str(exc).lower()
+                    if "duplicate" not in msg and "already exists" not in msg:
+                        errors.append(f"receipts.store_id: {exc.__class__.__name__}")
 
         backfill_hours = 0
         if inspector.has_table("period_cards"):

@@ -81,6 +81,7 @@
         <el-table-column prop="id" label="编号" width="75" />
         <el-table-column label="收款日期" width="135"><template #default="{ row }"><span v-if="row.received_on">{{ row.received_on }}</span><el-tag v-else type="warning" size="small">待补日期</el-tag></template></el-table-column>
         <el-table-column label="渠道" width="155"><template #default="{ row }">{{ channels[row.channel as Channel] }}</template></el-table-column>
+        <el-table-column label="门店" min-width="140" show-overflow-tooltip><template #default="{ row }">{{ storeName(row.store_id) }}</template></el-table-column>
         <el-table-column prop="customer" label="同学 / 付款人" min-width="120" show-overflow-tooltip />
         <el-table-column label="收款（元）" width="115" align="right"><template #default="{ row }">{{ money(row.amount) }}</template></el-table-column>
         <el-table-column label="累计退款（元）" width="130" align="right"><template #default="{ row }">{{ money(row.refunded_amount) }}</template></el-table-column>
@@ -116,11 +117,17 @@
       </el-table>
       <div class="pager"><el-pagination v-model:current-page="page" :page-size="20" :total="total" layout="total, prev, pager, next" @current-change="loadList" /></div>
     </el-card>
-    <p class="footnote">每个月只统计该月收款，退款从原收款月份扣除，不记到退款当天。净收款 = 当月收款 − 这些收款上已登记的退款。美团、抖音按核销日期及已确认金额统计，不是扣佣后的到账额。退款记录页仍按退款日期列出。退款登记不自动退钱，也不变更余额、套餐或预约权益。</p>
+    <p class="footnote">每个月只统计该月收款，退款从原收款月份扣除，不记到退款当天。净收款 = 当月收款 − 这些收款上已登记的退款。选定一家门店时只统计该店收款；全部门店是各店合计，同一笔不会重复计算。美团、抖音按核销日期及已确认金额统计，不是扣佣后的到账额。退款记录页仍按退款日期列出。退款登记不自动退钱，也不变更余额、套餐或预约权益。</p>
 
     <el-dialog v-model="createVisible" title="登记收款" width="min(520px, 94vw)" :close-on-click-modal="false">
       <el-alert v-if="createForm.channel !== 'wechat_transfer'" title="平台核销会自动同步；待核对的券请在「核销待核对」中处理。这里只补记未收录的款项，请勿重复登记平台结算款。" type="warning" :closable="false" />
       <el-form label-width="100px" @submit.prevent="saveReceipt">
+        <el-form-item label="门店" required>
+          <el-select v-model="createForm.store_id" placeholder="请选择门店" filterable style="width:100%" :disabled="!hq">
+            <el-option v-for="store in stores" :key="store.id" :label="store.name" :value="store.id" />
+          </el-select>
+          <p class="muted">手工登记必须选择门店。顶部为全部门店时，这笔收款也只计入所选门店。</p>
+        </el-form-item>
         <el-form-item label="收款渠道" required><el-select v-model="createForm.channel" style="width:100%"><el-option v-for="channel in manualChannels" :key="channel" :label="channels[channel]" :value="channel" /></el-select></el-form-item>
         <el-form-item label="实收金额" required><el-input-number v-model="createForm.amount" :min="0.01" :max="99999999.99" :precision="2" :step="1" style="width:100%" /></el-form-item>
         <el-form-item label="收款日期" required><el-date-picker v-model="createForm.received_on" type="date" value-format="YYYY-MM-DD" :disabled-date="futureDate" style="width:100%" /></el-form-item>
@@ -168,7 +175,8 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { onWorkingStoreChange, workingStoreParams } from '../utils/workingStore'
+import { isHqAdmin } from '../utils/adminAuth'
+import { getWorkingStoreId, onWorkingStoreChange, workingStoreParams } from '../utils/workingStore'
 import http from '../api/http'
 
 type Channel = 'meituan' | 'douyin' | 'wechat_pay' | 'wechat_transfer'
@@ -176,7 +184,7 @@ type ManualChannel = Exclude<Channel, 'wechat_pay'>
 type Totals = { received: string; refunded: string; net: string }
 type Summary = { month: Totals; year: Totals; channels: (Totals & { channel: Channel })[]; missing_dates: number; refunds_to_review: number; platforms_to_review: number }
 type PlatformReceipt = { id: number; channel: 'meituan' | 'douyin' | null; amount: string | null; reference_price: string | null; received_on: string | null; reference: string; customer: string; deal_name: string; reason: string; existing_receipt_id: number | null }
-type Receipt = { id: number; channel: Channel; amount: string; refunded_amount: string; remaining: string; received_on: string | null; customer: string; reference: string; remark: string; automatic: boolean; refund_needs_review: boolean }
+type Receipt = { id: number; channel: Channel; store_id: number | null; amount: string; refunded_amount: string; remaining: string; received_on: string | null; customer: string; reference: string; remark: string; automatic: boolean; refund_needs_review: boolean }
 type Refund = { id: number; receipt_id: number; channel: Channel; amount: string; refunded_on: string; reason: string; customer: string; reference: string }
 const channels: Record<Channel, string> = { meituan: '美团', douyin: '抖音', wechat_pay: '小程序微信支付', wechat_transfer: '微信转账' }
 const manualChannels: ManualChannel[] = ['meituan', 'douyin', 'wechat_transfer']
@@ -203,9 +211,19 @@ function requestId() {
   const hex = Array.from(bytes, b => b.toString(16).padStart(2, '0')).join('')
   return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`
 }
-const createForm = reactive({ channel: 'wechat_transfer' as ManualChannel, amount: undefined as number | undefined, received_on: chinaDate(), customer: '', reference: '', remark: '', request_id: '' })
+const hq = isHqAdmin()
+const stores = ref<{ id: number; name: string }[]>([])
+const scopeStoreId = ref<number | null>(getWorkingStoreId())
+const createForm = reactive({ channel: 'wechat_transfer' as ManualChannel, store_id: null as number | null, amount: undefined as number | undefined, received_on: chinaDate(), customer: '', reference: '', remark: '', request_id: '' })
 const refundForm = reactive({ amount: undefined as number | undefined, refunded_on: chinaDate(), reason: '', completed: false, request_id: '' })
-const periodLabel = computed(() => `${applied.year} 年${applied.month ? ` ${applied.month} 月` : '全年'}`)
+function storeName(id?: number | null) {
+  if (!id) return '未归属'
+  return stores.value.find((store) => store.id === id)?.name || `门店 #${id}`
+}
+const periodLabel = computed(() => {
+  const scope = scopeStoreId.value ? storeName(scopeStoreId.value) : '全部门店'
+  return `${scope} · ${applied.year} 年${applied.month ? ` ${applied.month} 月` : '全年'}`
+})
 const cards = computed(() => [
   { label: '本月收款', value: currentSummary.value?.month.received },
   { label: '本月退款', value: currentSummary.value?.month.refunded },
@@ -306,11 +324,12 @@ async function savePlatform() {
 }
 function clearReview() { review.value = ''; page.value = 1; void loadList() }
 function showReview(kind: 'date' | 'refund') { tab.value = 'receipts'; review.value = kind; keyword.value = ''; appliedKeyword.value = ''; page.value = 1; void loadList() }
-function openCreate() { Object.assign(createForm, { channel: 'wechat_transfer', amount: undefined, received_on: chinaDate(), customer: '', reference: '', remark: '', request_id: requestId() }); createVisible.value = true }
+function openCreate() { Object.assign(createForm, { channel: 'wechat_transfer', store_id: getWorkingStoreId(), amount: undefined, received_on: chinaDate(), customer: '', reference: '', remark: '', request_id: requestId() }); createVisible.value = true }
 function openRefund(row: Receipt) { activeReceipt.value = row; Object.assign(refundForm, { amount: undefined, refunded_on: chinaDate(), reason: '', completed: false, request_id: requestId() }); refundVisible.value = true }
 function openDate(row: Receipt) { activeReceipt.value = row; confirmedDate.value = ''; dateVisible.value = true }
 async function saveReceipt() {
   if (saving.value) return
+  if (!createForm.store_id) { ElMessage.warning('请选择门店'); return }
   if (!createForm.amount || !createForm.received_on) { ElMessage.warning('请填写金额和收款日期'); return }
   saving.value = true
   try { await http.post('/admin/receipts', { ...createForm, amount: createForm.amount.toFixed(2) }); createVisible.value = false; ElMessage.success('收款已登记'); await refresh() }
@@ -330,10 +349,19 @@ async function saveDate() {
   try { await http.patch(`/admin/receipts/${activeReceipt.value.id}/date`, { received_on: confirmedDate.value }); dateVisible.value = false; ElMessage.success('收款日期已补全'); await refresh() }
   catch (err) { ElMessage.error(message(err)) } finally { saving.value = false }
 }
+async function loadStores() {
+  try {
+    const res = await http.get<{ id: number; name: string }[]>('/admin/stores')
+    stores.value = res.data || []
+  } catch {
+    stores.value = []
+  }
+}
 let offWorkingStore: (() => void) | undefined
 onMounted(() => {
+  void loadStores()
   refresh()
-  offWorkingStore = onWorkingStoreChange(() => { page.value = 1; void refresh() })
+  offWorkingStore = onWorkingStoreChange((storeId) => { scopeStoreId.value = storeId; page.value = 1; void refresh() })
 })
 onUnmounted(() => offWorkingStore?.())
 </script>
@@ -357,5 +385,6 @@ h2 { font-size: 22px; margin: 0 0 8px; }
 .list-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-bottom: 16px; }
 .pager { display: flex; justify-content: flex-end; margin-top: 18px; }
 .footnote { margin: 0; line-height: 1.8; }
+.el-form-item .muted { margin: 6px 0 0; line-height: 1.5; }
 @media (max-width: 700px) { .metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 </style>
