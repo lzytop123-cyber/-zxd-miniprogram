@@ -40,6 +40,7 @@ class BleLockUpdate(BaseModel):
     lock_id: str | None = None
     mac_address: str | None = None
     lock_data: str | None = None
+    battery_level: int | None = None
     status: int | None = None
 
 
@@ -391,11 +392,25 @@ async def refresh_battery(
     admin=Depends(get_current_admin),
     db: Session = Depends(get_db),
 ):
+    from app.services.business import TTLockService
+
     lock = db.get(BleLock, lock_id)
     if not lock:
         raise HTTPException(status_code=404, detail="门锁不存在")
-    # 生产环境调用 TTLock API 查询电量
     assert_store_access(admin, lock.store_id)
-    lock.battery_level = lock.battery_level or 100
+
+    ttlock_id = str(lock.lock_id or "").strip()
+    if not ttlock_id or ttlock_id.startswith("mock_"):
+        raise HTTPException(status_code=400, detail="模拟锁无法从通通锁拉取电量")
+
+    try:
+        ekey = await TTLockService.get_ekey(ttlock_id)
+    except ValueError as e:
+        raise HTTPException(status_code=502, detail=f"查询通通锁电量失败: {e}") from e
+
+    level = ekey.get("electricQuantity")
+    if level is None:
+        raise HTTPException(status_code=502, detail="通通锁未返回电量")
+    lock.battery_level = int(level)
     db.commit()
     return ResponseModel(data={"battery_level": lock.battery_level})
