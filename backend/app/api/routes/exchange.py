@@ -92,6 +92,20 @@ class ExchangeRequest(BaseModel):
     store_id: int | None = None
 
 
+def _resolve_exchange_store_id(db: Session, store_id: int | None) -> int:
+    """兑换必须落到营业门店。旧版小程序不传 store_id 时，仅一家营业店则自动使用。"""
+    if store_id:
+        return int(store_id)
+    open_ids = list(
+        db.scalars(select(Store.id).where(Store.status == 1).order_by(Store.id)).all()
+    )
+    if len(open_ids) == 1:
+        return int(open_ids[0])
+    if not open_ids:
+        raise HTTPException(status_code=404, detail="暂无营业门店，请稍后再试")
+    raise HTTPException(status_code=400, detail="请选择门店后再兑换")
+
+
 @router.post("/meituan/{code}", response_model=ResponseModel)
 async def exchange_meituan(
     code: str = Path(..., min_length=6, max_length=32, description="团购券码"),
@@ -134,9 +148,8 @@ async def _exchange(
     source: CardSource,
 ):
     code = body.code.strip()
-    if not body.store_id:
-        raise HTTPException(status_code=400, detail="请选择门店后再兑换")
-    store = db.get(Store, body.store_id)
+    store_id = _resolve_exchange_store_id(db, body.store_id)
+    store = db.get(Store, store_id)
     if not store or store.status != 1:
         raise HTTPException(status_code=404, detail="门店不存在或已停业")
     # 云老板：本店 meituan_shop_id 优先，否则用全局默认（老店兼容）
@@ -149,7 +162,7 @@ async def _exchange(
     order = MeituanOrder(
         user_id=user.id,
         coupon_code=code,
-        store_id=body.store_id,
+        store_id=store_id,
         status=MeituanOrderStatus.pending,
     )
     db.add(order)
@@ -177,14 +190,14 @@ async def _exchange(
     deal_id = str((prepared.get("ticketData") or {}).get("dealId", ""))
     ticket_name = prepared.get("ticketName") or (prepared.get("ticketData") or {}).get("dealTitle", "")
     mapping = get_mapping_by_deal_id(db, deal_id)
-    if mapping and mapping.store_id and mapping.store_id != body.store_id:
+    if mapping and mapping.store_id and mapping.store_id != store_id:
         db.delete(order)
         db.commit()
         raise HTTPException(status_code=400, detail="该团购券不适用于当前门店，请切换到对应门店兑换")
     if not mapping:
         reward_type, reward_value = guess_reward_from_name(ticket_name)
         mapping = MeituanDealMapping(
-            store_id=body.store_id,
+            store_id=store_id,
             deal_id=deal_id,
             deal_name=ticket_name,
             reward_type=reward_type,
@@ -246,13 +259,13 @@ async def _exchange(
         mapping,
         source=source,
         receipt=code,
-        store_id=body.store_id,
+        store_id=store_id,
     )
 
     order.meituan_deal_id = deal_id
     order.deal_name = prepared.get("ticketName") or mapping.deal_name
     order.deal_type = mapping.reward_type.value
-    order.store_id = body.store_id or mapping.store_id
+    order.store_id = store_id or mapping.store_id
     order.status = MeituanOrderStatus.verified
     order.verified_at = datetime.now()
     order.deal_price = extract_deal_price(
