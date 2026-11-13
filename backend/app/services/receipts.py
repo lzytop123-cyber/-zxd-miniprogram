@@ -2,7 +2,7 @@
 from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal
 
-from sqlalchemy import String, cast, func, literal, or_, select
+from sqlalchemy import String, and_, cast, func, literal, or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 from sqlalchemy.sql import ColumnElement
@@ -43,6 +43,7 @@ def receipt_item(row: Receipt) -> dict:
         "remaining": money(row.amount - row.refunded_amount),
         "received_on": row.received_on, "customer": row.customer,
         "reference": row.reference, "remark": row.remark,
+        "store_id": row.store_id,
         "automatic": not row.source_key.startswith("manual:"),
         "source_label": "核销同步" if row.source_key.startswith("platform:") else ("手工登记" if row.source_key.startswith("manual:") else "微信同步"),
         "refund_needs_review": row.source_refunded and row.refunded_amount < row.amount,
@@ -64,8 +65,12 @@ def period(year: int, month: int | None = None) -> tuple[date, date]:
 
 
 def store_scope_clause(store_id: int) -> ColumnElement[bool]:
-    """收款无 store_id：按关联预约/购卡/核销订单归属门店过滤。"""
-    return or_(
+    """单店合计按收款自己的 store_id。
+
+    回填前的旧行 store_id 仍为空，这时才退回关联预约/购卡/核销订单。
+    已经写上门店的行不再走关联，避免同一笔在回填后被另一家店再算一次。
+    """
+    linked_to_store = or_(
         Receipt.source_key.in_(_prefixed_keys("platform:", MeituanOrder.id, MeituanOrder.store_id, store_id)),
         Receipt.source_key.in_(
             _prefixed_keys("reservation:", Reservation.order_no, Reservation.store_id, store_id)
@@ -74,6 +79,7 @@ def store_scope_clause(store_id: int) -> ColumnElement[bool]:
             _prefixed_keys("card:", CardPurchaseOrder.order_no, CardPurchaseOrder.store_id, store_id)
         ),
     )
+    return or_(Receipt.store_id == store_id, and_(Receipt.store_id.is_(None), linked_to_store))
 
 
 def apply_store_scope(query, store_id: int | None):
@@ -120,10 +126,13 @@ def sync_wechat(db: Session) -> int:
         )
         for order, nickname, existing in db.execute(query).all():
             fallback = order.paid_at or order.created_at
+            order_store = getattr(order, "store_id", None)
             if existing:
                 existing.source_refunded = order.pay_status == 2
                 if existing.received_on is None and fallback:
                     existing.received_on = fallback.date()
+                if existing.store_id is None and order_store:
+                    existing.store_id = order_store
                 continue
             row = Receipt(
                 source_key=prefix + order.order_no, channel="wechat_pay",
@@ -131,6 +140,7 @@ def sync_wechat(db: Session) -> int:
                 received_on=fallback.date() if fallback else None,
                 customer=nickname or f"用户 {order.user_id}", reference=order.order_no,
                 remark=label, source_refunded=order.pay_status == 2,
+                store_id=order_store,
             )
             try:
                 with db.begin_nested():

@@ -21,6 +21,8 @@ class Receipt(Base):
     amount: Mapped[Decimal] = mapped_column(Numeric(10, 2))
     refunded_amount: Mapped[Decimal] = mapped_column(Numeric(10, 2), default=Decimal("0"))
     received_on: Mapped[date | None] = mapped_column(Date, index=True)
+    # 空值只存在于回填前的历史行。新的手工收款必须带门店；同步行跟随订单门店。
+    store_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("stores.id"), index=True)
     customer: Mapped[str | None] = mapped_column(String(100))
     reference: Mapped[str | None] = mapped_column(String(100))
     remark: Mapped[str | None] = mapped_column(String(500))

@@ -142,6 +142,7 @@ def sync_platforms(db: Session) -> int:
             source_key=source_key(item["id"]), channel=item["channel"], amount=Decimal(item["amount"]),
             received_on=item["received_on"], reference=item["reference"], customer=item["customer"],
             remark=f"核销收款 · {item['deal_name']}"[:500], source_refunded=item["source_refunded"],
+            store_id=item["store_id"],
         )
         try:
             with db.begin_nested():

@@ -12,10 +12,10 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_admin
 from app.db.session import get_db
-from app.models import AdminUser, MeituanOrder
+from app.models import AdminUser, MeituanOrder, Store
 from app.models.receipts import Receipt, ReceiptRefund
 from app.schemas.common import PageResult, ResponseModel
-from app.services.admin_access import scope_store_id
+from app.services.admin_access import assert_store_access, scope_store_id
 from app.services.admin_audit import log_admin_action
 from app.services import receipts as svc
 from app.services import platform_receipts as platform_svc
@@ -30,6 +30,7 @@ class ReceiptBody(BaseModel):
     channel: Literal["meituan", "douyin", "wechat_transfer"]
     amount: Amount
     received_on: date
+    store_id: int = Field(gt=0)
     customer: str = Field(default="", max_length=100)
     reference: str = Field(default="", max_length=100)
     remark: str = Field(default="", max_length=500)
@@ -166,7 +167,8 @@ def bulk_reconcile(admin: AdminUser = Depends(get_current_admin), db: Session = 
         else:
             row = Receipt(source_key=key, channel=channel, amount=amount, received_on=day,
                           reference=item["reference"], customer=item["customer"],
-                          remark=f"核销收款（一键核对） · {item['deal_name']}"[:500], source_refunded=item["source_refunded"])
+                          remark=f"核销收款（一键核对） · {item['deal_name']}"[:500], source_refunded=item["source_refunded"],
+                          store_id=item.get("store_id"))
             try:
                 with db.begin_nested():
                     db.add(row)
@@ -218,7 +220,8 @@ def confirm_platform(order_id: int, body: PlatformConfirmBody, admin: AdminUser 
                 raise HTTPException(409, "该流水号已手工登记，请关联原收款，避免重复入账")
             row = Receipt(source_key=key, channel=body.channel, amount=body.amount, received_on=body.received_on,
                           reference=item["reference"], customer=item["customer"],
-                          remark=f"核销收款（人工核对） · {item['deal_name']}"[:500], source_refunded=item["source_refunded"])
+                          remark=f"核销收款（人工核对） · {item['deal_name']}"[:500], source_refunded=item["source_refunded"],
+                          store_id=item.get("store_id"))
             db.add(row)
             db.flush()
         log_admin_action(db, admin, "receipt_platform_confirm", target_type="receipt", target_id=row.id, detail=f"核销 #{order_id}: {body.model_dump_json()}")
@@ -284,8 +287,16 @@ def refunds(
     return ResponseModel(data=PageResult(items=[svc.refund_item(*row) for row in rows], total=count, page=page, page_size=page_size))
 
 
+def require_manual_store(db: Session, admin: AdminUser, store_id: int) -> int:
+    assert_store_access(admin, store_id)
+    if db.get(Store, store_id) is None:
+        raise HTTPException(400, "门店不存在")
+    return store_id
+
+
 @router.post("", response_model=ResponseModel)
 def create(body: ReceiptBody, admin: AdminUser = Depends(get_current_admin), db: Session = Depends(get_db)):
+    require_manual_store(db, admin, body.store_id)
     source_key = "manual:" + str(body.request_id)
     existing = db.scalar(select(Receipt).where(Receipt.source_key == source_key))
     if existing:
