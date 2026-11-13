@@ -1,18 +1,25 @@
 const { request } = require('../../utils/request')
 const routes = require('../../utils/routes')
+const { pickExchangeStore } = require('./utils/storePick')
 
 Page({
   data: {
     platform: 'meituan',
     platformLabel: '美团',
     code: '',
+    stores: [],
     storeId: null,
+    storeName: '',
+    storeIndex: 0,
+    storesLoading: true,
     loading: false,
     scanning: false,
   },
 
   onLoad(options) {
-    this._applyPlatform(options.platform || 'meituan', options.storeId || null)
+    const preferredId = options.storeId || options.store_id || null
+    this._applyPlatform(options.platform || 'meituan', preferredId)
+    this.loadStores(preferredId)
   },
 
   onPlatformTap(e) {
@@ -26,10 +33,41 @@ Page({
     this.setData({
       platform,
       platformLabel,
-      storeId: storeId || null,
+      storeId: storeId ? Number(storeId) : this.data.storeId,
       code: '',
     })
     wx.setNavigationBarTitle({ title: `${platformLabel}团购兑换` })
+  },
+
+  loadStores(preferredId) {
+    this.setData({ storesLoading: true })
+    return request({ url: '/store/list', silent: true, force: true })
+      .then((list) => {
+        const stores = list || []
+        const picked = pickExchangeStore(stores, preferredId || this.data.storeId)
+        this.setData({
+          stores,
+          storeId: picked.storeId,
+          storeName: picked.storeName,
+          storeIndex: picked.storeIndex,
+          storesLoading: false,
+        })
+      })
+      .catch(() => {
+        this.setData({ storesLoading: false })
+        wx.showToast({ title: '加载门店失败', icon: 'none' })
+      })
+  },
+
+  onStoreChange(e) {
+    const idx = Number(e.detail.value)
+    const store = this.data.stores[idx]
+    if (!store) return
+    this.setData({
+      storeId: store.id,
+      storeName: store.name,
+      storeIndex: idx,
+    })
   },
 
   onInput(e) {
@@ -92,6 +130,10 @@ Page({
       return
     }
     const { platform, storeId } = this.data
+    if (!storeId) {
+      wx.showToast({ title: '请选择门店后再兑换', icon: 'none' })
+      return
+    }
     let code = inputCode
     if (platform === 'douyin') {
       const { toDouyinSubmitCode } = require('./utils/voucherScan')
@@ -105,12 +147,11 @@ Page({
         result = await request({
           url: '/exchange/douyin',
           method: 'POST',
-          data: { code, store_id: storeId || undefined },
+          data: { code, store_id: Number(storeId) },
           silent: true,
         })
       } else {
-        let reqUrl = `/exchange/meituan/${encodeURIComponent(code)}`
-        if (storeId) reqUrl += `?store_id=${Number(storeId)}`
+        const reqUrl = `/exchange/meituan/${encodeURIComponent(code)}?store_id=${Number(storeId)}`
         result = await request({ url: reqUrl, method: 'POST', silent: true })
       }
       wx.hideLoading()

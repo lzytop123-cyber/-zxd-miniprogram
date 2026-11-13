@@ -38,6 +38,7 @@ Page({
   },
 
   goExchange() {
-    wx.navigateTo({ url: routes.exchangeIndex })
+    const { buildExchangeUrl } = require('../../../pages/exchange/utils/storePick')
+    wx.navigateTo({ url: buildExchangeUrl() })
   },
 })

@@ -180,7 +180,10 @@ Page({
   noop() {},
 
   goExchange() {
-    wx.navigateTo({ url: routes.exchangeIndex })
+    const { buildExchangeUrl } = require('../exchange/utils/storePick')
+    wx.navigateTo({
+      url: buildExchangeUrl({ storeId: this.data.storeId }),
+    })
   },
 
   goLogin() {
@@ -247,7 +250,7 @@ Page({
           confirmText: '去兑换',
           cancelText: '知道了',
           success: (r) => {
-            if (r.confirm) wx.navigateTo({ url: routes.exchangeIndex })
+            if (r.confirm) this.goExchange()
           },
         })
         return

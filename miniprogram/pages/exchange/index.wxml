@@ -1,5 +1,19 @@
 <view class="page-exchange page-safe-bottom">
   <view class="card exchange-card">
+    <view class="store-row">
+      <view class="store-name">{{storeName || (storesLoading ? '门店加载中…' : '请选择门店')}}</view>
+      <picker
+        wx:if="{{stores.length}}"
+        mode="selector"
+        range="{{stores}}"
+        range-key="name"
+        value="{{storeIndex}}"
+        bindchange="onStoreChange"
+      >
+        <view class="store-switch">切换门店 ›</view>
+      </picker>
+    </view>
+
     <view class="platform-tabs">
       <view
         class="platform-tab {{platform === 'meituan' ? 'active' : ''}}"
@@ -33,7 +47,7 @@
       </view>
     </view>
 
-    <view class="btn-primary {{loading?'disabled':''}}" bindtap="onSubmitTap">立即兑换</view>
+    <view class="btn-primary {{loading || !storeId ? 'disabled' : ''}}" bindtap="onSubmitTap">立即兑换</view>
     <view class="link-records" bindtap="goRecords">查看兑换记录 ›</view>
   </view>
 </view>
