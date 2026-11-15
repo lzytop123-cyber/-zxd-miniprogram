@@ -3,20 +3,22 @@
     <template #header>
       <div class="header-row">
         <span>联系店长海报</span>
-        <el-button type="primary" :loading="saving" @click="save">保存文案</el-button>
+        <el-button type="primary" :disabled="!storeId || loading || uploading" :loading="saving" @click="save">保存文案</el-button>
       </div>
     </template>
-    <GlobalConfigHint />
+    <el-select v-model="storeId" placeholder="选择门店" :disabled="loading || saving || uploading" @change="load" style="margin-bottom: 16px">
+      <el-option v-for="store in stores" :key="store.id" :label="store.name" :value="store.id" />
+    </el-select>
 
     <el-alert
       type="info"
       :closable="false"
       show-icon
-      title="小程序「联系店长」会展示此处海报；用户长按图片可识别二维码。建议上传含店长微信二维码的完整海报（≤2MB）。"
+      title="请为所选门店上传对应店长的微信二维码（≤2MB）。小程序可按定位推荐门店，用户也可手动切换。"
       style="margin-bottom: 16px"
     />
 
-    <el-form label-width="100px" style="max-width: 640px" v-loading="loading">
+    <el-form :disabled="!storeId || loading || saving || uploading" label-width="100px" style="max-width: 640px" v-loading="loading">
       <el-form-item label="页面标题">
         <el-input v-model="form.title" maxlength="50" show-word-limit placeholder="联系店长" />
       </el-form-item>
@@ -40,6 +42,7 @@
           <div v-else class="poster-empty">尚未上传海报</div>
           <div class="poster-actions">
             <el-upload
+              :disabled="!storeId || loading || saving || uploading"
               :show-file-list="false"
               accept="image/jpeg,image/png,image/webp,image/gif"
               :http-request="uploadPoster"
@@ -57,12 +60,14 @@
 <script setup lang="ts">
 import { onMounted, reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
-import GlobalConfigHint from '../components/GlobalConfigHint.vue'
 import http from '../api/http'
 
 const loading = ref(false)
 const saving = ref(false)
 const uploading = ref(false)
+const stores = ref<{ id: number; name: string }[]>([])
+const storeId = ref<number>()
+const contactUrl = () => `/admin/contact-setting?store_id=${storeId.value}`
 const form = reactive({
   poster_url: '' as string,
   title: '联系店长',
@@ -70,21 +75,29 @@ const form = reactive({
 })
 
 async function load() {
+  if (!storeId.value) return
   loading.value = true
+  form.poster_url = ''
+  form.title = '联系店长'
+  form.hint = '长按识别二维码，添加店长微信咨询'
   try {
-    const res = await http.get('/admin/contact-setting')
+    const res = await http.get(contactUrl())
     form.poster_url = res.data?.poster_url || ''
     form.title = res.data?.title || '联系店长'
     form.hint = res.data?.hint || '长按识别二维码，添加店长微信咨询'
+  } catch (_) {
+    storeId.value = undefined
+    ElMessage.error('配置加载失败，请重新选择门店')
   } finally {
     loading.value = false
   }
 }
 
 async function save() {
+  if (!storeId.value) return
   saving.value = true
   try {
-    await http.put('/admin/contact-setting', {
+    await http.put(contactUrl(), {
       title: form.title,
       hint: form.hint,
     })
@@ -96,11 +109,12 @@ async function save() {
 }
 
 async function uploadPoster(options: { file: File }) {
+  if (!storeId.value) return
   uploading.value = true
   try {
     const fd = new FormData()
     fd.append('file', options.file)
-    const res = await http.post('/admin/contact-setting/upload', fd, {
+    const res = await http.post(`/admin/contact-setting/upload?store_id=${storeId.value}`, fd, {
       headers: { 'Content-Type': 'multipart/form-data' },
     })
     form.poster_url = res.data?.poster_url || ''
@@ -113,7 +127,7 @@ async function uploadPoster(options: { file: File }) {
 async function clearPoster() {
   saving.value = true
   try {
-    await http.put('/admin/contact-setting', { poster_url: '' })
+    await http.put(contactUrl(), { poster_url: '' })
     form.poster_url = ''
     ElMessage.success('已清除海报')
   } finally {
@@ -121,7 +135,14 @@ async function clearPoster() {
   }
 }
 
-onMounted(load)
+onMounted(async () => {
+  try {
+    const res = await http.get('/admin/stores')
+    stores.value = res.data || []
+    storeId.value = stores.value[0]?.id
+    await load()
+  } catch (_) { ElMessage.error('门店配置加载失败，请刷新重试') }
+})
 </script>
 
 <style scoped>

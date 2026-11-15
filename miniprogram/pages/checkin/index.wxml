@@ -17,9 +17,10 @@
 
   <view wx:elif="{{!reservation}}" class="empty card empty-card">
     <view class="mi-glyph glyph-xl icon-book-open empty-icon"></view>
-    <view class="empty-text">暂无进行中的订单</view>
-    <view class="empty-hint">预约后到店开门即可</view>
-    <view class="btn-primary" bindtap="goBooking">立即预定</view>
+    <view class="empty-text">暂无待入座的预约</view>
+    <view class="empty-hint">先选门店和座位，预约后在这里开门入座</view>
+    <button class="empty-primary" hover-class="empty-action-hover" bindtap="goBooking">去预约座位</button>
+    <button class="empty-secondary" hover-class="empty-action-hover" bindtap="goOrders">查看我的订单</button>
   </view>
 
   <view wx:else class="active-panel">

@@ -1,7 +1,7 @@
 from datetime import datetime, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
@@ -25,6 +25,10 @@ class DoorLogRequest(BaseModel):
     error_msg: str | None = None
     # 门锁上报的真实电量（0-100）；有值时以此为准，替代模拟递减
     battery_level: int | None = None
+    stage: str | None = Field(None, max_length=24)
+    duration_ms: int | None = Field(None, ge=0, le=86400000)
+    client_system: str | None = Field(None, max_length=60)
+    plugin_version: str | None = Field(None, max_length=20)
 
 
 class BleLockCreate(BaseModel):
@@ -164,26 +168,36 @@ def report_door_log(
     ble_key = db.scalar(
         select(BleKey).where(BleKey.reservation_id == reservation_id, BleKey.user_id == user.id)
     )
-    if not ble_key:
-        raise HTTPException(status_code=404, detail="钥匙不存在")
-
     reservation = db.get(Reservation, reservation_id)
     if not reservation or reservation.user_id != user.id:
         raise HTTPException(status_code=404, detail="订单不存在")
 
-    # 瞬时并发态（插件“蓝牙正在操作中”）不是真实开门失败，不写记录以免刷屏
-    if body.result != "success":
-        reason = body.error_msg or ""
-        if any(kw in reason for kw in ("正在操作中", "operating", "busy")):
-            return ResponseModel(message="已忽略瞬时重试")
+    if body.result not in ("success", "fail"):
+        raise HTTPException(status_code=400, detail="无效的开门结果")
+    if body.result == "success" and not ble_key:
+        raise HTTPException(status_code=404, detail="钥匙不存在")
+    lock_id = ble_key.lock_id if ble_key else db.scalar(
+        select(BleLock.id).where(BleLock.store_id == reservation.store_id).order_by(BleLock.id)
+    )
+    if lock_id is None:
+        raise HTTPException(status_code=404, detail="门店未配置门锁")
+    details = []
+    for label, value in (("阶段", body.stage), ("代码", body.error_code),
+                         ("耗时ms", body.duration_ms), ("系统", body.client_system),
+                         ("插件", body.plugin_version)):
+        if value is not None and value != "":
+            details.append(f"{label}:{str(value)[:60]}")
+    reason = (body.error_msg or "")[:90]
+    if details:
+        reason += " | " + " ".join(details)
 
     log = DoorLog(
-        lock_id=ble_key.lock_id,
+        lock_id=lock_id,
         user_id=user.id,
         reservation_id=reservation_id,
         open_type=OpenType.ble,
         result=1 if body.result == "success" else 0,
-        fail_reason=body.error_msg,
+        fail_reason=reason[:200] or None,
     )
     if body.result == "success":
         if reservation.pay_status != 1:

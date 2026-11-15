@@ -3330,18 +3330,21 @@ class AdminContactSettingRequest(BaseModel):
 
 
 @router.get("/contact-setting", response_model=ResponseModel)
-def get_contact_setting_admin(_: object = Depends(get_current_admin), db: Session = Depends(get_db)):
-    row = _get_or_create_contact_setting(db)
+def get_contact_setting_admin(store_id: int | None = None, admin: AdminUser = Depends(get_current_admin), db: Session = Depends(get_db)):
+    from app.services.store_contact import contact_for_admin
+    row = contact_for_admin(db, admin, store_id)
     return ResponseModel(data=_contact_setting_dict(row))
 
 
 @router.put("/contact-setting", response_model=ResponseModel)
 def update_contact_setting_admin(
     body: AdminContactSettingRequest,
-    _: object = Depends(get_current_admin),
+    store_id: int | None = None,
+    admin: AdminUser = Depends(get_current_admin),
     db: Session = Depends(get_db),
 ):
-    row = _get_or_create_contact_setting(db)
+    from app.services.store_contact import contact_for_admin
+    row = contact_for_admin(db, admin, store_id)
     if body.poster_url is not None:
         raw = body.poster_url.strip()
         if raw == "":
@@ -3360,9 +3363,12 @@ def update_contact_setting_admin(
 @router.post("/contact-setting/upload", response_model=ResponseModel)
 async def upload_contact_poster_admin(
     file: UploadFile = File(...),
-    _: object = Depends(get_current_admin),
+    store_id: int | None = None,
+    admin: AdminUser = Depends(get_current_admin),
     db: Session = Depends(get_db),
 ):
+    from app.services.store_contact import contact_for_admin
+    row = contact_for_admin(db, admin, store_id)
     content_type = (file.content_type or "").lower()
     if content_type not in BANNER_IMAGE_TYPES:
         raise HTTPException(status_code=400, detail="仅支持 jpg / png / webp / gif")
@@ -3377,7 +3383,6 @@ async def upload_contact_poster_admin(
     (CONTACT_DIR / filename).write_bytes(content)
     path = f"/static/contact/{filename}"
 
-    row = _get_or_create_contact_setting(db)
     row.poster_url = path
     db.commit()
     db.refresh(row)

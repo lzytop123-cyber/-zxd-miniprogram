@@ -198,9 +198,10 @@ def get_home_bootstrap(
 
 
 @router.get("/contact", response_model=ResponseModel)
-def get_home_contact(db: Session = Depends(get_db)):
+def get_home_contact(store_id: int | None = None, db: Session = Depends(get_db)):
     """小程序「联系店长」海报配置。"""
-    row = db.get(SiteContactSetting, 1)
+    from app.models import StoreContactSetting
+    row = db.get(StoreContactSetting, store_id) if store_id else db.get(SiteContactSetting, 1)
     poster = public_static_url(row.poster_url) if row and row.poster_url else ""
     return ResponseModel(
         data={

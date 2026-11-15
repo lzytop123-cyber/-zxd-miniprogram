@@ -111,11 +111,9 @@ function mapBleOpenFailure({ errorCode, errorMsg, canOpen, reservation }) {
 
   // 手机蓝牙未开启 / 适配器不可用
   if (
-    msg.includes('bluetooth')
-    || raw.includes('蓝牙未开启')
+    raw.includes('蓝牙未开启')
     || raw.includes('蓝牙未打开')
-    || msg.includes('adapter')
-    || msg.includes('not available')
+    || msg.includes('adapter not available')
     || code === 10001
   ) {
     return { content: '手机蓝牙未开启，请下拉控制中心打开蓝牙后重试' }
@@ -129,7 +127,7 @@ function mapBleOpenFailure({ errorCode, errorMsg, canOpen, reservation }) {
     || raw.includes('授权')
     || raw.includes('权限')
   ) {
-    return { content: '微信没有蓝牙权限，请到「设置 → 微信 → 蓝牙」开启后重试' }
+    return { content: '请在手机设置中检查微信的蓝牙、附近设备及位置权限，再返回重试' }
   }
 
   // 连接超时
@@ -151,13 +149,16 @@ function mapBleOpenFailure({ errorCode, errorMsg, canOpen, reservation }) {
     || raw.includes('连接失败')
     || raw.includes('未找到')
     || raw.includes('未连接')
+    || raw.includes('断开')
+    || raw.includes('搜索不到')
+    || raw.includes('服务列表')
   ) {
     return { content: '没有连接到门锁，请靠近门锁（1 米内）并保持蓝牙开启后重试' }
   }
 
   // 钥匙 / lockData 失效
   if (msg.includes('key') || raw.includes('钥匙') || msg.includes('lockdata') || raw.includes('未生成')) {
-    return { content: '开门钥匙已失效，已为你刷新，请重新点击开门', refresh: true }
+    return { content: '开门钥匙暂不可用，请重试获取；仍失败请联系店长', refresh: true }
   }
 
   // 门锁电量过低

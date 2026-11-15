@@ -23,7 +23,50 @@ page {
 
 .empty-card {
   text-align: center;
-  padding: 92rpx 32rpx;
+  padding: 48rpx 32rpx 28rpx;
+  border-radius: 24rpx;
+  box-shadow: none;
+}
+
+.empty-card .empty-icon {
+  display: block;
+  width: 64rpx;
+  height: 64rpx;
+  margin: 0 auto 24rpx;
+  opacity: 1;
+}
+
+.empty-primary,
+.empty-secondary {
+  width: 100%;
+  margin: 0;
+  padding: 20rpx 24rpx;
+  border: none;
+  border-radius: 16rpx;
+  font-size: 28rpx;
+  line-height: 1.5;
+}
+
+.empty-primary::after,
+.empty-secondary::after {
+  border: none;
+}
+
+.empty-primary {
+  background: var(--color-primary);
+  color: #FFFFFF;
+  font-weight: 600;
+}
+
+.empty-secondary {
+  margin-top: 8rpx;
+  background: transparent;
+  color: var(--color-text-brand);
+  font-size: 26rpx;
+}
+
+.empty-action-hover {
+  opacity: 0.75;
 }
 
 .empty-text {
@@ -34,7 +77,8 @@ page {
 }
 
 .empty-hint {
-  font-size: 24rpx;
+  font-size: 26rpx;
+  line-height: 1.6;
   color: var(--color-text-secondary);
   margin-bottom: 40rpx;
 }

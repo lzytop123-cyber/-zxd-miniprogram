@@ -615,6 +615,16 @@ class HomeCarouselSetting(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now, onupdate=datetime.now)
 
 
+class StoreContactSetting(Base):
+    __tablename__ = "store_contact_settings"
+
+    store_id: Mapped[int] = mapped_column(Integer, ForeignKey("stores.id"), primary_key=True)
+    poster_url: Mapped[str | None] = mapped_column(String(500))
+    title: Mapped[str | None] = mapped_column(String(50), default="联系店长")
+    hint: Mapped[str | None] = mapped_column(String(100), default="长按识别二维码，添加店长微信咨询")
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now, onupdate=datetime.now)
+
+
 class SiteContactSetting(Base):
     """小程序「联系店长」海报（单行配置）。"""
 

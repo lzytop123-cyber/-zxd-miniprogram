@@ -18,6 +18,7 @@ function pickBatteryLevel(result) {
   if (!result || typeof result !== 'object') return null
   const candidates = [result.battery, result.electricQuantity, result.power, result.electric]
   for (const v of candidates) {
+    if (v === null || v === undefined || v === '') continue
     const n = Number(v)
     if (Number.isFinite(n) && n >= 0 && n <= 100) return Math.round(n)
   }
@@ -25,6 +26,7 @@ function pickBatteryLevel(result) {
 }
 
 let plugin = null
+let bleOperationPending = false
 
 function detectPlugin() {
   try {
@@ -213,6 +215,7 @@ Page({
   },
 
   selectReservation(e) {
+    if (this._opening) return
     const id = Number(e.currentTarget.dataset.id)
     if (!id || id === this.data.selectedId) return
     const reservation = this.data.activeList.find((item) => item.id === id)
@@ -244,20 +247,24 @@ Page({
   },
 
   loadBleKey(reservationId) {
+    const requestId = this._keyRequestId = (this._keyRequestId || 0) + 1
+    this.setData({ lockData: '', lockName: '' })
     if (!reservationId) {
       this.setData({ lockData: '' })
       return
     }
-    request({ url: `/ble/key/${reservationId}` })
+    return request({ url: `/ble/key/${reservationId}`, force: true, silent: true })
       .then((res) => {
-        wx.setStorageSync(`ble_key_${reservationId}`, res.lockData)
+        if (requestId !== this._keyRequestId || this.data.reservation?.id !== reservationId) return null
         this.setData({
           lockData: res.lockData,
           lockName: res.lockName || '门店大门',
         })
+        return res.lockData
       })
       .catch(() => {
-        this.setData({ lockData: '' })
+        if (requestId === this._keyRequestId) this.setData({ lockData: '' })
+        return null
       })
   },
 
@@ -292,6 +299,8 @@ Page({
   },
 
   onUnload() {
+    this._unloaded = true
+    this._keyRequestId = (this._keyRequestId || 0) + 1
     if (this._timer) clearInterval(this._timer)
   },
 
@@ -306,6 +315,8 @@ Page({
       url: `/ble/checkin/${reservation.id}`,
       method: 'POST',
       data,
+    }).catch(() => {
+      wx.showToast({ title: '门已开，入座记录同步失败，请刷新订单', icon: 'none' })
     }).finally(() => this.loadActive())
     this._opening = false
     this.setData({ opening: false, lastOpenError: '' })
@@ -333,90 +344,84 @@ Page({
         result: 'fail',
         error_code: errorCode ? String(errorCode) : '',
         error_msg: errorMsg || failure.content,
+        stage: this._openStage || 'plugin',
+        duration_ms: Math.max(0, Date.now() - (this._openStartedAt || Date.now())),
+        client_system: this._clientSystem || '',
+        plugin_version: '3.1.4',
       },
-    })
-    if (failure.refresh) {
-      this.loadBleKey(reservation.id)
-    }
+      silent: true,
+    }).catch(() => {})
   },
 
   async openDoorBle() {
-    // 用同步实例标志堵住 await 间隙内的重复点击：
-    // 否则狂点时多个 tap 会在 opening 置位前一起通过守卫，并发调用插件触发
-    // “蓝牙正在操作中”并刷出多条失败开门记录。
     if (!this.data.canOpen || this._opening || this.data.opening) return
-    if (!this.data.pluginReady) {
-      const hint = this.data.pluginHint || '通通锁插件未加载'
-      this.setData({ lastOpenError: hint })
+    if (bleOperationPending) {
+      this.setData({ lastOpenError: '上一次蓝牙操作尚未结束，请稍候；长时间无响应请联系店长。' })
       return
     }
-    const { reservation } = this.data
+    const reservation = this.data.reservation
     if (!reservation) return
-
     this._opening = true
+    bleOperationPending = true
+    this._openStartedAt = Date.now()
+    try { this._clientSystem = wx.getSystemInfoSync().system || '' } catch (_) {}
     this.setData({ opening: true, lastOpenError: '' })
-
+    let watchdog
+    let pluginStarted = false
     try {
-      await wx.openBluetoothAdapter()
-    } catch (e) {
-      const failure = mapBleOpenFailure({
-        errorMsg: '蓝牙未开启',
-        canOpen: true,
-        reservation,
-        mode: 'ble',
-      })
-      this._opening = false
-      this.setData({ opening: false, lastOpenError: failure.content })
-      return
-    }
-
-    wx.showLoading({ title: '蓝牙连接中...' })
-    const lockData = wx.getStorageSync(`ble_key_${reservation.id}`) || this.data.lockData
-
-    if (!plugin || typeof plugin.controlLock !== 'function') {
-      wx.hideLoading()
-      this._opening = false
-      this.setData({ opening: false, lastOpenError: '蓝牙插件未加载' })
-      return
-    }
-
-    if (!lockData) {
-      wx.hideLoading()
-      const failure = mapBleOpenFailure({
-        errorMsg: '钥匙未生成',
-        canOpen: true,
-        reservation,
-        mode: 'ble',
-      })
-      this._opening = false
-      this.setData({ opening: false, lastOpenError: failure.content })
-      this.loadBleKey(reservation.id)
-      return
-    }
-
-    const openAction = plugin.CONTROL_ACTION_OPEN || 3
-    try {
-      const result = await plugin.controlLock({
-        controlAction: openAction,
-        lockData,
-      })
+      this._openStage = 'key'
+      wx.showLoading({ title: '准备开门钥匙…' })
+      const lockData = await this.loadBleKey(reservation.id)
+      if (!lockData) throw new Error('钥匙获取失败，请检查网络后重试')
+      if (this._unloaded || this.data.reservation?.id !== reservation.id || !computeCanOpen(reservation)) {
+        throw new Error('预约状态已变化，请刷新订单后重试')
+      }
+      this._openStage = 'adapter'
+      await new Promise((resolve, reject) => wx.openBluetoothAdapter({ success: resolve, fail: reject }))
+      const state = detectPlugin()
+      this.setData(state)
+      if (!state.pluginReady) throw new Error(state.pluginHint)
+      if (this._unloaded || !computeCanOpen(reservation)) throw new Error('预约状态已变化，请刷新订单后重试')
+      this._openStage = 'plugin'
+      wx.showLoading({ title: '正在连接门锁…' })
+      watchdog = setTimeout(() => {
+        wx.hideLoading()
+        this.setData({ lastOpenError: '门锁响应超时，开门结果尚未确认。请勿重复操作；可联系店长协助。' })
+        // Do not release either guard: stopping the plugin cannot cancel an in-flight connection.
+      }, 35000)
+      pluginStarted = true
+      const result = await plugin.controlLock({ controlAction: plugin.CONTROL_ACTION_OPEN || 3, lockData })
+      clearTimeout(watchdog)
       if (result && result.errorCode === 0) {
         this.afterOpenSuccess(reservation, result)
       } else {
-        this.afterOpenFail(
-          reservation,
-          (result && result.errorMsg) || '蓝牙开门失败',
-          result && result.errorCode,
-          'ble'
-        )
+        throw result || new Error('蓝牙开门失败')
       }
     } catch (err) {
-      this.afterOpenFail(
-        reservation,
-        err?.errorMsg || err?.message || '蓝牙插件调用失败',
-        err?.errorCode || '',
-        'ble'
-      )
+      clearTimeout(watchdog)
+      if (pluginStarted && typeof plugin?.stopAllOperations === 'function') {
+        // Only clean up after controlLock has settled, never while it may still unlock.
+        try {
+          const cleanup = await Promise.race([
+            Promise.resolve().then(() => plugin.stopAllOperations()),
+            new Promise((_, reject) => { this._cleanupTimer = setTimeout(() => reject(new Error('cleanup timeout')), 5000) }),
+          ])
+          if (!cleanup || cleanup.errorCode !== 0) throw new Error('cleanup failed')
+        } catch (_) {
+          this._cleanupFailed = true
+        } finally { clearTimeout(this._cleanupTimer) }
+      }
+      this.afterOpenFail(reservation,
+        err?.errorMsg || err?.errMsg || err?.message || '蓝牙开门失败',
+        err?.errorCode ?? err?.errCode ?? '', 'ble')
+      if (this._cleanupFailed) this.setData({ lastOpenError: '蓝牙状态恢复失败，请退出小程序后重新进入，或联系店长。' })
+    } finally {
+      clearTimeout(watchdog)
+      wx.hideLoading()
+      this._opening = false
+      // A timed-out cleanup may still be running. Keep the shared guard closed until app restart.
+      if (!this._cleanupFailed) bleOperationPending = false
+      this.setData({ opening: false })
     }
   },
 
@@ -428,7 +433,8 @@ Page({
   },
 
   goContact() {
-    wx.navigateTo({ url: routes.profileContact })
+    const storeId = this.data.reservation?.store_id
+    wx.navigateTo({ url: routes.profileContact + (storeId ? `?storeId=${storeId}` : '') })
   },
 
   checkout() {
@@ -453,10 +459,11 @@ Page({
   },
 
   goBooking() {
-    if (!auth.isLoggedIn()) {
-      auth.goLogin('')
-      return
-    }
-    wx.switchTab({ url: '/pages/home/index' })
+    wx.navigateTo({ url: routes.storeSelect })
+  },
+
+  goOrders() {
+    if (!auth.requireLogin(routes.profileOrders)) return
+    wx.navigateTo({ url: routes.profileOrders })
   },
 })
