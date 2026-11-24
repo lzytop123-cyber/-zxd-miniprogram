@@ -125,6 +125,7 @@ function emptyForm() {
     wifi_name: '',
     wifi_password: '',
     meituan_shop_id: '',
+    coupon_provider: '',
     pay_account_id: null,
     benefits_isolated: 0,
     cover_images: [] as string[],
@@ -163,6 +164,7 @@ function buildPayload(data: any) {
     wifi_name: data.wifi_name,
     wifi_password: data.wifi_password,
     meituan_shop_id: data.meituan_shop_id || null,
+    coupon_provider: data.coupon_provider || null,
     pay_account_id: data.pay_account_id ?? null,
     benefits_isolated: data.benefits_isolated ? 1 : 0,
     cover_images: data.cover_images || [],
@@ -213,6 +215,7 @@ function openEdit(row: any) {
     ...row,
     cover_images: [...(row.cover_images || [])],
     meituan_shop_id: row.meituan_shop_id || '',
+    coupon_provider: row.coupon_provider || '',
     pay_account_id: row.pay_account_id ?? null,
     benefits_isolated: row.benefits_isolated ? 1 : 0,
   })

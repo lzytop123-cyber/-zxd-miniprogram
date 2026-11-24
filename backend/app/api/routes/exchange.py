@@ -31,17 +31,31 @@ from app.services.deal_mapping_service import (
 )
 from app.services.douyin import DouyinService, parse_douyin_voucher_expire_date, use_douyin_official
 from app.services.exchange_setting import resolve_exchange_store_id
+from app.services.yunfei import YunfeiService
 from app.services.yunlaoban import YunlaobanService, parse_voucher_expire_date
 
 router = APIRouter(prefix="/exchange", tags=["兑换"])
+
+
+def _store_coupon_channel(store: Store) -> str:
+    """门店核销通道：yunfei | yunlaoban（默认）。"""
+    raw = (getattr(store, "coupon_provider", None) or "").strip().lower()
+    if raw in ("yunfei", "yunlaoban"):
+        return raw
+    return "yunlaoban"
 
 
 async def _prepare(
     platform: int,
     code: str,
     shop_id: str | None = None,
+    *,
+    channel: str = "yunlaoban",
 ) -> tuple[dict, dict | None]:
-    """验券准备（不核销）。返回 (yunlaoban 形态 prepared, 抖音原始 prepared 或 None)。"""
+    """验券准备（不核销）。返回 (统一 prepared, 抖音官方 raw 或 None)。"""
+    if channel == "yunfei":
+        prepared = await YunfeiService.prepare(platform, code, op_poi_id=shop_id or "")
+        return prepared, None
     if platform == 2 and use_douyin_official():
         import httpx
         from app.core.config import settings
@@ -65,8 +79,12 @@ async def _consume(
     prepared: dict,
     douyin_raw: dict | None,
     shop_id: str | None = None,
+    *,
+    channel: str = "yunlaoban",
 ) -> str:
     """正式核销。"""
+    if channel == "yunfei":
+        return await YunfeiService.consume(platform, code, prepared)
     if platform == 2 and use_douyin_official():
         import httpx
         from app.core.config import settings
@@ -139,8 +157,11 @@ async def _exchange(
     store = db.get(Store, store_id)
     if not store or store.status != 1:
         raise HTTPException(status_code=404, detail="门店不存在或已停业")
-    # 云老板：本店 meituan_shop_id 优先，否则用全局默认（老店兼容）
-    yunlaoban_shop_id = (store.meituan_shop_id or "").strip() or None
+    channel = _store_coupon_channel(store)
+    # 云老板：本店 meituan_shop_id 优先，否则全局默认；云飞：meituan_shop_id = opPoiId（必填）
+    shop_id = (store.meituan_shop_id or "").strip() or None
+    if channel == "yunfei" and not shop_id:
+        raise HTTPException(status_code=400, detail="该门店未配置云飞门店 ID（opPoiId），请联系店长")
     existing = db.scalar(select(MeituanOrder).where(MeituanOrder.coupon_code == code))
     if existing and existing.status == MeituanOrderStatus.verified:
         raise HTTPException(status_code=400, detail="该券码已兑换")
@@ -164,7 +185,9 @@ async def _exchange(
 
     # 1) 仅 prepare，拿到 deal 信息后再决定是否正式核销（避免限兑用户把券核废）
     try:
-        prepared, douyin_raw = await _prepare(platform, code, shop_id=yunlaoban_shop_id)
+        prepared, douyin_raw = await _prepare(
+            platform, code, shop_id=shop_id, channel=channel
+        )
     except ValueError as e:
         db.delete(order)
         db.commit()
@@ -223,10 +246,10 @@ async def _exchange(
                 detail="该优惠每人限兑 1 次，您已兑换过。换手机号购买的券也无法重复兑换到同一微信账号。",
             )
 
-    # 2) 正式核销（须与 prepare 使用同一 shopId）
+    # 2) 正式核销（须与 prepare 使用同一通道/门店）
     try:
         consume_result = await _consume(
-            platform, code, prepared, douyin_raw, shop_id=yunlaoban_shop_id
+            platform, code, prepared, douyin_raw, shop_id=shop_id, channel=channel
         )
     except ValueError as e:
         db.delete(order)
@@ -268,6 +291,16 @@ async def _exchange(
             order.deal_price = Decimal(str(douyin_raw["deal_price"]))
         except Exception:
             pass
+    if order.deal_price is None and prepared.get("payAmount") is not None:
+        from decimal import Decimal
+
+        try:
+            order.deal_price = Decimal(str(prepared["payAmount"]))
+        except Exception:
+            pass
+    channel_label = (
+        "yunfei" if channel == "yunfei" else ("douyin_official" if douyin_raw else "yunlaoban")
+    )
     raw_payload: dict = {
         "receipt_channel": source.value,
         "result": consume_result,
@@ -275,8 +308,10 @@ async def _exchange(
         "voucherExpireDate": str(voucher_expire) if voucher_expire else None,
         "payAmount": prepared.get("payAmount"),
         "deal_price": float(order.deal_price) if order.deal_price is not None else None,
-        "platform": "douyin_official" if douyin_raw else "yunlaoban",
+        "platform": channel_label,
     }
+    if prepared.get("_yunfei_prepare"):
+        raw_payload["raw_prepare"] = prepared.get("_yunfei_prepare")
     if douyin_raw:
         raw_payload["raw_prepare"] = douyin_raw.get("raw_prepare") or douyin_raw
         if douyin_raw.get("encrypted_code"):

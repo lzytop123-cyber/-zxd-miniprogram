@@ -66,10 +66,27 @@
     <el-form-item label="WiFi 密码">
       <el-input v-model="form.wifi_password" />
     </el-form-item>
-    <el-form-item label="美团门店 ID">
-      <el-input v-model="form.meituan_shop_id" placeholder="云老板 shopId，新店必填" />
+    <el-form-item label="核销通道">
+      <el-select v-model="form.coupon_provider" clearable placeholder="默认（云老板）" style="width:100%">
+        <el-option label="云老板（默认/千峰）" value="yunlaoban" />
+        <el-option label="云飞 API（理工大）" value="yunfei" />
+      </el-select>
       <div class="field-hint">
-        与云老板开通的第二门店 shopId 一致；验券/核销按店走此 ID。留空则用系统默认（老店）。
+        千峰保持默认云老板；理工大选云飞后，美团后台核销会记在云飞绑定的那家美团店下。
+      </div>
+    </el-form-item>
+    <el-form-item :label="form.coupon_provider === 'yunfei' ? '云飞门店 ID' : '美团门店 ID'">
+      <el-input
+        v-model="form.meituan_shop_id"
+        :placeholder="form.coupon_provider === 'yunfei' ? '来客核销小程序里的 opPoiId' : '云老板 shopId，可留空用全局默认'"
+      />
+      <div class="field-hint">
+        <template v-if="form.coupon_provider === 'yunfei'">
+          填写云飞侧门店 ID（opPoiId，在「来客核销」小程序门店列表可见）。必填。
+        </template>
+        <template v-else>
+          云老板 shopId；留空则用系统默认（老店/千峰）。
+        </template>
       </div>
     </el-form-item>
     <template v-if="showFinanceFields">

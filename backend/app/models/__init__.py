@@ -171,6 +171,8 @@ class Store(Base):
     wifi_password: Mapped[str | None] = mapped_column(String(100))
     meituan_shop_id: Mapped[str | None] = mapped_column(String(100))
     meituan_auth_token: Mapped[str | None] = mapped_column(String(500))
+    # 核销通道：空/yunlaoban=云老板；yunfei=云飞（理工大等分店）
+    coupon_provider: Mapped[str | None] = mapped_column(String(20))
     pay_account_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("pay_accounts.id"))
     benefits_isolated: Mapped[int] = mapped_column(Integer, default=0)
     seat_map_mode: Mapped[str] = mapped_column(String(20), default="legacy")

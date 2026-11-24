@@ -46,6 +46,7 @@ MIGRATION_STATEMENTS = [
     "ALTER TABLE admin_users ADD COLUMN store_id INTEGER",
     "ALTER TABLE stores ADD COLUMN seat_map_mode VARCHAR(20) DEFAULT 'legacy'",
     "ALTER TABLE admin_users ADD COLUMN permissions JSON",
+    "ALTER TABLE stores ADD COLUMN coupon_provider VARCHAR(20)",
 ]
 
 # 性能索引（存量库补建；已存在时忽略）

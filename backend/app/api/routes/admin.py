@@ -547,6 +547,7 @@ class AdminStoreItem(BaseModel):
     floor_plan: str | None = None
     cover_images: list[str] = []
     meituan_shop_id: str | None = None
+    coupon_provider: str | None = None
     pay_account_id: int | None = None
     benefits_isolated: int = 0
     status: int
@@ -566,6 +567,7 @@ class AdminStoreUpdateRequest(BaseModel):
     floor_plan: str | None = None
     cover_images: list[str] | None = None
     meituan_shop_id: str | None = None
+    coupon_provider: str | None = None
     pay_account_id: int | None = None
     benefits_isolated: int | None = None
     status: int | None = None
@@ -643,6 +645,7 @@ def _store_to_admin_item(store: Store) -> dict:
         "floor_plan": store.floor_plan,
         "cover_images": _cover_images_admin(store),
         "meituan_shop_id": store.meituan_shop_id,
+        "coupon_provider": (getattr(store, "coupon_provider", None) or "").strip() or None,
         "pay_account_id": store.pay_account_id,
         "benefits_isolated": int(getattr(store, "benefits_isolated", 0) or 0),
         "seat_map_mode": getattr(store, "seat_map_mode", None) or "legacy",
@@ -1115,6 +1118,11 @@ def update_store_admin(
             raise HTTPException(status_code=400, detail="收款账户不存在或已停用")
     if "benefits_isolated" in data:
         data["benefits_isolated"] = 1 if data["benefits_isolated"] else 0
+    if "coupon_provider" in data:
+        raw = (data["coupon_provider"] or "").strip().lower()
+        if raw and raw not in ("yunlaoban", "yunfei"):
+            raise HTTPException(status_code=400, detail="核销通道仅支持 yunlaoban 或 yunfei")
+        data["coupon_provider"] = raw or None
 
     for key, value in data.items():
         if key in ("latitude", "longitude") and value is not None:
@@ -2514,9 +2522,15 @@ def system_status_admin(_: object = Depends(get_current_admin), db: Session = De
         },
         {
             "key": "yunlaoban",
-            "name": "团购核销",
+            "name": "团购核销(云老板)",
             "ok": yunlaoban_ok and not _use_mock(),
             "detail": f"provider={settings.coupon_provider}, mock={_use_mock()}",
+        },
+        {
+            "key": "yunfei",
+            "name": "团购核销(云飞)",
+            "ok": bool((settings.yunfei_app_id or "").strip() and (settings.yunfei_app_secret or "").strip()),
+            "detail": "已填 YUNFEI_APP_ID/SECRET" if (settings.yunfei_app_id or "").strip() else "未配置（理工大可选）",
         },
         {
             "key": "deepseek",
@@ -2693,6 +2707,7 @@ class AdminStoreCreateRequest(BaseModel):
     wifi_password: str | None = None
     cover_images: list[str] | None = None
     meituan_shop_id: str | None = None
+    coupon_provider: str | None = None
     pay_account_id: int | None = None
     benefits_isolated: int = 0
 
@@ -2828,6 +2843,7 @@ def create_store_admin(
         wifi_password=body.wifi_password,
         cover_images=_cover_images_to_store(body.cover_images or []),
         meituan_shop_id=body.meituan_shop_id,
+        coupon_provider=(body.coupon_provider or "").strip() or None,
         pay_account_id=body.pay_account_id,
         benefits_isolated=1 if body.benefits_isolated else 0,
         seat_map_mode="image",

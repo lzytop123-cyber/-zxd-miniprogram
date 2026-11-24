@@ -96,6 +96,15 @@ class Settings(BaseSettings):
         validation_alias=AliasChoices("COUPON_PROVIDER"),
     )
 
+    # 云飞 API（来客核销）— 按门店 coupon_provider=yunfei 时使用
+    yunfei_app_id: str = Field(default="", validation_alias=AliasChoices("YUNFEI_APP_ID"))
+    yunfei_app_secret: str = Field(default="", validation_alias=AliasChoices("YUNFEI_APP_SECRET"))
+    yunfei_base_url: str = Field(
+        default="http://wspacebot.yunfeiwork.com",
+        validation_alias=AliasChoices("YUNFEI_BASE_URL"),
+    )
+    yunfei_timeout_ms: int = Field(default=20000, validation_alias=AliasChoices("YUNFEI_TIMEOUT"))
+
     douyin_client_key: str = Field(
         default="",
         validation_alias=AliasChoices("DOUYIN_CLIENT_KEY", "DOUYIN_APP_ID"),
