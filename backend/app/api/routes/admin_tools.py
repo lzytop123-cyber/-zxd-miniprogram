@@ -25,6 +25,7 @@ from app.models import (
     AdminUser,
     BillType,
     CardType,
+    PayType,
     PendingDealMapping,
     PeriodCard,
     PricingRule,
@@ -748,6 +749,9 @@ def mark_reservation_refund(
     if not reservation:
         raise HTTPException(status_code=404, detail="订单不存在")
     assert_store_access(admin, reservation.store_id)
+    db.refresh(reservation, with_for_update=True)
+    if reservation.status == 3 and reservation.pay_status == 1 and reservation.pay_type == PayType.wechat:
+        raise HTTPException(status_code=409, detail="微信退款待确认，请使用重试退款核对实际结果")
     if reservation.pay_status != 1:
         raise HTTPException(status_code=400, detail="仅已付款订单可登记退款")
     reservation.pay_status = 2

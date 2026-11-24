@@ -10,7 +10,7 @@ from app.db.session import get_db
 from app.models import CardPurchaseOrder, Coupon, PayType, RechargeOrder, Reservation
 from app.services.booking import finalize_reservation_after_pay, fulfill_recharge_order, seat_conflict_excluding
 from app.services.card_service import fulfill_card_purchase
-from app.services.coupon_service import mark_coupon_used
+from app.services.coupon_service import claim_reservation_coupon, refund_coupon_for_reservation
 from app.services.pay_account import list_resolved_accounts_for_notify
 from app.services.wechat_pay import WechatPayService, resolve_account_for_mchid
 from app.services.receipts import payment_time
@@ -31,15 +31,8 @@ def _amount_ok(expected: Decimal | None, paid_fen) -> bool:
 
 
 def _apply_coupon_from_attach(db: Session, reservation: Reservation, attach: str | None) -> None:
-    if not attach or not attach.startswith("coupon_id="):
-        return
-    try:
-        coupon_id = int(attach.split("=", 1)[1])
-    except ValueError:
-        return
-    coupon = db.get(Coupon, coupon_id)
-    if coupon and coupon.user_id == reservation.user_id and coupon.status == 0:
-        mark_coupon_used(db, coupon, reservation)
+    # attach 是历史兼容字段；订单保存的券才是唯一依据。
+    claim_reservation_coupon(db, reservation)
 
 
 async def complete_reservation_wechat_payment(
@@ -80,7 +73,14 @@ async def complete_reservation_wechat_payment(
             reservation.end_time,
             reservation.id,
         )
-        if conflict or reservation.status == 3:
+        coupon_error = None
+        if not conflict and reservation.status != 3:
+            try:
+                _apply_coupon_from_attach(db, reservation, attach)
+            except ValueError as exc:
+                coupon_error = str(exc)
+                logger.warning("reservation coupon conflict order_no=%s: %s", reservation.order_no, exc)
+        if conflict or reservation.status == 3 or coupon_error:
             amount = reservation.final_price or Decimal("0")
             reservation.status = 3
             reservation.refund_remark = "微信退款尚未确认，等待重试或人工核对"
@@ -105,12 +105,12 @@ async def complete_reservation_wechat_payment(
             reservation.pay_status = 2
             reservation.refunded_at = payment_time(None)
             reservation.refund_remark = "预约冲突或取消后到账，已原路退款"
+            refund_coupon_for_reservation(db, reservation)
             db.commit()
             return "conflict"
 
         reservation.pay_status = 1
         reservation.pay_type = PayType.wechat
-        _apply_coupon_from_attach(db, reservation, attach)
         db.commit()
 
     await finalize_reservation_after_pay(db, reservation)

@@ -37,6 +37,8 @@ function isLoggedIn() {
 function syncAppUser(user) {
   const app = getAppSafe()
   if (!app) return
+  const cache = require('./requestCache')
+  const session = cache.getSession(wx.getStorageSync('token') || '')
   if (!app.globalData) app.globalData = {}
   app.globalData.user = user
   app.globalData.loginReady = true
@@ -44,7 +46,7 @@ function syncAppUser(user) {
   if (user) {
     wx.setStorageSync('userInfo', user)
     normalizeUser(user).then((normalized) => {
-      if (!app.globalData) return
+      if (!app.globalData || app.globalData.user !== user || !cache.isCurrentSession(session, wx.getStorageSync('token') || '')) return
       app.globalData.user = normalized
       wx.setStorageSync('userInfo', normalized)
     })
@@ -64,9 +66,7 @@ function logout() {
   wx.removeStorageSync('token')
   wx.removeStorageSync('userInfo')
   try {
-    const { invalidateCache } = require('./request')
-    invalidateCache('/user/')
-    invalidateCache('/reservation/')
+    require('./requestCache').resetSession()
   } catch (e) {
     // ignore
   }

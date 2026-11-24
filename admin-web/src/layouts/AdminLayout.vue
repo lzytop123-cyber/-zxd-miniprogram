@@ -140,7 +140,7 @@ import {
   Menu, Monitor, Reading, Search, Setting, ShoppingBag, SwitchButton,
   Ticket, TrendCharts, User, Wallet, Warning,
 } from '@element-plus/icons-vue'
-import { adminSessionTick, canAccessPath, clearAdminSession, isHqAdmin, setAdminPermissions } from '../utils/adminAuth'
+import { adminSessionTick, canAccessPath, clearAdminSession, getAdminStoreName, isHqAdmin, setAdminPermissions } from '../utils/adminAuth'
 import { getWorkingStoreId, onWorkingStoreChange, setWorkingStoreId } from '../utils/workingStore'
 import http from '../api/http'
 
@@ -159,7 +159,7 @@ const workingStore = ref<number>(0)
 const boundStoreName = computed(() => {
   void adminSessionTick.value
   return storeOptions.value.find((store) => store.id === getWorkingStoreId())?.name
-    || localStorage.getItem('admin_store_name') || ''
+    || getAdminStoreName()
 })
 
 function onWorkingStorePick(val: number) {

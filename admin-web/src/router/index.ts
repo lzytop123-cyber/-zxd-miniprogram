@@ -1,4 +1,5 @@
 import { createRouter, createWebHistory } from 'vue-router'
+import { canAccessRoute, firstAccessiblePath, getAdminToken } from '../utils/adminAuth'
 
 const router = createRouter({
   history: createWebHistory(),
@@ -52,10 +53,9 @@ const router = createRouter({
 
 const PUBLIC = new Set(['/login', '/landing'])
 router.beforeEach(async (to) => {
-  const token = localStorage.getItem('admin_token')
+  const token = getAdminToken()
   if (!PUBLIC.has(to.path) && !token) return '/login'
   if (token && !PUBLIC.has(to.path)) {
-    const { canAccessRoute, firstAccessiblePath } = await import('../utils/adminAuth')
     const path = to.path.split('?')[0]
     if (!canAccessRoute(path)) {
       const fallback = firstAccessiblePath()

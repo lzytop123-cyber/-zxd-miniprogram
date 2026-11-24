@@ -133,7 +133,14 @@
             @click="cancelOrder(row)"
           >取消</el-button>
           <el-button
-            v-if="row.pay_status === 1"
+            v-if="row.refund_state === 'pending'"
+            link
+            type="warning"
+            :loading="retryingRefunds.has(row.id)"
+            @click="retryRefund(row)"
+          >重试退款</el-button>
+          <el-button
+            v-if="row.pay_status === 1 && row.refund_state !== 'pending'"
             link
             type="info"
             @click="openRefund(row)"
@@ -569,6 +576,28 @@ function canCancel(row: any) {
   if (row.status === 3 || row.status === 2) return false
   if (row.status === 1) return false
   return row.status === 0
+}
+
+const retryingRefunds = ref(new Set<number>())
+async function retryRefund(row: any) {
+  if (row.refund_state !== 'pending' || retryingRefunds.value.has(row.id)) return
+  const storeId = filters.store_id
+  try {
+    await ElMessageBox.confirm(`重试订单 ${row.order_no} 的微信退款？`, '重试退款', { type: 'warning' })
+  } catch {
+    return
+  }
+  if (storeId !== filters.store_id || retryingRefunds.value.has(row.id)) return
+  retryingRefunds.value.add(row.id)
+  try {
+    await http.post(`/admin/reservations/${row.id}/cancel`)
+    ElMessage.success('退款已确认')
+    await load()
+  } catch (e: any) {
+    ElMessage.error(e?.response?.data?.detail || e?.message || '退款待确认，请稍后重试')
+  } finally {
+    retryingRefunds.value.delete(row.id)
+  }
 }
 
 async function cancelOrder(row: any) {

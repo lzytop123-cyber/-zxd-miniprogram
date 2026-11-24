@@ -132,6 +132,21 @@ $env:PYTHONPATH="f:\zxd-pro\backend"
 
 ## 环境变量
 
+### 本地回归测试
+
+后端测试依赖安装到开发虚拟环境，勿在真实业务库上运行：
+
+```powershell
+cd backend
+.\.venv\Scripts\python -m pip install -r requirements-dev.txt
+$env:DATABASE_URL="sqlite://"
+$env:APP_ENV="development"
+$env:PYTHONPATH=(Get-Location).Path
+.\.venv\Scripts\python -m pytest -q
+```
+
+小程序执行 `npm test`；管理后台执行 `npm test` 和 `npm run build`。
+
 参见 `backend/.env.example` 与 **`backend/.env.production.example`**
 
 ## 生产上线

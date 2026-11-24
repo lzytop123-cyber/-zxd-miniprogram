@@ -109,6 +109,7 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, onUnmounted, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { onWorkingStoreChange, workingStoreParams } from '../utils/workingStore'
+import { getAdminToken } from '../utils/adminAuth'
 import {
   Refresh, ArrowRight, ArrowDown, Download,
   Money, TrendCharts, PieChart,
@@ -287,7 +288,7 @@ async function refreshAll() {
 
 async function downloadExport(path: string) {
   const baseURL = import.meta.env.VITE_API_BASE || '/api'
-  const token = localStorage.getItem('admin_token')
+  const token = getAdminToken()
   try {
     const res = await fetch(`${baseURL}${path}`, {
       headers: token ? { Authorization: `Bearer ${token}` } : {},

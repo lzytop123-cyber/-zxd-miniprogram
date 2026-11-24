@@ -274,7 +274,7 @@ def admin_list_door_logs(
     query = select(DoorLog)
     if lock_id is not None:
         query = query.where(DoorLog.lock_id == lock_id)
-    elif sid:
+    if sid is not None:
         query = query.where(
             DoorLog.lock_id.in_(select(BleLock.id).where(BleLock.store_id == sid))
         )

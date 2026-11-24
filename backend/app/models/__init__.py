@@ -354,6 +354,8 @@ class Coupon(Base):
     min_amount: Mapped[Decimal] = mapped_column(Numeric(10, 2), default=Decimal("0.00"))
     expire_date: Mapped[date | None] = mapped_column(Date)
     status: Mapped[int] = mapped_column(Integer, default=0)
+    # 0 可用 / 1 已使用 / 2 预支付占用；归属用于防止其他订单核销或退回。
+    reserved_order_no: Mapped[str | None] = mapped_column(String(32))
 
 
 class WalletLog(Base):

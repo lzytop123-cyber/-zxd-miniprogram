@@ -20,10 +20,27 @@ const DEFAULT_TTL = {
 
 const memory = new Map()
 const inflight = new Map()
+let sessionToken = ''
+let sessionRevision = 0
+
+function resetSession(token = '') {
+  sessionToken = token
+  sessionRevision += 1
+  invalidate()
+}
+
+function getSession(token = '') {
+  if (sessionToken !== token) resetSession(token)
+  return sessionRevision
+}
+
+function isCurrentSession(revision, token = '') {
+  return revision === sessionRevision && token === sessionToken
+}
 
 function buildKey(method, url, data) {
   const payload = data === undefined ? '' : JSON.stringify(data)
-  return `${method.toUpperCase()}:${url}:${payload}`
+  return `${sessionRevision}:${method.toUpperCase()}:${url}:${payload}`
 }
 
 function resolveTtl(url, method, options = {}) {
@@ -56,11 +73,15 @@ function setCached(key, data, ttl) {
 function invalidate(match) {
   if (!match) {
     memory.clear()
+    inflight.clear()
     return
   }
   const needle = String(match)
   for (const key of memory.keys()) {
     if (key.includes(needle)) memory.delete(key)
+  }
+  for (const key of inflight.keys()) {
+    if (key.includes(needle)) inflight.delete(key)
   }
 }
 
@@ -76,11 +97,11 @@ function runDeduped(key, ttl, runner) {
 
   const promise = runner()
     .then((data) => {
-      setCached(key, data, ttl)
+      if (inflight.get(key) === promise) setCached(key, data, ttl)
       return data
     })
     .finally(() => {
-      inflight.delete(key)
+      if (inflight.get(key) === promise) inflight.delete(key)
     })
 
   inflight.set(key, promise)
@@ -92,5 +113,8 @@ module.exports = {
   resolveTtl,
   runDeduped,
   invalidate,
-  clear: () => memory.clear(),
+  clear: () => invalidate(),
+  resetSession,
+  getSession,
+  isCurrentSession,
 }

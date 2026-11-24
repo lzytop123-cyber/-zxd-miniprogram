@@ -595,6 +595,7 @@ def finalize_expired_reservation(
 ) -> bool:
     """预约时段结束后自动完结（未入座视为取消，已入座视为完成）。"""
     now = now or datetime.now()
+    db.refresh(reservation, with_for_update=True)
     if reservation.status not in (0, 1):
         return False
     if reservation.end_time > now:
@@ -607,6 +608,9 @@ def finalize_expired_reservation(
             record_study_on_checkout(db, reservation, user)
     else:
         reservation.status = 3
+        if reservation.pay_status == 0 and reservation.paid_at is None:
+            from app.services.coupon_service import refund_coupon_for_reservation
+            refund_coupon_for_reservation(db, reservation)
     return True
 
 

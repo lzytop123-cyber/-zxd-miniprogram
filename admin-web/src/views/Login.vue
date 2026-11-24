@@ -54,18 +54,7 @@
           <p>登录后进入后台管理</p>
         </div>
 
-        <div class="tabs">
-          <button type="button" class="tab" :class="{ active: tab === 'password' }" @click="tab = 'password'">
-            <el-icon><Key /></el-icon><span>账号密码</span>
-          </button>
-          <button type="button" class="tab" :class="{ active: tab === 'qr' }" @click="tab = 'qr'">
-            <el-icon><Grid /></el-icon><span>扫码登录</span>
-          </button>
-          <span class="tab-indicator" :style="{ transform: `translateX(${tab === 'qr' ? '100%' : '0'})` }"></span>
-        </div>
-
-        <transition name="swap" mode="out-in">
-          <el-form v-if="tab === 'password'" key="pw" :model="form" @submit.prevent="onSubmit" class="form">
+          <el-form :model="form" @submit.prevent="onSubmit" class="form">
             <el-input v-model="form.username" placeholder="用户名" size="large" :prefix-icon="User" autocomplete="username" />
             <el-input v-model="form.password" placeholder="密码" size="large" type="password" show-password :prefix-icon="Lock" autocomplete="current-password" @keyup.enter="onSubmit" />
             <div class="options">
@@ -78,44 +67,6 @@
             </el-button>
           </el-form>
 
-          <div v-else key="qr" class="qr-panel">
-            <div class="qr-frame">
-              <svg class="qr" viewBox="0 0 220 220" xmlns="http://www.w3.org/2000/svg" aria-label="扫码登录二维码">
-                <rect width="220" height="220" fill="#fff" rx="8" />
-                <g fill="#0a0b0d">
-                  <rect v-for="(c, i) in qrCells" :key="i" :x="10 + c.x * 9" :y="10 + c.y * 9" width="9" height="9" />
-                </g>
-                <!-- 三个定位框 -->
-                <g>
-                  <rect x="10" y="10" width="63" height="63" fill="#0a0b0d" />
-                  <rect x="19" y="19" width="45" height="45" fill="#fff" />
-                  <rect x="28" y="28" width="27" height="27" fill="#0a0b0d" />
-
-                  <rect x="147" y="10" width="63" height="63" fill="#0a0b0d" />
-                  <rect x="156" y="19" width="45" height="45" fill="#fff" />
-                  <rect x="165" y="28" width="27" height="27" fill="#0a0b0d" />
-
-                  <rect x="10" y="147" width="63" height="63" fill="#0a0b0d" />
-                  <rect x="19" y="156" width="45" height="45" fill="#fff" />
-                  <rect x="28" y="165" width="27" height="27" fill="#0a0b0d" />
-                </g>
-                <!-- 中央品牌 -->
-                <rect x="80" y="80" width="60" height="60" fill="#fff" rx="10" />
-                <rect x="86" y="86" width="48" height="48" fill="url(#brand-grad)" rx="12" />
-                <text x="110" y="123" text-anchor="middle" font-size="30" font-weight="700" fill="#1a1a1a" font-family="-apple-system, PingFang SC, sans-serif">知</text>
-                <defs>
-                  <linearGradient id="brand-grad" x1="0" y1="0" x2="1" y2="1">
-                    <stop offset="0%" stop-color="#FFD000" />
-                    <stop offset="100%" stop-color="#ffb400" />
-                  </linearGradient>
-                </defs>
-              </svg>
-              <div class="qr-scan-line" aria-hidden="true"></div>
-            </div>
-            <p class="qr-hint">请使用「知行岛管理员」小程序扫码</p>
-            <p class="qr-sub">首次使用请先在小程序内绑定账号 · <a class="link" @click.prevent="refreshQr">刷新</a></p>
-          </div>
-        </transition>
 
         <div class="card-foot">
           <span>首次登录请联系管理员开通账号</span>
@@ -128,37 +79,19 @@
 </template>
 
 <script setup lang="ts">
-import { computed, reactive, ref } from 'vue'
+import { reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { User, Lock, Right, OfficeBuilding, Wallet, DataAnalysis, Key, Grid } from '@element-plus/icons-vue'
+import { User, Lock, Right, OfficeBuilding, Wallet, DataAnalysis } from '@element-plus/icons-vue'
 import http from '../api/http'
+import { saveAdminSession, setAdminPermissions } from '../utils/adminAuth'
 
 const router = useRouter()
 const loading = ref(false)
 const remember = ref(true)
-const tab = ref<'password' | 'qr'>('password')
 const form = reactive({ username: '', password: '' })
 const year = new Date().getFullYear()
 const version = '2.0'
-
-// 生成一个"看起来像 QR"的静态点阵；跳过定位框和中央 logo 区域。
-const qrSeed = ref(42)
-const qrCells = computed(() => {
-  let seed = qrSeed.value
-  const rng = () => { seed = (seed * 9301 + 49297) % 233280; return seed / 233280 }
-  const out: { x: number, y: number }[] = []
-  for (let y = 0; y < 21; y++) {
-    for (let x = 0; x < 21; x++) {
-      const inMarker = (x < 8 && y < 8) || (x > 12 && y < 8) || (x < 8 && y > 12)
-      const inCenter = x >= 8 && x <= 12 && y >= 8 && y <= 12
-      if (inMarker || inCenter) continue
-      if (rng() < 0.48) out.push({ x, y })
-    }
-  }
-  return out
-})
-function refreshQr() { qrSeed.value = Math.floor(Math.random() * 999) + 1 }
 
 function onMove(e: PointerEvent) {
   const el = e.currentTarget as HTMLElement
@@ -178,7 +111,6 @@ async function onSubmit() {
   loading.value = true
   try {
     const res = await http.post('/admin/login', form)
-    const { saveAdminSession, setAdminPermissions } = await import('../utils/adminAuth')
     saveAdminSession({
       token: res.data.token,
       username: res.data.username,
@@ -187,7 +119,7 @@ async function onSubmit() {
       store_id: res.data.store_id,
       store_name: res.data.store_name,
       permissions: Array.isArray(res.data.permissions) ? res.data.permissions : undefined,
-    })
+    }, remember.value)
     try {
       const me = await http.get('/admin/me')
       if (Array.isArray(me.data?.permissions)) {
@@ -376,40 +308,6 @@ async function onSubmit() {
 .card-head h2 { margin: 0; font-size: 22px; color: #f5f5f7; font-weight: 600; letter-spacing: 0.5px; }
 .card-head p  { margin: 6px 0 0; font-size: 13px; color: #7c7c86; }
 
-/* 登录方式 tabs */
-.tabs {
-  position: relative;
-  display: grid; grid-template-columns: 1fr 1fr;
-  padding: 4px; margin-bottom: 22px;
-  background: rgba(255,255,255,0.03);
-  border: 1px solid rgba(255,255,255,0.07);
-  border-radius: 12px;
-  isolation: isolate;
-}
-.tab {
-  position: relative; z-index: 2;
-  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
-  padding: 9px 12px; border: 0; background: transparent;
-  color: #909096; font-size: 13px; font-weight: 500;
-  cursor: pointer; border-radius: 8px;
-  transition: color 0.25s ease;
-}
-.tab.active { color: #1a1a1a; }
-.tab:not(.active):hover { color: #d0d0d6; }
-.tab-indicator {
-  position: absolute; z-index: 1;
-  top: 4px; bottom: 4px; left: 4px; width: calc(50% - 4px);
-  background: linear-gradient(135deg, #FFD000, #ffb400);
-  border-radius: 8px;
-  box-shadow: 0 4px 14px rgba(255, 208, 0, 0.35);
-  transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-/* 面板切换动画 */
-.swap-enter-active, .swap-leave-active { transition: opacity 0.25s ease, transform 0.25s ease; }
-.swap-enter-from { opacity: 0; transform: translateY(6px); }
-.swap-leave-to   { opacity: 0; transform: translateY(-6px); }
-
 .form { display: flex; flex-direction: column; gap: 14px; }
 
 :deep(.el-input__wrapper) {
@@ -460,45 +358,6 @@ async function onSubmit() {
   text-align: center; font-size: 11.5px; color: #5c5c66; letter-spacing: 0.4px;
 }
 
-/* QR 面板 */
-.qr-panel {
-  display: flex; flex-direction: column; align-items: center;
-  gap: 14px; padding: 4px 0 10px;
-}
-.qr-frame {
-  position: relative;
-  width: 200px; height: 200px;
-  padding: 10px; border-radius: 16px;
-  background: #fff;
-  box-shadow: 0 8px 28px rgba(255, 208, 0, 0.15), 0 0 0 1px rgba(255, 208, 0, 0.25);
-  overflow: hidden;
-}
-.qr-frame::before, .qr-frame::after,
-.qr-frame > .qr-scan-line::before, .qr-frame > .qr-scan-line::after {
-  /* 四角装饰 */
-  content: ''; position: absolute; width: 14px; height: 14px;
-  border-color: #FFD000; border-style: solid; border-width: 0; pointer-events: none;
-}
-.qr-frame::before      { top: -1px; left: -1px; border-top-width: 2px; border-left-width: 2px; border-top-left-radius: 8px; }
-.qr-frame::after       { top: -1px; right: -1px; border-top-width: 2px; border-right-width: 2px; border-top-right-radius: 8px; }
-.qr-scan-line::before  { bottom: -1px; left: -1px; border-bottom-width: 2px; border-left-width: 2px; border-bottom-left-radius: 8px; }
-.qr-scan-line::after   { bottom: -1px; right: -1px; border-bottom-width: 2px; border-right-width: 2px; border-bottom-right-radius: 8px; }
-.qr { width: 100%; height: 100%; display: block; }
-.qr-scan-line {
-  position: absolute; left: 12px; right: 12px; height: 2px;
-  background: linear-gradient(90deg, transparent, #FFD000 30%, #FFD000 70%, transparent);
-  box-shadow: 0 0 12px rgba(255, 208, 0, 0.7);
-  animation: scan 2.4s cubic-bezier(0.4, 0, 0.6, 1) infinite;
-}
-@keyframes scan {
-  0%       { top: 14px;  opacity: 0; }
-  10%      { opacity: 1; }
-  90%      { opacity: 1; }
-  100%     { top: 184px; opacity: 0; }
-}
-.qr-hint { margin: 6px 0 0; color: #d0d0d6; font-size: 13.5px; letter-spacing: 0.3px; }
-.qr-sub  { margin: 0; color: #6b6b73; font-size: 12px; letter-spacing: 0.2px; }
-
 .page-foot {
   position: absolute; left: 0; right: 0; bottom: 20px;
   text-align: center; z-index: 2;
@@ -515,6 +374,6 @@ async function onSubmit() {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .blob, .stage, .stage > *, .live-dot, .qr-scan-line { animation: none; }
+  .blob, .stage, .stage > *, .live-dot { animation: none; }
 }
 </style>

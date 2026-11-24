@@ -219,7 +219,11 @@ def admin_reservations(
             query = query.where(or_(Reservation.status != 3, Reservation.paid_at.is_(None)))
     if refund_pending:
         query = query.where(
-            Reservation.status == 3, Reservation.pay_status == 0, Reservation.paid_at.is_not(None)
+            Reservation.status == 3,
+            or_(
+                (Reservation.pay_status == 0) & Reservation.paid_at.is_not(None),
+                (Reservation.pay_status == 1) & (Reservation.pay_type == PayType.wechat),
+            ),
         )
     if status is not None:
         query = query.where(Reservation.status == status)
@@ -1289,7 +1293,9 @@ def _reservation_admin_item(db: Session, r: Reservation) -> dict | None:
     base["pay_type"] = r.pay_type.value if r.pay_type else None
     base["refund_remark"] = r.refund_remark
     base["refund_state"] = (
-        "pending" if r.status == 3 and r.pay_status == 0 and r.paid_at
+        "pending" if r.status == 3 and (
+            (r.pay_status == 0 and r.paid_at) or (r.pay_status == 1 and r.pay_type == PayType.wechat)
+        )
         else "wechat_confirmed" if r.pay_status == 2 and r.refund_remark == "预约冲突或取消后到账，已原路退款"
         else "recorded" if r.pay_status == 2
         else None
@@ -1329,58 +1335,9 @@ def admin_cancel_reservation(
     if not reservation:
         raise HTTPException(status_code=404, detail="订单不存在")
     assert_store_access(admin, reservation.store_id)
-    if reservation.status == 3:
-        raise HTTPException(status_code=400, detail="订单已取消")
-    if reservation.status == 2:
-        raise HTTPException(status_code=400, detail="订单已完成，不可取消")
-    if reservation.status == 1:
-        raise HTTPException(status_code=400, detail="使用中，请先强制离座")
-
-    if reservation.pay_status == 0:
-        reservation.status = 3
-        db.commit()
-        return ResponseModel(message="未支付订单已取消，座位已释放")
-
+    from app.services.reservation_cancel import cancel_reservation
     user = db.get(User, reservation.user_id)
-    if reservation.pay_status == 1 and user:
-        amount = reservation.final_price or Decimal("0")
-        if reservation.pay_type == PayType.admin:
-            reservation.status = 3
-            db.commit()
-            return ResponseModel(message="已取消，前台收款订单不退款，座位已释放")
-        if reservation.pay_type == PayType.balance and amount > 0:
-            add_wallet_log(
-                db, user, "refund", amount,
-                f"预约退款-{reservation.order_no}", reservation.order_no,
-            )
-            reservation.pay_status = 2
-        elif reservation.pay_type == PayType.wechat and amount > 0:
-            from app.services.wechat_pay import resolve_account_for_mchid
-
-            pay_acc = resolve_account_for_mchid(db, reservation.pay_mchid)
-            WechatPayService.refund(
-                reservation.order_no,
-                amount,
-                amount,
-                "管理员取消预约",
-                pay_account=pay_acc,
-            )
-            reservation.pay_status = 2
-        elif reservation.pay_type == PayType.period_card:
-            if reservation.period_card_id:
-                card = db.get(PeriodCard, reservation.period_card_id)
-                if card:
-                    refund_period_card_consume(
-                        card,
-                        reservation.bill_type,
-                        reservation.start_time,
-                        reservation.end_time,
-                    )
-            reservation.pay_status = 2
-
-    reservation.status = 3
-    db.commit()
-    return ResponseModel(message="订单已取消")
+    return ResponseModel(message=cancel_reservation(db, reservation, user, "管理员取消预约"))
 
 
 class AdminChangeSeatRequest(BaseModel):
@@ -1394,12 +1351,13 @@ class AdminSwapSeatsRequest(BaseModel):
 @router.get("/reservations/{reservation_id}/seat-options", response_model=ResponseModel)
 def admin_reservation_seat_options(
     reservation_id: int,
-    _: object = Depends(get_current_admin),
+    admin: AdminUser = Depends(get_current_admin),
     db: Session = Depends(get_db),
 ):
     reservation = db.get(Reservation, reservation_id)
     if not reservation:
         raise HTTPException(status_code=404, detail="订单不存在")
+    assert_store_access(admin, reservation.store_id)
     if reservation.pay_status != 1:
         raise HTTPException(status_code=400, detail="仅已付款订单可换座")
     if reservation.status not in (0, 1):
@@ -1438,12 +1396,13 @@ def admin_reservation_seat_options(
 def admin_change_reservation_seat(
     reservation_id: int,
     body: AdminChangeSeatRequest,
-    _: object = Depends(get_current_admin),
+    admin: AdminUser = Depends(get_current_admin),
     db: Session = Depends(get_db),
 ):
     reservation = db.get(Reservation, reservation_id)
     if not reservation:
         raise HTTPException(status_code=404, detail="订单不存在")
+    assert_store_access(admin, reservation.store_id)
     conflict = seat_conflict_excluding(
         db,
         body.seat_id,
@@ -1452,6 +1411,7 @@ def admin_change_reservation_seat(
         reservation.id,
     )
     if conflict:
+        assert_store_access(admin, conflict.store_id)
         try:
             seat_a, seat_b = swap_reservation_seats(db, reservation, conflict, force=True)
         except ValueError as e:
@@ -1486,6 +1446,8 @@ def admin_swap_reservation_seats(
     other = db.get(Reservation, body.other_reservation_id)
     if not reservation or not other:
         raise HTTPException(status_code=404, detail="订单不存在")
+    assert_store_access(admin, reservation.store_id)
+    assert_store_access(admin, other.store_id)
     try:
         seat_a, seat_b = swap_reservation_seats(db, reservation, other, force=True)
     except ValueError as e:
@@ -1514,12 +1476,13 @@ def admin_swap_reservation_seats(
 @router.post("/reservations/{reservation_id}/remote-unlock", response_model=ResponseModel)
 async def admin_reservation_remote_unlock(
     reservation_id: int,
-    _: object = Depends(get_current_admin),
+    admin: AdminUser = Depends(get_current_admin),
     db: Session = Depends(get_db),
 ):
     reservation = db.get(Reservation, reservation_id)
     if not reservation:
         raise HTTPException(status_code=404, detail="订单不存在")
+    assert_store_access(admin, reservation.store_id)
     try:
         data = await admin_remote_unlock(db, reservation)
     except ValueError as e:
@@ -1531,12 +1494,13 @@ async def admin_reservation_remote_unlock(
 @router.post("/reservations/{reservation_id}/force-checkout", response_model=ResponseModel)
 def admin_reservation_force_checkout(
     reservation_id: int,
-    _: object = Depends(get_current_admin),
+    admin: AdminUser = Depends(get_current_admin),
     db: Session = Depends(get_db),
 ):
     reservation = db.get(Reservation, reservation_id)
     if not reservation:
         raise HTTPException(status_code=404, detail="订单不存在")
+    assert_store_access(admin, reservation.store_id)
     try:
         admin_force_checkout(db, reservation)
     except ValueError as e:

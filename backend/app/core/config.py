@@ -187,13 +187,10 @@ class Settings(BaseSettings):
             errors.append("ADMIN_PASSWORD 为弱默认值，请设置强密码")
         if self.cors_origin_list == ["*"]:
             errors.append('CORS_ORIGINS 不能为 "*"（携带凭证时浏览器也会拒绝），请配置域名白名单')
+        if self.pre_wechat_launch:
+            errors.append("生产环境必须设置 PRE_WECHAT_LAUNCH=false，禁止测试登录与模拟支付")
         if errors:
             raise RuntimeError("生产环境配置校验失败：\n- " + "\n- ".join(errors))
-        if self.pre_wechat_launch and not self.wx_pay_configured:
-            logger.warning(
-                "PRE_WECHAT_LAUNCH=true 且未配置微信支付：生产环境仍允许 dev 登录与 mock 支付，"
-                "审核通过后请置为 false。"
-            )
 
 
 settings = Settings()

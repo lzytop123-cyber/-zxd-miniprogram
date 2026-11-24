@@ -94,15 +94,14 @@ EOF
 
 ```powershell
 cd f:\zxd-pro
-.\deploy\prepare-production-env.ps1 -ApiBase "https://api.你的域名.com"
-# 或暂无域名：-ApiBase "http://公网IP:8000"
+.\deploy\prepare-production-env.ps1 -ApiBase "https://api.你的域名.com" -AdminOrigin "https://admin.你的域名.com"
 ```
 
 生成：
 - `backend/.env.docker` → 上传到服务器后 **改名为** `backend/.env`
 - 根目录 `.env.docker` → 上传到服务器项目根目录
 
-脚本会随机生成 `SECRET_KEY`、`ADMIN_PASSWORD`、MySQL 密码，**请保存输出**。
+脚本只在这两个目标文件均不存在时生成随机凭据，拒绝覆盖现有文件；密码只写文件，不打印。手工填齐真实微信/云老板配置并安全保存文件。日常更新复用服务器现有配置，不再次生成或上传 env；API 端口只对服务器本机开放，公网经 Nginx 的 HTTPS 接入。
 
 **方式 2 — 在服务器上手工编辑**
 
@@ -115,10 +114,11 @@ nano backend/.env
 
 ```env
 APP_ENV=production
-PRE_WECHAT_LAUNCH=true
+PRE_WECHAT_LAUNCH=false
 
 SECRET_KEY=<openssl rand -hex 32>
 BASE_URL=https://api.你的域名.com
+CORS_ORIGINS=https://admin.你的域名.com
 
 DATABASE_URL=mysql+pymysql://zxd:与.env.docker相同的密码@mysql:3306/zxd_study?charset=utf8mb4
 REDIS_URL=redis://redis:6379/0
@@ -154,9 +154,10 @@ openssl rand -hex 32
 | 变量 | 必填 | 说明 |
 |------|------|------|
 | `APP_ENV` | 是 | 服务器固定 `production` |
-| `PRE_WECHAT_LAUNCH` | 审核期 | `true` = 未配微信时仍可用 dev 登录 + mock 支付；微信就绪后改 `false` |
+| `PRE_WECHAT_LAUNCH` | 是 | 正式生产固定 `false`；`true` 拒绝启动，dev/mock 只能在隔离开发环境联调 |
 | `SECRET_KEY` | 是 | ≥32 位随机串，勿用默认值 |
 | `BASE_URL` | 是 | 对外 API 根地址，如 `https://api.example.com`（无 `/api` 后缀） |
+| `CORS_ORIGINS` | 是 | 后台真实来源，多个用逗号分隔，禁止 `*` |
 | `DATABASE_URL` | 是 | Docker 内主机名必须是 `mysql`，不是 `127.0.0.1` |
 | `REDIS_URL` | 是 | Docker 内为 `redis://redis:6379/0` |
 | `MEITUAN_*` | 核销要 | 云老板凭证；`COUPON_PROVIDER=meituan` |
@@ -301,10 +302,10 @@ Windows 防火墙需放行 **8000** 端口。
 
 ```bash
 chmod +x deploy/setup-server.sh
-./deploy/setup-server.sh
+./deploy/setup-server.sh --initialize   # 仅新库首次；日常运行不加参数
 ```
 
-会执行：`docker compose up` → 健康检查 → 询问是否 `init_production.py` → `deploy_check.py`。
+会构建并自检，再启动依赖和 API、验证健康；仅显式 `--initialize` 时运行 `init_production.py`。自检失败会阻断并返回非零。不要对已有业务库重新 seed，以免覆盖价格和团购映射。
 
 ---
 
@@ -321,7 +322,7 @@ docker compose -f docker-compose.prod.yml --env-file .env.docker restart api
 
 # 更新代码后重建
 git pull
-docker compose -f docker-compose.prod.yml --env-file .env.docker up -d --build
+bash deploy/run-production.sh
 
 # 备份 MySQL
 docker exec zxd-mysql mysqldump -uzxd -p zxd_study > backup_$(date +%F).sql

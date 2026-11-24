@@ -4,6 +4,7 @@ from pathlib import Path
 from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 
 from app.api.admin_role_guard import AdminRoleGuardMiddleware
@@ -31,7 +32,11 @@ async def lifespan(app: FastAPI):
     finally:
         db.close()
     start_scheduler()
-    yield
+    try:
+        yield
+    finally:
+        from app.tasks.scheduler import stop_scheduler
+        stop_scheduler()
 
 
 app = FastAPI(
@@ -77,7 +82,8 @@ app.mount("/static", StaticFiles(directory=str(UPLOADS_DIR)), name="static")
 
 @app.get("/health")
 def health(db: Session = Depends(get_db)):
-    return run_health_checks(db)
+    result = run_health_checks(db)
+    return JSONResponse(result, status_code=200 if result["status"] == "ok" else 503)
 
 
 @app.get("/health/live")

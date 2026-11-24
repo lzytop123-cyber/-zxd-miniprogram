@@ -25,50 +25,68 @@ const KEYS = {
   permissions: 'admin_permissions',
 } as const
 
-/** Bumped on save/clear so layout/menu recompute against localStorage. */
+function sessionStorageForAdmin(): Storage {
+  return sessionStorage.getItem(KEYS.token) ? sessionStorage : localStorage
+}
+
+export function getAdminToken(): string | null {
+  return sessionStorageForAdmin().getItem(KEYS.token)
+}
+
+export function getAdminStoreName(): string {
+  return sessionStorageForAdmin().getItem(KEYS.storeName) || ''
+}
+
+/** Bumped on save/clear so layout/menu recompute against session storage. */
 export const adminSessionTick = ref(0)
 
 function bumpSession() {
   adminSessionTick.value += 1
 }
 
-export function saveAdminSession(data: AdminProfile) {
-  localStorage.setItem(KEYS.token, data.token)
-  localStorage.setItem(KEYS.role, data.role || 'hq')
-  localStorage.setItem(KEYS.username, data.username || '')
-  if (data.name) localStorage.setItem(KEYS.name, data.name)
-  else localStorage.removeItem(KEYS.name)
+export function saveAdminSession(data: AdminProfile, remember = true) {
+  clearAdminSession()
+  const storage = remember ? localStorage : sessionStorage
+  storage.setItem(KEYS.token, data.token)
+  storage.setItem(KEYS.role, data.role || 'hq')
+  storage.setItem(KEYS.username, data.username || '')
+  if (data.name) storage.setItem(KEYS.name, data.name)
+  else storage.removeItem(KEYS.name)
   if (data.role === 'store' && data.store_id) {
-    localStorage.setItem(KEYS.storeId, String(data.store_id))
-    localStorage.setItem(KEYS.storeName, data.store_name || '')
+    storage.setItem(KEYS.storeId, String(data.store_id))
+    storage.setItem(KEYS.storeName, data.store_name || '')
   } else {
-    localStorage.removeItem(KEYS.storeId)
-    localStorage.removeItem(KEYS.storeName)
+    storage.removeItem(KEYS.storeId)
+    storage.removeItem(KEYS.storeName)
   }
   if (data.role === 'hq') {
-    localStorage.removeItem(KEYS.permissions)
+    storage.removeItem(KEYS.permissions)
   } else if (Array.isArray(data.permissions)) {
-    localStorage.setItem(KEYS.permissions, JSON.stringify(data.permissions))
+    storage.setItem(KEYS.permissions, JSON.stringify(data.permissions))
   } else {
-    localStorage.setItem(KEYS.permissions, JSON.stringify([...STORE_DEFAULT_PERMISSIONS]))
+    storage.setItem(KEYS.permissions, JSON.stringify([...STORE_DEFAULT_PERMISSIONS]))
   }
   bumpSession()
 }
 
 export function clearAdminSession() {
-  Object.values(KEYS).forEach((k) => localStorage.removeItem(k))
+  Object.values(KEYS).forEach((k) => {
+    localStorage.removeItem(k)
+    sessionStorage.removeItem(k)
+  })
   bumpSession()
 }
 
 export function getAdminRole(): AdminRole {
-  const role = localStorage.getItem(KEYS.role)
+  const storage = sessionStorageForAdmin()
+  const role = storage.getItem(KEYS.role)
   if (role === 'store') return 'store'
   if (role === 'hq') return 'hq'
-  return localStorage.getItem(KEYS.storeId) ? 'store' : 'hq'
+  return storage.getItem(KEYS.storeId) ? 'store' : 'hq'
 }
 
 export function getAdminStoreId(): number | null {
-  const v = localStorage.getItem(KEYS.storeId)
+  const v = sessionStorageForAdmin().getItem(KEYS.storeId)
   return v ? Number(v) : null
 }
 
@@ -79,7 +97,7 @@ export function isHqAdmin(): boolean {
 /** null = HQ full access; store always returns a string[]. */
 export function getAdminPermissions(): string[] | null {
   if (isHqAdmin()) return null
-  const raw = localStorage.getItem(KEYS.permissions)
+  const raw = sessionStorageForAdmin().getItem(KEYS.permissions)
   if (!raw) return [...STORE_DEFAULT_PERMISSIONS]
   try {
     const parsed = JSON.parse(raw)
@@ -91,10 +109,11 @@ export function getAdminPermissions(): string[] | null {
 }
 
 export function setAdminPermissions(permissions: string[]) {
+  const storage = sessionStorageForAdmin()
   if (isHqAdmin()) {
-    localStorage.removeItem(KEYS.permissions)
+    storage.removeItem(KEYS.permissions)
   } else {
-    localStorage.setItem(KEYS.permissions, JSON.stringify(permissions))
+    storage.setItem(KEYS.permissions, JSON.stringify(permissions))
   }
   bumpSession()
 }

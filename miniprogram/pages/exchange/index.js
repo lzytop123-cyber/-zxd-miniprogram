@@ -139,6 +139,9 @@ Page({
     }
     this.setData({ loading: true, code: inputCode })
     wx.showLoading({ title: '连接核销中…', mask: true })
+    const showAfterLoading = (fn) => {
+      wx.hideLoading({ complete: () => fn() })
+    }
     try {
       let result
       if (platform === 'douyin') {
@@ -147,13 +150,13 @@ Page({
           method: 'POST',
           data: { code, store_id: Number(storeId) },
           silent: true,
+          timeout: 60000,
         })
       } else {
         const reqUrl = `/exchange/meituan/${encodeURIComponent(code)}?store_id=${Number(storeId)}`
-        result = await request({ url: reqUrl, method: 'POST', silent: true })
+        result = await request({ url: reqUrl, method: 'POST', silent: true, timeout: 60000 })
       }
-      wx.hideLoading()
-      const lines = [result.card_name || '期限卡']
+      const lines = [`已核销到「${storeName || '所选门店'}」`, result.card_name || '期限卡']
       if (result.validity_range) {
         lines.push(`卡面效期 ${result.validity_range}`)
       } else if (result.start_date && result.end_date) {
@@ -166,51 +169,54 @@ Page({
       } else if (result.remaining_sessions != null) {
         lines.push(`含 ${result.remaining_sessions} 次`)
       }
-      wx.showModal({
-        title: '兑换成功',
-        content: lines.join('\n'),
-        confirmText: '去选座预约',
-        cancelText: '查看卡包',
-        showCancel: true,
-        confirmColor: '#2D6A4F',
-        success: (res) => {
-          const { invalidateCache } = require('../../utils/request')
-          invalidateCache('/user/cards')
-          if (res.confirm) {
-            const billType =
-              result.card_type === 'night_monthly'
-                ? 'night'
-                : result.card_type || 'hourly'
-            wx.navigateTo({
-              url: `${routes.bookingIndex}?storeId=${storeId}&billType=${billType}`,
-              fail: () => wx.navigateTo({ url: routes.profileCards }),
-            })
-          } else {
-            wx.navigateTo({
-              url: routes.profileCards,
-              fail: () => wx.switchTab({ url: '/pages/profile/index' }),
-            })
-          }
-        },
+      showAfterLoading(() => {
+        wx.showModal({
+          title: '兑换成功',
+          content: lines.join('\n'),
+          confirmText: '去选座预约',
+          cancelText: '查看卡包',
+          showCancel: true,
+          confirmColor: '#2D6A4F',
+          success: (res) => {
+            const { invalidateCache } = require('../../utils/request')
+            invalidateCache('/user/cards')
+            if (res.confirm) {
+              const billType =
+                result.card_type === 'night_monthly'
+                  ? 'night'
+                  : result.card_type || 'hourly'
+              wx.navigateTo({
+                url: `${routes.bookingIndex}?storeId=${storeId}&billType=${billType}`,
+                fail: () => wx.navigateTo({ url: routes.profileCards }),
+              })
+            } else {
+              wx.navigateTo({
+                url: routes.profileCards,
+                fail: () => wx.switchTab({ url: '/pages/profile/index' }),
+              })
+            }
+          },
+        })
       })
     } catch (e) {
-      wx.hideLoading()
       const msg = e.detail || e.message || '兑换失败'
-      if (msg.includes('dealId') || msg.includes('未配置')) {
-        wx.showModal({
-          title: '待配置团购',
-          content: `${msg}\n\n该券未被核销，请联系店长配置后再试`,
-          showCancel: false,
-        })
-      } else if (msg.includes('仅适用于') || msg.includes('不适用于当前门店')) {
-        wx.showModal({
-          title: '请切换门店',
-          content: `${msg}\n\n该券未被核销`,
-          showCancel: false,
-        })
-      } else {
-        wx.showToast({ title: msg, icon: 'none', duration: 3000 })
-      }
+      showAfterLoading(() => {
+        if (msg.includes('dealId') || msg.includes('未配置')) {
+          wx.showModal({
+            title: '待配置团购',
+            content: `${msg}\n\n该券未被核销，请联系店长配置后再试`,
+            showCancel: false,
+          })
+        } else if (msg.includes('仅适用于') || msg.includes('不适用于当前门店')) {
+          wx.showModal({
+            title: '请切换门店',
+            content: `${msg}\n\n该券未被核销`,
+            showCancel: false,
+          })
+        } else {
+          wx.showToast({ title: msg, icon: 'none', duration: 3000 })
+        }
+      })
     } finally {
       this.setData({ loading: false })
     }

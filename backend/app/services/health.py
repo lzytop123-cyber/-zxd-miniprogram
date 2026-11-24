@@ -25,6 +25,20 @@ def run_health_checks(db: Session) -> dict:
         status = "degraded"
         logger.error("health check database failed: %s", exc)
 
+    # 必须探测真实 Redis；内存降级不能证明跨进程锁和调度器可用。
+    client = None
+    try:
+        import redis
+        client = redis.from_url(settings.redis_url, socket_connect_timeout=1, socket_timeout=1)
+        client.ping()
+        checks["redis"] = "ok"
+    except Exception as exc:
+        checks["redis"] = f"error: {exc.__class__.__name__}"
+        status = "degraded"
+    finally:
+        if client is not None:
+            client.close()
+
     if settings.wx_login_configured:
         checks["wechat_login"] = "configured"
     else:

@@ -57,7 +57,7 @@ function handleUnauthorized() {
     // ignore
   }
   try {
-    requestCache.invalidate() // 清空全部缓存，避免读到旧用户数据
+    requestCache.resetSession() // 清空全部会话缓存和并发请求
   } catch (e) {
     // ignore
   }
@@ -90,21 +90,30 @@ function handleUnauthorized() {
 
 const REQUEST_TIMEOUT = 15000
 
-function rawRequest({ url, method = 'GET', data, silent = false, retries }) {
+function rawRequest({ url, method = 'GET', data, silent = false, retries, timeout, session, token }) {
   const payload = data === undefined ? undefined : data
   // GET 幂等，弱网下默认重试 1 次
   const maxRetries = retries != null ? retries : method.toUpperCase() === 'GET' ? 1 : 0
   return new Promise((resolve, reject) => {
+    const sessionChanged = () => {
+      if (requestCache.isCurrentSession(session, wx.getStorageSync('token') || '')) return false
+      const err = new Error('登录状态已改变，请重新操作')
+      err.code = 'SESSION_CHANGED'
+      reject(err)
+      return true
+    }
+    if (sessionChanged()) return
     wx.request({
       url: getApiBase() + url,
       method,
-      timeout: REQUEST_TIMEOUT,
+      timeout: timeout || REQUEST_TIMEOUT,
       ...(payload !== undefined ? { data: payload } : {}),
       header: {
         'Content-Type': 'application/json',
-        Authorization: `Bearer ${wx.getStorageSync('token') || ''}`,
+        Authorization: `Bearer ${token}`,
       },
       success(res) {
+        if (sessionChanged()) return
         if (res.statusCode === 401) {
           handleUnauthorized()
           const msg = getErrorMessage(res)
@@ -130,8 +139,9 @@ function rawRequest({ url, method = 'GET', data, silent = false, retries }) {
         }
       },
       fail(err) {
+        if (sessionChanged()) return
         if (maxRetries > 0) {
-          resolve(rawRequest({ url, method, data, silent, retries: maxRetries - 1 }))
+          resolve(rawRequest({ url, method, data, silent, retries: maxRetries - 1, timeout, session, token }))
           return
         }
         const msg = (err && (err.errMsg || err.message)) || '网络异常，请稍后重试'
@@ -150,15 +160,17 @@ function rawRequest({ url, method = 'GET', data, silent = false, retries }) {
  * @param {boolean} [options.force] 跳过缓存并强制请求
  */
 function request(options) {
-  const { url, method = 'GET', data, silent = false, force = false } = options
+  const { url, method = 'GET', data, silent = false, force = false, timeout } = options
+  const token = wx.getStorageSync('token') || ''
+  const session = requestCache.getSession(token)
   const ttl = requestCache.resolveTtl(url, method, options)
   const key = requestCache.buildKey(method, url, data)
 
   if (!force && method.toUpperCase() === 'GET') {
-    return requestCache.runDeduped(key, ttl, () => rawRequest({ url, method, data, silent }))
+    return requestCache.runDeduped(key, ttl, () => rawRequest({ url, method, data, silent, timeout, session, token }))
   }
 
-  return rawRequest({ url, method, data, silent })
+  return rawRequest({ url, method, data, silent, timeout, session, token })
 }
 
 function invalidateCache(match) {

@@ -51,7 +51,8 @@ from app.services.card_service import (
     validate_period_card_for_reservation,
 )
 from app.api.routes.payment import complete_reservation_wechat_payment
-from app.services.coupon_service import apply_coupon, mark_coupon_used, refund_coupon_for_reservation
+from app.services.coupon_service import apply_coupon, claim_reservation_coupon
+from app.services.reservation_cancel import cancel_reservation
 from app.services.pay_account import assert_store_allows_pay_type, resolve_pay_account
 from app.services.wechat_pay import WechatPayService, resolve_account_for_mchid
 
@@ -129,11 +130,12 @@ def _mark_pay_coupon(
     coupon_id: int | None,
     reservation: Reservation,
 ) -> None:
-    if not coupon_id:
-        return
-    coupon = db.get(Coupon, coupon_id)
-    if coupon and coupon.user_id == user_id and coupon.status == 0:
-        mark_coupon_used(db, coupon, reservation)
+    if coupon_id is not None and coupon_id != reservation.coupon_id:
+        raise HTTPException(status_code=400, detail="优惠券与订单不一致，请重新下单")
+    try:
+        claim_reservation_coupon(db, reservation)
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
 
 
 def _resolve_coupon_price(
@@ -293,9 +295,13 @@ def create(
                 Reservation.end_time == end,
                 Reservation.status == 0,
                 Reservation.pay_status == 0,
-            )
+            ).with_for_update().execution_options(populate_existing=True)
         )
         if existing:
+            if existing.pay_mchid:
+                if existing.coupon_id != (coupon.id if coupon else None) or existing.final_price != final_price:
+                    raise HTTPException(status_code=409, detail="订单已发起微信支付，请取消后重新下单")
+                return ResponseModel(data=_to_item(db, existing))
             existing.original_price = price
             existing.discount_price = discount
             existing.final_price = final_price
@@ -337,12 +343,16 @@ async def pay(
     reservation = db.scalar(
         select(Reservation).where(
             Reservation.order_no == body.order_no, Reservation.user_id == user.id
-        )
+        ).with_for_update().execution_options(populate_existing=True)
     )
     if not reservation:
         raise HTTPException(status_code=404, detail="订单不存在")
     if reservation.pay_status == 1:
         raise HTTPException(status_code=400, detail="订单已支付")
+    if body.coupon_id is not None and body.coupon_id != reservation.coupon_id:
+        raise HTTPException(status_code=400, detail="优惠券与订单不一致，请重新下单")
+    if reservation.pay_mchid and body.pay_type != PayType.wechat:
+        raise HTTPException(status_code=409, detail="订单已发起微信支付，请完成支付或取消后重新下单")
 
     _assert_seat_available_for_pay(db, reservation)
 
@@ -353,7 +363,7 @@ async def pay(
         assert_store_allows_pay_type(store, body.pay_type.value)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
-    if getattr(store, "benefits_isolated", 0) and body.coupon_id:
+    if getattr(store, "benefits_isolated", 0) and reservation.coupon_id:
         raise HTTPException(status_code=400, detail="该门店不可使用全局优惠券")
 
     # 夜读不售单次票：无 night 价格时只能用晚自习月卡支付
@@ -389,6 +399,8 @@ async def pay(
             if not lock.acquired:
                 raise HTTPException(status_code=409, detail="座位正在被占用，请重试")
             _assert_seat_available_for_pay(db, reservation)
+            # 持卡支付不消耗现金优惠券；解除订单绑定，防止取消时退回别单的券。
+            reservation.coupon_id = None
             consume_period_card(
                 db,
                 card,
@@ -414,6 +426,7 @@ async def pay(
             if not lock.acquired:
                 raise HTTPException(status_code=409, detail="座位正在被占用，请重试")
             _assert_seat_available_for_pay(db, reservation)
+            _mark_pay_coupon(db, user.id, body.coupon_id, reservation)
             try:
                 add_wallet_log(
                     db, user, "consume", reservation.final_price or Decimal("0"),
@@ -423,7 +436,6 @@ async def pay(
                 raise HTTPException(status_code=400, detail="余额不足")
             reservation.pay_type = PayType.balance
             reservation.pay_status = 1
-            _mark_pay_coupon(db, user.id, body.coupon_id, reservation)
             db.commit()
         await finalize_reservation_after_pay(db, reservation)
         return ResponseModel(
@@ -435,10 +447,14 @@ async def pay(
             pay_account = resolve_pay_account(db, store)
         except ValueError as e:
             raise HTTPException(status_code=400, detail=str(e)) from e
+        try:
+            claim_reservation_coupon(db, reservation, reserve=True)
+        except ValueError as exc:
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
         reservation.pay_type = PayType.wechat
         reservation.pay_mchid = pay_account.mchid
         db.commit()
-        attach = f"coupon_id={body.coupon_id}" if body.coupon_id else None
+        attach = f"coupon_id={reservation.coupon_id}" if reservation.coupon_id else None
         try:
             pay_params = WechatPayService.create_jsapi_order(
                 body.order_no,
@@ -697,46 +713,4 @@ def cancel(
     reservation = db.get(Reservation, reservation_id)
     if not reservation or reservation.user_id != user.id:
         raise HTTPException(status_code=404, detail="订单不存在")
-    if reservation.status not in (0,):
-        raise HTTPException(status_code=400, detail="当前状态不可取消")
-    reservation.status = 3
-    if reservation.pay_status == 0:
-        db.commit()
-        return ResponseModel(message="已取消")
-
-    if reservation.pay_status == 1:
-        amount = reservation.final_price or Decimal("0")
-        if reservation.pay_type == PayType.admin:
-            db.commit()
-            return ResponseModel(message="已取消，前台收款订单不退款")
-        if reservation.pay_type == PayType.wechat:
-            if amount > 0:
-                pay_acc = resolve_account_for_mchid(db, reservation.pay_mchid)
-                WechatPayService.refund(
-                    reservation.order_no,
-                    amount,
-                    amount,
-                    "用户取消预约",
-                    pay_account=pay_acc,
-                )
-            reservation.pay_status = 2
-        elif reservation.pay_type == PayType.balance:
-            if amount > 0:
-                add_wallet_log(
-                    db, user, "refund", amount,
-                    f"取消退款-{reservation.order_no}", reservation.order_no,
-                )
-            reservation.pay_status = 2
-        elif reservation.pay_type == PayType.period_card:
-            if reservation.period_card_id:
-                card = db.get(PeriodCard, reservation.period_card_id)
-                if card:
-                    refund_period_card_consume(
-                        card, reservation.bill_type, reservation.start_time, reservation.end_time
-                    )
-            reservation.pay_status = 2
-        reservation.refunded_at = datetime.now()
-        reservation.refund_remark = "用户取消预约"
-        refund_coupon_for_reservation(db, reservation)
-    db.commit()
-    return ResponseModel(message="已取消")
+    return ResponseModel(message=cancel_reservation(db, reservation, user, "用户取消预约"))

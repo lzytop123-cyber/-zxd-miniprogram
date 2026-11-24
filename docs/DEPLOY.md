@@ -4,6 +4,8 @@
 
 > **详细部署与配置步骤**（Docker、`.env` 怎么填、笔记本当服务器、MySQL 要不要装）见 **[SERVER-SETUP.md](./SERVER-SETUP.md)**。
 
+> 当前生产安全校验要求 `APP_ENV=production` 且 `PRE_WECHAT_LAUNCH=false`；`true` 会拒绝启动。本文历史审核期 dev/mock 联调说明仅适用于隔离的开发环境，不能直接用于生产 Compose。
+
 > **小程序/商户审核中？** 可先走 **[无微信阶段](#无微信阶段审核中)**（A + C + 后台 + Nginx），微信审核通过后再补 [B. 微信小程序](#b-微信小程序)。
 
 ---
@@ -28,7 +30,8 @@
 
 ```env
 APP_ENV=production
-PRE_WECHAT_LAUNCH=true          # 审核期必开；微信就绪后改 false
+PRE_WECHAT_LAUNCH=false         # 正式生产必须；true 会拒绝启动
+CORS_ORIGINS=https://admin.你的域名.com
 COUPON_PROVIDER=meituan         # 云老板真实核销
 MEITUAN_CLIENT_ID=...
 MEITUAN_SECRET=...
@@ -36,10 +39,10 @@ MEITUAN_SHOP_ID=...
 # WX_* 留空即可，勿填占位 AppID
 ```
 
-**本机 Windows 生成生产 .env**（从当前开发 `.env` 复制云老板凭证，输出 `backend/.env.docker`，**不会覆盖**开发用 `.env`）：
+**首次在 Windows 生成生产 .env**（只在目标文件不存在时生成，不读取开发凭证、不输出密码）：
 
 ```powershell
-.\deploy\prepare-production-env.ps1 -ApiBase "https://api.你的域名.com"
+.\deploy\prepare-production-env.ps1 -ApiBase "https://api.你的域名.com" -AdminOrigin "https://admin.你的域名.com"
 # 上传到服务器：backend/.env.docker → backend/.env，根目录 .env.docker 保持不变
 ```
 
@@ -49,7 +52,7 @@ MEITUAN_SHOP_ID=...
 
 ```bash
 chmod +x deploy/setup-server.sh
-./deploy/setup-server.sh
+./deploy/setup-server.sh --initialize   # 仅新数据库首次部署
 ```
 
 此阶段能力：
@@ -60,6 +63,8 @@ chmod +x deploy/setup-server.sh
 - 期限卡支付、mock-pay（`PRE_WECHAT_LAUNCH=true` 且未配商户号时）
 
 暂不可用（等 B 节）：真机 HTTPS 合法域名、真实微信登录/支付、手机号组件。
+
+正式生产保持 `PRE_WECHAT_LAUNCH=false` 并填齐真实微信配置。审核联调若需 dev/mock，应使用 `APP_ENV=development` 的隔离环境，不能把它作为正式上线验收。
 
 ---
 
@@ -105,6 +110,22 @@ docker compose -f docker-compose.prod.yml --env-file .env.docker exec api python
 验证：`curl http://127.0.0.1:8000/health` → `{"status":"ok"}`
 
 **API + 后台已部署？** 继续 **[POST-DEPLOY.md](./POST-DEPLOY.md)**（小程序联调、团购映射、验收）。
+
+### 日常更新与首次初始化
+
+现有服务器日常更新：
+
+```powershell
+.\deploy\deploy-to-server.ps1 -SshHost SERVER_IP -ApiDomain api.你的域名.com
+```
+
+脚本复用服务器 `backend/.env` 和根目录 `.env.docker`，不会重新生成密码、清空微信配置或运行 seed。发布包排除本机环境文件、数据库、上传文件和证书；`backend/uploads` 固定挂到容器 `/app/uploads`，API 仅监听服务器 `127.0.0.1:8000`，公网经 Nginx 接入。
+
+新服务器先运行准备脚本，手工填写并审阅真实凭据，通过安全渠道上传两个 env 文件（后端文件改名为 `backend/.env`），设置权限 `chmod 600 backend/.env .env.docker`，再加 `-Initialize` 首次建表和 seed。**不要对已有业务库使用 `-Initialize` 或重跑 `init_production.py`，seed 会重写价格及团购映射。** 数据库结构升级使用对应版本迁移，不能用 seed 代替迁移。
+
+Linux 对应命令是 `bash deploy/run-production.sh`，仅新库首次加 `--initialize`。两种入口都先构建镜像并复用 `validate_for_production()` 自检，再替换运行容器；健康检查或部署自检失败会返回非零，发布方必须处理失败。已有服务器缺少 `CORS_ORIGINS` 时先补后台真实来源，不能用 `*`。
+
+调度器使用真实 Redis 租约，每个 worker 保留 30 秒重试；旧进程退出会按 owner 释放锁，崩溃时旧锁最多 120 秒后过期。Redis 失效期间暂停定时任务，恢复后重试接管；查看 scheduler 日志确认已恢复。备份与隔离恢复演练见 [POST-DEPLOY.md](./POST-DEPLOY.md)。
 
 ### A3. 手动部署（不用 Docker）
 

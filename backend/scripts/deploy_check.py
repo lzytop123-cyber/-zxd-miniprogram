@@ -1,4 +1,4 @@
-"""上线前自检（跳过微信项）。在服务器上: python scripts/deploy_check.py"""
+"""上线前自检；复用服务启动时的生产安全校验。"""
 
 from __future__ import annotations
 
@@ -26,6 +26,16 @@ def fail(msg: str) -> None:
 def main() -> int:
     errors = 0
     print("知行岛 deploy_check（非微信）\n")
+
+    if not settings.is_production:
+        fail("APP_ENV 必须为 production")
+        return 1
+    try:
+        settings.validate_for_production()
+    except RuntimeError as exc:
+        fail(str(exc))
+        return 1
+    ok("生产环境安全基线校验通过")
 
     if settings.secret_key in ("change-me", "change-me-in-production") or len(settings.secret_key) < 32:
         fail("SECRET_KEY 过短或为默认值")

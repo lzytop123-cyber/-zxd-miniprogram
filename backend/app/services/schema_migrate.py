@@ -13,6 +13,7 @@ from app.db.session import engine
 logger = logging.getLogger(__name__)
 
 MIGRATION_STATEMENTS = [
+    "ALTER TABLE coupons ADD COLUMN reserved_order_no VARCHAR(32)",
     "ALTER TABLE reservations ADD COLUMN paid_at DATETIME",
     "ALTER TABLE card_purchase_orders ADD COLUMN paid_at DATETIME",
     "ALTER TABLE users ADD COLUMN invite_code VARCHAR(20)",

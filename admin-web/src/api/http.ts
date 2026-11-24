@@ -1,5 +1,6 @@
 import axios from 'axios'
 import { transformResponseTimes } from '../utils/datetime'
+import { clearAdminSession, getAdminToken } from '../utils/adminAuth'
 
 const baseURL = import.meta.env.VITE_API_BASE || '/api'
 
@@ -9,7 +10,7 @@ const http = axios.create({
 })
 
 http.interceptors.request.use((config) => {
-  const token = localStorage.getItem('admin_token')
+  const token = getAdminToken()
   if (token) {
     config.headers.Authorization = `Bearer ${token}`
   }
@@ -25,7 +26,15 @@ http.interceptors.response.use(
     // 解包，并把时间统一成北京时间可读格式
     return transformResponseTimes(data) as any
   },
-  (err) => Promise.reject(err)
+  (err) => {
+    const token = getAdminToken()
+    // A response from an old login must not sign out a newer session.
+    if (err.response?.status === 401 && token && err.config?.headers?.Authorization === `Bearer ${token}`) {
+      clearAdminSession()
+      if (window.location.pathname !== '/login') window.location.replace('/login')
+    }
+    return Promise.reject(err)
+  }
 )
 
 type UnwrappedResponse<T = any> = { code: number; message: string; data: T }

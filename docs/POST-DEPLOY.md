@@ -2,6 +2,8 @@
 
 API + 后台已上线后，按本清单继续（**微信审核中可跳过 B 节**）。
 
+正式生产必须 `PRE_WECHAT_LAUNCH=false`。下文历史 dev_openid/mock 验收项仅供隔离开发环境使用，当前生产模式会拒绝 `PRE_WECHAT_LAUNCH=true`。
+
 前置：服务器上 `curl http://127.0.0.1:8000/health` 返回 `{"status":"ok"}`，后台能登录。
 
 ---
@@ -98,12 +100,42 @@ docker compose -f docker-compose.prod.yml --env-file .env.docker restart api
 ## 步骤 6：日常备份（建议现在就设）
 
 ```bash
-# 手动备份
-docker exec zxd-mysql mysqldump -uzxd -p zxd_study > backup_$(date +%F).sql
-
-# 可加 crontab 每日 3 点（密码用 .env.docker 里的）
-# 0 3 * * * docker exec zxd-mysql mysqldump -uzxd -p'密码' zxd_study > /backup/zxd_$(date +\%F).sql
+set -euo pipefail
+umask 077
+backup="/backup/zxd_$(date +%F_%H%M%S)"
+mkdir -p "$backup"
+# 密码从 MySQL 容器自身环境取得，不写到命令行或日志。
+docker exec zxd-mysql sh -c 'MYSQL_PWD="$MYSQL_PASSWORD" exec mysqldump -uzxd --single-transaction --no-tablespaces zxd_study' > "$backup/database.sql"
+test -s "$backup/database.sql"
+paths=(backend/uploads backend/data backend/.env .env.docker)
+[[ ! -d backend/certs ]] || paths+=(backend/certs)
+[[ ! -d backend/cert ]] || paths+=(backend/cert)
+tar -czf "$backup/files.tar.gz" "${paths[@]}"
+sha256sum "$backup/database.sql" "$backup/files.tar.gz" > "$backup/SHA256SUMS"
 ```
+
+将脚本保存为服务器受限权限文件后加入每日定时任务，监测退出码并将加密副本同步到异机。备份含用户数据、商户私钥及密码，限制读取权限；部署更新必须保留 `backend/uploads`，其容器挂载是 `/app/uploads`。
+
+定期在隔离容器演练恢复；以下命令只创建临时 MySQL，不映射端口、不接生产网络。将 `backup` 指向某次备份，先校验散列，再恢复：
+
+```bash
+set -euo pipefail
+sha256sum -c "$backup/SHA256SUMS"
+export MYSQL_ROOT_PASSWORD="$(openssl rand -hex 32)"
+docker run -d --name zxd-restore-check --network none \
+  -e MYSQL_ROOT_PASSWORD -e MYSQL_DATABASE=zxd_restore mysql:8.0
+unset MYSQL_ROOT_PASSWORD
+for i in $(seq 1 60); do
+  if docker exec zxd-restore-check sh -c 'MYSQL_PWD="$MYSQL_ROOT_PASSWORD" mysqladmin -uroot ping --silent' >/dev/null 2>&1; then break; fi
+  sleep 2
+done
+docker exec -i zxd-restore-check sh -c 'MYSQL_PWD="$MYSQL_ROOT_PASSWORD" exec mysql -uroot zxd_restore' < "$backup/database.sql"
+docker exec zxd-restore-check sh -c 'MYSQL_PWD="$MYSQL_ROOT_PASSWORD" exec mysql -uroot zxd_restore -e "SELECT COUNT(*) AS orders FROM reservations; SELECT COUNT(*) AS users FROM users;"'
+mkdir -p "$backup/restore-files-check"
+tar -xzf "$backup/files.tar.gz" -C "$backup/restore-files-check"
+```
+
+对照该备份时间点的业务台账检查订单、用户、余额/期限卡、价格和团购映射，并打开抽样上传图片。通过后记录备份时间、恢复耗时和核对结果，再删除临时容器 `docker rm -f -v zxd-restore-check`。真实事故恢复需先停写业务并备份当前状态，将已验证备份恢复到新库/新目录，审阅配置与文件权限，再切换服务、自检和真机验收；不要在运行中的生产库直接试导入。
 
 ---
 
