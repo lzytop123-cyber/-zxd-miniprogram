@@ -202,6 +202,12 @@ Page({
           content: `${msg}\n\n该券未被核销，请联系店长配置后再试`,
           showCancel: false,
         })
+      } else if (msg.includes('仅适用于') || msg.includes('不适用于当前门店')) {
+        wx.showModal({
+          title: '请切换门店',
+          content: `${msg}\n\n该券未被核销`,
+          showCancel: false,
+        })
       } else {
         wx.showToast({ title: msg, icon: 'none', duration: 3000 })
       }

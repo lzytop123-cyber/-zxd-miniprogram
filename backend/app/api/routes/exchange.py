@@ -30,7 +30,11 @@ from app.services.deal_mapping_service import (
     user_redeemed_deal_count,
 )
 from app.services.douyin import DouyinService, parse_douyin_voucher_expire_date, use_douyin_official
-from app.services.exchange_setting import resolve_exchange_store_id
+from app.services.exchange_setting import (
+    infer_store_from_deal_name,
+    resolve_exchange_store_id,
+    store_short_name,
+)
 from app.services.yunfei import YunfeiService
 from app.services.yunlaoban import YunlaobanService, parse_voucher_expire_date
 
@@ -199,8 +203,20 @@ async def _exchange(
 
     deal_id = str((prepared.get("ticketData") or {}).get("dealId", ""))
     ticket_name = prepared.get("ticketName") or (prepared.get("ticketData") or {}).get("dealTitle", "")
+    open_stores = list(db.scalars(select(Store).where(Store.status == 1).order_by(Store.id)).all())
+    named_store = infer_store_from_deal_name(open_stores, ticket_name)
+    if named_store and named_store.id != store_id:
+        db.delete(order)
+        db.commit()
+        raise HTTPException(
+            status_code=400,
+            detail=f"该团购券仅适用于{store_short_name(named_store.name)}，请切换到该门店后再兑换",
+        )
     mapping = get_mapping_by_deal_id(db, deal_id)
-    if mapping and mapping.store_id and mapping.store_id != store_id:
+    if named_store and mapping and mapping.store_id != named_store.id:
+        mapping.store_id = named_store.id
+        db.flush()
+    elif mapping and mapping.store_id and mapping.store_id != store_id:
         db.delete(order)
         db.commit()
         raise HTTPException(status_code=400, detail="该团购券不适用于当前门店，请切换到对应门店兑换")
