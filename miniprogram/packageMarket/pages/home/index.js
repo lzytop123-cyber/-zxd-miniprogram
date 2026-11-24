@@ -126,4 +126,14 @@ Page({
   goMine() {
     wx.navigateTo({ url: routes.marketMine })
   },
+
+  goList() {
+    const d = this.data
+    const qs = [
+      d.keyword ? `q=${encodeURIComponent(d.keyword.trim())}` : '',
+      d.exam_category_id ? `exam_category_id=${d.exam_category_id}` : '',
+      d.material_category_id ? `material_category_id=${d.material_category_id}` : '',
+    ].filter(Boolean).join('&')
+    wx.navigateTo({ url: `${routes.marketList}${qs ? '?' + qs : ''}` })
+  },
 })

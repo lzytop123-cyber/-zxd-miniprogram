@@ -1,7 +1,7 @@
 from datetime import date, datetime, timedelta
 from decimal import Decimal
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
@@ -9,7 +9,7 @@ from app.api.deps import get_current_user
 from app.core.prod import block_mock_in_production
 from app.core.static_url import public_static_path
 from app.db.session import get_db
-from app.models import PeriodCard, RechargeOrder, Reservation, Seat, StudyStat, User, WalletLog
+from app.models import PeriodCard, RechargeOrder, Reservation, Seat, Store, StudyStat, User, WalletLog
 from app.schemas.common import ResponseModel
 from app.schemas.report import DailyStatItem, LeaderboardItem, ReportSummary, RechargeRequest, WalletInfo
 from app.services.booking import add_wallet_log, fulfill_recharge_order
@@ -158,7 +158,7 @@ def get_wallet(user: User = Depends(get_current_user), db: Session = Depends(get
                     "amount": float(l.amount or 0),
                     "balance_after": float(l.balance_after or 0),
                     "remark": l.remark,
-                    "created_at": l.created_at.isoformat(),
+                    "created_at": l.created_at.strftime("%Y-%m-%d %H:%M") if l.created_at else "",
                 }
                 for l in logs
             ],
@@ -182,6 +182,41 @@ def recharge(
     return ResponseModel(
         data={"order_no": order_no, "wechat_pay": pay_params, "mock_recharge_url": f"/api/user/recharge/{order_no}/mock"}
     )
+
+
+@router.post("/user/recharge/{order_no}/confirm-pay", response_model=ResponseModel[WalletInfo])
+def confirm_recharge_pay(
+    order_no: str,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """微信支付客户端成功后主动确认余额入账（回调延迟时兜底）。"""
+    order = db.scalar(
+        select(RechargeOrder).where(
+            RechargeOrder.order_no == order_no,
+            RechargeOrder.user_id == user.id,
+        )
+    )
+    if not order:
+        raise HTTPException(status_code=404, detail="充值订单不存在")
+    if order.pay_status == 1:
+        db.refresh(user)
+        return get_wallet(user, db)
+
+    query = WechatPayService.query_order(order.order_no)
+    if not query or query.get("trade_state") != "SUCCESS":
+        raise HTTPException(status_code=400, detail="支付尚未到账，请稍后再试")
+
+    paid_fen = query.get("amount_total")
+    if paid_fen is not None:
+        expected = int((order.amount * 100).quantize(Decimal("1")))
+        if int(paid_fen) != expected:
+            raise HTTPException(status_code=400, detail="充值金额异常，请联系店长")
+
+    fulfill_recharge_order(db, order, success_time=query.get("success_time"))
+    db.commit()
+    db.refresh(user)
+    return get_wallet(user, db)
 
 
 @router.post("/user/recharge/{order_no}/mock", response_model=ResponseModel[WalletInfo])
@@ -212,33 +247,47 @@ def mock_recharge(
 
 
 @router.get("/user/cards", response_model=ResponseModel)
-def get_cards(user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+def get_cards(
+    include_history: bool = Query(False),
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
     today = date.today()
-    cards = db.scalars(
-        select(PeriodCard)
-        .where(PeriodCard.user_id == user.id, PeriodCard.status == 1)
-        .order_by(PeriodCard.created_at.desc())
-    ).all()
+    q = select(PeriodCard).where(PeriodCard.user_id == user.id)
+    if not include_history:
+        q = q.where(PeriodCard.status == 1)
+    cards = db.scalars(q.order_by(PeriodCard.created_at.desc())).all()
+    stores_map = {
+        s.id: s.name for s in db.scalars(select(Store)).all()
+    }
     active = []
+    all_rows = []
     repaired = False
+    dirty = False
     for c in cards:
-        if not is_period_card_active(c, today):
-            c.status = 0
-            continue
-        if repair_misissued_card_validity(c):
-            repaired = True
-        if repair_monthly_pass_days_from_name(c):
-            repaired = True
-        active.append(c)
-    if repaired or len(active) < len(cards):
+        if c.status == 1:
+            if not is_period_card_active(c, today):
+                c.status = 0
+                dirty = True
+            else:
+                if repair_misissued_card_validity(c):
+                    repaired = True
+                if repair_monthly_pass_days_from_name(c):
+                    repaired = True
+                active.append(c)
+        all_rows.append(c)
+    if repaired or dirty:
         db.commit()
+    target_rows = all_rows if include_history else active
     return ResponseModel(
         data=[
             {
                 "id": c.id,
                 "store_id": c.store_id,
+                "store_name": stores_map.get(c.store_id) if c.store_id else "全店通用",
                 "card_name": c.card_name,
                 "card_type": c.card_type.value,
+                "status": c.status,
                 "remaining_hours": float(c.remaining_hours) if c.remaining_hours else None,
                 "total_hours": float(c.total_hours) if c.total_hours else None,
                 "remaining_sessions": c.remaining_sessions,
@@ -254,7 +303,7 @@ def get_cards(user: User = Depends(get_current_user), db: Session = Depends(get_
                 "daily_end": str(c.daily_end) if c.daily_end else None,
                 "usage_rule": OFFICE_NIGHT_USAGE_RULE if is_office_night_monthly_card(c) else None,
             }
-            for c in active
+            for c in target_rows
         ]
     )
 
@@ -263,6 +312,7 @@ def get_cards(user: User = Depends(get_current_user), db: Session = Depends(get_
 def get_coupons(user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     from app.models import Coupon
 
+    today = date.today()
     coupons = db.scalars(select(Coupon).where(Coupon.user_id == user.id).order_by(Coupon.id.desc())).all()
     return ResponseModel(
         data=[
@@ -273,7 +323,7 @@ def get_coupons(user: User = Depends(get_current_user), db: Session = Depends(ge
                 "discount_val": float(c.discount_val or 0),
                 "min_amount": float(c.min_amount or 0),
                 "expire_date": str(c.expire_date) if c.expire_date else None,
-                "status": c.status,
+                "status": 2 if (c.status == 0 and c.expire_date and c.expire_date < today) else c.status,
             }
             for c in coupons
         ]

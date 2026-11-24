@@ -27,5 +27,8 @@ Component({
       const { openStoreNavigation } = require('../../utils/location')
       openStoreNavigation(this.properties.store).catch(() => {})
     },
+    onDetail() {
+      this.triggerEvent('detail', { id: this.properties.store.id })
+    },
   },
 })

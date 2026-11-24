@@ -1,6 +1,7 @@
 const auth = require('../../../utils/auth')
-const { request } = require('../../../utils/request')
+const { request, invalidateCache } = require('../../../utils/request')
 const { normalizeUser, pickAvatarDisplay } = require('../../../utils/user')
+const { peekPendingInvite, clearPendingInvite } = require('../../../utils/share')
 
 const GOAL_OPTIONS = [
   { value: 'kaoyan', label: '考研' },
@@ -182,7 +183,29 @@ Page({
     this.setData({ step: 'welcome', loginError: '' })
   },
 
+  async _tryApplyPendingInvite(user) {
+    const pending = peekPendingInvite()
+    if (!pending) return
+    if (user && (user.invited_by || user.invite_code === pending)) {
+      clearPendingInvite()
+      return
+    }
+    try {
+      await request({
+        url: '/user/invite/apply',
+        method: 'POST',
+        data: { invite_code: pending },
+        silent: true,
+      })
+      clearPendingInvite()
+      invalidateCache('/user/profile')
+    } catch (_) {
+      clearPendingInvite()
+    }
+  },
+
   async applyUser(user, localAvatar) {
+    await this._tryApplyPendingInvite(user)
     const normalized = await normalizeUser(user)
     const avatarDisplay = pickAvatarDisplay(localAvatar, normalized)
     if (user.needs_profile_setup) {

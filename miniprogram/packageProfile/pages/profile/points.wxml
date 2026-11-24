@@ -2,15 +2,31 @@
   <view class="card">
     <view class="points-hero">
       <view class="total">{{total}}</view>
-      <view class="total-label">当前积分</view>
+      <view class="total-label">当前积分（自习每 10 分钟得 1 分）</view>
     </view>
+    <view class="section-head">积分兑换福利</view>
+    <view class="log" wx:for="{{tiers}}" wx:key="code">
+      <view>
+        <view style="font-weight: 600;">{{item.title}}</view>
+        <view class="time">{{item.desc}} · 消耗 {{item.points}} 积分</view>
+      </view>
+      <view
+        class="copy-btn"
+        style="{{total >= item.points ? '' : 'background: #C5CDCA;'}}"
+        data-code="{{item.code}}"
+        bindtap="redeem"
+      >{{total >= item.points ? '立即兑换' : '积分不足'}}</view>
+    </view>
+  </view>
+
+  <view class="card">
     <view class="section-head">积分明细</view>
     <view class="log" wx:for="{{logs}}" wx:key="id">
       <view>
         <view>{{item.remark}}</view>
         <view class="time">{{item.created_at}}</view>
       </view>
-      <view class="pts">+{{item.points}}</view>
+      <view class="pts" style="{{item.isNegative ? 'color: #E07A5F;' : ''}}">{{item.pointsText}}</view>
     </view>
     <view class="empty" wx:if="{{!logs.length}}">
       <view class="empty-icon">⭐</view>

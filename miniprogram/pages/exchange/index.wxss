@@ -27,6 +27,10 @@
   white-space: nowrap;
 }
 
+.store-name-warn {
+  color: #b45309;
+}
+
 .store-switch {
   flex-shrink: 0;
   font-size: 24rpx;

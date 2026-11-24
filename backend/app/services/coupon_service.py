@@ -38,6 +38,18 @@ def mark_coupon_used(db: Session, coupon: Coupon, reservation: Reservation) -> b
         update(Coupon).where(Coupon.id == coupon.id, Coupon.status == 0).values(status=1)
     )
     if result.rowcount == 1:
+        reservation.coupon_id = coupon.id
         db.refresh(coupon)
         return True
     return False
+
+
+def refund_coupon_for_reservation(db: Session, reservation: Reservation) -> bool:
+    """取消已用券预约时退回优惠券。"""
+    if not getattr(reservation, "coupon_id", None):
+        return False
+    coupon = db.get(Coupon, reservation.coupon_id)
+    if not coupon or coupon.status != 1:
+        return False
+    coupon.status = 0
+    return True

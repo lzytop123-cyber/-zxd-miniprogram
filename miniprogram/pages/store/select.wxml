@@ -35,6 +35,7 @@
       store="{{item}}"
       showLocationHint="{{!!locationHint}}"
       bind:select="selectStore"
+      bind:detail="goStoreDetail"
     />
   </block>
 </view>

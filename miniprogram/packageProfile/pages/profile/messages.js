@@ -1,4 +1,5 @@
-const { request } = require('../../../utils/request')
+const { request, invalidateCache } = require('../../../utils/request')
+const { TAB_PAGES } = require('../../../utils/auth')
 
 Page({
   data: {
@@ -35,19 +36,27 @@ Page({
     const linkPath = e.currentTarget.dataset.link
     const item = this.data.list.find((n) => n.id === id)
     if (item && !item.is_read) {
-      request({ url: `/notifications/${id}/read`, method: 'POST', silent: true }).catch(() => {})
+      request({ url: `/notifications/${id}/read`, method: 'POST', silent: true })
+        .then(() => invalidateCache('/notifications/unread-count'))
+        .catch(() => {})
       const next = this.data.list.map((n) => (n.id === id ? { ...n, is_read: true } : n))
       this.setData({ list: next })
     }
     if (linkPath) {
       const url = linkPath.startsWith('/') ? linkPath : `/${linkPath}`
-      wx.navigateTo({ url, fail: () => wx.switchTab({ url }).catch(() => {}) })
+      const base = url.split('?')[0]
+      if (TAB_PAGES.includes(base)) {
+        wx.switchTab({ url: base })
+      } else {
+        wx.navigateTo({ url, fail: () => wx.switchTab({ url: base }) })
+      }
     }
   },
 
   markAllRead() {
     request({ url: '/notifications/read-all', method: 'POST' })
       .then(() => {
+        invalidateCache('/notifications/unread-count')
         wx.showToast({ title: '全部已读', icon: 'success' })
         const next = this.data.list.map((n) => ({ ...n, is_read: true }))
         this.setData({ list: next })

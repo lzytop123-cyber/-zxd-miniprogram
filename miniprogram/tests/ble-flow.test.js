@@ -1,11 +1,12 @@
 const assert = require('node:assert/strict')
 const fs = require('node:fs')
+const path = require('node:path')
 const vm = require('node:vm')
 function setup({ adapterFailure, result } = {}) {
   let page; let keyResolve; let unlockResolve; let calls=0; let stops=0
   const timers = new Map(); const reports=[]
   const plugin = { controlLock: () => { calls++; return result ? Promise.resolve(result) : new Promise(r=>{unlockResolve=r}) }, stopAllOperations: async()=>{stops++;return {errorCode:0}} }
-  vm.runInNewContext(fs.readFileSync('miniprogram/pages/checkin/index.js','utf8'), {
+  vm.runInNewContext(fs.readFileSync(path.join(__dirname, '../pages/checkin/index.js'),'utf8'), {
     require(name) {
       if(name.endsWith('/request')) return {request: opts=>{
         if(opts.url.startsWith('/ble/key/')) return new Promise(r=>{keyResolve=r})

@@ -4,6 +4,7 @@ Page({
   data: {
     items: [],
     revealed: {},
+    savedWechatId: '',
     statusText: {
       pending: '待处理',
       approved: '已同意',
@@ -15,7 +16,18 @@ Page({
 
   onShow() {
     if (!guardMarketplace()) return
+    this.loadMeta()
     this.load()
+  },
+
+  loadMeta() {
+    request({ url: '/market/meta', silent: true })
+      .then((meta) => {
+        if (meta && meta.market_wechat_id) {
+          this.setData({ savedWechatId: meta.market_wechat_id })
+        }
+      })
+      .catch(() => {})
   },
 
   onPullDownRefresh() {
@@ -66,13 +78,15 @@ Page({
             wx.showModal({
               title: '填写微信号',
               editable: true,
+              content: this.data.savedWechatId || '',
               placeholderText: '微信号',
               success: resolve,
               fail: () => resolve({ confirm: false }),
             })
           })
           if (!modal.confirm) return
-          wechat_id = modal.content || ''
+          wechat_id = (modal.content || this.data.savedWechatId || '').trim()
+          if (wechat_id) this.setData({ savedWechatId: wechat_id })
         }
         try {
           const data = await request({

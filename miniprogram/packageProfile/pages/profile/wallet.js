@@ -1,8 +1,24 @@
-const { request } = require('../../../utils/request')
-const { completeWechatPay, isPayCancelled } = require('../../../utils/pay')
+const { request, invalidateCache } = require('../../../utils/request')
+const { completeWechatPay, ensureRechargePaid, isPayCancelled } = require('../../../utils/pay')
+
+function formatLog(item) {
+  const isPlus = item.type === 'recharge' || item.type === 'refund' || (item.type === 'admin_adjust' && Number(item.amount) >= 0)
+  const absAmt = Math.abs(Number(item.amount || 0)).toFixed(2).replace(/\.00$/, '')
+  return {
+    ...item,
+    isPlus,
+    amountText: `${isPlus ? '+' : '-'}¥${absAmt}`,
+  }
+}
 
 Page({
-  data: { balance: 0, logs: [], amount: 100 },
+  data: {
+    balance: 0,
+    allLogs: [],
+    logs: [],
+    filter: 'all',
+    amount: 100,
+  },
 
   onShow() {
     this.loadWallet({ silent: true })
@@ -16,12 +32,28 @@ Page({
     const { force = false } = options
     return request({ url: '/user/wallet', silent: true, force })
       .then((data) => {
+        const allLogs = (data.logs || []).map(formatLog)
         this.setData({
           balance: data.balance,
-          logs: data.logs.filter((l) => l.type === 'recharge'),
+          allLogs,
+          logs: this._filterLogs(allLogs, this.data.filter),
         })
       })
       .catch(() => {})
+  },
+
+  _filterLogs(allLogs, filter) {
+    if (filter === 'recharge') return allLogs.filter((l) => l.type === 'recharge')
+    if (filter === 'consume') return allLogs.filter((l) => l.type !== 'recharge')
+    return allLogs
+  },
+
+  setFilter(e) {
+    const filter = e.currentTarget.dataset.filter || 'all'
+    this.setData({
+      filter,
+      logs: this._filterLogs(this.data.allLogs, filter),
+    })
   },
 
   setAmount(e) {
@@ -36,6 +68,9 @@ Page({
       await completeWechatPay(res.wechat_pay, () =>
         request({ url: `/user/recharge/${res.order_no}/mock?amount=${amount}`, method: 'POST' })
       )
+      await ensureRechargePaid(res.order_no, res.wechat_pay)
+      invalidateCache('/user/wallet')
+      invalidateCache('/user/profile')
       wx.hideLoading()
       wx.showToast({ title: '充值成功' })
       await this.loadWallet({ force: true })

@@ -105,17 +105,59 @@ Page({
     if (!auth.requireLogin(routes.marketDetail + `?id=${this.data.id}`)) return
     wx.showActionSheet({
       itemList: ['疑似盗版侵权', '虚假信息', '骚扰广告', '其他'],
-      success: async (res) => {
+      success: (res) => {
         const codes = ['piracy', 'fake', 'spam', 'other']
+        const reason_code = codes[res.tapIndex]
+        wx.showModal({
+          title: '补充举报说明（可选）',
+          editable: true,
+          placeholderText: '可填写具体违规情况说明',
+          confirmText: '提交举报',
+          success: async (modalRes) => {
+            if (!modalRes.confirm) return
+            try {
+              await request({
+                url: '/market/reports',
+                method: 'POST',
+                data: {
+                  listing_id: this.data.id,
+                  reason_code,
+                  detail: (modalRes.content || '').trim() || undefined,
+                },
+              })
+              wx.showToast({ title: '已提交举报', icon: 'success' })
+            } catch (e) {
+              wx.showToast({ title: e.message || '提交失败', icon: 'none' })
+            }
+          },
+        })
+      },
+    })
+  },
+
+  async ownerSubmit() {
+    try {
+      await request({ url: `/market/listings/${this.data.id}/submit`, method: 'POST' })
+      wx.showToast({ title: '已提交审核', icon: 'success' })
+      this.load()
+    } catch (e) {
+      wx.showToast({ title: e.message || '提交失败', icon: 'none' })
+    }
+  },
+
+  ownerDelete() {
+    wx.showModal({
+      title: '删除发布',
+      content: '删除后不可恢复，确定删除吗？',
+      confirmColor: '#E07A5F',
+      success: async (res) => {
+        if (!res.confirm) return
         try {
-          await request({
-            url: '/market/reports',
-            method: 'POST',
-            data: { listing_id: this.data.id, reason_code: codes[res.tapIndex] },
-          })
-          wx.showToast({ title: '已提交举报', icon: 'success' })
+          await request({ url: `/market/listings/${this.data.id}`, method: 'DELETE' })
+          wx.showToast({ title: '已删除', icon: 'success' })
+          setTimeout(() => wx.navigateBack({ fail: () => wx.redirectTo({ url: routes.marketMine }) }), 400)
         } catch (e) {
-          wx.showToast({ title: e.message || '提交失败', icon: 'none' })
+          wx.showToast({ title: e.message || '删除失败', icon: 'none' })
         }
       },
     })

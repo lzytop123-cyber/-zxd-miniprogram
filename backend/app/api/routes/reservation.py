@@ -51,7 +51,7 @@ from app.services.card_service import (
     validate_period_card_for_reservation,
 )
 from app.api.routes.payment import complete_reservation_wechat_payment
-from app.services.coupon_service import apply_coupon, mark_coupon_used
+from app.services.coupon_service import apply_coupon, mark_coupon_used, refund_coupon_for_reservation
 from app.services.pay_account import assert_store_allows_pay_type, resolve_pay_account
 from app.services.wechat_pay import WechatPayService, resolve_account_for_mchid
 
@@ -299,10 +299,13 @@ def create(
             existing.original_price = price
             existing.discount_price = discount
             existing.final_price = final_price
+            existing.coupon_id = coupon.id if coupon else None
+            user.preferred_store_id = body.store_id
             db.commit()
             db.refresh(existing)
             return ResponseModel(data=_to_item(db, existing))
 
+        user.preferred_store_id = body.store_id
         reservation = Reservation(
             order_no=generate_order_no(),
             user_id=user.id,
@@ -315,6 +318,7 @@ def create(
             original_price=price,
             discount_price=discount,
             final_price=final_price,
+            coupon_id=coupon.id if coupon else None,
             pay_status=0,
             status=0,
         )
@@ -733,5 +737,6 @@ def cancel(
             reservation.pay_status = 2
         reservation.refunded_at = datetime.now()
         reservation.refund_remark = "用户取消预约"
+        refund_coupon_for_reservation(db, reservation)
     db.commit()
     return ResponseModel(message="已取消")

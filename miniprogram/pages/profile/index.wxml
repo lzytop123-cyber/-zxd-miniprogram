@@ -93,17 +93,28 @@
       <view class="menu-icon"><view class="mi-glyph icon-cards"></view></view>
       <text>我的期限卡</text>
     </view>
-    <view class="menu-item" hover-class="menu-item-hover" bindtap="go" data-url="{{menuUrls.wrongbook}}">
-      <view class="menu-icon"><view class="mi-glyph icon-book-open"></view></view>
-      <text>错题本</text>
+    <view class="menu-item" hover-class="menu-item-hover" bindtap="go" data-url="{{menuUrls.coupons}}">
+      <view class="menu-icon"><view class="mi-glyph icon-coupons"></view></view>
+      <text>优惠券</text>
     </view>
   </view>
 
   <view class="menu-sect-title">更多</view>
   <view class="menu-grid card">
+    <view class="menu-item menu-item--msg" hover-class="menu-item-hover" bindtap="go" data-url="{{menuUrls.messages}}">
+      <view class="menu-icon">
+        <view class="mi-glyph icon-megaphone"></view>
+        <view class="msg-badge" wx:if="{{unreadCount > 0}}">{{unreadCount > 99 ? '99+' : unreadCount}}</view>
+      </view>
+      <text>消息中心</text>
+    </view>
+    <view class="menu-item" hover-class="menu-item-hover" bindtap="go" data-url="{{menuUrls.wrongbook}}">
+      <view class="menu-icon"><view class="mi-glyph icon-book-open"></view></view>
+      <text>错题本</text>
+    </view>
     <view class="menu-item" hover-class="menu-item-hover" bindtap="go" data-url="{{menuUrls.points}}">
       <view class="menu-icon"><view class="mi-glyph icon-points"></view></view>
-      <text>积分明细</text>
+      <text>积分兑换</text>
     </view>
     <view class="menu-item" hover-class="menu-item-hover" bindtap="go" data-url="{{menuUrls.invite}}">
       <view class="menu-icon"><view class="mi-glyph icon-invite"></view></view>
@@ -121,5 +132,11 @@
 
   <view class="logout-row" wx:if="{{loginState === 'ready' && user}}">
     <view class="btn-logout" bindtap="doLogout">退出登录</view>
+  </view>
+
+  <view class="logout-row" style="margin-top:0;font-size:22rpx;color:#8C9BA5;">
+    <text bindtap="openAgreement" data-type="user">《用户服务协议》</text>
+    <text> · </text>
+    <text bindtap="openAgreement" data-type="privacy">《隐私政策》</text>
   </view>
 </view>

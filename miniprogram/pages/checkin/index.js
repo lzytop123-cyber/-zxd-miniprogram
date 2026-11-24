@@ -432,6 +432,54 @@ Page({
     wx.navigateTo({ url: `${routes.profileChangeSeat}?id=${reservation.id}` })
   },
 
+  goRenew() {
+    const { reservation } = this.data
+    if (!reservation || !reservation.store_id) return
+    const q = [
+      `storeId=${reservation.store_id}`,
+      `billType=${encodeURIComponent(reservation.bill_type || 'hourly')}`,
+      reservation.seat_id ? `seatId=${reservation.seat_id}` : '',
+      reservation.seat_code ? `seatCode=${encodeURIComponent(reservation.seat_code)}` : '',
+      reservation.end_time ? `startFrom=${encodeURIComponent(reservation.end_time)}` : '',
+    ].filter(Boolean).join('&')
+    wx.navigateTo({ url: `${routes.bookingIndex}?${q}` })
+  },
+
+  showStoreWifi() {
+    const storeId = this.data.reservation?.store_id
+    if (!storeId) return
+    wx.showLoading({ title: '加载中' })
+    request({ url: `/store/${storeId}`, silent: true })
+      .then((detail) => {
+        wx.hideLoading()
+        const wifiName = detail && detail.wifi_name
+        const wifiPassword = detail && detail.wifi_password
+        if (!wifiName) {
+          wx.showToast({ title: '该门店暂未配置 WiFi', icon: 'none' })
+          return
+        }
+        const pwd = wifiPassword || '（无密码）'
+        wx.showModal({
+          title: '门店 WiFi',
+          content: `WiFi名称：${wifiName}\n连接密码：${pwd}`,
+          confirmText: '复制密码',
+          cancelText: '关闭',
+          confirmColor: '#2D6A4F',
+          success: (res) => {
+            if (!res.confirm) return
+            wx.setClipboardData({
+              data: String(wifiPassword || wifiName),
+              success: () => wx.showToast({ title: '已复制', icon: 'success' }),
+            })
+          },
+        })
+      })
+      .catch(() => {
+        wx.hideLoading()
+        wx.showToast({ title: '获取 WiFi 信息失败', icon: 'none' })
+      })
+  },
+
   goContact() {
     const storeId = this.data.reservation?.store_id
     wx.navigateTo({ url: routes.profileContact + (storeId ? `?storeId=${storeId}` : '') })

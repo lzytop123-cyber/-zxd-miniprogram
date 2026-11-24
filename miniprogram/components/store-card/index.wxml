@@ -21,7 +21,7 @@
   <view class="info">
     <view class="name-row">
       <text class="name">{{store.name}}</text>
-      <text class="arrow">›</text>
+      <text class="detail-link" catchtap="onDetail">门店详情 ›</text>
     </view>
     <view class="addr-row" catchtap="onNavigate">
       <view class="addr-block">

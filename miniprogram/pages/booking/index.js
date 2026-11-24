@@ -215,16 +215,31 @@ Page({
       this.setData({ seatTipDismissed: true })
     }
     this._refreshPreviewDebounced = debounce(() => this._doRefreshPreview(), 450)
+    let initStartDate = today
+    let initStartClock = defaultHourlyStartClock(today, today, nowTimeStr())
+    if (options.startFrom) {
+      const decoded = String(decodeURIComponent(options.startFrom)).replace('T', ' ')
+      const dPart = decoded.slice(0, 10)
+      const tPart = decoded.slice(11, 16)
+      if (/^\d{4}-\d{2}-\d{2}$/.test(dPart) && dPart >= today) {
+        initStartDate = dPart
+      }
+      if (/^\d{2}:\d{2}$/.test(tPart)) {
+        initStartClock = defaultHourlyStartClock(initStartDate, today, tPart)
+      }
+    }
+    const initSeatId = options.seatId ? Number(options.seatId) : null
+    const initSeatCode = options.seatCode ? decodeURIComponent(options.seatCode) : ''
     this.setData({
       storeId: options.storeId,
-      startDate: today,
-      endDate: today,
-      startClock: defaultHourlyStartClock(today, today, nowTimeStr()),
-      endClock: this._addHoursToClock(
-        defaultHourlyStartClock(today, today, nowTimeStr()),
-        2,
-      ),
+      startDate: initStartDate,
+      endDate: initStartDate,
+      startClock: initStartClock,
+      endClock: this._addHoursToClock(initStartClock, 2),
       quickHours: 2,
+      seatId: initSeatId,
+      selectedId: initSeatId,
+      seatCode: initSeatCode,
       planSeatCount: this._layout.planSeatCount,
       showSeatMap: true,
       seats: [],
@@ -1160,6 +1175,14 @@ Page({
               selectedId: null,
               selectedLabel: '',
               selectedZone: '',
+            })
+          } else {
+            const display = this._seatDisplay(current)
+            Object.assign(patch, {
+              seatCode: current.seat_code || this.data.seatCode,
+              selectedId: current.id,
+              selectedLabel: display.mapLabel,
+              selectedZone: display.zoneName,
             })
           }
         }

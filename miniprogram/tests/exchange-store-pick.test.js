@@ -13,14 +13,22 @@ describe('exchange storePick', () => {
       storeId: 2,
       storeName: '理工大店',
       storeIndex: 1,
+      storePicked: true,
     })
   })
 
-  it('falls back to first store', () => {
-    assert.deepEqual(pickExchangeStore(stores, 99), {
-      storeId: 1,
-      storeName: '千峰南路店',
+  it('does not default when preferred missing or unknown', () => {
+    assert.deepEqual(pickExchangeStore(stores, null), {
+      storeId: null,
+      storeName: '',
       storeIndex: 0,
+      storePicked: false,
+    })
+    assert.deepEqual(pickExchangeStore(stores, 99), {
+      storeId: null,
+      storeName: '',
+      storeIndex: 0,
+      storePicked: false,
     })
   })
 
@@ -29,6 +37,7 @@ describe('exchange storePick', () => {
       storeId: null,
       storeName: '',
       storeIndex: 0,
+      storePicked: false,
     })
   })
 

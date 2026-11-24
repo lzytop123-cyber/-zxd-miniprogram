@@ -34,19 +34,29 @@ test('study booking opens the dedicated store page', () => {
   assert.deepEqual(calls, ['/pages/store/select'])
 })
 
-test('opening home does not request location for the moved store list', async () => {
+test('opening home requests location for store distance', async () => {
   let definition
   const filename = path.join(__dirname, '../pages/home/index.js')
+  const urls = []
   const stubs = {
-    '../../utils/request': { request: async () => ({ stores: [], banners: { items: [] }, announcements: { items: [] } }) },
+    '../../utils/request': {
+      request: async ({ url }) => {
+        urls.push(url)
+        return { stores: [], banners: { items: [] }, announcements: { items: [] } }
+      },
+    },
     '../../utils/auth': {},
     '../../utils/user': { normalizeUser() {} },
     '../../utils/routes': {},
     '../../utils/tabbar': { handleTabScroll() {} },
     '../../utils/features': { syncTabBar() {}, setFeatures() {}, isMarketplaceEnabled: () => false },
     '../../utils/share': { enableShareMenu() {}, savePendingInvite() {}, shareAppMessage() {}, shareTimeline() {} },
-    '../../utils/location': { isLocationDenied: () => { throw new Error('location requested on home') } },
-    '../../utils/media': { resolveStoreList: () => { throw new Error('hidden store covers requested on home') } },
+    '../../utils/location': {
+      getUserLocation: async () => ({ latitude: 30.1, longitude: 120.2 }),
+      isLocationDenied: async () => false,
+      formatDistance: () => '',
+    },
+    '../../utils/media': { resolveStoreList: (stores) => stores || [] },
   }
   vm.runInNewContext(fs.readFileSync(filename, 'utf8'), {
     Page(value) { definition = value },
@@ -68,4 +78,5 @@ test('opening home does not request location for the moved store list', async ()
   await page.loadBootstrap()
 
   assert.equal(page.data.storesLoading, false)
+  assert.ok(urls.some((url) => url.includes('latitude=30.1') && url.includes('longitude=120.2')))
 })

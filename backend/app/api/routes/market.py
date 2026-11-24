@@ -358,6 +358,17 @@ def sold_listing(
     return ResponseModel(message="已标记已出", data=svc.listing_to_dict(db, listing, viewer=user))
 
 
+@router.delete("/listings/{listing_id}", response_model=ResponseModel)
+def delete_listing(
+    listing_id: int,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    _ensure_enabled()
+    svc.owner_delete_listing(db, user, listing_id)
+    return ResponseModel(message="已删除")
+
+
 @router.post("/favorites/{listing_id}", response_model=ResponseModel)
 def add_favorite(
     listing_id: int,

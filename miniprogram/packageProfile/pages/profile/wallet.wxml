@@ -16,14 +16,22 @@
   </view>
 
   <view class="card">
-    <view class="section-head">充值记录</view>
+    <view class="section-head">账单明细</view>
+    <view style="margin-bottom: 16rpx;">
+      <view class="chip {{filter==='all'?'active':''}}" bindtap="setFilter" data-filter="all">全部</view>
+      <view class="chip {{filter==='recharge'?'active':''}}" bindtap="setFilter" data-filter="recharge">充值</view>
+      <view class="chip {{filter==='consume'?'active':''}}" bindtap="setFilter" data-filter="consume">消费与退款</view>
+    </view>
     <view class="log" wx:for="{{logs}}" wx:key="id">
-      <view>{{item.remark}}</view>
-      <view class="log-amt">+¥{{item.amount}}</view>
+      <view>
+        <view>{{item.remark}}</view>
+        <view class="time" wx:if="{{item.created_at}}">{{item.created_at}}<text wx:if="{{item.balance_after != null}}"> · 余额 ¥{{item.balance_after}}</text></view>
+      </view>
+      <view class="log-amt" style="{{item.isPlus ? '' : 'color: #E07A5F;'}}">{{item.amountText}}</view>
     </view>
     <view class="empty" wx:if="{{!logs.length}}">
       <view class="empty-icon">💰</view>
-      <view>暂无充值记录</view>
+      <view>暂无账单记录</view>
     </view>
   </view>
 </view>

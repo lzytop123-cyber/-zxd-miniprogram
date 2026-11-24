@@ -244,7 +244,7 @@ Page({
           return fetchWithoutLocation(denied ? '开启定位查看距离' : '定位失败，点击重试')
         })
 
-    return fetchWithoutLocation('')
+    return fetchWithLocation()
   },
 
   _hydrateBannerCache() {
@@ -481,7 +481,15 @@ Page({
   },
 
   goExchange() {
-    wx.navigateTo({ url: routes.exchangeIndex })
+    // exchange 在分包内，主包不能 require 其 utils；此处直接拼跳转 URL
+    const preferred =
+      this.data.user?.preferred_store_id ||
+      (this.data.stores && this.data.stores.length === 1 ? this.data.stores[0].id : null)
+    let url = routes.exchangeIndex
+    if (preferred != null && preferred !== '') {
+      url += `?storeId=${encodeURIComponent(preferred)}`
+    }
+    wx.navigateTo({ url })
   },
 
   goMarket() {

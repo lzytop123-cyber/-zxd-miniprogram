@@ -65,8 +65,11 @@
         </view>
       </view>
       <view class="detail-actions">
-        <view class="detail-btn primary" wx:if="{{detail.mode === 'buy'}}" bindtap="buyFromDetail">
-          立即购买 ¥{{detail.priceText}}
+        <view class="detail-btn primary" wx:if="{{detail.mode === 'buy'}}" data-pay="wechat" bindtap="buyFromDetail">
+          微信支付 ¥{{detail.priceText}}
+        </view>
+        <view class="detail-btn" wx:if="{{detail.mode === 'buy'}}" data-pay="balance" bindtap="buyFromDetail">
+          余额支付
         </view>
         <view class="detail-btn" bindtap="closeDetail">再看看</view>
       </view>

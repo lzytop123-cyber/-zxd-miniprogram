@@ -1776,6 +1776,7 @@ class AdminIssuePeriodCardRequest(BaseModel):
 class AdminUpdatePeriodCardRequest(BaseModel):
     status: int | None = None
     card_type: str | None = None
+    store_id: int | None = None
     end_date: date | None = None
     extend_days: int | None = None
     remaining_hours: float | None = None
@@ -1824,6 +1825,21 @@ def update_period_card_admin(
     if not card:
         raise HTTPException(status_code=404, detail="期限卡不存在")
     assert_store_access(admin, card.store_id)
+    data = body.model_dump(exclude_unset=True)
+    if "store_id" in data:
+        new_store_id = data["store_id"]
+        if new_store_id is not None:
+            assert_store_access(admin, new_store_id)
+            store = db.get(Store, new_store_id)
+            if not store:
+                raise HTTPException(status_code=404, detail="门店不存在")
+        card.store_id = new_store_id
+        if card.meituan_receipt:
+            order = db.scalar(
+                select(MeituanOrder).where(MeituanOrder.coupon_code == card.meituan_receipt)
+            )
+            if order:
+                order.store_id = new_store_id
     try:
         card_type = CardType(body.card_type) if body.card_type else None
     except ValueError as e:

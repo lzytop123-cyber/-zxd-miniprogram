@@ -74,7 +74,20 @@
     }
   ],
   "lazyCodeLoading": "requiredComponents",
-  "preloadRule": {},
+  "preloadRule": {
+    "pages/home/index": {
+      "network": "all",
+      "packages": ["booking", "store"]
+    },
+    "pages/packages/index": {
+      "network": "all",
+      "packages": ["booking", "exchange"]
+    },
+    "pages/profile/index": {
+      "network": "all",
+      "packages": ["profile"]
+    }
+  },
   "window": {
     "navigationBarBackgroundColor": "#2D6A4F",
     "navigationBarTitleText": "知行岛自习室",

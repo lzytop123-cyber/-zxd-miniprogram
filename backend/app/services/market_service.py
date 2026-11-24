@@ -24,11 +24,34 @@ from app.models import (
     MarketReportStatus,
     MarketRevealType,
     MarketSensitiveWord,
+    Notification,
     Reservation,
     Store,
     User,
 )
 from app.services.market_seed import COPYRIGHT_TEXT_V1
+
+
+def _notify_market_user(
+    db: Session,
+    *,
+    user_id: int,
+    title: str,
+    content: str,
+    link_path: str | None = None,
+) -> None:
+    if not user_id:
+        return
+    db.add(
+        Notification(
+            title=title[:100],
+            content=content[:2000],
+            category="reminder",
+            target_type="user",
+            target_user_id=user_id,
+            link_path=link_path,
+        )
+    )
 
 EDITABLE_STATUSES = {
     MarketListingStatus.draft.value,
@@ -411,6 +434,23 @@ def owner_set_status(
     return listing
 
 
+def owner_delete_listing(db: Session, user: User, listing_id: int) -> None:
+    listing = db.get(MarketListing, listing_id)
+    if not listing or listing.user_id != user.id:
+        raise HTTPException(status_code=404, detail="资料不存在")
+    if listing.status == MarketListingStatus.published.value:
+        raise HTTPException(status_code=400, detail="请先下架后再删除")
+    add_moderation_log(
+        db,
+        target_type="listing",
+        target_id=listing.id,
+        action="delete",
+        user_id=user.id,
+    )
+    db.delete(listing)
+    db.commit()
+
+
 def query_listings(
     db: Session,
     *,
@@ -553,6 +593,13 @@ def create_contact_request(
     )
     db.add(row)
     listing.contact_count = (listing.contact_count or 0) + 1
+    _notify_market_user(
+        db,
+        user_id=listing.user_id,
+        title="收到新的集市联系申请",
+        content=f"有同学申请获取《{listing.title}》的联系方式，请前往「上岸集市-联系申请」处理。",
+        link_path="/packageMarket/pages/contacts/index",
+    )
     db.commit()
     db.refresh(row)
     return row
@@ -579,9 +626,19 @@ def decide_contact_request(
         db.commit()
         raise HTTPException(status_code=400, detail="申请已过期")
 
+    listing = db.get(MarketListing, row.listing_id)
+    listing_title = listing.title if listing else f"资料#{row.listing_id}"
+
     if not approve:
         row.status = MarketContactStatus.rejected.value
         row.decided_at = datetime.now()
+        _notify_market_user(
+            db,
+            user_id=row.buyer_id,
+            title="集市联系申请未通过",
+            content=f"卖家已拒绝您对《{listing_title}》的联系申请。",
+            link_path=f"/packageMarket/pages/detail/index?id={row.listing_id}",
+        )
         db.commit()
         db.refresh(row)
         return row
@@ -606,6 +663,13 @@ def decide_contact_request(
     row.reveal_type = reveal_type
     row.reveal_value = reveal_value
     row.decided_at = datetime.now()
+    _notify_market_user(
+        db,
+        user_id=row.buyer_id,
+        title="卖家已同意您的联系申请",
+        content=f"卖家已同意公开《{listing_title}》的联系方式，点击查看详情即可复制。",
+        link_path=f"/packageMarket/pages/detail/index?id={row.listing_id}",
+    )
     db.commit()
     db.refresh(row)
     return row
@@ -709,6 +773,17 @@ def admin_review_listing(
         listing.status = MarketListingStatus.rejected.value
         listing.reject_reason = reason[:200]
         action = "reject"
+    _notify_market_user(
+        db,
+        user_id=listing.user_id,
+        title="上岸集市发布审核通过" if approve else "上岸集市发布被驳回",
+        content=(
+            f"您发布的《{listing.title}》已审核通过并上架。"
+            if approve
+            else f"您发布的《{listing.title}》未通过审核，原因：{listing.reject_reason or '不合规'}。"
+        ),
+        link_path=f"/packageMarket/pages/detail/index?id={listing.id}",
+    )
     add_moderation_log(
         db,
         target_type="listing",

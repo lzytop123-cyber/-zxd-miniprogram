@@ -35,6 +35,8 @@ class UserProfile(BaseModel):
     balance: Decimal
     total_points: int
     invite_code: str | None = None
+    invited_by: int | None = None
+    invite_count: int = 0
     face_registered: bool = False
     needs_profile_setup: bool = False
 
@@ -42,7 +44,11 @@ class UserProfile(BaseModel):
 
 
 class AvatarUploadRequest(BaseModel):
-    avatar_image: str = Field(min_length=10, max_length=300000)
+    avatar_image: str = Field(min_length=10, max_length=1500000)
+
+
+class PointRedeemRequest(BaseModel):
+    tier_code: str = Field(min_length=2, max_length=32)
 
 
 class InviteApplyRequest(BaseModel):

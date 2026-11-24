@@ -1,12 +1,13 @@
 const assert = require('node:assert/strict')
 const fs = require('node:fs')
+const path = require('node:path')
 const vm = require('node:vm')
 const { mapBleOpenFailure } = require('../utils/bleUnlock')
 async function main() {
   assert.match(mapBleOpenFailure({errorMsg:'bluetooth permission denied', canOpen:true}).content, /权限/)
   assert.match(mapBleOpenFailure({errorMsg:'bluetooth connection timeout', errorCode:10012, canOpen:true}).content, /超时/)
   const pending = []; let page
-  vm.runInNewContext(fs.readFileSync('miniprogram/pages/checkin/index.js','utf8'), {
+  vm.runInNewContext(fs.readFileSync(path.join(__dirname, '../pages/checkin/index.js'),'utf8'), {
     require: name => name.endsWith('/request') ? {request: () => new Promise(resolve => pending.push(resolve))} : {},
     Page: p => {page=p}, wx: {setStorageSync(){}}, console
   })

@@ -85,4 +85,10 @@ Page({
     if (!auth.requireLogin(bookingUrl)) return
     wx.navigateTo({ url: bookingUrl })
   },
+
+  goStoreDetail(event) {
+    const id = event.detail?.id ?? event.currentTarget?.dataset?.id
+    if (!id) return
+    wx.navigateTo({ url: `${routes.storeDetail}?id=${id}` })
+  },
 })

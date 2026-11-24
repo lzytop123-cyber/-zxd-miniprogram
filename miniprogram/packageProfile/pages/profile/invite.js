@@ -1,4 +1,4 @@
-const { request } = require('../../../utils/request')
+const { request, invalidateCache } = require('../../../utils/request')
 const {
   enableShareMenu,
   shareAppMessage,
@@ -12,6 +12,9 @@ Page({
   data: {
     inviteCode: '',
     inputCode: '',
+    hasAppliedInvite: false,
+    inviteCount: 0,
+    records: [],
   },
 
   onShow() {
@@ -45,9 +48,17 @@ Page({
 
   loadInvite(options = {}) {
     const { force = false } = options
-    return request({ url: '/user/profile', silent: true, force })
-      .then((user) => {
-        this.setData({ inviteCode: user.invite_code || '' })
+    return Promise.all([
+      request({ url: '/user/profile', silent: true, force }),
+      request({ url: '/user/invite/records', silent: true, force }).catch(() => []),
+    ])
+      .then(([user, records]) => {
+        this.setData({
+          inviteCode: user.invite_code || '',
+          hasAppliedInvite: !!user.invited_by,
+          inviteCount: user.invite_count || (records || []).length,
+          records: records || [],
+        })
       })
       .catch(() => {})
   },
@@ -75,8 +86,11 @@ Page({
       data: { invite_code: this.data.inputCode },
     }).then(() => {
       clearPendingInvite()
-      wx.showToast({ title: '领取成功' })
-      this.setData({ inputCode: '' })
+      invalidateCache('/user/profile')
+      invalidateCache('/user/points/logs')
+      wx.showToast({ title: '领取成功 +20积分' })
+      this.setData({ inputCode: '', hasAppliedInvite: true })
+      this.loadInvite({ force: true })
     })
   },
 })

@@ -58,7 +58,9 @@
 
   <view class="bottom">
     <block wx:if="{{listing.is_owner}}">
+      <view class="btn ghost" bindtap="ownerDelete" wx:if="{{listing.status!=='published'}}">删除</view>
       <view class="btn ghost" bindtap="goEdit" wx:if="{{listing.status!=='published' && listing.status!=='pending'}}">编辑</view>
+      <view class="btn primary" bindtap="ownerSubmit" wx:if="{{listing.status==='draft' || listing.status==='rejected' || listing.status==='off'}}">提交审核</view>
       <view class="btn ghost" bindtap="ownerOff" wx:if="{{listing.status==='published' || listing.status==='sold'}}">下架</view>
       <view class="btn primary" bindtap="ownerSold" wx:if="{{listing.status==='published' || listing.status==='off'}}">已出</view>
     </block>

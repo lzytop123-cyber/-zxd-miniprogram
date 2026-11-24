@@ -55,6 +55,8 @@ function enrichOrder(item) {
   const canOpen =
     item.pay_status === 1 && [0, 1].includes(item.status) && parseDate(item.end_time) > new Date()
   const canPay = item.pay_status !== 1 && item.status === 0 && parseDate(item.end_time) > new Date()
+  const canCancelPaid =
+    item.pay_status === 1 && item.status === 0 && parseDate(item.end_time) > new Date()
   const canChangeSeat = canOpen
 
   const display = seatDisplay({ seat_code: item.seat_code || '' })
@@ -86,6 +88,7 @@ function enrichOrder(item) {
     statusTone: tone,
     canOpen,
     canPay,
+    canCancelPaid,
     canChangeSeat,
   }
 }
@@ -212,10 +215,12 @@ Page({
     const id = Number(e.currentTarget.dataset.id)
     const o = this.data.orders.find((x) => x.id === id)
     if (!o) return
+    const price = o.original_price != null ? o.original_price : o.final_price
     const url =
       `${routes.bookingOrder}?storeId=${o.store_id}` +
+      `&storeName=${encodeURIComponent(o.store_name || '')}` +
       `&start=${encodeURIComponent(o.start_time)}&end=${encodeURIComponent(o.end_time)}` +
-      `&seatId=${o.seat_id}&price=${o.final_price}` +
+      `&seatId=${o.seat_id}&price=${price}` +
       `&seatCode=${encodeURIComponent(o.seat_code || '')}&billType=${o.bill_type}`
     wx.navigateTo({ url })
   },
@@ -231,10 +236,41 @@ Page({
         if (!res.confirm) return
         request({ url: `/reservation/${id}/cancel`, method: 'POST' })
           .then(() => {
+            invalidateCache('/reservation/active/list')
+            invalidateCache('/user/coupons')
             wx.showToast({ title: '已取消', icon: 'success' })
             this.loadOrders({ force: true })
           })
           .catch(() => {})
+      },
+    })
+  },
+
+  cancelPaidOrder(e) {
+    const id = Number(e.currentTarget.dataset.id)
+    if (!id) return
+    wx.showModal({
+      title: '取消预约并退款',
+      content: '确定取消该预约吗？已支付金额或期限卡次数/时长将原路退回。',
+      confirmText: '确认取消',
+      confirmColor: '#E07A5F',
+      success: (res) => {
+        if (!res.confirm) return
+        wx.showLoading({ title: '处理中...' })
+        request({ url: `/reservation/${id}/cancel`, method: 'POST' })
+          .then(() => {
+            wx.hideLoading()
+            invalidateCache('/reservation/active/list')
+            invalidateCache('/user/wallet')
+            invalidateCache('/user/cards')
+            invalidateCache('/user/profile')
+            invalidateCache('/user/coupons')
+            wx.showToast({ title: '已取消并退回', icon: 'success' })
+            this.loadOrders({ force: true })
+          })
+          .catch(() => {
+            wx.hideLoading()
+          })
       },
     })
   },

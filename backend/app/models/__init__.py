@@ -274,6 +274,7 @@ class Reservation(Base):
     status: Mapped[int] = mapped_column(Integer, default=0)
     check_in_time: Mapped[datetime | None] = mapped_column(DateTime)
     period_card_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("period_cards.id"))
+    coupon_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("coupons.id"))
     refund_remark: Mapped[str | None] = mapped_column(String(200))
     refunded_at: Mapped[datetime | None] = mapped_column(DateTime)
     paid_at: Mapped[datetime | None] = mapped_column(DateTime)

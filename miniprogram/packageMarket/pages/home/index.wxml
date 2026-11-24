@@ -31,6 +31,7 @@
   <view class="section-row">
     <view class="section-title">{{filtered ? '筛选结果' : '最新发布'}}</view>
     <view class="section-links">
+      <text class="link" bindtap="goList" style="margin-right: 20rpx;">按门店/免费筛选</text>
       <text class="link" bindtap="goPublish">发布</text>
       <text class="more" wx:if="{{filtered}}" bindtap="clearFilters">清除筛选</text>
     </view>

@@ -101,6 +101,16 @@
   line-height: 1;
 }
 
+.detail-link {
+  font-size: 24rpx;
+  color: var(--color-text-brand);
+  font-weight: 600;
+  padding: 6rpx 16rpx;
+  border-radius: 999rpx;
+  background: var(--color-primary-soft, #ECF9F0);
+  flex-shrink: 0;
+}
+
 .addr-row {
   display: flex;
   justify-content: space-between;

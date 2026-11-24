@@ -11,6 +11,7 @@ Page({
     storeId: null,
     storeName: '',
     storeIndex: 0,
+    storePicked: false,
     storesLoading: true,
     loading: false,
     scanning: false,
@@ -50,6 +51,7 @@ Page({
           storeId: picked.storeId,
           storeName: picked.storeName,
           storeIndex: picked.storeIndex,
+          storePicked: !!picked.storePicked,
           storesLoading: false,
         })
       })
@@ -67,6 +69,7 @@ Page({
       storeId: store.id,
       storeName: store.name,
       storeIndex: idx,
+      storePicked: true,
     })
   },
 
@@ -89,32 +92,15 @@ Page({
   async onScanTap() {
     if (this.data.loading || this.data.scanning) return
     this.setData({ scanning: true })
-    let loadingShown = false
     try {
       const { pickAndScanVoucher } = require('./utils/voucherScan')
-      const res = await pickAndScanVoucher({
-        onAlbumStart: () => {
-          loadingShown = true
-          wx.showLoading({ title: '识别券码…', mask: true })
-        },
-      })
+      const res = await pickAndScanVoucher()
       this._applyScanResult(res)
     } catch (e) {
       const msg = e.errMsg || e.message || ''
       if (msg.includes('cancel') || msg.includes('fail cancel')) return
-      if (msg.includes('未识别') || msg.includes('条形码')) {
-        wx.showModal({
-          title: '识别失败',
-          content: msg.includes('条形码')
-            ? msg
-            : '未识别到有效券码，请重试或使用相机扫码',
-          showCancel: false,
-        })
-        return
-      }
       wx.showToast({ title: '扫码失败', icon: 'none' })
     } finally {
-      if (loadingShown) wx.hideLoading()
       this.setData({ scanning: false })
     }
   },
@@ -129,11 +115,23 @@ Page({
       wx.showToast({ title: '请输入有效券码', icon: 'none' })
       return
     }
-    const { platform, storeId } = this.data
-    if (!storeId) {
-      wx.showToast({ title: '请选择门店后再兑换', icon: 'none' })
+    const { platform, storeId, storeName, storePicked } = this.data
+    if (!storeId || !storePicked) {
+      wx.showToast({ title: '请先选择门店后再兑换', icon: 'none' })
       return
     }
+    const confirmed = await new Promise((resolve) => {
+      wx.showModal({
+        title: '确认核销',
+        content: `将核销到「${storeName || '所选门店'}」。\n核销后美团券即作废，请确认门店无误。`,
+        confirmText: '确认核销',
+        confirmColor: '#2D6A4F',
+        success: (res) => resolve(!!res.confirm),
+        fail: () => resolve(false),
+      })
+    })
+    if (!confirmed) return
+
     let code = inputCode
     if (platform === 'douyin') {
       const { toDouyinSubmitCode } = require('./utils/voucherScan')
@@ -171,11 +169,28 @@ Page({
       wx.showModal({
         title: '兑换成功',
         content: lines.join('\n'),
-        showCancel: false,
-        success: () => {
+        confirmText: '去选座预约',
+        cancelText: '查看卡包',
+        showCancel: true,
+        confirmColor: '#2D6A4F',
+        success: (res) => {
           const { invalidateCache } = require('../../utils/request')
           invalidateCache('/user/cards')
-          wx.switchTab({ url: '/pages/packages/index' })
+          if (res.confirm) {
+            const billType =
+              result.card_type === 'night_monthly'
+                ? 'night'
+                : result.card_type || 'hourly'
+            wx.navigateTo({
+              url: `${routes.bookingIndex}?storeId=${storeId}&billType=${billType}`,
+              fail: () => wx.navigateTo({ url: routes.profileCards }),
+            })
+          } else {
+            wx.navigateTo({
+              url: routes.profileCards,
+              fail: () => wx.switchTab({ url: '/pages/profile/index' }),
+            })
+          }
         },
       })
     } catch (e) {

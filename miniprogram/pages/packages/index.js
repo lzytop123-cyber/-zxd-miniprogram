@@ -194,18 +194,30 @@ Page({
     const billType = e?.currentTarget?.dataset?.type || this.data.detail?.bill_type
     if (!billType) return
     if (!auth.requireLogin('/pages/packages/index')) return
-    this.doPurchase(billType)
+    const store = (this.data.stores || []).find((s) => s.id === this.data.storeId)
+    if (store && store.benefits_isolated) {
+      this.doPurchase(billType, 'wechat')
+      return
+    }
+    wx.showActionSheet({
+      itemList: ['微信支付', '余额支付'],
+      success: (res) => {
+        const payType = res.tapIndex === 1 ? 'balance' : 'wechat'
+        this.doPurchase(billType, payType)
+      },
+    })
   },
 
-  buyFromDetail() {
+  buyFromDetail(e) {
     const billType = this.data.detail?.bill_type
+    const payType = e?.currentTarget?.dataset?.pay || 'wechat'
     if (!billType) return
     if (!auth.requireLogin('/pages/packages/index')) return
     this.closeDetail()
-    this.doPurchase(billType)
+    this.doPurchase(billType, payType)
   },
 
-  async doPurchase(billType) {
+  async doPurchase(billType, payType = 'wechat') {
     const { storeId, buying } = this.data
     if (buying || !storeId || !billType) return
 
@@ -215,26 +227,38 @@ Page({
       const res = await request({
         url: '/card/purchase',
         method: 'POST',
-        data: { store_id: storeId, bill_type: billType, pay_type: 'wechat' },
+        data: { store_id: storeId, bill_type: billType, pay_type: payType },
       })
 
-      const wp = res.wechat_pay
-      await completeWechatPay(wp, () =>
-        request({ url: `/card/purchase/${res.order_no}/mock`, method: 'POST' })
-      )
-      const confirmed = await ensureCardPurchasePaid(res.order_no, wp)
+      let confirmed = res
+      if (payType === 'wechat') {
+        const wp = res.wechat_pay
+        await completeWechatPay(wp, () =>
+          request({ url: `/card/purchase/${res.order_no}/mock`, method: 'POST' })
+        )
+        confirmed = await ensureCardPurchasePaid(res.order_no, wp)
+      } else {
+        invalidateCache('/user/wallet')
+        invalidateCache('/user/profile')
+      }
 
       wx.hideLoading()
       invalidateCache('/user/cards')
       await requestCardExpireSubscribe({ force: true })
+      const cardName = (confirmed && confirmed.card_name) || res.card_name || res.label || '期限卡'
       wx.showModal({
         title: '购买成功',
-        content: `已购买：${(confirmed && confirmed.card_name) || res.label || '期限卡'}`,
-        confirmText: '查看卡包',
-        cancelText: '继续购卡',
+        content: `已购买：${cardName}`,
+        confirmText: '去选座预约',
+        cancelText: '查看卡包',
         confirmColor: '#2D6A4F',
         success: (r) => {
-          if (r.confirm) wx.navigateTo({ url: routes.profileCards })
+          if (r.confirm) {
+            const targetBill = billType === 'night_monthly' ? 'night' : billType
+            wx.navigateTo({ url: `${routes.bookingIndex}?storeId=${storeId}&billType=${targetBill}` })
+          } else {
+            wx.navigateTo({ url: routes.profileCards })
+          }
         },
       })
     } catch (err) {

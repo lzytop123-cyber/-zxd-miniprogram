@@ -127,6 +127,34 @@ async function ensureCardPurchasePaid(orderNo, wechatPay) {
   throw new Error('支付确认超时')
 }
 
+/**
+ * 余额充值：微信支付成功后主动确认入账（不等待微信回调）。
+ */
+async function ensureRechargePaid(orderNo, wechatPay) {
+  const { request } = require('./request')
+
+  if (isMockPrepay(wechatPay)) {
+    return
+  }
+
+  const attempts = 24
+  for (let i = 0; i < attempts; i += 1) {
+    try {
+      return await request({
+        url: `/user/recharge/${orderNo}/confirm-pay`,
+        method: 'POST',
+        silent: true,
+      })
+    } catch (e) {
+      if (i === attempts - 1) {
+        throw new Error('充值确认中，请稍后下拉刷新「钱包」')
+      }
+      await sleep(500)
+    }
+  }
+  throw new Error('充值确认超时')
+}
+
 module.exports = {
   isMockPrepay,
   isPayCancelled,
@@ -134,4 +162,5 @@ module.exports = {
   completeWechatPay,
   ensureReservationPaid,
   ensureCardPurchasePaid,
+  ensureRechargePaid,
 }

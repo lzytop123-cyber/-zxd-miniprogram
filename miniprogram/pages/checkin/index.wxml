@@ -107,6 +107,8 @@
       </view>
 
       <view class="open-footer">
+        <view class="change-seat-link" bindtap="showStoreWifi">门店WiFi</view>
+        <view class="change-seat-link" bindtap="goRenew">续座</view>
         <view class="change-seat-link" bindtap="goChangeSeat" wx:if="{{canChangeSeat}}">换座</view>
         <view class="checkout-link" bindtap="checkout" wx:if="{{reservation.status === 1}}">提前离座</view>
         <view class="checkout-hint" wx:elif="{{reservation.status === 0 && canOpen}}">开门后可提前离座</view>

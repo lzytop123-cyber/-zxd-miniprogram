@@ -24,6 +24,7 @@ Page({
     menuUrls: {
       wallet: routes.profileWallet,
       orders: routes.profileOrders,
+      coupons: routes.profileCoupons,
       wrongbook: routes.wrongbookIndex,
       points: routes.profilePoints,
       invite: routes.profileInvite,
@@ -201,5 +202,10 @@ Page({
       return
     }
     wx.navigateTo({ url: routes.marketMine })
+  },
+
+  openAgreement(e) {
+    const type = e.currentTarget.dataset.type || 'user'
+    wx.navigateTo({ url: `${routes.profileAgreement}?type=${type}` })
   },
 })
