@@ -124,6 +124,26 @@
   line-height: 1;
 }
 
+.exchange-result {
+  margin-top: 28rpx;
+  padding: 24rpx;
+  border-radius: 16rpx;
+  background: #eef6f1;
+}
+
+.exchange-result-title {
+  font-size: 32rpx;
+  font-weight: 700;
+  color: #2d6a4f;
+  margin-bottom: 12rpx;
+}
+
+.exchange-result-line {
+  font-size: 26rpx;
+  line-height: 1.6;
+  color: var(--color-text);
+}
+
 .link-records {
   text-align: center;
   color: var(--color-primary);

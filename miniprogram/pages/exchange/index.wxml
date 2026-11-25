@@ -48,6 +48,10 @@
     </view>
 
     <view class="btn-primary {{loading || !storeId || !storePicked ? 'disabled' : ''}}" bindtap="onSubmitTap">立即兑换</view>
+    <view class="exchange-result" wx:if="{{resultTitle}}">
+      <view class="exchange-result-title">{{resultTitle}}</view>
+      <view class="exchange-result-line" wx:for="{{resultLines}}" wx:key="*this">{{item}}</view>
+    </view>
     <view class="link-records" bindtap="goRecords">查看兑换记录 ›</view>
   </view>
 </view>

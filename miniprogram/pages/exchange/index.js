@@ -15,6 +15,8 @@ Page({
     storesLoading: true,
     loading: false,
     scanning: false,
+    resultTitle: '',
+    resultLines: [],
   },
 
   onLoad(options) {
@@ -36,6 +38,8 @@ Page({
       platformLabel,
       storeId: storeId ? Number(storeId) : this.data.storeId,
       code: '',
+      resultTitle: '',
+      resultLines: [],
     })
     wx.setNavigationBarTitle({ title: `${platformLabel}团购兑换` })
   },
@@ -137,10 +141,17 @@ Page({
       const { toDouyinSubmitCode } = require('./utils/voucherScan')
       code = toDouyinSubmitCode(inputCode)
     }
-    this.setData({ loading: true, code: inputCode })
+    this.setData({ loading: true, code: inputCode, resultTitle: '', resultLines: [] })
     wx.showLoading({ title: '连接核销中…', mask: true })
     const showAfterLoading = (fn) => {
-      wx.hideLoading({ complete: () => fn() })
+      let ran = false
+      const run = () => {
+        if (ran) return
+        ran = true
+        setTimeout(fn, 200)
+      }
+      wx.hideLoading({ complete: run, fail: run })
+      setTimeout(run, 500)
     }
     try {
       let result
@@ -156,22 +167,24 @@ Page({
         const reqUrl = `/exchange/meituan/${encodeURIComponent(code)}?store_id=${Number(storeId)}`
         result = await request({ url: reqUrl, method: 'POST', silent: true, timeout: 60000 })
       }
-      const lines = [`已核销到「${storeName || '所选门店'}」`, result.card_name || '期限卡']
-      if (result.validity_range) {
-        lines.push(`卡面效期 ${result.validity_range}`)
-      } else if (result.start_date && result.end_date) {
-        lines.push(`卡面效期 ${result.start_date} ~ ${result.end_date}`)
-      } else if (result.end_date) {
-        lines.push(`卡面效期至 ${result.end_date}`)
+      const payload = result && typeof result === 'object' ? result : {}
+      const lines = [`已核销到「${storeName || '所选门店'}」`, payload.card_name || '期限卡']
+      if (payload.validity_range) {
+        lines.push(`卡面效期 ${payload.validity_range}`)
+      } else if (payload.start_date && payload.end_date) {
+        lines.push(`卡面效期 ${payload.start_date} ~ ${payload.end_date}`)
+      } else if (payload.end_date) {
+        lines.push(`卡面效期至 ${payload.end_date}`)
       }
-      if (result.remaining_hours != null) {
-        lines.push(`含 ${result.remaining_hours} 小时`)
-      } else if (result.remaining_sessions != null) {
-        lines.push(`含 ${result.remaining_sessions} 次`)
+      if (payload.remaining_hours != null) {
+        lines.push(`含 ${payload.remaining_hours} 小时`)
+      } else if (payload.remaining_sessions != null) {
+        lines.push(`含 ${payload.remaining_sessions} 次`)
       }
+      this.setData({ loading: false, code: '', resultTitle: '核销成功', resultLines: lines })
       showAfterLoading(() => {
         wx.showModal({
-          title: '兑换成功',
+          title: '核销成功',
           content: lines.join('\n'),
           confirmText: '去选座预约',
           cancelText: '查看卡包',
@@ -182,9 +195,9 @@ Page({
             invalidateCache('/user/cards')
             if (res.confirm) {
               const billType =
-                result.card_type === 'night_monthly'
+                payload.card_type === 'night_monthly'
                   ? 'night'
-                  : result.card_type || 'hourly'
+                  : payload.card_type || 'hourly'
               wx.navigateTo({
                 url: `${routes.bookingIndex}?storeId=${storeId}&billType=${billType}`,
                 fail: () => wx.navigateTo({ url: routes.profileCards }),
