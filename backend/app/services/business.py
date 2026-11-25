@@ -407,6 +407,56 @@ def get_seat_status(db: Session, seat_id: int, at: datetime | None = None) -> st
     return "available"
 
 
+def get_seats_status_map(
+    db: Session, seats: list[Seat], at: datetime | None = None
+) -> dict[int, str]:
+    """批量计算多个座位在指定时刻的状态（消除逐座 N+1 查询）。"""
+    at = at or datetime.now()
+    result: dict[int, str] = {}
+    active_ids: list[int] = []
+    for seat in seats:
+        if seat.status != 1:
+            result[seat.id] = "disabled"
+        else:
+            active_ids.append(seat.id)
+    if not active_ids:
+        return result
+
+    window_end = at + timedelta(hours=2)
+    candidates = db.scalars(
+        select(Reservation).where(
+            Reservation.seat_id.in_(active_ids),
+            Reservation.pay_status == 1,
+            Reservation.status.in_([0, 1]),
+            Reservation.end_time > at,
+            Reservation.start_time < window_end,
+        )
+    ).all()
+
+    by_seat: dict[int, list[Reservation]] = {}
+    for res in candidates:
+        by_seat.setdefault(res.seat_id, []).append(res)
+
+    moment_end = at + timedelta(seconds=1)
+    for sid in active_ids:
+        rows = by_seat.get(sid)
+        if not rows:
+            result[sid] = "available"
+            continue
+        status = "available"
+        for res in rows:
+            if reservation_blocks_interval(res, at, moment_end):
+                status = "occupied" if res.status == 1 else "reserved"
+                break
+        if status == "available":
+            for res in rows:
+                if res.status == 0 and reservation_blocks_interval(res, at, window_end):
+                    status = "reserved"
+                    break
+        result[sid] = status
+    return result
+
+
 def find_available_seat(
     db: Session, store_id: int, start: datetime, end: datetime, seat_type: str | None = None
 ) -> Seat | None:
@@ -524,7 +574,11 @@ async def create_ble_keys_for_reservation(db: Session, reservation: Reservation)
         keys.append(ble_key)
         expire = int((reservation.end_time - datetime.now()).total_seconds()) + 3600
         if expire > 0:
-            cache_set(f"ble_key:{reservation.id}", lock_data, expire)
+            cache_set(
+                f"ble_key:{reservation.id}",
+                {"lockData": lock_data, "lockName": lock.lock_name},
+                expire,
+            )
     if keys:
         db.commit()
     return keys

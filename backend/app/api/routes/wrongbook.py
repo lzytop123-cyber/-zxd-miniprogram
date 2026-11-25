@@ -125,6 +125,10 @@ async def upload_image(
     if len(content) > MAX_IMAGE_BYTES:
         raise HTTPException(status_code=400, detail="图片不能超过 5MB")
 
+    from app.utils.image_opt import optimize_image_bytes
+
+    content, ext = optimize_image_bytes(content, max_dim=1200, quality=82, preferred_ext=ext)
+
     UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
     filename = f"{uuid.uuid4().hex}.{ext}"
     (UPLOAD_DIR / filename).write_bytes(content)

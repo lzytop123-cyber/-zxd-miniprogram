@@ -12,7 +12,7 @@
     </view>
 
     <view class="section-title inner" wx:if="{{usableCoupons.length}}">优惠券</view>
-    <picker wx:if="{{usableCoupons.length}}" mode="selector" range="{{usableCoupons}}" range-key="coupon_name" bindchange="selectCoupon">
+    <picker wx:if="{{usableCoupons.length}}" mode="selector" range="{{couponPickerItems}}" range-key="coupon_name" bindchange="selectCoupon">
       <view class="picker-row">
         {{selectedCouponId ? selectedCouponName : '选择优惠券'}}
       </view>

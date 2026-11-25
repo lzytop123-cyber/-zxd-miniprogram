@@ -1,13 +1,14 @@
 from datetime import datetime, timedelta
+import logging
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_admin, get_current_user
 from app.services.admin_access import assert_store_access, scope_store_id
-from app.core.redis_client import cache_get
+from app.core.redis_client import cache_get, cache_set
 from app.db.session import get_db
 from app.models import BleBatteryAlert, BleKey, BleLock, DoorLog, OpenType, Reservation, User
 from app.schemas.common import PageResult, ResponseModel
@@ -16,6 +17,7 @@ from app.services.business import TTLockService
 from app.services.booking import auto_checkin_reservation, reservation_unlock_allowed, reservation_unlock_message
 
 router = APIRouter(tags=["蓝牙"])
+logger = logging.getLogger(__name__)
 
 
 class DoorLogRequest(BaseModel):
@@ -64,7 +66,16 @@ def get_ble_key(
         raise HTTPException(status_code=400, detail=detail)
 
     cached = cache_get(f"ble_key:{reservation_id}")
-    if cached:
+    if isinstance(cached, dict) and cached.get("lockData"):
+        return ResponseModel(
+            data={
+                "reservationId": reservation_id,
+                "lockData": cached["lockData"],
+                "lockName": cached.get("lockName"),
+                "blePlugin": True,
+            }
+        )
+    if isinstance(cached, str) and cached:
         ble_key = db.scalar(
             select(BleKey).where(
                 BleKey.reservation_id == reservation_id,
@@ -73,11 +84,15 @@ def get_ble_key(
             )
         )
         lock = db.get(BleLock, ble_key.lock_id) if ble_key else None
+        lock_name = lock.lock_name if lock else None
+        expire = int((reservation.end_time - datetime.now()).total_seconds()) + 3600
+        if expire > 0:
+            cache_set(f"ble_key:{reservation_id}", {"lockData": cached, "lockName": lock_name}, expire)
         return ResponseModel(
             data={
                 "reservationId": reservation_id,
                 "lockData": cached,
-                "lockName": lock.lock_name if lock else None,
+                "lockName": lock_name,
                 "blePlugin": True,
             }
         )
@@ -93,11 +108,19 @@ def get_ble_key(
         raise HTTPException(status_code=404, detail="蓝牙钥匙未生成")
 
     lock = db.get(BleLock, ble_key.lock_id)
+    lock_name = lock.lock_name if lock else None
+    expire = int((reservation.end_time - datetime.now()).total_seconds()) + 3600
+    if expire > 0:
+        cache_set(
+            f"ble_key:{reservation_id}",
+            {"lockData": ble_key.lock_data, "lockName": lock_name},
+            expire,
+        )
     return ResponseModel(
         data={
             "reservationId": reservation_id,
             "lockData": ble_key.lock_data,
-            "lockName": lock.lock_name if lock else None,
+            "lockName": lock_name,
             "blePlugin": True,
         }
     )
@@ -141,8 +164,9 @@ async def remote_unlock_door(
             result = {"mock": True}
         else:
             result = await TTLockService.remote_unlock(str(lock.lock_id))
-    except ValueError as e:
-        raise HTTPException(status_code=502, detail=str(e)) from e
+    except Exception as e:
+        logger.warning("ttlock remote_unlock failed lock_id=%s res=%s: %s", lock.lock_id, reservation_id, e)
+        raise HTTPException(status_code=502, detail="远程开门失败，请检查门锁或联系店长") from e
 
     log = DoorLog(
         lock_id=ble_key.lock_id,
@@ -152,7 +176,7 @@ async def remote_unlock_door(
         result=1,
     )
     ble_key.used_at = datetime.now()
-    auto_checkin_reservation(db, reservation)
+    auto_checkin_reservation(db, reservation, allow_early=True)
     db.add(log)
     db.commit()
     return ResponseModel(message="开门成功", data={"result": result})
@@ -216,7 +240,7 @@ def report_door_log(
                 # 仅模拟锁在无真实上报时递减，便于演示电量告警；真实锁不臆造电量
                 lock.battery_level = max(lock.battery_level - 1, 0)
         if reservation:
-            auto_checkin_reservation(db, reservation)
+            auto_checkin_reservation(db, reservation, allow_early=True)
     db.add(log)
     db.commit()
     return ResponseModel(message="记录成功")
@@ -265,6 +289,7 @@ def admin_list_door_logs(
     result: int | None = Query(None, description="1成功 0失败"),
     date_from: str | None = Query(None, description="YYYY-MM-DD"),
     date_to: str | None = Query(None, description="YYYY-MM-DD"),
+    keyword: str | None = None,
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
     admin=Depends(get_current_admin),
@@ -280,6 +305,12 @@ def admin_list_door_logs(
         )
     if result is not None:
         query = query.where(DoorLog.result == result)
+    if keyword and keyword.strip():
+        kw = keyword.strip()
+        matched_user_ids = select(User.id).where(
+            or_(User.phone.contains(kw), User.nickname.contains(kw))
+        )
+        query = query.where(DoorLog.user_id.in_(matched_user_ids))
     if date_from:
         try:
             start = datetime.strptime(date_from, "%Y-%m-%d")
@@ -419,8 +450,9 @@ async def refresh_battery(
 
     try:
         ekey = await TTLockService.get_ekey(ttlock_id)
-    except ValueError as e:
-        raise HTTPException(status_code=502, detail=f"查询通通锁电量失败: {e}") from e
+    except Exception as e:
+        logger.warning("ttlock get_ekey failed lock_id=%s: %s", ttlock_id, e)
+        raise HTTPException(status_code=502, detail="查询门锁电量失败，请稍后重试") from e
 
     level = ekey.get("electricQuantity")
     if level is None:

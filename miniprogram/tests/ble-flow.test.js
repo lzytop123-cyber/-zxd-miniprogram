@@ -28,7 +28,7 @@ const flush=async()=>{for(let i=0;i<12;i++)await Promise.resolve()}
 async function run(){
   let h=setup();const op=h.page.openDoorBle();assert.equal(h.calls(),0)
   await h.page.openDoorBle();h.key();await flush();assert.equal(h.calls(),1)
-  h.timers.get(35000)();assert.equal(h.page.data.opening,true)
+  h.timers.get(35000)();assert.equal(h.page.data.opening,false);assert.equal(h.page.data.bleLocked,true)
   await h.page.openDoorBle();assert.equal(h.calls(),1)
   h.unlock();await op;assert.equal(h.page.data.opening,false)
   assert.equal(h.reports.filter(r=>r.data.result==='success').length,1)

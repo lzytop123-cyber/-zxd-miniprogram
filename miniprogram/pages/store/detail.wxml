@@ -1,4 +1,11 @@
-<view class="page-detail page-safe-bottom" wx:if="{{store}}">
+<view class="empty" wx:if="{{loading && !store}}" style="padding:120rpx 32rpx;text-align:center;color:#666;">
+  <view>正在加载门店信息…</view>
+</view>
+<view class="empty" wx:elif="{{loadError && !store}}" style="padding:120rpx 32rpx;text-align:center;color:#666;">
+  <view>{{loadError}}</view>
+  <view class="btn-primary" style="margin-top:28rpx;" bindtap="retryLoad">重新加载</view>
+</view>
+<view class="page-detail page-safe-bottom" wx:elif="{{store}}">
   <view class="hero">
     <view class="cover-placeholder" wx:if="{{!store.cover_images || !store.cover_images.length}}">
       <text>知行岛</text>

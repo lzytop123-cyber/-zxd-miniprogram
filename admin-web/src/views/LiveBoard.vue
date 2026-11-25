@@ -129,10 +129,11 @@
           class="seat"
           :class="[
             's-' + seat.state,
-            { 'not-checked': seat.info && !seat.info.checked_in },
+            { 'not-checked': seat.info && !seat.info.checked_in, 'seat--clickable': !!seat.info },
             popSide(seat),
           ]"
           :style="seatStyle(seat)"
+          @click="openSeatDetail(seat)"
         >
           <div class="code">{{ seat.seat_code }}</div>
           <template v-if="seat.info">
@@ -180,16 +181,81 @@
     <div class="legend">
       <span class="refresh">每 10 秒自动刷新 · 服务器 {{ data?.server_time || '-' }}</span>
     </div>
+
+    <el-dialog
+      v-model="seatDialogVisible"
+      :title="activeSeat ? `座位 ${activeSeat.seat_code} · ${activeSeat.zone_name}` : '座位详情'"
+      width="460px"
+      append-to-body
+    >
+      <template v-if="activeSeat?.info">
+        <el-descriptions :column="1" border size="small">
+          <el-descriptions-item label="学员">
+            <div class="detail-row">
+              <strong>{{ activeSeat.info.user }}</strong>
+              <el-tag :type="activeSeat.info.checked_in ? 'success' : 'warning'" size="small">
+                {{ activeSeat.info.checked_in ? '已入座' : '已预约未到店' }}
+              </el-tag>
+            </div>
+          </el-descriptions-item>
+          <el-descriptions-item label="手机号">
+            <div class="detail-row">
+              <span>{{ activeSeat.info.phone || '未绑定' }}</span>
+              <el-button
+                v-if="activeSeat.info.phone"
+                link
+                type="primary"
+                size="small"
+                @click="copyText(activeSeat.info.phone, '手机号')"
+              >复制</el-button>
+            </div>
+          </el-descriptions-item>
+          <el-descriptions-item label="订单号">
+            <div class="detail-row">
+              <span class="mono">{{ activeSeat.info.order_no }}</span>
+              <el-button
+                v-if="activeSeat.info.order_no"
+                link
+                type="primary"
+                size="small"
+                @click="copyText(activeSeat.info.order_no, '订单号')"
+              >复制</el-button>
+            </div>
+          </el-descriptions-item>
+          <el-descriptions-item label="套餐类型">{{ activeSeat.info.bill_type }}</el-descriptions-item>
+          <el-descriptions-item label="有效期">{{ activeSeat.info.period }}</el-descriptions-item>
+          <el-descriptions-item v-if="!activeSeat.info.is_hourly" label="预计离场">
+            今日 {{ activeSeat.info.leave_at }}
+          </el-descriptions-item>
+          <el-descriptions-item v-if="activeSeat.info.check_in" label="到店时间">
+            {{ activeSeat.info.check_in }}
+          </el-descriptions-item>
+        </el-descriptions>
+      </template>
+      <template #footer>
+        <el-button @click="seatDialogVisible = false">关闭</el-button>
+        <el-button v-if="activeSeat?.info?.order_no" @click="goOrder(activeSeat.info.order_no)">查看订单</el-button>
+        <el-button
+          v-if="activeSeat?.info"
+          type="primary"
+          :loading="unlocking"
+          @click="remoteUnlockActiveSeat"
+        >一键远程开门</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from 'vue'
-import { ElMessage } from 'element-plus'
+import { useRouter } from 'vue-router'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import http from '../api/http'
 import { useRequiredStoreId } from '../composables/useWorkingStore'
 import { resolveRequiredStoreId, setWorkingStoreId } from '../utils/workingStore'
 import { isHqAdmin } from '../utils/adminAuth'
+
+const router = useRouter()
 
 const stores = ref<any[]>([])
 const storeId = ref<number | null>(null)
@@ -263,6 +329,80 @@ function shortName(name: string) {
 const expiring = ref<any[]>([])
 const showExpiring = ref(false)
 const remindingId = ref<number | null>(null)
+const seatDialogVisible = ref(false)
+const activeSeat = ref<any>(null)
+const unlocking = ref(false)
+
+function openSeatDetail(seat: any) {
+  if (!seat?.info) return
+  activeSeat.value = seat
+  seatDialogVisible.value = true
+}
+
+async function copyText(text: string, label: string) {
+  if (!text) return
+  try {
+    if (navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(text)
+    } else {
+      const ta = document.createElement('textarea')
+      ta.value = text
+      ta.style.position = 'fixed'
+      ta.style.opacity = '0'
+      document.body.appendChild(ta)
+      ta.select()
+      document.execCommand('copy')
+      document.body.removeChild(ta)
+    }
+    ElMessage.success(`${label}已复制`)
+  } catch {
+    ElMessage.error(`复制${label}失败`)
+  }
+}
+
+function goOrder(orderNo: string) {
+  seatDialogVisible.value = false
+  if (document.fullscreenElement) {
+    void document.exitFullscreen?.()
+  }
+  router.push({ path: '/reservations', query: { keyword: orderNo } })
+}
+
+async function remoteUnlockActiveSeat() {
+  const seat = activeSeat.value
+  if (!seat?.info || unlocking.value) return
+  try {
+    await ElMessageBox.confirm(
+      `确定为座位 ${seat.seat_code}（${seat.info.user} · 订单 ${seat.info.order_no}）执行远程开门吗？`,
+      '一键远程开门',
+      { type: 'warning', confirmButtonText: '确认开门', cancelButtonText: '取消' },
+    )
+  } catch {
+    return
+  }
+  unlocking.value = true
+  try {
+    let reservationId = seat.info.reservation_id
+    if (!reservationId && seat.info.order_no) {
+      const lookup = await http.get('/admin/reservations', {
+        params: { order_no: seat.info.order_no, page: 1, page_size: 1 },
+      })
+      reservationId = lookup.data?.items?.[0]?.id
+    }
+    if (!reservationId) {
+      ElMessage.error('未找到关联预约订单，请点击「查看订单」处理')
+      return
+    }
+    const res = await http.post(`/admin/reservations/${reservationId}/remote-unlock`)
+    ElMessage.success(res.message || '远程开门成功')
+    seatDialogVisible.value = false
+    await load()
+  } catch (e: any) {
+    ElMessage.error(e?.response?.data?.detail || e?.message || '远程开门失败')
+  } finally {
+    unlocking.value = false
+  }
+}
 
 let boardRequest = 0
 let expiringRequest = 0
@@ -496,6 +636,7 @@ onUnmounted(() => {
   transition: transform 0.15s;
   cursor: default;
 }
+.seat--clickable { cursor: pointer; }
 .seat:hover { transform: translate(-50%, -50%) scale(1.08); z-index: 3; box-shadow: 0 8px 20px rgba(0,0,0,0.7); }
 .seat .code { font-weight: 700; font-size: clamp(11px, 1.35cqw, 15px); line-height: 1.1; }
 .seat .who { font-size: clamp(9px, 1.05cqw, 12px); opacity: 0.92; margin-top: 2px; max-width: 92%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -625,4 +766,6 @@ onUnmounted(() => {
 }
 .expire-panel :deep(.el-table__inner-wrapper::before) { display: none; }
 .expire-panel .phone { color: #8b95a1; margin-left: 8px; font-size: 12px; }
+.detail-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.detail-row .mono { font-family: 'Consolas', 'Menlo', monospace; }
 </style>

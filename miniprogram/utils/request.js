@@ -144,9 +144,10 @@ function rawRequest({ url, method = 'GET', data, silent = false, retries, timeou
           resolve(rawRequest({ url, method, data, silent, retries: maxRetries - 1, timeout, session, token }))
           return
         }
-        const msg = (err && (err.errMsg || err.message)) || '网络异常，请稍后重试'
+        const rawMsg = (err && (err.errMsg || err.message)) || ''
+        const msg = normalizeNetworkError(rawMsg)
         if (!silent) {
-          wx.showToast({ title: '网络异常，请稍后重试', icon: 'none' })
+          wx.showToast({ title: msg, icon: 'none' })
         }
         reject(toRequestError({ message: msg, errMsg: msg }, msg))
       },
@@ -177,14 +178,24 @@ function invalidateCache(match) {
   requestCache.invalidate(match)
 }
 
+function normalizeNetworkError(rawMsg) {
+  const s = String(rawMsg || '').trim()
+  if (!s) return '网络连接异常，请稍后重试'
+  if (/timeout|ERR_TIMED_OUT/i.test(s)) return '请求超时，请检查网络后重试'
+  if (/request:fail|ERR_INTERNET_DISCONNECTED|ERR_NAME_NOT_RESOLVED|ERR_CONNECTION|ERR_NETWORK|net::/i.test(s)) {
+    return '网络连接异常，请稍后重试'
+  }
+  return s
+}
+
 function formatRequestError(err) {
   if (!err) return '请求失败'
-  if (typeof err === 'string') return err
-  if (typeof err.detail === 'string') return err.detail
+  if (typeof err === 'string') return normalizeNetworkError(err)
+  if (typeof err.detail === 'string') return normalizeNetworkError(err.detail)
   if (typeof err.message === 'string' && err.message && err.message !== '[object Object]') {
-    return err.message
+    return normalizeNetworkError(err.message)
   }
-  if (typeof err.errMsg === 'string' && err.errMsg) return err.errMsg
+  if (typeof err.errMsg === 'string' && err.errMsg) return normalizeNetworkError(err.errMsg)
   if (err.detail && typeof err.detail === 'object') {
     try {
       return JSON.stringify(err.detail)
@@ -195,4 +206,4 @@ function formatRequestError(err) {
   return '请求失败'
 }
 
-module.exports = { request, invalidateCache, getErrorMessage, formatRequestError }
+module.exports = { request, invalidateCache, getErrorMessage, formatRequestError, normalizeNetworkError }

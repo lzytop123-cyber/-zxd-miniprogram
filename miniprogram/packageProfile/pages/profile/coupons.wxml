@@ -8,19 +8,29 @@
     <view style="font-size: 24rpx; color: #2D6A4F; font-weight: 600;" bindtap="goPoints">积分换券 ›</view>
   </view>
 
-  <view class="card coupon-item" style="{{item.status !== 0 ? 'opacity: 0.6; border-left-color: #9AA5A0;' : ''}}" wx:for="{{coupons}}" wx:key="id">
-    <view class="name">{{item.coupon_name}}</view>
-    <view class="info" wx:if="{{item.discount_type==='amount'}}">减 ¥{{item.discount_val}}</view>
-    <view class="info" wx:else>折扣 {{100 - item.discount_val}} 折</view>
-    <view class="info" wx:if="{{item.min_amount > 0}}">满 {{item.min_amount}} 元可用</view>
-    <view class="info">有效期至 {{item.expire_date || '长期'}}</view>
-    <view class="status" wx:if="{{item.status === 0}}" bindtap="goUse">去使用 ›</view>
-    <view class="status" wx:elif="{{item.status === 1}}" style="background:#EEF2F0;color:#666;">已使用</view>
-    <view class="status" wx:else style="background:#EEF2F0;color:#999;">已过期</view>
+  <view class="empty" wx:if="{{loading}}">
+    <view>正在加载优惠券…</view>
   </view>
-  <view class="empty" wx:if="{{!coupons.length}}">
-    <view class="empty-icon">🏷</view>
-    <view>{{tab === 0 ? '暂无可用优惠券' : (tab === 1 ? '暂无已使用优惠券' : '暂无过期优惠券')}}</view>
-    <view class="empty-hint" wx:if="{{tab === 0}}" bindtap="goPoints" style="color: #2D6A4F; font-weight: 600;">去用自习积分兑换立减券 ›</view>
+  <view class="empty" wx:elif="{{loadError && !allCoupons.length}}">
+    <view class="empty-icon">⚠️</view>
+    <view>{{loadError}}</view>
+    <view class="btn-primary" style="margin-top:24rpx;" bindtap="retryLoad">重新加载</view>
   </view>
+  <block wx:else>
+    <view class="card coupon-item" style="{{item.status !== 0 ? 'opacity: 0.6; border-left-color: #9AA5A0;' : ''}}" wx:for="{{coupons}}" wx:key="id">
+      <view class="name">{{item.coupon_name}}</view>
+      <view class="info" wx:if="{{item.discount_type==='amount'}}">减 ¥{{item.discount_val}}</view>
+      <view class="info" wx:else>折扣 {{100 - item.discount_val}} 折</view>
+      <view class="info" wx:if="{{item.min_amount > 0}}">满 {{item.min_amount}} 元可用</view>
+      <view class="info">有效期至 {{item.expire_date || '长期'}}</view>
+      <view class="status" wx:if="{{item.status === 0}}" bindtap="goUse">去使用 ›</view>
+      <view class="status" wx:elif="{{item.status === 1}}" style="background:#EEF2F0;color:#666;">已使用</view>
+      <view class="status" wx:else style="background:#EEF2F0;color:#999;">已过期</view>
+    </view>
+    <view class="empty" wx:if="{{!coupons.length}}">
+      <view class="empty-icon">🏷</view>
+      <view>{{tab === 0 ? '暂无可用优惠券' : (tab === 1 ? '暂无已使用优惠券' : '暂无过期优惠券')}}</view>
+      <view class="empty-hint" wx:if="{{tab === 0}}" bindtap="goPoints" style="color: #2D6A4F; font-weight: 600;">去用自习积分兑换立减券 ›</view>
+    </view>
+  </block>
 </view>

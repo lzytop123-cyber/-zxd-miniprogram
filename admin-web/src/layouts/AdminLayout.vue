@@ -71,22 +71,22 @@
           </div>
           <button class="search-btn" @click="openSearch">
             <el-icon><Search /></el-icon>
-            <span>搜索页面 / 用户 / 订单</span>
+            <span>快速跳转功能页面</span>
             <kbd>{{ macLike ? '⌘' : 'Ctrl' }} K</kbd>
           </button>
-          <el-popover placement="bottom-end" width="320" trigger="click">
+          <el-popover placement="bottom-end" width="320" trigger="click" @show="loadNotifications(false)">
             <template #reference>
               <button class="icon-btn notify"><el-icon><Bell /></el-icon><span v-if="notifyCount" class="notify-dot">{{ notifyCount }}</span></button>
             </template>
             <div class="notify-panel">
-              <div class="np-head"><b>通知</b><a @click="clearNotify">全部标记已读</a></div>
+              <div class="np-head"><b>待办提醒</b><a v-if="notifications.length" @click="clearNotify">全部忽略</a></div>
               <div v-if="notifications.length" class="np-list">
                 <a v-for="n in notifications" :key="n.id" class="np-item" @click="onNotify(n)">
                   <span class="np-icon" :class="n.kind"><el-icon><component :is="n.icon" /></el-icon></span>
                   <div><b>{{ n.title }}</b><i>{{ n.time }}</i></div>
                 </a>
               </div>
-              <div v-else class="np-empty">暂无未读通知</div>
+              <div v-else class="np-empty">暂无待办提醒</div>
             </div>
           </el-popover>
           <el-dropdown trigger="click" @command="onUserAction">
@@ -109,12 +109,12 @@
       <main class="content"><router-view /></main>
     </div>
 
-    <!-- 搜索命令面板（占位实现） -->
+    <!-- 搜索命令面板 -->
     <el-dialog v-model="searchOpen" width="min(560px, 92vw)" :show-close="false" class="cmdk-dialog">
       <template #header>
         <div class="cmdk-input">
           <el-icon><Search /></el-icon>
-          <input v-model="searchQuery" placeholder="搜索页面、订单、用户..." autofocus />
+          <input v-model="searchQuery" placeholder="快速跳转功能页面..." autofocus />
           <kbd>ESC</kbd>
         </div>
       </template>
@@ -141,7 +141,7 @@ import {
   Ticket, TrendCharts, User, Wallet, Warning,
 } from '@element-plus/icons-vue'
 import { adminSessionTick, canAccessPath, clearAdminSession, getAdminStoreName, isHqAdmin, setAdminPermissions } from '../utils/adminAuth'
-import { getWorkingStoreId, onWorkingStoreChange, setWorkingStoreId } from '../utils/workingStore'
+import { getWorkingStoreId, onWorkingStoreChange, setWorkingStoreId, workingStoreParams } from '../utils/workingStore'
 import http from '../api/http'
 
 const route = useRoute()
@@ -282,14 +282,91 @@ const pathIndex = computed(() => {
 })
 const crumb = computed(() => pathIndex.value.get(route.path) || { group: '', page: '页面' })
 
-// ============ 通知（模拟 UI） ============
-const notifications = ref([
-  { id: 1, title: '本月有 1 家门店座位未配置完整', time: '2 小时前', kind: 'warn', icon: Warning, link: '/seats' },
-  { id: 2, title: '收款管理有 3 笔核销待核对', time: '今日 09:12', kind: 'info', icon: Ticket, link: '/receipts' },
-])
+// ============ 实时运营提醒 ============
+type NotifyItem = { id: string; title: string; time: string; kind: 'warn' | 'info'; icon: any; link: string }
+const rawNotifications = ref<NotifyItem[]>([])
+const dismissedNotifyIds = ref(new Set<string>())
+const notifications = computed(() => rawNotifications.value.filter((n) => !dismissedNotifyIds.value.has(n.id)))
 const notifyCount = computed(() => notifications.value.length)
-function clearNotify() { notifications.value = []; ElMessage.success('已全部标记已读') }
-function onNotify(n: any) { router.push(n.link); notifications.value = notifications.value.filter(x => x.id !== n.id) }
+
+async function loadNotifications(resetDismissed = false) {
+  if (resetDismissed) dismissedNotifyIds.value = new Set()
+  const params = workingStoreParams()
+  const [todosRes, alertsRes, refundRes] = await Promise.allSettled([
+    http.get('/admin/stats/todos', { params }),
+    http.get('/admin/locks/alerts', { params }),
+    http.get('/admin/reservations', { params: { ...params, refund_pending: true, page: 1, page_size: 1 } }),
+  ])
+  const todos = todosRes.status === 'fulfilled' ? (todosRes.value.data || {}) : {}
+  const lockAlerts = alertsRes.status === 'fulfilled' && Array.isArray(alertsRes.value.data) ? alertsRes.value.data : []
+  const refundTotal = refundRes.status === 'fulfilled' ? Number(refundRes.value.data?.total || 0) : 0
+
+  const items: NotifyItem[] = []
+  const batteryCount = Math.max(Number(todos.unread_battery_alerts || 0), lockAlerts.length)
+  if (batteryCount > 0) {
+    items.push({
+      id: `low_battery:${batteryCount}`,
+      title: `有 ${batteryCount} 条门锁低电量告警`,
+      time: '请尽快检查并更换电池',
+      kind: 'warn',
+      icon: Warning,
+      link: '/locks',
+    })
+  }
+  const pendingRefunds = Number(todos.pending_refunds ?? refundTotal)
+  if (pendingRefunds > 0) {
+    items.push({
+      id: `pending_refunds:${pendingRefunds}`,
+      title: `有 ${pendingRefunds} 笔退款待确认`,
+      time: '点击前往预约订单重试或核对',
+      kind: 'warn',
+      icon: Wallet,
+      link: '/reservations?pay_status=refund_pending',
+    })
+  }
+  const unpaidOrders = Number(todos.unpaid_orders || 0)
+  if (unpaidOrders > 0) {
+    items.push({
+      id: `unpaid_orders:${unpaidOrders}`,
+      title: `有 ${unpaidOrders} 笔待付款订单`,
+      time: '预约提交但未支付',
+      kind: 'info',
+      icon: Ticket,
+      link: '/reservations?pay_status=0',
+    })
+  }
+  const pendingDeals = Number(todos.pending_deal_mappings || 0)
+  if (pendingDeals > 0) {
+    items.push({
+      id: `pending_deals:${pendingDeals}`,
+      title: `有 ${pendingDeals} 项团购待配置映射`,
+      time: '缺映射的团购券需补全',
+      kind: 'info',
+      icon: Setting,
+      link: '/deal-mappings',
+    })
+  }
+  const incompleteStores = Array.isArray(todos.incomplete_seat_stores) ? todos.incomplete_seat_stores.length : 0
+  if (incompleteStores > 0) {
+    items.push({
+      id: `incomplete_seats:${incompleteStores}`,
+      title: `有 ${incompleteStores} 家门店座位未配置完整`,
+      time: '前往座位管理补全布局',
+      kind: 'warn',
+      icon: Warning,
+      link: '/seats',
+    })
+  }
+  rawNotifications.value = items
+}
+
+function clearNotify() {
+  dismissedNotifyIds.value = new Set(rawNotifications.value.map((n) => n.id))
+  ElMessage.success('已忽略当前提醒')
+}
+function onNotify(n: NotifyItem) {
+  router.push(n.link)
+}
 
 // ============ 用户操作 ============
 function onUserAction(cmd: string) {
@@ -335,9 +412,13 @@ async function refreshSessionPermissions() {
 let stopWorkingStoreSync: (() => void) | undefined
 onMounted(() => {
   window.addEventListener('keydown', onKey)
-  stopWorkingStoreSync = onWorkingStoreChange((id) => { workingStore.value = id || 0 })
+  stopWorkingStoreSync = onWorkingStoreChange((id) => {
+    workingStore.value = id || 0
+    void loadNotifications(true)
+  })
   void loadStoreOptions()
   void refreshSessionPermissions()
+  void loadNotifications(true)
 })
 onUnmounted(() => {
   window.removeEventListener('keydown', onKey)

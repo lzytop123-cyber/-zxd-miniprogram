@@ -96,6 +96,9 @@ class RewardType(str, enum.Enum):
 
 class User(Base):
     __tablename__ = "users"
+    __table_args__ = (
+        Index("ix_users_invited_by", "invited_by"),
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     openid: Mapped[str] = mapped_column(String(64), unique=True, nullable=False)
@@ -201,6 +204,9 @@ class StoreSeatMap(Base):
 
 class Zone(Base):
     __tablename__ = "zones"
+    __table_args__ = (
+        Index("ix_zones_store_id", "store_id"),
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     store_id: Mapped[int] = mapped_column(Integer, ForeignKey("stores.id"), nullable=False)
@@ -214,6 +220,9 @@ class Zone(Base):
 
 class Seat(Base):
     __tablename__ = "seats"
+    __table_args__ = (
+        Index("ix_seats_store_id", "store_id"),
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     store_id: Mapped[int] = mapped_column(Integer, ForeignKey("stores.id"), nullable=False)
@@ -234,6 +243,9 @@ class Seat(Base):
 
 class PricingRule(Base):
     __tablename__ = "pricing_rules"
+    __table_args__ = (
+        Index("ix_pricing_rules_store_active", "store_id", "is_active"),
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     store_id: Mapped[int] = mapped_column(Integer, ForeignKey("stores.id"), nullable=False)
@@ -256,6 +268,8 @@ class Reservation(Base):
     __table_args__ = (
         Index("ix_reservations_seat_time", "seat_id", "start_time", "end_time"),
         Index("ix_reservations_user", "user_id"),
+        Index("ix_reservations_user_created", "user_id", "created_at"),
+        Index("ix_reservations_status_end", "status", "end_time"),
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
@@ -286,6 +300,9 @@ class Reservation(Base):
 
 class PeriodCard(Base):
     __tablename__ = "period_cards"
+    __table_args__ = (
+        Index("ix_period_cards_user_status", "user_id", "status"),
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     user_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"), nullable=False)
@@ -345,6 +362,9 @@ class RechargeOrder(Base):
 
 class Coupon(Base):
     __tablename__ = "coupons"
+    __table_args__ = (
+        Index("ix_coupons_user_status", "user_id", "status"),
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     user_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"), nullable=False)
@@ -374,6 +394,9 @@ class WalletLog(Base):
 
 class PointLog(Base):
     __tablename__ = "point_logs"
+    __table_args__ = (
+        Index("ix_point_logs_user_created", "user_id", "created_at"),
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     user_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"), nullable=False)
@@ -438,6 +461,9 @@ class AssistantChatLog(Base):
 
 class BleLock(Base):
     __tablename__ = "ble_locks"
+    __table_args__ = (
+        Index("ix_ble_locks_store_id", "store_id"),
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     store_id: Mapped[int] = mapped_column(Integer, ForeignKey("stores.id"), nullable=False)
@@ -456,6 +482,9 @@ class BleLock(Base):
 
 class BleKey(Base):
     __tablename__ = "ble_keys"
+    __table_args__ = (
+        Index("ix_ble_keys_res_user", "reservation_id", "user_id"),
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     lock_id: Mapped[int] = mapped_column(Integer, ForeignKey("ble_locks.id"), nullable=False)
@@ -473,6 +502,9 @@ class BleKey(Base):
 
 class DoorLog(Base):
     __tablename__ = "door_logs"
+    __table_args__ = (
+        Index("ix_door_logs_lock_opened", "lock_id", "opened_at"),
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     lock_id: Mapped[int] = mapped_column(Integer, ForeignKey("ble_locks.id"), nullable=False)

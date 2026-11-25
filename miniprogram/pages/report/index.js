@@ -1,4 +1,5 @@
 const { request } = require('../../utils/request')
+const auth = require('../../utils/auth')
 const { handleTabScroll } = require('../../utils/tabbar')
 const { syncTabBar, isStudyAssistantEnabled, leaveStudyAssistantIfDisabled } = require('../../utils/features')
 const { enableShareMenu, shareAppMessage, shareTimeline } = require('../../utils/share')
@@ -49,6 +50,7 @@ Page({
   data: {
     tab: 'assistant',
     blocked: false,
+    notLoggedIn: false,
 
     // 学习报告
     summary: null,
@@ -108,7 +110,14 @@ Page({
     }
     this.setData({ blocked: false })
     this._tabbarLastTop = 0
-    this.load({ silent: true })
+    if (typeof auth.isLoggedIn === 'function' && !auth.isLoggedIn()) {
+      this.setData({ notLoggedIn: true, reportLoading: false, reportError: '' })
+      return
+    }
+    this.setData({ notLoggedIn: false })
+    if (this.data.tab === 'report') {
+      this.load({ silent: true })
+    }
     if (this.data.tab === 'assistant' && !this.data.introLoaded) {
       this.loadIntro()
     }
@@ -117,8 +126,23 @@ Page({
     }
   },
 
+  goLogin() {
+    if (typeof auth.goLogin === 'function') {
+      auth.goLogin('/pages/report/index')
+    } else if (routes.profileLogin) {
+      wx.navigateTo({ url: `${routes.profileLogin}?redirect=${encodeURIComponent('/pages/report/index')}` })
+    }
+  },
+
   onPullDownRefresh() {
-    const tasks = [this.load({ force: true })]
+    if (typeof auth.isLoggedIn === 'function' && !auth.isLoggedIn()) {
+      wx.stopPullDownRefresh()
+      return
+    }
+    const tasks = []
+    if (this.data.tab === 'report') {
+      tasks.push(this.load({ force: true }))
+    }
     if (this.data.tab === 'assistant') {
       this.setData({ introLoaded: false })
       tasks.push(this.loadIntro({ force: true }))
@@ -273,13 +297,22 @@ Page({
       })
   },
 
-  /** 解析「本店」对应的门店 id（取门店列表首个，结果缓存）。 */
+  /** 解析「本店」对应的门店 id（优先取用户最近选择的门店，否则取门店列表首个）。 */
   resolveStoreId() {
-    if (this._storeId) return Promise.resolve(this._storeId)
+    let savedId = null
+    try {
+      const v = wx.getStorageSync('lastSelectedStoreId')
+      if (v) savedId = Number(v) || null
+    } catch (_) {}
+    if (this._storeId && (!savedId || Number(this._storeId) === savedId)) {
+      return Promise.resolve(this._storeId)
+    }
     return request({ url: '/store/list', silent: true })
       .then((list) => {
-        const first = Array.isArray(list) && list.length ? list[0] : null
-        this._storeId = first ? first.id : null
+        const stores = Array.isArray(list) ? list : []
+        const matched = savedId ? stores.find((s) => Number(s.id) === savedId) : null
+        const picked = matched || (stores.length ? stores[0] : null)
+        this._storeId = picked ? picked.id : null
         return this._storeId
       })
   },
@@ -288,6 +321,10 @@ Page({
     const tab = e.currentTarget.dataset.tab
     if (tab === this.data.tab) return
     this.setData({ tab })
+    if (typeof auth.isLoggedIn === 'function' && !auth.isLoggedIn()) return
+    if (tab === 'report') {
+      this.load({ silent: true })
+    }
     if (tab === 'assistant' && !this.data.introLoaded) {
       this.loadIntro()
     }
@@ -415,21 +452,31 @@ Page({
     this.sendMessage(text)
   },
 
-  sendMessage(text) {
-    this._seq = (this._seq || 0) + 1
-    const messages = this.data.messages.concat({ _id: `m${this._seq}`, role: 'user', content: text })
+  sendMessage(text, options = {}) {
+    if (typeof auth.isLoggedIn === 'function' && !auth.isLoggedIn()) {
+      this.goLogin()
+      return
+    }
+    let messages = this.data.messages || []
+    if (!options.isRetry) {
+      this._seq = (this._seq || 0) + 1
+      messages = messages.concat({ _id: `m${this._seq}`, role: 'user', content: text })
+    }
     this.setData({ messages, draft: '', loading: true })
     this.scrollToBottom()
 
-    const payload = messages.map((m) => ({ role: m.role, content: m.content }))
+    const payload = messages
+      .filter((m) => !m.isError)
+      .map((m) => ({ role: m.role, content: m.content }))
     request({
       url: '/assistant/chat',
       method: 'POST',
       data: { messages: payload },
       silent: true,
+      timeout: 60000,
     })
       .then((res) => {
-        this._seq += 1
+        this._seq = (this._seq || 0) + 1
         this.setData({
           messages: this.data.messages.concat({ _id: `m${this._seq}`, role: 'assistant', content: res.reply }),
           loading: false,
@@ -437,17 +484,29 @@ Page({
         this.scrollToBottom()
       })
       .catch(() => {
-        this._seq += 1
+        this._seq = (this._seq || 0) + 1
         this.setData({
           messages: this.data.messages.concat({
             _id: `m${this._seq}`,
             role: 'assistant',
             content: '网络有点问题，没能回复你，请稍后再试～',
+            isError: true,
+            retryText: text,
           }),
           loading: false,
         })
         this.scrollToBottom()
       })
+  },
+
+  retryChatMessage(e) {
+    if (this.data.loading) return
+    const id = e.currentTarget.dataset.id
+    const target = (this.data.messages || []).find((m) => m._id === id)
+    if (!target) return
+    const cleaned = (this.data.messages || []).filter((m) => m._id !== id)
+    this.setData({ messages: cleaned })
+    this.sendMessage(target.retryText || '', { isRetry: true })
   },
 
   scrollToBottom() {

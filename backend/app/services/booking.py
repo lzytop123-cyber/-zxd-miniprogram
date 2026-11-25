@@ -322,16 +322,48 @@ def seat_options_for_change(db: Session, reservation: Reservation, *, for_admin:
         key=lambda s: seat_code_to_slot(s.seat_code) or 9999,
     )
 
-    options: list[dict] = []
+    from app.services.business import reservation_blocks_interval
+
+    eligible_seats: list[Seat] = []
+    expected_codes_set: set[str] | None = None
+    if not image_mode:
+        from app.services.seat_setup import expected_seat_codes
+        expected_codes_set = set(expected_seat_codes())
+
     for seat in seats:
         if image_mode:
             if allowed_ids is not None and seat.id not in allowed_ids and seat.id != reservation.seat_id:
                 continue
         else:
-            from app.services.seat_setup import expected_seat_codes
-
-            if seat.seat_code not in set(expected_seat_codes()) and seat.id != reservation.seat_id:
+            if expected_codes_set is not None and seat.seat_code not in expected_codes_set and seat.id != reservation.seat_id:
                 continue
+        eligible_seats.append(seat)
+
+    check_ids = [
+        s.id for s in eligible_seats if s.id != reservation.seat_id and s.status == 1
+    ]
+    conflict_by_seat: dict[int, Reservation] = {}
+    if check_ids:
+        now_dt = datetime.now()
+        cand_rows = db.scalars(
+            select(Reservation).where(
+                Reservation.seat_id.in_(check_ids),
+                Reservation.status.in_([0, 1]),
+                Reservation.pay_status == 1,
+                Reservation.end_time > now_dt,
+                Reservation.start_time < reservation.end_time,
+                Reservation.end_time > reservation.start_time,
+                Reservation.id != reservation.id,
+            )
+        ).all()
+        for cand in cand_rows:
+            if cand.seat_id in conflict_by_seat:
+                continue
+            if reservation_blocks_interval(cand, reservation.start_time, reservation.end_time):
+                conflict_by_seat[cand.seat_id] = cand
+
+    options: list[dict] = []
+    for seat in eligible_seats:
         if image_mode:
             zone_name = zone_names.get(seat.zone_id) or "-"
         else:
@@ -355,13 +387,7 @@ def seat_options_for_change(db: Session, reservation: Reservation, *, for_admin:
             base["reason"] = "座位已停用"
             options.append(base)
             continue
-        conflict = seat_conflict_excluding(
-            db,
-            seat.id,
-            reservation.start_time,
-            reservation.end_time,
-            exclude_reservation_id=reservation.id,
-        )
+        conflict = conflict_by_seat.get(seat.id)
         if conflict:
             if for_admin:
                 occupant = _occupant_brief(db, conflict)
@@ -504,17 +530,19 @@ def fulfill_recharge_order(db: Session, order, *, success_time: str | None = Non
 
 
 EARLY_CHECKIN_MINUTES = 15
+LATE_EXIT_MINUTES = 15
 
 
 def reservation_open_window(
     reservation: Reservation,
     now: datetime | None = None,
 ) -> tuple[datetime, datetime] | None:
-    """当日允许开门/入座的时间窗（营业时间与预约时段的交集）。"""
+    """当日允许开门/入座的时间窗（营业时间与预约时段的交集，含提前入座与离场宽限）。"""
     now = now or datetime.now()
     today = now.date()
     res_start = reservation.start_time
     res_end = reservation.end_time
+    res_end_grace = res_end + timedelta(minutes=LATE_EXIT_MINUTES)
 
     if today < res_start.date() or today > res_end.date():
         return None
@@ -529,13 +557,13 @@ def reservation_open_window(
 
     if res_start.date() == res_end.date() == today:
         open_from = max(day_open, res_start - timedelta(minutes=EARLY_CHECKIN_MINUTES))
-        open_until = min(day_close, res_end)
+        open_until = min(day_close, res_end_grace)
     elif res_start.date() == today:
         open_from = max(day_open, res_start - timedelta(minutes=EARLY_CHECKIN_MINUTES))
         open_until = day_close
     elif res_end.date() == today:
         open_from = day_open
-        open_until = min(day_close, res_end)
+        open_until = min(day_close, res_end_grace)
     else:
         open_from = day_open
         open_until = day_close
@@ -556,12 +584,14 @@ def reservation_unlock_message(reservation: Reservation, now: datetime | None = 
         return "订单已结束"
     if now.date() < reservation.start_time.date():
         return f"{reservation.start_time.strftime('%m月%d日')} 起可开门"
-    if now.date() > reservation.end_time.date():
+    if now > reservation.end_time + timedelta(minutes=LATE_EXIT_MINUTES):
         return "订单已结束"
 
     window = reservation_open_window(reservation, now)
-    if window and window[0] <= now <= window[1]:
-        return ""
+    if window:
+        if window[0] <= now <= window[1]:
+            return ""
+        return f"{window[0].strftime('%H:%M')}-{window[1].strftime('%H:%M')} 可开门"
 
     today = now.date()
     if reservation.bill_type in (BillType.night, BillType.night_monthly):
@@ -606,6 +636,12 @@ def finalize_expired_reservation(
         user = db.get(User, reservation.user_id)
         if user:
             record_study_on_checkout(db, reservation, user)
+        try:
+            from app.services.subscribe_notify import send_checkout_notify
+
+            send_checkout_notify(db, reservation)
+        except Exception:
+            logger.warning("checkout notify error res=%s", reservation.id, exc_info=True)
     else:
         reservation.status = 3
         if reservation.pay_status == 0 and reservation.paid_at is None:
@@ -623,10 +659,13 @@ def auto_checkin_reservation(
     reservation: Reservation,
     *,
     when: datetime | None = None,
+    allow_early: bool = False,
 ) -> bool:
-    """预约时段内自动入座，无需用户手动签到。"""
+    """预约时段内自动入座，无需用户手动签到（默认仅在开始时间到达后自动入座）。"""
     when = when or datetime.now()
     if reservation.pay_status != 1 or reservation.status != 0:
+        return False
+    if not allow_early and when < reservation.start_time:
         return False
     window = reservation_open_window(reservation, when)
     if not window or not (window[0] <= when <= window[1]):
@@ -684,18 +723,29 @@ CARD_SOURCE_LABELS = {
 }
 
 
-def reservation_display_meta(db: Session, reservation: Reservation) -> dict:
+def reservation_display_meta(
+    db: Session,
+    reservation: Reservation,
+    *,
+    seat: Seat | None = None,
+    zones_map: dict[int, Zone] | None = None,
+    cards_map: dict[int, PeriodCard] | None = None,
+) -> dict:
     """订单列表展示：套餐类型、用卡、支付来源、座位区域。"""
     bill_label = BILL_TYPE_LABELS.get(reservation.bill_type, reservation.bill_type.value)
 
-    seat = db.get(Seat, reservation.seat_id)
+    seat_obj = seat if seat is not None else db.get(Seat, reservation.seat_id)
     zone_name = None
-    if seat:
+    if seat_obj:
         from app.services.seat_setup import seat_code_to_slot, zone_name_by_slot
 
-        zone_name = zone_name_by_slot(seat_code_to_slot(seat.seat_code))
-        if not zone_name and seat.zone_id:
-            zone = db.get(Zone, seat.zone_id)
+        zone_name = zone_name_by_slot(seat_code_to_slot(seat_obj.seat_code))
+        if not zone_name and seat_obj.zone_id:
+            zone = (
+                zones_map.get(seat_obj.zone_id)
+                if zones_map is not None
+                else db.get(Zone, seat_obj.zone_id)
+            )
             zone_name = zone.name if zone else None
 
     card_name = None
@@ -712,11 +762,14 @@ def reservation_display_meta(db: Session, reservation: Reservation) -> dict:
     elif reservation.pay_type == PayType.balance:
         pay_source_label = "余额支付"
     elif reservation.pay_type == PayType.period_card or reservation.period_card_id:
-        card = (
-            db.get(PeriodCard, reservation.period_card_id)
-            if reservation.period_card_id
-            else None
-        )
+        if reservation.period_card_id:
+            card = (
+                cards_map.get(reservation.period_card_id)
+                if cards_map is not None
+                else db.get(PeriodCard, reservation.period_card_id)
+            )
+        else:
+            card = None
         if card:
             card_name = card.card_name
             card_type_label = CARD_TYPE_LABELS.get(card.card_type, "期限卡")
@@ -775,9 +828,107 @@ def reservation_status_display(
     return "已结束", "预约时段已结束"
 
 
+def calc_extend_price(
+    db: Session,
+    reservation: Reservation,
+    extra_hours: int,
+) -> Decimal:
+    """计算在线续时费用：优先按门店按小时定价规则，否则按原订单均价估算。"""
+    seat = db.get(Seat, reservation.seat_id)
+    seat_type = (seat.seat_type if seat and seat.seat_type else "standard")
+    rule = db.scalar(
+        select(PricingRule).where(
+            PricingRule.store_id == reservation.store_id,
+            PricingRule.bill_type == BillType.hourly,
+            PricingRule.seat_type == seat_type,
+            PricingRule.is_active == 1,
+        )
+    )
+    if not rule and seat_type != "standard":
+        rule = db.scalar(
+            select(PricingRule).where(
+                PricingRule.store_id == reservation.store_id,
+                PricingRule.bill_type == BillType.hourly,
+                PricingRule.seat_type == "standard",
+                PricingRule.is_active == 1,
+            )
+        )
+    if rule:
+        return (Decimal(str(rule.price)) * Decimal(extra_hours)).quantize(Decimal("0.01"))
+    if reservation.original_price and reservation.duration_hours and reservation.duration_hours > 0:
+        unit = Decimal(str(reservation.original_price)) / Decimal(str(reservation.duration_hours))
+        return (unit * Decimal(extra_hours)).quantize(Decimal("0.01"))
+    raise ValueError("门店未配置按小时续时价格，请联系店长")
+
+
+def extend_reservation_with_balance(
+    db: Session,
+    reservation: Reservation,
+    user: User,
+    extra_hours: int,
+) -> Decimal:
+    """使用余额为预约续时：校验冲突、原子扣款、延长结束时间与蓝牙钥匙有效期。"""
+    from app.core.redis_client import cache_delete
+    from app.models import BleKey
+
+    now = datetime.now()
+    if reservation.pay_status != 1:
+        raise ValueError("仅已付款订单可续时")
+    if reservation.status not in (0, 1):
+        raise ValueError("当前订单状态不可续时")
+    if reservation.end_time <= now - timedelta(minutes=LATE_EXIT_MINUTES):
+        raise ValueError("预约已结束，不可续时")
+
+    new_end_time = reservation.end_time + timedelta(hours=extra_hours)
+    conflict = seat_conflict_excluding(
+        db,
+        reservation.seat_id,
+        reservation.end_time,
+        new_end_time,
+        exclude_reservation_id=reservation.id,
+    )
+    if conflict:
+        raise ValueError("该座位后续时段已被预约，无法续时")
+
+    extra_amount = calc_extend_price(db, reservation, extra_hours)
+    if extra_amount > 0:
+        if user.balance < extra_amount:
+            raise ValueError("余额不足，请先充值后再续时")
+        try:
+            add_wallet_log(
+                db,
+                user,
+                "consume",
+                extra_amount,
+                f"预约续时{extra_hours}小时-{reservation.order_no}",
+                reservation.order_no,
+            )
+        except ValueError as exc:
+            raise ValueError("余额不足，请先充值后再续时") from exc
+
+    reservation.end_time = new_end_time
+    reservation.duration_hours = (reservation.duration_hours or Decimal("0")) + Decimal(extra_hours)
+    reservation.original_price = (reservation.original_price or Decimal("0")) + extra_amount
+    reservation.final_price = (reservation.final_price or Decimal("0")) + extra_amount
+
+    ble_keys = db.scalars(
+        select(BleKey).where(BleKey.reservation_id == reservation.id, BleKey.status == 1)
+    ).all()
+    for key in ble_keys:
+        key.end_time = new_end_time + timedelta(minutes=LATE_EXIT_MINUTES)
+    cache_delete(f"ble_key:{reservation.id}")
+    return extra_amount
+
+
 async def finalize_reservation_after_pay(db: Session, reservation: Reservation) -> None:
     from app.services.business import create_ble_keys_for_reservation
 
     await create_ble_keys_for_reservation(db, reservation)
     auto_checkin_reservation(db, reservation)
+    try:
+        from app.services.subscribe_notify import send_booking_confirm_notify
+
+        send_booking_confirm_notify(db, reservation)
+    except Exception:
+        logger.warning("booking confirm notify error res=%s", reservation.id, exc_info=True)
     db.commit()

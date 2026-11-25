@@ -412,6 +412,7 @@ test('a late active-order failure cannot replace a newer successful refresh', as
 test('a failed report request is shown as an error instead of an empty report', async () => {
   const definition = loadPage('pages/report/index.js', {
     '../../utils/request': { request: async () => { throw new Error('offline') } },
+    '../../utils/auth': { isLoggedIn: () => true },
     '../../utils/tabbar': { handleTabScroll() {} },
     '../../utils/features': { syncTabBar() {}, isStudyAssistantEnabled: () => true, leaveStudyAssistantIfDisabled() {} },
     '../../utils/share': { enableShareMenu() {}, shareAppMessage() {}, shareTimeline() {} },
@@ -431,6 +432,7 @@ test('a failed store lookup never labels the global leaderboard as the local sto
   const calls = []
   const definition = loadPage('pages/report/index.js', {
     '../../utils/request': { request: async (options) => { calls.push(options.url); throw new Error('offline') } },
+    '../../utils/auth': { isLoggedIn: () => true },
     '../../utils/tabbar': { handleTabScroll() {} },
     '../../utils/features': { syncTabBar() {}, isStudyAssistantEnabled: () => true, leaveStudyAssistantIfDisabled() {} },
     '../../utils/share': { enableShareMenu() {}, shareAppMessage() {}, shareTimeline() {} },

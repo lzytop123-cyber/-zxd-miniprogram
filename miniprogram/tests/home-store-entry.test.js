@@ -34,10 +34,11 @@ test('study booking opens the dedicated store page', () => {
   assert.deepEqual(calls, ['/pages/store/select'])
 })
 
-test('opening home requests location for store distance', async () => {
+test('opening home loads bootstrap immediately without blocking on location', async () => {
   let definition
   const filename = path.join(__dirname, '../pages/home/index.js')
   const urls = []
+  let locationCalled = false
   const stubs = {
     '../../utils/request': {
       request: async ({ url }) => {
@@ -52,7 +53,10 @@ test('opening home requests location for store distance', async () => {
     '../../utils/features': { syncTabBar() {}, setFeatures() {}, isMarketplaceEnabled: () => false },
     '../../utils/share': { enableShareMenu() {}, savePendingInvite() {}, shareAppMessage() {}, shareTimeline() {} },
     '../../utils/location': {
-      getUserLocation: async () => ({ latitude: 30.1, longitude: 120.2 }),
+      getUserLocation: async () => {
+        locationCalled = true
+        return { latitude: 30.1, longitude: 120.2 }
+      },
       isLocationDenied: async () => false,
       formatDistance: () => '',
     },
@@ -78,5 +82,6 @@ test('opening home requests location for store distance', async () => {
   await page.loadBootstrap()
 
   assert.equal(page.data.storesLoading, false)
-  assert.ok(urls.some((url) => url.includes('latitude=30.1') && url.includes('longitude=120.2')))
+  assert.equal(locationCalled, false)
+  assert.ok(urls.includes('/home/bootstrap'))
 })

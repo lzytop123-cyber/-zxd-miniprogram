@@ -143,6 +143,20 @@ def remind_card_expire_job():
         db.close()
 
 
+def remind_expiring_reservations_job():
+    db = SessionLocal()
+    try:
+        from app.services.subscribe_notify import remind_expiring_reservations
+
+        result = remind_expiring_reservations(db)
+        if result.get("sent") or result.get("failed"):
+            logger.info("expiring reservation remind: %s", result)
+    except Exception:
+        logger.exception("expiring reservation remind job failed")
+    finally:
+        db.close()
+
+
 def _acquire_leadership() -> bool:
     """抢占调度领导权（分布式锁）。抢到的实例负责跑定时任务。"""
     try:
@@ -206,6 +220,7 @@ def start_scheduler():
     scheduler.add_job(_run_as_leader, "interval", args=[cancel_unpaid_orders], minutes=5)
     scheduler.add_job(_run_as_leader, "interval", args=[expire_finished_orders], minutes=5)
     scheduler.add_job(_run_as_leader, "interval", args=[auto_checkin_due_orders], minutes=1)
+    scheduler.add_job(_run_as_leader, "interval", args=[remind_expiring_reservations_job], minutes=2)
     scheduler.add_job(_run_as_leader, "interval", args=[check_ble_battery], hours=1)
     scheduler.add_job(_run_as_leader, "interval", args=[health_alert_job], minutes=5)
     scheduler.add_job(_run_as_leader, "cron", args=[remind_card_expire_job], hour=10, minute=0)

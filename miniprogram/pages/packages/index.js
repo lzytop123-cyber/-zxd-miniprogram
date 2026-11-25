@@ -28,6 +28,7 @@ Page({
     buying: false,
     detailVisible: false,
     detail: null,
+    canUseBalance: true,
     buyLoaded: false,
   },
 
@@ -45,10 +46,6 @@ Page({
     this._tabbarLastTop = 0
     this.setData({ loggedIn: auth.isLoggedIn() })
     this.refreshPage({ silent: true })
-    if (auth.isLoggedIn()) {
-      // 进入套餐页时尝试续期订阅授权（无模板 ID 时静默跳过）
-      requestCardExpireSubscribe()
-    }
   },
 
   onPageScroll(e) {
@@ -82,12 +79,18 @@ Page({
     return request({ url: '/store/list', silent: true, force })
       .then((stores) => {
         const list = stores || []
-        const storeId = this.data.storeId || list[0]?.id || null
-        const store = list.find((s) => s.id === storeId) || list[0]
+        let savedStoreId = null
+        try {
+          const v = wx.getStorageSync('lastSelectedStoreId')
+          if (v) savedStoreId = Number(v) || null
+        } catch (_) {}
+        const storeId = this.data.storeId || savedStoreId || list[0]?.id || null
+        const store = list.find((s) => Number(s.id) === Number(storeId)) || list[0]
         this.setData({
           stores: list,
           storeId: store?.id || null,
           storeName: store?.name || '',
+          canUseBalance: !(store && store.benefits_isolated),
           buyLoaded: true,
         })
         if (store?.id) return this.loadPackages(store.id, { force, silent: silent || hasStores })
@@ -106,9 +109,13 @@ Page({
     const idx = Number(e.detail.value)
     const store = this.data.stores[idx]
     if (!store) return
+    try {
+      wx.setStorageSync('lastSelectedStoreId', store.id)
+    } catch (_) {}
     this.setData({
       storeId: store.id,
       storeName: store.name,
+      canUseBalance: !store.benefits_isolated,
       activeCategory: 'all',
       packages: [],
       displayPackages: [],
@@ -170,7 +177,12 @@ Page({
     const idx = Number(e.currentTarget.dataset.index)
     const pkg = this.data.displayPackages[idx]
     if (!pkg) return
-    this.setData({ detailVisible: true, detail: buildPackageDetail(pkg) })
+    const store = (this.data.stores || []).find((s) => Number(s.id) === Number(this.data.storeId))
+    this.setData({
+      detailVisible: true,
+      detail: buildPackageDetail(pkg),
+      canUseBalance: !(store && store.benefits_isolated),
+    })
   },
 
   closeDetail() {
@@ -180,9 +192,8 @@ Page({
   noop() {},
 
   goExchange() {
-    const { buildExchangeUrl } = require('../exchange/utils/storePick')
     wx.navigateTo({
-      url: buildExchangeUrl({ storeId: this.data.storeId }),
+      url: routes.buildExchangeUrl({ storeId: this.data.storeId }),
     })
   },
 
@@ -212,6 +223,11 @@ Page({
     const billType = this.data.detail?.bill_type
     const payType = e?.currentTarget?.dataset?.pay || 'wechat'
     if (!billType) return
+    const store = (this.data.stores || []).find((s) => Number(s.id) === Number(this.data.storeId))
+    if (payType === 'balance' && (store?.benefits_isolated || !this.data.canUseBalance)) {
+      wx.showToast({ title: '该门店暂不支持余额支付', icon: 'none' })
+      return
+    }
     if (!auth.requireLogin('/pages/packages/index')) return
     this.closeDetail()
     this.doPurchase(billType, payType)

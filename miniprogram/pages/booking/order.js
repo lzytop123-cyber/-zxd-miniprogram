@@ -1,7 +1,7 @@
 const { request, formatRequestError, invalidateCache } = require('../../utils/request')
 const { getLayout } = require('../../utils/seat-layout')
 const { dailyPassDays, isOfficeNightMonthlyCard, OFFICE_NIGHT_BOOKING_HINT, cardValidUntil, withinCardValidity, weeklyPassDays, monthlyPassDays, quarterlyPassDays, officeNightPassDays } = require('../../utils/cardDisplay')
-const { completeWechatPay, ensureReservationPaid, isPayCancelled } = require('../../utils/pay')
+const { completeWechatPay, ensureReservationPaid, isPayCancelled, isPayBanned } = require('../../utils/pay')
 
 const BILL_LABELS = { hourly: '按小时', daily: '天卡', weekly: '周卡', session: '次卡', monthly: '月卡', quarterly: '季卡', night: '夜读' }
 
@@ -45,7 +45,7 @@ function explainCardMismatch(cards, ctx) {
     if (c.store_id && Number(c.store_id) !== storeId) return false
     return true
   })
-  if (!owned.length) return '暂无可用期限卡'
+  if (!owned.length) return ''
 
   const typeMatched = owned.filter((c) => cardTypeMatchesBill(c, billType))
   if (!typeMatched.length) {
@@ -311,6 +311,7 @@ Page({
     selectedCardName: '',
     coupons: [],
     usableCoupons: [],
+    couponPickerItems: [],
     selectedCouponId: null,
     selectedCouponName: '',
     durationDisplay: '',
@@ -327,27 +328,38 @@ Page({
 
   onLoad(options) {
     this._payTypePinned = false
-    const layout = getLayout()
-    const display = layout.seatDisplay({ seat_code: options.seatCode || '' })
-    const seatDisplay = display.mapLabel
-      ? `${display.mapLabel} 号 · ${display.zoneName}`
-      : (options.seatCode || '-')
+    const seatCode = options.seatCode ? decodeURIComponent(options.seatCode) : ''
+    let seatDisplay = options.seatDisplay ? decodeURIComponent(options.seatDisplay) : ''
+    if (!seatDisplay) {
+      const layout = getLayout()
+      const display = layout.seatDisplay({ seat_code: seatCode })
+      seatDisplay = display.mapLabel
+        ? `${display.mapLabel} 号 · ${display.zoneName}`
+        : (seatCode || '-')
+    }
     const startTime = decodeURIComponent(options.start)
     const endTime = decodeURIComponent(options.end)
     const billType = options.billType || 'hourly'
     const range = formatOrderRange(billType, startTime, endTime)
+    const existingReservationId = options.reservationId ? Number(options.reservationId) : null
+    const existingOrderNo = options.orderNo ? decodeURIComponent(options.orderNo) : ''
+    this._isExistingOrder = !!(existingReservationId && existingOrderNo)
+    const preferredCardId = options.selectedPeriodCardId ? Number(options.selectedPeriodCardId) : null
     this.setData({
       storeId: options.storeId,
       storeName: options.storeName ? decodeURIComponent(options.storeName) : '',
       startTime,
       endTime,
       seatId: options.seatId,
-      seatCode: options.seatCode,
+      seatCode,
       seatDisplay,
       originalPrice: options.price,
       price: options.price,
       billType,
       billTypeLabel: BILL_LABELS[billType] || '按小时',
+      reservationId: existingReservationId,
+      orderNo: existingOrderNo,
+      selectedCardId: preferredCardId,
       startDisplay: range.startDisplay,
       endDisplay: range.endDisplay,
       nightDays: range.nightDays,
@@ -355,21 +367,23 @@ Page({
       durationDisplay: formatDurationDisplay(billType, startTime, endTime),
       cardUsageText: formatCardUsage(billType, startTime, endTime),
     })
-    if (options.storeId) {
-      request({ url: `/store/${options.storeId}`, silent: true })
+    this._storeReadyPromise = options.storeId
+      ? request({ url: `/store/${options.storeId}`, silent: true })
         .then((store) => {
           const isolated = !!(store && store.benefits_isolated)
           const patch = { benefitsIsolated: isolated }
+          if (store && store.name && !this.data.storeName) patch.storeName = store.name
           if (isolated && this.data.payType === 'balance') patch.payType = 'wechat'
           this.setData(patch)
-          return this.loadPayOptions({ silent: true })
         })
         .catch(() => {})
-    }
+      : Promise.resolve()
   },
 
   onShow() {
-    this.loadPayOptions({ silent: true })
+    Promise.resolve(this._storeReadyPromise).then(() => {
+      this.loadPayOptions({ silent: true })
+    })
   },
 
   onPullDownRefresh() {
@@ -398,11 +412,15 @@ Page({
         : (coupons || []).filter(
           (c) => c.status === 0 && originalPrice >= (c.min_amount || 0)
         )
+      const couponPickerItems = usableCoupons.length
+        ? [{ id: null, coupon_name: '不使用优惠券' }, ...usableCoupons]
+        : []
       const patch = {
         cards,
         usableCards,
         coupons,
         usableCoupons,
+        couponPickerItems,
         payOptionsError: '',
         cardMismatchHint: usableCards.length
           ? ''
@@ -487,11 +505,12 @@ Page({
 
   selectCoupon(e) {
     const idx = e.detail.value === '' ? -1 : Number(e.detail.value)
-    const coupon = idx >= 0 ? this.data.usableCoupons[idx] : null
-    const couponId = coupon ? coupon.id : null
+    const items = this.data.couponPickerItems || []
+    const coupon = idx >= 0 ? items[idx] : null
+    const couponId = coupon && coupon.id != null ? coupon.id : null
     this.setData({
       selectedCouponId: couponId,
-      selectedCouponName: coupon ? coupon.coupon_name : '',
+      selectedCouponName: couponId ? coupon.coupon_name : '',
       payType: this.data.payType === 'period_card' ? 'wechat' : this.data.payType,
       selectedCardId: null,
     })
@@ -547,25 +566,30 @@ Page({
     this._submitting = true
     this._payCompleted = false
     this.setData({ submitting: true })
-    wx.showLoading({ title: '提交中' })
+    wx.showLoading({ title: '提交中', mask: true })
     try {
-      const body = {
-        store_id: Number(this.data.storeId),
-        bill_type: this.data.billType,
-        start_time: this.data.startTime,
-        seat_id: Number(this.data.seatId),
-        end_time: this.data.endTime,
-      }
-      if (this.data.selectedCouponId && this.data.payType !== 'period_card') {
-        body.coupon_id = this.data.selectedCouponId
-      }
+      let created
+      if (this._isExistingOrder && this.data.reservationId && this.data.orderNo) {
+        created = { id: this.data.reservationId, order_no: this.data.orderNo }
+      } else {
+        const body = {
+          store_id: Number(this.data.storeId),
+          bill_type: this.data.billType,
+          start_time: this.data.startTime,
+          seat_id: Number(this.data.seatId),
+          end_time: this.data.endTime,
+        }
+        if (this.data.selectedCouponId && this.data.payType !== 'period_card') {
+          body.coupon_id = this.data.selectedCouponId
+        }
 
-      const created = await request({
-        url: '/reservation/create',
-        method: 'POST',
-        data: body,
-      })
-      this.setData({ orderNo: created.order_no, reservationId: created.id })
+        created = await request({
+          url: '/reservation/create',
+          method: 'POST',
+          data: body,
+        })
+        this.setData({ orderNo: created.order_no, reservationId: created.id })
+      }
 
       const payBody = {
         order_no: created.order_no,
@@ -636,17 +660,35 @@ Page({
           // ignore
         }
         if (!paidOnServer) {
-          request({
-            url: `/reservation/${this.data.reservationId}/cancel`,
-            method: 'POST',
-            silent: true,
-          }).catch(() => {})
-          this.setData({ reservationId: null, orderNo: '' })
-          wx.showToast({
-            title: isPayCancelled(e) ? '已取消支付' : formatRequestError(e),
-            icon: 'none',
-          })
+          if (!this._isExistingOrder) {
+            request({
+              url: `/reservation/${this.data.reservationId}/cancel`,
+              method: 'POST',
+              silent: true,
+            }).catch(() => {})
+            this.setData({ reservationId: null, orderNo: '' })
+          }
+          if (typeof isPayBanned === 'function' && isPayBanned(e)) {
+            wx.showModal({
+              title: '微信支付暂不可用',
+              content: '你的微信支付未能发起，通常是账号未实名认证、未成年或支付被限制。可改用余额/期限卡支付，或在微信完成实名认证后重试。',
+              showCancel: false,
+              confirmText: '知道了',
+            })
+          } else {
+            wx.showToast({
+              title: isPayCancelled(e) ? '已取消支付' : formatRequestError(e),
+              icon: 'none',
+            })
+          }
         }
+      } else if (typeof isPayBanned === 'function' && isPayBanned(e)) {
+        wx.showModal({
+          title: '微信支付暂不可用',
+          content: '你的微信支付未能发起，通常是账号未实名认证、未成年或支付被限制。可改用余额/期限卡支付，或在微信完成实名认证后重试。',
+          showCancel: false,
+          confirmText: '知道了',
+        })
       } else {
         wx.showToast({
           title: isPayCancelled(e) ? '已取消支付' : formatRequestError(e),

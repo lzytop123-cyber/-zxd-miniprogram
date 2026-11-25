@@ -1,4 +1,4 @@
-const { request } = require('../../../utils/request')
+const { request, formatRequestError } = require('../../../utils/request')
 const routes = require('../../../utils/routes')
 
 Page({
@@ -9,6 +9,8 @@ Page({
     unusedCount: 0,
     usedCount: 0,
     expiredCount: 0,
+    loading: true,
+    loadError: '',
   },
 
   onShow() {
@@ -19,8 +21,14 @@ Page({
     this.loadCoupons({ force: true }).finally(() => wx.stopPullDownRefresh())
   },
 
+  retryLoad() {
+    return this.loadCoupons({ force: true })
+  },
+
   loadCoupons(options = {}) {
     const { force = false } = options
+    const hasData = (this.data.allCoupons || []).length > 0
+    this.setData({ loading: !hasData, loadError: '' })
     return request({ url: '/user/coupons', silent: true, force })
       .then((rows) => {
         const allCoupons = rows || []
@@ -31,9 +39,16 @@ Page({
           unusedCount: allCoupons.filter((c) => c.status === 0).length,
           usedCount: allCoupons.filter((c) => c.status === 1).length,
           expiredCount: allCoupons.filter((c) => c.status === 2).length,
+          loading: false,
+          loadError: '',
         })
       })
-      .catch(() => {})
+      .catch((err) => {
+        this.setData({
+          loading: false,
+          loadError: formatRequestError(err) || '加载失败，请检查网络后重试',
+        })
+      })
   },
 
   switchTab(e) {

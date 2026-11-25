@@ -115,9 +115,27 @@ function safeEnrichOrder(item) {
   }
 }
 
+const ORDER_TABS = [
+  { key: 'all', label: '全部' },
+  { key: 'active', label: '进行中' },
+  { key: 'upcoming', label: '待入座' },
+  { key: 'done', label: '已完成' },
+]
+
+function filterOrdersByTab(orders, tab) {
+  const list = Array.isArray(orders) ? orders : []
+  if (tab === 'active') return list.filter((o) => o.status === 1)
+  if (tab === 'upcoming') return list.filter((o) => o.status === 0)
+  if (tab === 'done') return list.filter((o) => o.status === 2 || o.status === 3)
+  return list
+}
+
 Page({
   data: {
+    tabs: ORDER_TABS,
+    activeTab: 'all',
     orders: [],
+    filteredOrders: [],
     pageLoading: true,
     loadError: '',
     needLogin: false,
@@ -160,37 +178,38 @@ Page({
     }
   },
 
-  loadOrders(options = {}, retried = false) {
-    const { force = false } = options
+  switchTab(e) {
+    const tab = e.currentTarget.dataset.key || 'all'
+    if (tab === this.data.activeTab) return
+    this.setData({
+      activeTab: tab,
+      filteredOrders: filterOrdersByTab(this.data.orders, tab),
+    })
+  },
+
+  retryLoad() {
+    return this.bootstrap()
+  },
+
+  loadOrders() {
     invalidateCache('/reservation/list')
     return request({ url: '/reservation/list', silent: true, force: true })
       .then((orders) => {
-        const list = Array.isArray(orders) ? orders : []
+        const list = (Array.isArray(orders) ? orders : []).map(safeEnrichOrder)
         this.setData({
-          orders: list.map(safeEnrichOrder),
+          orders: list,
+          filteredOrders: filterOrdersByTab(list, this.data.activeTab),
           pageLoading: false,
           loadError: '',
           needLogin: false,
         })
       })
-      .catch(async (err) => {
-        if (err && err.statusCode === 401 && !retried) {
-          try {
-            await auth.login({ silent: true, force: true })
-            return this.loadOrders(options, true)
-          } catch (loginErr) {
-            this.setData({
-              pageLoading: false,
-              needLogin: true,
-              loadError: formatRequestError(loginErr) || '登录已失效，请重新登录',
-              orders: [],
-            })
-            return Promise.reject(loginErr)
-          }
-        }
+      .catch((err) => {
+        const is401 = !!(err && err.statusCode === 401)
         this.setData({
           pageLoading: false,
-          loadError: formatRequestError(err) || '加载失败，请下拉刷新',
+          needLogin: is401,
+          loadError: is401 ? '' : (formatRequestError(err) || '加载失败，请重试'),
         })
         return Promise.reject(err)
       })
@@ -221,7 +240,8 @@ Page({
       `&storeName=${encodeURIComponent(o.store_name || '')}` +
       `&start=${encodeURIComponent(o.start_time)}&end=${encodeURIComponent(o.end_time)}` +
       `&seatId=${o.seat_id}&price=${price}` +
-      `&seatCode=${encodeURIComponent(o.seat_code || '')}&billType=${o.bill_type}`
+      `&seatCode=${encodeURIComponent(o.seat_code || '')}&billType=${o.bill_type}` +
+      `&reservationId=${o.id}&orderNo=${encodeURIComponent(o.order_no || '')}`
     wx.navigateTo({ url })
   },
 

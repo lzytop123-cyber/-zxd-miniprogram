@@ -22,7 +22,7 @@ function setup() {
     vm.runInNewContext(js, { module, exports: module.exports, localStorage, sessionStorage,
       window: { location: { pathname: '/dashboard', replace: url => redirects.push(url) } },
       require: name => {
-        if (name === 'vue-router') return { useRouter: () => ({ push: url => redirects.push(url) }) }
+        if (name === 'vue-router') return { useRouter: () => ({ push: url => redirects.push(url) }), useRoute: () => ({ query: {} }) }
         if (name === 'element-plus') return { ElMessage: { error: value => messages.push(value), success: value => messages.push(value) }, ElMessageBox: { confirm: async () => true } }
         if (name === 'vue') return { ...require('vue'), onMounted() {}, onUnmounted() {} }
         return name.startsWith('.') ? load(path.resolve(path.dirname(file), name + '.ts')) : require(name)

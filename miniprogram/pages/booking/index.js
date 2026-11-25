@@ -1132,9 +1132,6 @@ Page({
     this.setData({
       seatsLoading: true,
       seatLoadError: '',
-      seats: [],
-      seatGroups: [],
-      availableSeatCount: 0,
     })
 
     return request({
@@ -1274,8 +1271,30 @@ Page({
     this.setData(patch, () => this.refreshPreview({ immediate: true }))
   },
 
+  _buildOrderUrl(preview) {
+    const { storeId, storeName, billType, selectedPeriodCardId, selectedLabel, selectedZone } = this.data
+    const seatDisplayText = selectedLabel
+      ? (selectedZone ? `${selectedLabel} 号 · ${selectedZone}` : `${selectedLabel} 号`)
+      : (preview.seat_code || '')
+    const parts = [
+      `storeId=${storeId}`,
+      `storeName=${encodeURIComponent(storeName || '')}`,
+      `start=${encodeURIComponent(preview.start_time)}`,
+      `end=${encodeURIComponent(preview.end_time)}`,
+      `seatId=${preview.seat_id}`,
+      `price=${preview.final_price}`,
+      `seatCode=${encodeURIComponent(preview.seat_code || '')}`,
+      `seatDisplay=${encodeURIComponent(seatDisplayText)}`,
+      `billType=${billType}`,
+    ]
+    if (selectedPeriodCardId) {
+      parts.push(`selectedPeriodCardId=${selectedPeriodCardId}`)
+    }
+    return `${routes.bookingOrder}?${parts.join('&')}`
+  },
+
   goOrder() {
-    const { storeId, storeName, preview, billType, seatId } = this.data
+    const { storeId, preview, seatId } = this.data
     if (!auth.isLoggedIn()) {
       const redirect = `${routes.bookingIndex}?storeId=${storeId}`
       auth.requireLogin(redirect)
@@ -1290,18 +1309,14 @@ Page({
       return
     }
     if (preview && preview.seat_id === seatId) {
-      wx.navigateTo({
-        url: `${routes.bookingOrder}?storeId=${storeId}&storeName=${encodeURIComponent(storeName || '')}&start=${encodeURIComponent(preview.start_time)}&end=${encodeURIComponent(preview.end_time)}&seatId=${preview.seat_id}&price=${preview.final_price}&seatCode=${preview.seat_code}&billType=${billType}`,
-      })
+      wx.navigateTo({ url: this._buildOrderUrl(preview) })
       return
     }
     // 选座后预览尚未带上该座位，自动刷新一次再跳转
     this.refreshPreview({ immediate: true }).then(() => {
       const { preview: latest, seatId: sid, previewError } = this.data
       if (latest && latest.seat_id === sid) {
-        wx.navigateTo({
-          url: `${routes.bookingOrder}?storeId=${storeId}&storeName=${encodeURIComponent(storeName || '')}&start=${encodeURIComponent(latest.start_time)}&end=${encodeURIComponent(latest.end_time)}&seatId=${latest.seat_id}&price=${latest.final_price}&seatCode=${latest.seat_code}&billType=${billType}`,
-        })
+        wx.navigateTo({ url: this._buildOrderUrl(latest) })
       } else {
         const tip = (previewError || '').trim()
         wx.showToast({

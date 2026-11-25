@@ -206,6 +206,7 @@ def admin_reservations(
     status: int | None = None,
     order_no: str | None = None,
     user_id: int | None = None,
+    keyword: str | None = None,
     admin: AdminUser = Depends(get_current_admin),
     db: Session = Depends(get_db),
 ):
@@ -231,6 +232,17 @@ def admin_reservations(
         query = query.where(Reservation.order_no.contains(order_no.strip()))
     if user_id:
         query = query.where(Reservation.user_id == user_id)
+    if keyword and keyword.strip():
+        kw = keyword.strip()
+        matched_user_ids = select(User.id).where(
+            or_(User.phone.contains(kw), User.nickname.contains(kw))
+        )
+        query = query.where(
+            or_(
+                Reservation.order_no.contains(kw),
+                Reservation.user_id.in_(matched_user_ids),
+            )
+        )
     total = db.scalar(select(func.count()).select_from(query.subquery()))
     rows = db.scalars(
         query.order_by(Reservation.created_at.desc()).offset((page - 1) * page_size).limit(page_size)
@@ -1136,6 +1148,9 @@ def update_store_admin(
 
     db.commit()
     db.refresh(store)
+    from app.api.routes.store import invalidate_store_cache
+
+    invalidate_store_cache(store.id)
     return ResponseModel(message="已保存", data=_store_to_admin_item(store))
 
 
@@ -1192,6 +1207,9 @@ def create_store_pricing(
     db.add(rule)
     db.commit()
     db.refresh(rule)
+    from app.api.routes.store import invalidate_store_cache
+
+    invalidate_store_cache(store_id)
     return ResponseModel(message="已添加", data=_pricing_to_dict(rule))
 
 
@@ -1223,6 +1241,9 @@ def update_pricing_rule(
 
     db.commit()
     db.refresh(rule)
+    from app.api.routes.store import invalidate_store_cache
+
+    invalidate_store_cache(rule.store_id)
     return ResponseModel(message="已更新", data=_pricing_to_dict(rule))
 
 
@@ -1236,8 +1257,12 @@ def delete_pricing_rule(
     if not rule:
         raise HTTPException(status_code=404, detail="价格规则不存在")
     assert_store_access(admin, rule.store_id)
+    sid = rule.store_id
     db.delete(rule)
     db.commit()
+    from app.api.routes.store import invalidate_store_cache
+
+    invalidate_store_cache(sid)
     return ResponseModel(message="已删除")
 
 
@@ -2816,6 +2841,9 @@ def create_store_admin(
     db.add(store)
     db.commit()
     db.refresh(store)
+    from app.api.routes.store import invalidate_store_cache
+
+    invalidate_store_cache(store.id)
     return ResponseModel(message="门店已创建", data=_store_to_admin_item(store))
 
 
@@ -2966,6 +2994,9 @@ def update_carousel_settings_admin(
     row.hero_mode = body.hero_mode if body.hero_mode in ("fullscreen", "card") else "fullscreen"
     db.commit()
     db.refresh(row)
+    from app.api.routes.home import invalidate_home_cache
+
+    invalidate_home_cache()
     return ResponseModel(message="轮播设置已保存", data=_carousel_setting_dict(row))
 
 
@@ -3007,6 +3038,9 @@ def create_banner_admin(
     db.add(row)
     db.commit()
     db.refresh(row)
+    from app.api.routes.home import invalidate_home_cache
+
+    invalidate_home_cache()
     return ResponseModel(message="已创建", data=_banner_dict(row))
 
 
@@ -3024,6 +3058,9 @@ def update_banner_admin(
         setattr(row, key, value)
     db.commit()
     db.refresh(row)
+    from app.api.routes.home import invalidate_home_cache
+
+    invalidate_home_cache()
     return ResponseModel(message="已更新", data=_banner_dict(row))
 
 

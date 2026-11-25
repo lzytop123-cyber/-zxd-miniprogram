@@ -3,7 +3,7 @@ from decimal import Decimal
 import logging
 
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -11,7 +11,7 @@ from app.api.deps import get_current_user
 from app.core.prod import block_mock_in_production
 from app.core.redis_client import RedisLock
 from app.db.session import get_db
-from app.models import BillType, Coupon, PayType, PeriodCard, PricingRule, Reservation, Seat, Store, User
+from app.models import BillType, Coupon, PayType, PeriodCard, PricingRule, Reservation, Seat, Store, User, Zone
 from app.schemas.common import ResponseModel
 from app.schemas.reservation import (
     ReservationCreateRequest,
@@ -31,6 +31,7 @@ from app.services.booking import (
     add_wallet_log,
     auto_checkin_reservation,
     change_reservation_seat,
+    extend_reservation_with_balance,
     finalize_expired_reservation,
     finalize_reservation_after_pay,
     get_booking_start_max_advance_days,
@@ -156,11 +157,21 @@ def _resolve_coupon_price(
     return discount, final_price, coupon
 
 
-def _to_item(db: Session, r: Reservation) -> ReservationItem:
-    seat = db.get(Seat, r.seat_id)
-    store = db.get(Store, r.store_id)
+def _to_item(
+    db: Session,
+    r: Reservation,
+    *,
+    seats_map: dict[int, Seat] | None = None,
+    stores_map: dict[int, Store] | None = None,
+    zones_map: dict[int, Zone] | None = None,
+    cards_map: dict[int, PeriodCard] | None = None,
+) -> ReservationItem:
+    seat = seats_map.get(r.seat_id) if seats_map is not None else db.get(Seat, r.seat_id)
+    store = stores_map.get(r.store_id) if stores_map is not None else db.get(Store, r.store_id)
     label, hint = reservation_status_display(r)
-    meta = reservation_display_meta(db, r)
+    meta = reservation_display_meta(
+        db, r, seat=seat, zones_map=zones_map, cards_map=cards_map
+    )
     return ReservationItem(
         id=r.id,
         order_no=r.order_no,
@@ -180,6 +191,53 @@ def _to_item(db: Session, r: Reservation) -> ReservationItem:
         status_hint=hint,
         **meta,
     )
+
+
+def _to_items_batch(db: Session, rows: list[Reservation]) -> list[ReservationItem]:
+    if not rows:
+        return []
+    seat_ids = {r.seat_id for r in rows if r.seat_id}
+    store_ids = {r.store_id for r in rows if r.store_id}
+    card_ids = {r.period_card_id for r in rows if r.period_card_id}
+
+    seats_map = (
+        {s.id: s for s in db.scalars(select(Seat).where(Seat.id.in_(seat_ids))).all()}
+        if seat_ids
+        else {}
+    )
+    stores_map = (
+        {s.id: s for s in db.scalars(select(Store).where(Store.id.in_(store_ids))).all()}
+        if store_ids
+        else {}
+    )
+    zone_ids = {s.zone_id for s in seats_map.values() if s.zone_id}
+    zones_map = (
+        {z.id: z for z in db.scalars(select(Zone).where(Zone.id.in_(zone_ids))).all()}
+        if zone_ids
+        else {}
+    )
+    cards_map = (
+        {c.id: c for c in db.scalars(select(PeriodCard).where(PeriodCard.id.in_(card_ids))).all()}
+        if card_ids
+        else {}
+    )
+
+    items: list[ReservationItem] = []
+    for r in rows:
+        try:
+            items.append(
+                _to_item(
+                    db,
+                    r,
+                    seats_map=seats_map,
+                    stores_map=stores_map,
+                    zones_map=zones_map,
+                    cards_map=cards_map,
+                )
+            )
+        except Exception:
+            logger.exception("reservation list item failed id=%s order=%s", r.id, r.order_no)
+    return items
 
 
 def _safe_to_item(db: Session, r: Reservation) -> ReservationItem | None:
@@ -464,8 +522,9 @@ async def pay(
                 attach=attach,
                 pay_account=pay_account,
             )
-        except RuntimeError as e:
-            raise HTTPException(status_code=502, detail=str(e))
+        except Exception as e:
+            logger.exception("wechat pay create_jsapi_order failed order_no=%s", body.order_no)
+            raise HTTPException(status_code=502, detail="微信支付下单失败，请稍后重试或联系店长") from e
         # WechatPayParams 可能不含 mchid 字段，剔除额外键
         wp = {k: v for k, v in pay_params.items() if k in WechatPayParams.model_fields}
         return ResponseModel(
@@ -495,7 +554,11 @@ async def confirm_pay(
         raise HTTPException(status_code=400, detail="订单尚未支付")
 
     pay_acc = resolve_account_for_mchid(db, reservation.pay_mchid)
-    query = WechatPayService.query_order(reservation.order_no, pay_account=pay_acc)
+    try:
+        query = WechatPayService.query_order(reservation.order_no, pay_account=pay_acc)
+    except Exception as e:
+        logger.warning("wechat pay query_order failed order_no=%s: %s", reservation.order_no, e)
+        raise HTTPException(status_code=502, detail="查询支付结果失败，请稍后重试") from e
     if not query or query.get("trade_state") != "SUCCESS":
         raise HTTPException(status_code=400, detail="支付尚未到账，请稍后再试")
 
@@ -560,8 +623,7 @@ def list_reservations(user: User = Depends(get_current_user), db: Session = Depe
         except Exception:
             logger.exception("reservation list commit failed user=%s", user.id)
             db.rollback()
-    items = [_safe_to_item(db, r) for r in rows]
-    return ResponseModel(data=[item for item in items if item is not None])
+    return ResponseModel(data=_to_items_batch(db, rows))
 
 
 @router.get("/active/list", response_model=ResponseModel[list[ReservationItem]])
@@ -571,24 +633,26 @@ def list_active_reservations(
 ):
     now = datetime.now()
     rows = _sync_user_active_reservations(db, user, now)
-    items = [_safe_to_item(db, row) for row in rows]
-    return ResponseModel(data=[item for item in items if item is not None])
+    return ResponseModel(data=_to_items_batch(db, rows))
 
 
 @router.get("/active", response_model=ResponseModel[ReservationItem | None])
 def active_reservation(user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     now = datetime.now()
     rows = _sync_user_active_reservations(db, user, now)
-    if not rows:
-        return ResponseModel(data=None)
-    row = rows[0]
-    if not reservation_unlock_allowed(row, now):
-        return ResponseModel(data=None)
-    return ResponseModel(data=_to_item(db, row))
+    for row in rows:
+        if reservation_unlock_allowed(row, now):
+            return ResponseModel(data=_to_item(db, row))
+    return ResponseModel(data=None)
 
 
 class ChangeSeatRequest(BaseModel):
     seat_id: int
+
+
+class ExtendReservationRequest(BaseModel):
+    extra_hours: int = Field(default=1, ge=1, le=12)
+    pay_type: PayType = PayType.balance
 
 
 def _assert_user_can_change_seat(reservation: Reservation) -> None:
@@ -637,16 +701,52 @@ def user_change_reservation_seat(
     if not reservation or reservation.user_id != user.id:
         raise HTTPException(status_code=404, detail="订单不存在")
     _assert_user_can_change_seat(reservation)
-    try:
-        new_seat, old_seat = change_reservation_seat(db, reservation, body.seat_id)
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-
-    db.commit()
+    with _seat_lock(body.seat_id) as lock:
+        if not lock.acquired:
+            raise HTTPException(status_code=409, detail="目标座位正在被操作，请稍后重试")
+        try:
+            new_seat, old_seat = change_reservation_seat(db, reservation, body.seat_id)
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e))
+        db.commit()
     db.refresh(reservation)
     return ResponseModel(
         message=f"已换座：{old_seat.seat_code} → {new_seat.seat_code}",
         data=_to_item(db, reservation),
+    )
+
+
+@router.post("/{reservation_id}/extend", response_model=ResponseModel)
+def extend_reservation(
+    reservation_id: int,
+    body: ExtendReservationRequest,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    reservation = db.get(Reservation, reservation_id)
+    if not reservation or reservation.user_id != user.id:
+        raise HTTPException(status_code=404, detail="订单不存在")
+    if body.pay_type != PayType.balance:
+        raise HTTPException(status_code=400, detail="当前仅支持余额续时，请先充值后再续时")
+
+    with _seat_lock(reservation.seat_id) as lock:
+        if not lock.acquired:
+            raise HTTPException(status_code=409, detail="座位正在被操作，请稍后重试")
+        try:
+            extra_amount = extend_reservation_with_balance(db, reservation, user, body.extra_hours)
+        except ValueError as e:
+            msg = str(e)
+            status_code = 409 if "已被预约" in msg else 400
+            raise HTTPException(status_code=status_code, detail=msg) from e
+        db.commit()
+    db.refresh(reservation)
+    return ResponseModel(
+        message=f"续时成功，已延长 {body.extra_hours} 小时",
+        data={
+            "reservation": _to_item(db, reservation).model_dump(),
+            "extra_amount": float(extra_amount),
+            "extra_hours": body.extra_hours,
+        },
     )
 
 
@@ -678,7 +778,7 @@ def checkin(
     if not reservation_unlock_allowed(reservation):
         detail = reservation_unlock_message(reservation) or "当前无法入座"
         raise HTTPException(status_code=400, detail=detail)
-    if not auto_checkin_reservation(db, reservation):
+    if not auto_checkin_reservation(db, reservation, allow_early=True):
         raise HTTPException(status_code=400, detail="当前无法入座")
     db.commit()
     return ResponseModel(message="入座成功")

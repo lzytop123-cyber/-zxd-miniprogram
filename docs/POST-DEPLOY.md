@@ -1,29 +1,26 @@
 # 部署完成后 · 下一步
 
-API + 后台已上线后，按本清单继续（**微信审核中可跳过 B 节**）。
+API + 后台已上线后，按本清单完成自检、运营配置与生产验收。
 
-正式生产必须 `PRE_WECHAT_LAUNCH=false`。下文历史 dev_openid/mock 验收项仅供隔离开发环境使用，当前生产模式会拒绝 `PRE_WECHAT_LAUNCH=true`。
+> 生产模式（`APP_ENV=production`）强制要求 `PRE_WECHAT_LAUNCH=false`，后端会自动禁用 `dev_openid` 与 `mock-pay` 接口，所有登录和支付均走真实微信链路。
 
-前置：服务器上 `curl http://127.0.0.1:8000/health` 返回 `{"status":"ok"}`，后台能登录。
+前置：服务器上 `curl http://127.0.0.1:8000/health` 返回 `{"status":"ok", ...}`，管理后台可正常登录。
 
 ---
 
 ## 步骤 1：小程序指向服务器
 
-编辑 `miniprogram/config.js`，把 `PROD_API_BASE` 改成你的线上地址：
+编辑 `miniprogram/config.js`，把 `PROD_API_BASE` 和 `PROD_STATIC_BASE` 改成你的线上 HTTPS 域名（真机调试 / 体验版 / 正式版会自动走生产地址；仅开发者工具模拟器走本地开发地址）：
 
 ```javascript
-const USE_PROD = true
-const PROD_API_BASE = 'https://api.你的域名.com/api'   // ← 改这里
-const DEV_API_BASE = 'http://127.0.0.1:8000/api'
-const API_BASE = USE_PROD ? PROD_API_BASE : DEV_API_BASE
+const PROD_API_BASE = 'https://api.你的域名.com/api'
+const PROD_STATIC_BASE = 'https://api.你的域名.com'
 ```
 
-微信开发者工具：
+微信小程序公众平台与开发者工具：
 
-1. 重新 **编译**
-2. **详情 → 本地设置** → 勾选「不校验合法域名」（审核通过后再关）
-3. 真机预览前确认手机能访问该 HTTPS 域名
+1. 在公众平台「开发管理 → 开发设置 → 服务器域名」中配置 `request`、`uploadFile`、`downloadFile` 合法域名为 `https://api.你的域名.com`
+2. 开发者工具重新 **编译**，真机预览/体验版确认手机能正常访问该 HTTPS 域名
 
 ---
 
@@ -54,13 +51,13 @@ $env:ZXD_ADMIN_PASSWORD="你在 backend/.env 里设的密码"
 
 | 菜单 | 动作 |
 |------|------|
-| **数据总览** | 能打开，无报错 |
-| **座位管理** | 24 座启用；按门店实际调整 |
-| **团购映射** | seed 自带映射是否齐全；缺的开源 dealId 补上 |
+| **数据总览** | 能打开，无报错，实时指标正常 |
+| **座位管理** | 座位布局完整并已发布；按门店实际调整 |
+| **团购映射** | 核对映射是否齐全；缺的团购商品补全映射 |
 | **待配置团购** | 若有记录 → **一键配置** → 让用户用同券再兑一次 |
-| **订单列表** | 能查到测试单 |
+| **预约订单** | 能查询测试单并支持远程开门 / 换座 / 取消 |
 
-云老板凭证在 `backend/.env` 的 `MEITUAN_*`，改后需：
+云老板凭证在 `backend/.env` 的 `MEITUAN_*`，修改后需重启 API：
 
 ```bash
 docker compose -f docker-compose.prod.yml --env-file .env.docker restart api
@@ -70,7 +67,7 @@ docker compose -f docker-compose.prod.yml --env-file .env.docker restart api
 
 ## 步骤 4：业务联调（每种卡各测 1 次）
 
-在小程序走完整链路：**兑换 → 我的期限卡 → 选座预约 → 期限卡支付**。
+在小程序走完整链路：**微信登录 → 兑换团购 / 购卡 → 我的期限卡 → 选座预约 → 支付 → 开门入座**。
 
 | 卡种 | 验证点 |
 |------|--------|
@@ -81,19 +78,17 @@ docker compose -f docker-compose.prod.yml --env-file .env.docker restart api
 | 次卡 | 连选 N 天扣 N 次 |
 | 夜读月卡 | 夜读时段 + 1 次核销 |
 
-美团 **真实券** 在 `COUPON_PROVIDER=meituan` 下测试；缺映射时不应核销，应进「待配置团购」。
-
-微信支付未配置时：选「微信支付」会返回 mock 参数，订单页可走 mock-pay（需 `PRE_WECHAT_LAUNCH=true`）。
+- 美团 **真实券** 在 `COUPON_PROVIDER=meituan` 下测试；缺映射时不应核销，应进「待配置团购」。
+- 微信支付使用小额真实支付单验证下单、回调与退款闭环，并确认 `WX_PAY_PUBLIC_KEY_PATH=./certs/pub_key.pem` 等证书配置正确。
 
 ---
 
-## 步骤 5：仍跳过（等微信）
+## 步骤 5：硬件与扩展能力核对
 
-- 公众平台合法域名、真实微信登录
-- 真实微信支付、手机号组件
-- 通通锁真机（D 节，`TTLOCK_*` + 企业 AppID）
+- 确认通通锁真机凭证（`TTLOCK_*`）及门锁电量刷新、远程开门、蓝牙开门均正常
+- 如已开通微信订阅消息，在 `backend/.env` 配置 `WX_SUBSCRIBE_*_TMPL_ID` 模板 ID
 
-微信下来后见 [DEPLOY.md](./DEPLOY.md) 第二节，并把 `PRE_WECHAT_LAUNCH=false`。
+更多上线配置见 [DEPLOY.md](./DEPLOY.md)。
 
 ---
 
@@ -109,7 +104,6 @@ docker exec zxd-mysql sh -c 'MYSQL_PWD="$MYSQL_PASSWORD" exec mysqldump -uzxd --
 test -s "$backup/database.sql"
 paths=(backend/uploads backend/data backend/.env .env.docker)
 [[ ! -d backend/certs ]] || paths+=(backend/certs)
-[[ ! -d backend/cert ]] || paths+=(backend/cert)
 tar -czf "$backup/files.tar.gz" "${paths[@]}"
 sha256sum "$backup/database.sql" "$backup/files.tar.gz" > "$backup/SHA256SUMS"
 ```
@@ -141,16 +135,15 @@ tar -xzf "$backup/files.tar.gz" -C "$backup/restore-files-check"
 
 ## 验收打勾
 
-- [ ] 公网 `/health` 正常
+- [ ] 公网 `/health` 正常，容器 healthcheck 为 healthy
 - [ ] 后台登录 + 各菜单无 401
-- [ ] 小程序能登录（dev_openid）
-- [ ] 至少 1 张真实美团券兑换成功
-- [ ] 期限卡预约 + 支付成功
+- [ ] 小程序真机微信登录 + 手机号绑定正常
+- [ ] 真实微信支付 + 退款回调正常
+- [ ] 至少 1 张真实团购券兑换成功
+- [ ] 期限卡预约 + 支付 + 开门入座成功
 - [ ] 待配置团购流程走通
 - [ ] `deploy_check.py` 通过
 - [ ] `smoke_remote.py` 通过
-
-全部完成后，进入 **微信/商户审核通过 → 切 PRE_WECHAT_LAUNCH=false → 真机验收 → 提审**。
 
 ---
 

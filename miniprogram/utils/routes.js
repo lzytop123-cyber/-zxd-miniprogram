@@ -1,6 +1,15 @@
 /** 分包页面路径（主包 Tab 仍用 /pages/...） */
 
+function buildExchangeUrl({ platform, storeId } = {}) {
+  const parts = []
+  if (platform) parts.push(`platform=${encodeURIComponent(platform)}`)
+  if (storeId != null && storeId !== '') parts.push(`storeId=${encodeURIComponent(storeId)}`)
+  const qs = parts.length ? `?${parts.join('&')}` : ''
+  return `/pages/exchange/index${qs}`
+}
+
 module.exports = {
+  buildExchangeUrl,
   bookingIndex: '/pages/booking/index',
   bookingOrder: '/pages/booking/order',
   storeDetail: '/pages/store/detail',

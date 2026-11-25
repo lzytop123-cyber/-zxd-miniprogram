@@ -8,6 +8,14 @@
     </view>
   </view>
 
+  <view wx:elif="{{notLoggedIn}}" class="empty card empty-card">
+    <view class="mi-glyph glyph-xl icon-book-open empty-icon"></view>
+    <view class="empty-text">登录后查看入座订单</view>
+    <view class="empty-hint">登录后可查看当前预约并一键蓝牙开门</view>
+    <button class="empty-primary" hover-class="empty-action-hover" bindtap="goLogin">去登录</button>
+    <button class="empty-secondary" hover-class="empty-action-hover" bindtap="goBooking">先逛逛门店</button>
+  </view>
+
   <view wx:elif="{{loadError && !reservation}}" class="empty card empty-card error-card">
     <view class="mi-glyph glyph-xl icon-orders empty-icon"></view>
     <view class="empty-text">订单加载失败</view>
@@ -77,6 +85,7 @@
         >
           <view class="order-chip-seat">{{item.seat_code}}</view>
           <view class="order-chip-meta">{{item.store_name}}</view>
+          <view class="order-chip-time" wx:if="{{item.timeRange}}">{{item.timeRange}}</view>
         </view>
       </view>
     </view>
@@ -88,6 +97,10 @@
       </view>
 
       <view class="tip warn" wx:if="{{lastOpenError}}">{{lastOpenError}}</view>
+      <view class="ble-recovery-actions" wx:if="{{blePermissionError || bleLocked}}">
+        <button class="ble-recovery-btn" wx:if="{{blePermissionError}}" bindtap="openBleSetting">去开启蓝牙权限</button>
+        <button class="ble-recovery-btn ble-recovery-btn--primary" wx:if="{{bleLocked}}" bindtap="resetBleAndRetry">重置蓝牙并重试</button>
+      </view>
       <view class="open-help" wx:if="{{lastOpenError}}" bindtap="goContact">多次尝试仍无法开门？联系店长</view>
 
       <view
@@ -108,6 +121,7 @@
 
       <view class="open-footer">
         <view class="change-seat-link" bindtap="showStoreWifi">门店WiFi</view>
+        <view class="change-seat-link" bindtap="extendReservation" wx:if="{{canExtend}}">续时</view>
         <view class="change-seat-link" bindtap="goRenew">续座</view>
         <view class="change-seat-link" bindtap="goChangeSeat" wx:if="{{canChangeSeat}}">换座</view>
         <view class="checkout-link" bindtap="checkout" wx:if="{{reservation.status === 1}}">提前离座</view>

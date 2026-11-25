@@ -1,5 +1,6 @@
 from datetime import date, datetime, timedelta
 from decimal import Decimal
+import logging
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -30,9 +31,11 @@ from app.services.business import WechatService
 from app.services.points import apply_invite_code, ensure_invite_code
 
 router = APIRouter(prefix="/user", tags=["用户"])
+logger = logging.getLogger(__name__)
 
 DEFAULT_NICKNAME = "知行岛学员"
 AVATAR_DIR = Path(__file__).resolve().parents[3] / "uploads" / "avatars"
+FACE_DIR = Path(__file__).resolve().parents[3] / "uploads" / "faces"
 
 POINT_REDEEM_TIERS = {
     "coupon_5": {
@@ -88,8 +91,9 @@ def _to_profile(db: Session, user: User) -> UserProfile:
 async def login(body: LoginRequest, db: Session = Depends(get_db)):
     try:
         wx_data = await WechatService.code_to_openid(body.code)
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.warning("wechat login failed: %s", e)
+        raise HTTPException(status_code=400, detail="微信授权已过期，请重新登录") from e
 
     user = db.scalar(select(User).where(User.openid == wx_data["openid"]))
     if not user:
@@ -162,6 +166,10 @@ def upload_avatar(
     if len(binary) > 1_000_000:
         raise HTTPException(status_code=400, detail="头像过大，请选择 1MB 以内的图片")
 
+    from app.utils.image_opt import optimize_image_bytes
+
+    binary, ext = optimize_image_bytes(binary, max_dim=256, quality=82, preferred_ext=ext)
+
     AVATAR_DIR.mkdir(parents=True, exist_ok=True)
     path = AVATAR_DIR / f"{user.id}.{ext}"
     path.write_bytes(binary)
@@ -181,8 +189,9 @@ async def bind_phone(
 ):
     try:
         phone = await WechatService.get_phone_number(body.code)
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.warning("wechat bind_phone failed user=%s: %s", user.id, e)
+        raise HTTPException(status_code=400, detail="获取手机号失败，请重新授权") from e
     user.phone = phone
     db.commit()
     db.refresh(user)
@@ -302,8 +311,38 @@ def upload_face(
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """开发环境：保存人脸照片（生产对接门禁/人脸设备）。"""
-    user.face_image = body.face_image[:500000]
+    """保存人脸照片到静态文件目录（数据库仅存短路径 <= 500 字符）。"""
+    import base64
+    import re
+    from app.utils.image_opt import optimize_image_bytes
+
+    raw = (body.face_image or "").strip()
+    if not raw:
+        raise HTTPException(status_code=400, detail="请上传有效的人脸照片")
+
+    if raw.startswith(("/static/", "http://", "https://")) and len(raw) <= 500:
+        user.face_image = raw
+    else:
+        match = re.match(r"^data:image/(png|jpeg|jpg|webp);base64,(.+)$", raw, re.I | re.S)
+        if match:
+            ext = "jpg" if match.group(1).lower() in ("jpeg", "jpg") else match.group(1).lower()
+            data = match.group(2)
+        else:
+            ext = "jpg"
+            data = raw
+        try:
+            binary = base64.b64decode(data)
+        except Exception as exc:
+            raise HTTPException(status_code=400, detail="人脸照片格式无效") from exc
+        if len(binary) > 2_000_000:
+            raise HTTPException(status_code=400, detail="人脸照片过大，请选择 2MB 以内的图片")
+
+        binary, ext = optimize_image_bytes(binary, max_dim=800, quality=85, preferred_ext=ext)
+        FACE_DIR.mkdir(parents=True, exist_ok=True)
+        (FACE_DIR / f"{user.id}.{ext}").write_bytes(binary)
+        ver = int(datetime.now().timestamp())
+        user.face_image = f"/static/faces/{user.id}.{ext}?v={ver}"
+
     db.commit()
     db.refresh(user)
     return ResponseModel(message="人脸录入成功", data=_to_profile(db, user))
@@ -311,11 +350,19 @@ def upload_face(
 
 @router.get("/subscribe-config", response_model=ResponseModel)
 def get_subscribe_config(user: User = Depends(get_current_user)):
-    tmpl = (settings.wx_subscribe_card_expire_tmpl_id or "").strip()
+    card_expire = (settings.wx_subscribe_card_expire_tmpl_id or "").strip()
+    booking_confirm = (settings.wx_subscribe_booking_confirm_tmpl_id or "").strip()
+    expiring_soon = (settings.wx_subscribe_expiring_soon_tmpl_id or "").strip()
+    checkout = (settings.wx_subscribe_checkout_tmpl_id or "").strip()
+    enabled_tmpl_ids = [t for t in (card_expire, booking_confirm, expiring_soon, checkout) if t]
     return ResponseModel(
         data={
-            "card_expire_tmpl_id": tmpl or None,
-            "enabled": bool(tmpl),
+            "card_expire_tmpl_id": card_expire or None,
+            "booking_confirm_tmpl_id": booking_confirm or None,
+            "expiring_soon_tmpl_id": expiring_soon or None,
+            "checkout_tmpl_id": checkout or None,
+            "enabled_tmpl_ids": enabled_tmpl_ids,
+            "enabled": bool(enabled_tmpl_ids),
         }
     )
 
@@ -326,11 +373,22 @@ def save_subscriptions(
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    from app.services.subscribe_notify import CARD_EXPIRE_SCENE
+    from app.services.subscribe_notify import (
+        BOOKING_CONFIRM_SCENE,
+        CARD_EXPIRE_SCENE,
+        CHECKOUT_SCENE,
+        EXPIRING_SOON_SCENE,
+    )
 
-    tmpl_expire = (settings.wx_subscribe_card_expire_tmpl_id or "").strip()
+    scene_by_tmpl = {
+        (settings.wx_subscribe_card_expire_tmpl_id or "").strip(): CARD_EXPIRE_SCENE,
+        (settings.wx_subscribe_booking_confirm_tmpl_id or "").strip(): BOOKING_CONFIRM_SCENE,
+        (settings.wx_subscribe_expiring_soon_tmpl_id or "").strip(): EXPIRING_SOON_SCENE,
+        (settings.wx_subscribe_checkout_tmpl_id or "").strip(): CHECKOUT_SCENE,
+    }
+    scene_by_tmpl.pop("", None)
     for tmpl_id, status in body.subscriptions.items():
-        scene = CARD_EXPIRE_SCENE if tmpl_id == tmpl_expire else "booking"
+        scene = scene_by_tmpl.get(tmpl_id, "booking")
         existing = db.scalar(
             select(WechatSubscription)
             .where(

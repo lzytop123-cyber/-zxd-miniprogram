@@ -80,6 +80,9 @@ Page({
     const id = event.detail?.id ?? event.currentTarget?.dataset?.id
     const store = this.data.stores.find((item) => String(item.id) === String(id))
     if (!store) return
+    try {
+      wx.setStorageSync('lastSelectedStoreId', store.id)
+    } catch (_) {}
 
     const bookingUrl = `${routes.bookingIndex}?storeId=${store.id}`
     if (!auth.requireLogin(bookingUrl)) return

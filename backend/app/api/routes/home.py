@@ -8,6 +8,7 @@ from app.api.deps import get_optional_user
 from app.api.routes.store import _store_list_item
 from app.api.routes.user import _to_profile
 from app.core.config import settings
+from app.core.redis_client import cache_delete, cache_get, cache_set
 from app.db.session import get_db
 from app.core.static_url import public_static_url
 from app.models import HomeBanner, HomeCarouselSetting, PeriodCard, SiteContactSetting, Store, SystemAnnouncement, User
@@ -16,6 +17,17 @@ from app.services.business import calc_distance
 from app.services.card_service import is_period_card_active
 
 router = APIRouter(prefix="/home", tags=["首页"])
+
+HOME_CACHE_TTL = 60
+CACHE_KEY_BANNERS = "cache:home:banners"
+CACHE_KEY_CAROUSEL = "cache:home:carousel"
+CACHE_KEY_ANNOUNCEMENTS = "cache:home:announcements"
+
+
+def invalidate_home_cache() -> None:
+    cache_delete(CACHE_KEY_BANNERS)
+    cache_delete(CACHE_KEY_CAROUSEL)
+    cache_delete(CACHE_KEY_ANNOUNCEMENTS)
 
 EMPTY_BANNER = {
     "id": 0,
@@ -83,11 +95,19 @@ def _carousel_from_row(row: HomeCarouselSetting | None) -> dict:
 
 
 def _get_carousel_settings(db: Session) -> dict:
+    cached = cache_get(CACHE_KEY_CAROUSEL)
+    if isinstance(cached, dict):
+        return cached
     row = db.get(HomeCarouselSetting, 1)
-    return _carousel_from_row(row)
+    data = _carousel_from_row(row)
+    cache_set(CACHE_KEY_CAROUSEL, data, HOME_CACHE_TTL)
+    return data
 
 
 def _list_active_banners(db: Session) -> list[dict]:
+    cached = cache_get(CACHE_KEY_BANNERS)
+    if isinstance(cached, list):
+        return cached
     rows = db.scalars(
         select(HomeBanner)
         .where(HomeBanner.is_active == 1)
@@ -98,6 +118,7 @@ def _list_active_banners(db: Session) -> list[dict]:
         data = _banner_from_row(row)
         if _banner_visible(data):
             items.append(data)
+    cache_set(CACHE_KEY_BANNERS, items, HOME_CACHE_TTL)
     return items
 
 
@@ -120,6 +141,9 @@ def get_home_banner(db: Session = Depends(get_db)):
 
 
 def _list_active_announcements(db: Session) -> list[dict]:
+    cached = cache_get(CACHE_KEY_ANNOUNCEMENTS)
+    if isinstance(cached, list):
+        return cached
     now = datetime.now()
     rows = db.scalars(
         select(SystemAnnouncement)
@@ -131,7 +155,7 @@ def _list_active_announcements(db: Session) -> list[dict]:
         )
         .order_by(SystemAnnouncement.priority.desc(), SystemAnnouncement.id.desc())
     ).all()
-    return [
+    items = [
         {
             "id": row.id,
             "title": row.title,
@@ -141,6 +165,8 @@ def _list_active_announcements(db: Session) -> list[dict]:
         }
         for row in rows
     ]
+    cache_set(CACHE_KEY_ANNOUNCEMENTS, items, HOME_CACHE_TTL)
+    return items
 
 
 @router.get("/announcements", response_model=ResponseModel)

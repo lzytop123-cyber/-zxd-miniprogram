@@ -8,6 +8,15 @@
     </template>
 
     <el-form inline class="filters" @submit.prevent>
+      <el-form-item label="用户">
+        <el-input
+          v-model="filters.keyword"
+          placeholder="手机号 / 昵称"
+          clearable
+          style="width:170px"
+          @keyup.enter="search"
+        />
+      </el-form-item>
       <el-form-item label="门锁">
         <el-select v-model="filters.lock_id" clearable placeholder="全部" style="width:140px">
           <el-option v-for="l in locks" :key="l.id" :label="l.lock_name || `锁#${l.id}`" :value="l.id" />
@@ -88,9 +97,11 @@ const total = ref(0)
 const dateRange = ref<[string, string] | null>(null)
 
 const filters = reactive<{
+  keyword: string
   lock_id: number | null
   result: number | null
 }>({
+  keyword: '',
   lock_id: null,
   result: null,
 })
@@ -108,6 +119,7 @@ async function load() {
       page_size: pageSize,
       ...workingStoreParams(),
     }
+    if (filters.keyword.trim()) params.keyword = filters.keyword.trim()
     if (filters.lock_id != null) params.lock_id = filters.lock_id
     if (filters.result != null) params.result = filters.result
     if (dateRange.value?.[0]) params.date_from = dateRange.value[0]
@@ -126,6 +138,7 @@ function search() {
 }
 
 function reset() {
+  filters.keyword = ''
   filters.lock_id = null
   filters.result = null
   dateRange.value = null

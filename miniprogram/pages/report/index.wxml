@@ -1,5 +1,10 @@
 <view class="page-report {{tab==='assistant' ? 'chat-mode' : ''}}">
   <view wx:if="{{blocked}}" class="blocked-tip">功能暂未开放，正在返回首页…</view>
+  <view wx:elif="{{notLoggedIn}}" class="card" style="margin:32rpx 24rpx;padding:64rpx 32rpx;text-align:center;">
+    <view style="font-size:32rpx;font-weight:600;margin-bottom:12rpx;">登录后开启学习助手与报告</view>
+    <view style="font-size:26rpx;color:#666;margin-bottom:36rpx;">查看自习趋势、排行榜并使用 AI 学习助手</view>
+    <view class="btn-primary" bindtap="goLogin">去登录</view>
+  </view>
   <block wx:else>
   <!-- 顶部分段切换 -->
   <view class="seg-wrap">
@@ -119,6 +124,12 @@
           <view wx:if="{{item.role !== 'user'}}" class="avatar bot">岛</view>
           <view class="bubble {{item.role === 'user' ? 'user' : 'bot'}}">
             <text>{{item.content}}</text>
+            <view
+              wx:if="{{item.isError}}"
+              data-id="{{item._id}}"
+              bindtap="retryChatMessage"
+              style="margin-top:12rpx;color:#2D6A4F;font-size:24rpx;font-weight:600;"
+            >重试 ↻</view>
           </view>
         </view>
 

@@ -4,9 +4,10 @@ from datetime import datetime
 from decimal import Decimal
 
 from fastapi import HTTPException
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.models import PayType, PeriodCard, Reservation, User
+from app.models import DoorLog, PayType, PeriodCard, Reservation, User
 from app.services.booking import add_wallet_log
 from app.services.card_service import refund_period_card_consume
 from app.services.coupon_service import refund_coupon_for_reservation
@@ -26,7 +27,17 @@ def cancel_reservation(db: Session, reservation: Reservation, user: User | None,
             refund_coupon_for_reservation(db, reservation)
             db.commit()
         return "订单已取消"
-    if reservation.status != 0 and not pending:
+    can_cancel = reservation.status == 0
+    if not can_cancel and reservation.status == 1 and datetime.now() < reservation.start_time:
+        opened = db.scalar(
+            select(DoorLog.id).where(
+                DoorLog.reservation_id == reservation.id,
+                DoorLog.result == 1,
+            ).limit(1)
+        )
+        if opened is None:
+            can_cancel = True
+    if not can_cancel and not pending:
         raise HTTPException(status_code=400, detail="当前状态不可取消")
     reservation.status = 3
     if reservation.pay_status == 0 and not conflict_refund:

@@ -109,6 +109,7 @@ Page({
     this.setData({ announcements: items })
     if (!items.length) return
     const popup = items.find((a) => a.popup_once) || items[0]
+    if (this._dismissedAnnouncements && this._dismissedAnnouncements.has(popup.id)) return
     if (popup.popup_once) {
       try {
         const seen = wx.getStorageSync(ANNOUNCE_SEEN_KEY) || []
@@ -161,7 +162,6 @@ Page({
 
   loadBootstrap(options = {}) {
     const { force = false } = options
-    const { getUserLocation, isLocationDenied, formatDistance } = require('../../utils/location')
     const hasBanners = this.data.banners.length > 0
     const hasStores = this.data.stores.length > 0
 
@@ -211,40 +211,22 @@ Page({
       }
     }
 
-    const fetchBootstrap = (query = '') =>
-      request({ url: `/home/bootstrap${query}`, silent: true, force })
-
-    const fetchWithoutLocation = (hint) =>
-      fetchBootstrap('')
-        .then((data) => applyBootstrap(data, hint))
-        .catch(() => {
-          if (token !== this._storeFetchToken) return Promise.reject(new Error('bootstrap failed'))
-          if (!this.data.stores.length) {
-            this.setData({ stores: [], storesLoading: false, locationHint: hint || '加载门店失败' })
-          } else {
-            this.setData({ storesLoading: false })
-          }
-          if (!this.data.banners.length) {
-            this.setData({ bannersLoading: false, bannerReady: false })
-          } else {
-            this.setData({ bannersLoading: false })
-          }
-          return Promise.reject(new Error('bootstrap failed'))
-        })
-
-    const fetchWithLocation = () =>
-      getUserLocation()
-        .then(({ latitude, longitude }) =>
-          fetchBootstrap(`?latitude=${latitude}&longitude=${longitude}`)
-        )
-        .then((data) => applyBootstrap(data, ''))
-        .catch(async () => {
-          if (token !== this._storeFetchToken) return Promise.reject(new Error('bootstrap failed'))
-          const denied = await isLocationDenied()
-          return fetchWithoutLocation(denied ? '开启定位查看距离' : '定位失败，点击重试')
-        })
-
-    return fetchWithLocation()
+    return request({ url: '/home/bootstrap', silent: true, force })
+      .then((data) => applyBootstrap(data, ''))
+      .catch(() => {
+        if (token !== this._storeFetchToken) return Promise.reject(new Error('bootstrap failed'))
+        if (!this.data.stores.length) {
+          this.setData({ stores: [], storesLoading: false, locationHint: '加载门店失败' })
+        } else {
+          this.setData({ storesLoading: false })
+        }
+        if (!this.data.banners.length) {
+          this.setData({ bannersLoading: false, bannerReady: false })
+        } else {
+          this.setData({ bannersLoading: false })
+        }
+        return Promise.reject(new Error('bootstrap failed'))
+      })
   },
 
   _hydrateBannerCache() {
@@ -280,6 +262,10 @@ Page({
 
   closeAnnouncement() {
     const item = this.data.popupAnnouncement
+    if (item && item.id != null) {
+      if (!this._dismissedAnnouncements) this._dismissedAnnouncements = new Set()
+      this._dismissedAnnouncements.add(item.id)
+    }
     if (item && item.popup_once) {
       try {
         const seen = wx.getStorageSync(ANNOUNCE_SEEN_KEY) || []
@@ -508,6 +494,14 @@ Page({
     wx.switchTab({ url: '/pages/packages/index' })
   },
 
+  goCards() {
+    if (!auth.isLoggedIn()) {
+      auth.goLogin(routes.profileCards)
+      return
+    }
+    wx.navigateTo({ url: routes.profileCards })
+  },
+
   goCoupons() {
     wx.navigateTo({ url: routes.profileCoupons })
   },
@@ -530,7 +524,7 @@ Page({
 
   goOrders() {
     if (!auth.isLoggedIn()) {
-      auth.goLogin('/pages/home/index')
+      auth.goLogin(routes.profileOrders)
       return
     }
     wx.navigateTo({ url: routes.profileOrders })

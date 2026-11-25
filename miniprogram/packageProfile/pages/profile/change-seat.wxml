@@ -1,6 +1,11 @@
 <view class="page-seats page-safe-bottom">
   <view wx:if="{{pageLoading}}" class="loading card">加载座位中…</view>
 
+  <view wx:elif="{{loadError}}" class="loading card" style="text-align:center;padding:48rpx 32rpx;">
+    <view style="margin-bottom:24rpx;">{{loadError}}</view>
+    <view class="btn-primary" bindtap="loadOptions">重新加载</view>
+  </view>
+
   <view wx:else class="card seat-card seat-card--premium">
     <view class="seat-head">
       <view class="seat-head-bar"></view>
@@ -36,8 +41,8 @@
     </view>
   </view>
 
-  <view class="fixed-bottom-spacer" wx:if="{{!pageLoading}}"></view>
-  <view class="fixed-bottom-bar seat-bottom" wx:if="{{!pageLoading}}">
+  <view class="fixed-bottom-spacer" wx:if="{{!pageLoading && !loadError}}"></view>
+  <view class="fixed-bottom-bar seat-bottom" wx:if="{{!pageLoading && !loadError}}">
     <view class="seat-selected" wx:if="{{selectedCode}}">
       换到 <text class="seat-selected-code">{{selectedLabel}}号</text>
       <text class="seat-selected-meta" wx:if="{{selectedZone}}"> · {{selectedZone}}</text>

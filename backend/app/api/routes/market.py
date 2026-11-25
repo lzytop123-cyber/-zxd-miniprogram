@@ -221,8 +221,13 @@ async def upload_market_image(
     )
     if not safety.ok:
         raise HTTPException(status_code=400, detail=safety.reason or "图片未通过安全检测")
+    from app.utils.image_opt import optimize_image_bytes
+
+    content, ext = optimize_image_bytes(
+        content, max_dim=1200, quality=82, preferred_ext=IMAGE_TYPES[content_type]
+    )
     UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
-    filename = f"{uuid.uuid4().hex}.{IMAGE_TYPES[content_type]}"
+    filename = f"{uuid.uuid4().hex}.{ext}"
     (UPLOAD_DIR / filename).write_bytes(content)
     path = f"/static/market/{filename}"
     return ResponseModel(

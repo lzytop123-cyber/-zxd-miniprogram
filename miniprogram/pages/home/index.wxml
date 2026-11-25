@@ -132,7 +132,7 @@
             <text class="pill-val">{{user.total_points || 0}}</text>
             <text class="pill-key">积分</text>
           </view>
-          <view class="member-pill data" catchtap="goPackages">
+          <view class="member-pill data" catchtap="goCards">
             <text class="pill-val">{{user ? cardCount : 0}}</text>
             <text class="pill-key">期限卡</text>
           </view>

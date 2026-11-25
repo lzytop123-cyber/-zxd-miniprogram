@@ -1,5 +1,6 @@
 from datetime import datetime
 from decimal import Decimal
+import logging
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
@@ -21,6 +22,7 @@ from app.services.pay_account import assert_store_allows_pay_type, resolve_pay_a
 from app.services.wechat_pay import WechatPayService, resolve_account_for_mchid
 
 router = APIRouter(prefix="/card", tags=["期限卡"])
+logger = logging.getLogger(__name__)
 
 
 class CardPackageItem(BaseModel):
@@ -167,9 +169,10 @@ def purchase_card(
             attach=f"card_purchase={order.id}",
             pay_account=pay_account,
         )
-    except RuntimeError as e:
+    except Exception as e:
         db.rollback()
-        raise HTTPException(status_code=502, detail=str(e)) from e
+        logger.exception("card wechat pay create_jsapi_order failed order_no=%s", order_no)
+        raise HTTPException(status_code=502, detail="微信支付下单失败，请稍后重试或联系店长") from e
 
     db.commit()
     # 前端不需要 mchid
@@ -241,7 +244,11 @@ def confirm_purchase_card(
         )
 
     pay_acc = resolve_account_for_mchid(db, order.pay_mchid)
-    query = WechatPayService.query_order(order.order_no, pay_account=pay_acc)
+    try:
+        query = WechatPayService.query_order(order.order_no, pay_account=pay_acc)
+    except Exception as e:
+        logger.warning("card wechat pay query_order failed order_no=%s: %s", order.order_no, e)
+        raise HTTPException(status_code=502, detail="查询支付结果失败，请稍后重试") from e
     if not query or query.get("trade_state") != "SUCCESS":
         raise HTTPException(status_code=400, detail="支付尚未到账，请稍后再试")
 

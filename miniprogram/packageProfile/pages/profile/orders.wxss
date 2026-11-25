@@ -3,6 +3,35 @@
   padding-bottom: 32rpx;
 }
 
+.order-tabs {
+  display: flex;
+  gap: 12rpx;
+  padding: 16rpx 24rpx 20rpx;
+  background: var(--color-bg-page);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.order-tab {
+  flex: 1;
+  text-align: center;
+  padding: 14rpx 0;
+  border-radius: 999rpx;
+  font-size: 26rpx;
+  font-weight: 500;
+  color: var(--color-text-secondary);
+  background: var(--color-bg-card);
+  border: 2rpx solid transparent;
+}
+
+.order-tab.active {
+  background: var(--color-primary-soft);
+  color: var(--color-text-brand);
+  font-weight: 700;
+  border-color: rgba(82, 183, 136, 0.35);
+}
+
 .order-card {
   margin-bottom: 24rpx;
 }

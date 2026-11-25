@@ -21,13 +21,7 @@ function pickExchangeStore(stores, preferredId) {
   }
 }
 
-function buildExchangeUrl({ platform, storeId } = {}) {
-  const parts = []
-  if (platform) parts.push(`platform=${encodeURIComponent(platform)}`)
-  if (storeId != null && storeId !== '') parts.push(`storeId=${encodeURIComponent(storeId)}`)
-  const qs = parts.length ? `?${parts.join('&')}` : ''
-  return `/pages/exchange/index${qs}`
-}
+const { buildExchangeUrl } = require('../../../utils/routes')
 
 module.exports = {
   pickExchangeStore,

@@ -16,7 +16,20 @@
     <view class="chip {{tab==='history'?'active':''}}" bindtap="switchTab" data-tab="history">已使用 / 已过期 ({{historyCount}})</view>
   </view>
 
-  <view class="cards-list" wx:if="{{cards.length}}">
+  <view class="cards-empty" wx:if="{{loading}}">
+    <view class="empty-title">正在加载期限卡…</view>
+  </view>
+
+  <view class="cards-empty" wx:elif="{{loadError && !cards.length}}">
+    <view class="empty-icon">⚠️</view>
+    <view class="empty-title">加载失败</view>
+    <view class="empty-desc">{{loadError}}</view>
+    <view class="empty-actions">
+      <view class="empty-btn primary" bindtap="retryLoad">重新加载</view>
+    </view>
+  </view>
+
+  <view class="cards-list" wx:elif="{{cards.length}}">
     <view class="ticket-card ticket-{{item.card_type}}" style="{{tab==='history'?'opacity:0.68;filter:grayscale(0.35);':''}}" wx:for="{{cards}}" wx:key="id">
       <view class="ticket-deco"></view>
       <view class="ticket-top">

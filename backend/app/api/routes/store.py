@@ -5,12 +5,13 @@ from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.core.redis_client import cache_delete, cache_get, cache_set
 from app.core.static_url import public_static_path, public_static_url
 from app.db.session import get_db
 from app.models import PricingRule, Reservation, Seat, Store, Zone
 from app.schemas.common import ResponseModel
 from app.schemas.store import PricingItem, SeatItem, StoreDetail, StoreListItem
-from app.services.business import calc_distance, find_busy_seat_ids, get_seat_status
+from app.services.business import calc_distance, find_busy_seat_ids, get_seats_status_map
 from app.services.store_seat_maps import (
     get_published_map,
     is_image_mode,
@@ -19,6 +20,16 @@ from app.services.store_seat_maps import (
 )
 
 router = APIRouter(prefix="/store", tags=["门店"])
+
+STORE_CACHE_TTL = 60
+CACHE_KEY_STORES_LIST = "cache:stores:list"
+
+
+def invalidate_store_cache(store_id: int | None = None) -> None:
+    cache_delete(CACHE_KEY_STORES_LIST)
+    if store_id is not None:
+        cache_delete(f"cache:store:{store_id}:pricing")
+        cache_delete(f"cache:store:{store_id}:zones")
 
 
 def _normalize_cover_images(images: list | None) -> list | None:
@@ -147,10 +158,14 @@ def get_availability(
 
 @router.get("/{store_id}/zones", response_model=ResponseModel)
 def get_zones(store_id: int, db: Session = Depends(get_db)):
+    cache_key = f"cache:store:{store_id}:zones"
+    cached = cache_get(cache_key)
+    if isinstance(cached, list):
+        return ResponseModel(data=cached)
     zones = db.scalars(select(Zone).where(Zone.store_id == store_id).order_by(Zone.sort_order)).all()
-    return ResponseModel(
-        data=[{"id": z.id, "name": z.name, "type": z.type} for z in zones]
-    )
+    data = [{"id": z.id, "name": z.name, "type": z.type} for z in zones]
+    cache_set(cache_key, data, STORE_CACHE_TTL)
+    return ResponseModel(data=data)
 
 @router.get("/list", response_model=ResponseModel[list[StoreListItem]])
 def list_stores(
@@ -158,16 +173,23 @@ def list_stores(
     longitude: float | None = Query(None),
     db: Session = Depends(get_db),
 ):
-    stores = db.scalars(select(Store).where(Store.status == 1)).all()
-    items: list[StoreListItem] = []
-    for store in stores:
-        distance = None
-        if latitude and longitude and store.latitude and store.longitude:
-            distance = calc_distance(
-                latitude, longitude, float(store.latitude), float(store.longitude)
-            )
-        items.append(_store_list_item(store, distance=distance))
-    if latitude and longitude:
+    cached = cache_get(CACHE_KEY_STORES_LIST)
+    if isinstance(cached, list):
+        items = [StoreListItem.model_validate(item) for item in cached]
+    else:
+        stores = db.scalars(select(Store).where(Store.status == 1)).all()
+        items = [_store_list_item(store) for store in stores]
+        cache_set(
+            CACHE_KEY_STORES_LIST,
+            [it.model_dump(mode="json") for it in items],
+            STORE_CACHE_TTL,
+        )
+    if latitude is not None and longitude is not None:
+        for item in items:
+            if item.latitude is not None and item.longitude is not None:
+                item.distance = calc_distance(
+                    latitude, longitude, float(item.latitude), float(item.longitude)
+                )
         items.sort(key=lambda x: x.distance if x.distance is not None else 99999)
     return ResponseModel(data=items)
 
@@ -187,6 +209,7 @@ def get_seats(store_id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="门店不存在")
     seats = list_bookable_seats(db, store)
     now = datetime.now()
+    status_map = get_seats_status_map(db, seats, now)
     items = [
         SeatItem(
             id=s.id,
@@ -197,7 +220,7 @@ def get_seats(store_id: int, db: Session = Depends(get_db)):
             has_curtain=s.has_curtain,
             pos_x=s.pos_x,
             pos_y=s.pos_y,
-            status=get_seat_status(db, s.id, now),
+            status=status_map.get(s.id, "available"),
         )
         for s in seats
     ]
@@ -206,8 +229,14 @@ def get_seats(store_id: int, db: Session = Depends(get_db)):
 
 @router.get("/{store_id}/pricing", response_model=ResponseModel[list[PricingItem]])
 def get_pricing(store_id: int, db: Session = Depends(get_db)):
+    cache_key = f"cache:store:{store_id}:pricing"
+    cached = cache_get(cache_key)
+    if isinstance(cached, list):
+        return ResponseModel(data=[PricingItem.model_validate(item) for item in cached])
     rules = db.scalars(
         select(PricingRule).where(PricingRule.store_id == store_id, PricingRule.is_active == 1)
         .order_by(PricingRule.sort_order)
     ).all()
-    return ResponseModel(data=[PricingItem.model_validate(r) for r in rules])
+    items = [PricingItem.model_validate(r) for r in rules]
+    cache_set(cache_key, [it.model_dump(mode="json") for it in items], STORE_CACHE_TTL)
+    return ResponseModel(data=items)

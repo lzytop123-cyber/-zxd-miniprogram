@@ -1,4 +1,5 @@
-const { request } = require('../../utils/request')
+const { request, invalidateCache } = require('../../utils/request')
+const auth = require('../../utils/auth')
 const routes = require('../../utils/routes')
 const { pickExchangeStore } = require('./utils/storePick')
 
@@ -69,6 +70,9 @@ Page({
     const idx = Number(e.detail.value)
     const store = this.data.stores[idx]
     if (!store) return
+    try {
+      wx.setStorageSync('lastSelectedStoreId', store.id)
+    } catch (_) {}
     this.setData({
       storeId: store.id,
       storeName: store.name,
@@ -114,26 +118,37 @@ Page({
   },
 
   async submit(forcedCode) {
+    if (this.data.loading || this._confirming) return
     const inputCode = typeof forcedCode === 'string' ? forcedCode.trim() : (this.data.code || '').trim()
     if (!inputCode || inputCode.length < 6) {
       wx.showToast({ title: '请输入有效券码', icon: 'none' })
       return
     }
-    const { platform, storeId, storeName, storePicked } = this.data
+    const { platform, platformLabel, storeId, storeName, storePicked } = this.data
     if (!storeId || !storePicked) {
       wx.showToast({ title: '请先选择门店后再兑换', icon: 'none' })
       return
     }
-    const confirmed = await new Promise((resolve) => {
-      wx.showModal({
-        title: '确认核销',
-        content: `将核销到「${storeName || '所选门店'}」。\n核销后美团券即作废，请确认门店无误。`,
-        confirmText: '确认核销',
-        confirmColor: '#2D6A4F',
-        success: (res) => resolve(!!res.confirm),
-        fail: () => resolve(false),
+    if (!auth.isLoggedIn()) {
+      auth.requireLogin(routes.buildExchangeUrl({ platform, storeId }))
+      return
+    }
+    this._confirming = true
+    let confirmed = false
+    try {
+      confirmed = await new Promise((resolve) => {
+        wx.showModal({
+          title: '确认核销',
+          content: `将核销到「${storeName || '所选门店'}」。\n核销后${platformLabel}券即作废，请确认门店无误。`,
+          confirmText: '确认核销',
+          confirmColor: '#2D6A4F',
+          success: (res) => resolve(!!res.confirm),
+          fail: () => resolve(false),
+        })
       })
-    })
+    } finally {
+      this._confirming = false
+    }
     if (!confirmed) return
 
     let code = inputCode
@@ -181,6 +196,8 @@ Page({
       } else if (payload.remaining_sessions != null) {
         lines.push(`含 ${payload.remaining_sessions} 次`)
       }
+      invalidateCache('/user/cards')
+      invalidateCache('/exchange/records')
       this.setData({ loading: false, code: '', resultTitle: '核销成功', resultLines: lines })
       showAfterLoading(() => {
         wx.showModal({
@@ -191,8 +208,6 @@ Page({
           showCancel: true,
           confirmColor: '#2D6A4F',
           success: (res) => {
-            const { invalidateCache } = require('../../utils/request')
-            invalidateCache('/user/cards')
             if (res.confirm) {
               const billType =
                 payload.card_type === 'night_monthly'
@@ -216,8 +231,8 @@ Page({
       showAfterLoading(() => {
         if (msg.includes('dealId') || msg.includes('未配置')) {
           wx.showModal({
-            title: '待配置团购',
-            content: `${msg}\n\n该券未被核销，请联系店长配置后再试`,
+            title: '暂未支持该团购券',
+            content: '该团购商品暂未完成门店配置，您的券未被核销，请联系店长处理后再试。',
             showCancel: false,
           })
         } else if (msg.includes('仅适用于') || msg.includes('不适用于当前门店')) {

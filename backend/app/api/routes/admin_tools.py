@@ -854,6 +854,9 @@ def create_announcement(
     log_admin_action(db, admin, "create_announcement", target_type="announcement", detail=body.title)
     db.commit()
     db.refresh(row)
+    from app.api.routes.home import invalidate_home_cache
+
+    invalidate_home_cache()
     return ResponseModel(message="公告已创建", data=_announcement_dict(row))
 
 
@@ -871,6 +874,9 @@ def update_announcement(
         setattr(row, key, value)
     log_admin_action(db, admin, "update_announcement", target_type="announcement", target_id=announcement_id)
     db.commit()
+    from app.api.routes.home import invalidate_home_cache
+
+    invalidate_home_cache()
     return ResponseModel(message="公告已更新", data=_announcement_dict(row))
 
 
@@ -886,6 +892,9 @@ def delete_announcement(
     db.delete(row)
     log_admin_action(db, admin, "delete_announcement", target_type="announcement", target_id=announcement_id)
     db.commit()
+    from app.api.routes.home import invalidate_home_cache
+
+    invalidate_home_cache()
     return ResponseModel(message="公告已删除")
 
 

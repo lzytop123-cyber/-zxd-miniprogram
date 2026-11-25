@@ -176,7 +176,7 @@ const secondary = computed(() => [
 ])
 
 const todoList = computed(() => [
-  { label: '待付款订单', count: todos.value.unpaid_orders ?? 0, link: '/reservations', icon: CreditCard, sub: '预约提交但未支付' },
+  { label: '待付款订单', count: todos.value.unpaid_orders ?? 0, link: '/reservations?pay_status=0', icon: CreditCard, sub: '预约提交但未支付' },
   { label: '待配置团购', count: todos.value.pending_deal_mappings ?? 0, link: '/deal-mappings', icon: Setting, sub: '缺映射的团购券' },
   { label: '座位不完整门店', count: (todos.value.incomplete_seat_stores || []).length, link: '/seats', icon: OfficeBuilding, sub: '楼层/座位待补' },
   { label: '门锁低电量', count: todos.value.unread_battery_alerts ?? 0, link: '/locks', icon: Bell, sub: '需换电池的锁' },

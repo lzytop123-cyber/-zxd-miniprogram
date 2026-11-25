@@ -1,5 +1,5 @@
 const auth = require('../../../utils/auth')
-const { request, invalidateCache } = require('../../../utils/request')
+const { request, invalidateCache, formatRequestError } = require('../../../utils/request')
 const routes = require('../../../utils/routes')
 const { formatCard, isCardUsable } = require('../../../utils/cardDisplay')
 
@@ -11,6 +11,8 @@ Page({
     cards: [],
     activeCount: 0,
     historyCount: 0,
+    loading: true,
+    loadError: '',
   },
 
   onShow() {
@@ -21,11 +23,18 @@ Page({
     this.loadCards({ force: true }).finally(() => wx.stopPullDownRefresh())
   },
 
+  retryLoad() {
+    return this.loadCards({ force: true })
+  },
+
   loadCards(options = {}) {
     const { force = false } = options
     if (!auth.requireLogin('/packageProfile/pages/profile/cards')) {
+      this.setData({ loading: false })
       return Promise.resolve()
     }
+    const hasData = (this.data.activeCards || []).length > 0 || (this.data.historyCards || []).length > 0
+    this.setData({ loading: !hasData, loadError: '' })
     if (force) {
       invalidateCache('/user/cards')
     }
@@ -41,10 +50,15 @@ Page({
           cards: tab === 'active' ? activeCards : historyCards,
           activeCount: activeCards.length,
           historyCount: historyCards.length,
+          loading: false,
+          loadError: '',
         })
       })
-      .catch(() => {
-        wx.showToast({ title: '加载失败', icon: 'none' })
+      .catch((err) => {
+        this.setData({
+          loading: false,
+          loadError: formatRequestError(err) || '加载失败，请检查网络后重试',
+        })
       })
   },
 
@@ -76,8 +90,7 @@ Page({
   },
 
   goExchange() {
-    const { buildExchangeUrl } = require('../../../pages/exchange/utils/storePick')
-    wx.navigateTo({ url: buildExchangeUrl() })
+    wx.navigateTo({ url: routes.buildExchangeUrl() })
   },
 
   goExchangeRecords() {

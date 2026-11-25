@@ -1,4 +1,4 @@
-const { request, invalidateCache } = require('../../../utils/request')
+const { request, invalidateCache, formatRequestError } = require('../../../utils/request')
 const { getLayout } = require('../../../utils/seat-layout')
 const { seatDisplayImage } = require('../../../utils/seat-map-image')
 const { resolveStaticUrl } = require('../../../config')
@@ -32,6 +32,7 @@ Page({
     planSeatCount: 27,
     availableSeatCount: 0,
     pageLoading: true,
+    loadError: '',
     submitting: false,
     seatMapMode: 'legacy',
     seatMapImage: '',
@@ -84,7 +85,7 @@ Page({
 
   loadOptions() {
     const { reservationId } = this.data
-    this.setData({ pageLoading: true })
+    this.setData({ pageLoading: true, loadError: '' })
     return request({ url: `/reservation/${reservationId}/seat-options`, silent: true })
       .then(async (data) => {
         if (data.store_id) {
@@ -109,11 +110,13 @@ Page({
           seats: applied,
           availableSeatCount: applied.filter((s) => s.status === 'available').length,
           pageLoading: false,
+          loadError: '',
         })
       })
-      .catch(() => {
-        this.setData({ pageLoading: false })
-        setTimeout(() => wx.navigateBack(), 1500)
+      .catch((err) => {
+        const msg = formatRequestError(err) || '座位信息加载失败，请重试'
+        this.setData({ pageLoading: false, loadError: msg })
+        wx.showToast({ title: String(msg).slice(0, 40), icon: 'none' })
       })
   },
 

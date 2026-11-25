@@ -1,13 +1,23 @@
 <view class="list-page page-safe-bottom">
-  <view class="card item-card" wx:for="{{records}}" wx:key="id">
-    <view class="name">{{item.deal_name || '团购兑换'}}</view>
-    <view class="info" wx:if="{{item.validityText}}">{{item.validityText}}</view>
-    <view class="info">券码 {{item.coupon_code}}</view>
-    <view class="info">状态 {{item.status === 'verified' ? '已兑换' : item.status}}</view>
-    <view class="info" wx:if="{{item.verified_at}}">{{item.verified_at}}</view>
+  <view class="empty" wx:if="{{loading}}">
+    <view>正在加载…</view>
   </view>
-  <view class="empty" wx:if="{{!records.length}}">
-    <view class="empty-icon">🌿</view>
-    <view>暂无兑换记录</view>
+  <view class="empty" wx:elif="{{loadError && !records.length}}">
+    <view class="empty-icon">⚠️</view>
+    <view>{{loadError}}</view>
+    <view class="btn-primary" style="margin-top:24rpx;" bindtap="retryLoad">重新加载</view>
   </view>
+  <block wx:else>
+    <view class="card item-card" wx:for="{{records}}" wx:key="id">
+      <view class="name">{{item.deal_name || '团购兑换'}}</view>
+      <view class="info" wx:if="{{item.validityText}}">{{item.validityText}}</view>
+      <view class="info">券码 {{item.coupon_code}}</view>
+      <view class="info">状态 {{item.status === 'verified' ? '已兑换' : item.status}}</view>
+      <view class="info" wx:if="{{item.verified_at}}">{{item.verified_at}}</view>
+    </view>
+    <view class="empty" wx:if="{{!records.length}}">
+      <view class="empty-icon">🌿</view>
+      <view>暂无兑换记录</view>
+    </view>
+  </block>
 </view>

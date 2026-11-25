@@ -1,11 +1,16 @@
 from contextlib import asynccontextmanager
+import logging
 from pathlib import Path
 
-from fastapi import Depends, FastAPI
+from fastapi import Depends, FastAPI, Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
+
+logger = logging.getLogger(__name__)
 
 from app.api.admin_role_guard import AdminRoleGuardMiddleware
 from app.api.routes import admin, admin_market, admin_seat_maps, admin_tools, admin_wrongbook, assistant, ble, card, exchange, home, market, notifications, payment, report, reservation, store, user, wrongbook
@@ -47,6 +52,7 @@ app = FastAPI(
 )
 _cors_origins = settings.cors_origin_list
 app.add_middleware(AdminRoleGuardMiddleware)
+app.add_middleware(GZipMiddleware, minimum_size=1000)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=_cors_origins,
@@ -55,6 +61,24 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    logger.warning("validation error %s %s: %s", request.method, request.url.path, exc.errors())
+    return JSONResponse(
+        status_code=422,
+        content={"code": 422, "message": "参数格式有误，请检查后重试", "data": None},
+    )
+
+
+@app.exception_handler(Exception)
+async def unhandled_exception_handler(request: Request, exc: Exception):
+    logger.exception("unhandled exception %s %s", request.method, request.url.path)
+    return JSONResponse(
+        status_code=500,
+        content={"code": 500, "message": "服务暂时开小差了，请稍后重试", "data": None},
+    )
 
 app.include_router(user.router, prefix="/api")
 app.include_router(store.router, prefix="/api")

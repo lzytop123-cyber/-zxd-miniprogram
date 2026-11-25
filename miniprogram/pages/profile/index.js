@@ -123,14 +123,16 @@ Page({
   async _uploadAvatarFile(avatarUrl) {
     if (!avatarUrl || this.data.avatarUploading) return
 
+    const prevAvatar = this.data.avatarDisplay
     this.setData({ avatarDisplay: avatarUrl, avatarUploading: true })
-    wx.showLoading({ title: '更新头像...' })
+    wx.showLoading({ title: '更新头像...', mask: true })
     try {
       const user = await auth.uploadAvatar(avatarUrl)
       auth.syncAppUser(user)
       await this.applyUser(user, avatarUrl)
       wx.showToast({ title: '头像已更新', icon: 'success' })
     } catch (err) {
+      this.setData({ avatarDisplay: prevAvatar })
       wx.showToast({ title: err.detail || err.message || '更新失败', icon: 'none' })
     } finally {
       wx.hideLoading()

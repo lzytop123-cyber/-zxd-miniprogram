@@ -302,6 +302,41 @@ page {
   white-space: nowrap;
 }
 
+.order-chip-time {
+  font-size: 20rpx;
+  color: var(--color-text-brand);
+  margin-top: 4rpx;
+  font-weight: 500;
+}
+
+.ble-recovery-actions {
+  display: flex;
+  gap: 16rpx;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.ble-recovery-btn {
+  margin: 0;
+  padding: 12rpx 28rpx;
+  border-radius: 999rpx;
+  font-size: 24rpx;
+  font-weight: 600;
+  line-height: 1.4;
+  background: var(--color-primary-soft);
+  color: var(--color-text-brand);
+  border: none;
+}
+
+.ble-recovery-btn::after {
+  border: none;
+}
+
+.ble-recovery-btn--primary {
+  background: var(--color-primary);
+  color: #FFFFFF;
+}
+
 @media screen and (min-width: 430px) {
   .order-switch-list {
     grid-template-columns: repeat(3, minmax(0, 1fr));

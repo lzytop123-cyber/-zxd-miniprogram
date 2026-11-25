@@ -54,11 +54,10 @@
       <el-table-column prop="total_points" label="积分" width="80" />
       <el-table-column prop="invite_code" label="邀请码" width="100" />
       <el-table-column prop="created_at" label="注册时间" width="170" />
-      <el-table-column label="操作" width="240" fixed="right">
+      <el-table-column label="操作" width="200" fixed="right">
         <template #default="{ row }">
-          <el-button link type="primary" @click.stop="openDetail(row, 'balance')">编辑</el-button>
-          <el-button link type="success" @click.stop="openDetail(row, 'balance')">余额</el-button>
-          <el-button link @click.stop="openDetail(row, 'orders')">详情</el-button>
+          <el-button link type="success" @click.stop="openDetail(row, 'balance')">余额/编辑</el-button>
+          <el-button link type="primary" @click.stop="openDetail(row, 'orders')">详情</el-button>
           <el-button link type="danger" @click.stop="removeUser(row)">删除</el-button>
         </template>
       </el-table-column>
@@ -146,6 +145,11 @@
               </el-table-column>
               <el-table-column prop="status_label" label="状态" width="90" />
               <el-table-column prop="start_time" label="开始" min-width="140" />
+              <el-table-column label="操作" width="84" fixed="right">
+                <template #default="{ row }">
+                  <el-button link type="primary" size="small" @click="goHandleOrder(row.order_no)">处理订单</el-button>
+                </template>
+              </el-table-column>
             </el-table>
           </el-tab-pane>
 
@@ -295,6 +299,12 @@ async function loadOverview() {
 function goIssueCard() {
   if (!detail.value) return
   router.push({ path: '/period-cards', query: { userId: String(detail.value.id) } })
+}
+
+function goHandleOrder(orderNo: string) {
+  if (!orderNo) return
+  showDetail.value = false
+  router.push({ path: '/reservations', query: { keyword: orderNo } })
 }
 
 async function saveStudyGoal() {

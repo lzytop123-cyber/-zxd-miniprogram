@@ -59,6 +59,27 @@ class Settings(BaseSettings):
             "wx_subscribe_card_expire_tmpl_id",
         ),
     )
+    wx_subscribe_booking_confirm_tmpl_id: str = Field(
+        default="",
+        validation_alias=AliasChoices(
+            "WX_SUBSCRIBE_BOOKING_CONFIRM_TMPL_ID",
+            "wx_subscribe_booking_confirm_tmpl_id",
+        ),
+    )
+    wx_subscribe_expiring_soon_tmpl_id: str = Field(
+        default="",
+        validation_alias=AliasChoices(
+            "WX_SUBSCRIBE_EXPIRING_SOON_TMPL_ID",
+            "wx_subscribe_expiring_soon_tmpl_id",
+        ),
+    )
+    wx_subscribe_checkout_tmpl_id: str = Field(
+        default="",
+        validation_alias=AliasChoices(
+            "WX_SUBSCRIBE_CHECKOUT_TMPL_ID",
+            "wx_subscribe_checkout_tmpl_id",
+        ),
+    )
 
     ttlock_client_id: str = ""
     ttlock_client_secret: str = ""

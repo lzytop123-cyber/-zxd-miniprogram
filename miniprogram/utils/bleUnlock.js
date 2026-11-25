@@ -116,7 +116,7 @@ function mapBleOpenFailure({ errorCode, errorMsg, canOpen, reservation }) {
     || msg.includes('adapter not available')
     || code === 10001
   ) {
-    return { content: '手机蓝牙未开启，请下拉控制中心打开蓝牙后重试' }
+    return { content: '手机蓝牙未开启，请下拉控制中心打开蓝牙；若蓝牙已开，请在手机设置中为微信开启「附近的设备」与位置权限后重试' }
   }
 
   // 蓝牙权限未授权

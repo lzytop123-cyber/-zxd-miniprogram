@@ -11,8 +11,14 @@
     </template>
 
     <el-form inline class="filters" @submit.prevent>
-      <el-form-item label="订单号">
-        <el-input v-model="filters.order_no" placeholder="模糊搜索" clearable style="width:150px" />
+      <el-form-item label="搜索">
+        <el-input
+          v-model="filters.keyword"
+          placeholder="手机号 / 昵称 / 订单号"
+          clearable
+          style="width:200px"
+          @keyup.enter="search"
+        />
       </el-form-item>
       <el-form-item label="用户ID">
         <el-input-number v-model="filters.user_id" :min="1" controls-position="right" style="width:110px" />
@@ -112,8 +118,15 @@
       <el-table-column label="说明" min-width="120" show-overflow-tooltip>
         <template #default="{ row }">{{ row.status_hint || '-' }}</template>
       </el-table-column>
-      <el-table-column label="操作" width="200" fixed="right">
+      <el-table-column label="操作" width="250" fixed="right">
         <template #default="{ row }">
+          <el-button
+            v-if="canRemoteUnlock(row)"
+            link
+            type="success"
+            :loading="unlockingIds.has(row.id)"
+            @click="remoteUnlock(row)"
+          >远程开门</el-button>
           <el-button
             v-if="canChangeSeat(row)"
             link
@@ -313,10 +326,13 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, reactive, ref } from 'vue'
+import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
+import { useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { onWorkingStoreChange, resolveFilterStoreId } from '../utils/workingStore'
 import http from '../api/http'
+
+const route = useRoute()
 
 const billTypeMap: Record<string, string> = {
   hourly: '按小时',
@@ -388,8 +404,8 @@ const refundLabels: Record<string, string> = {
   manual: '人工登记退款',
   recorded: '已退款（来源未核实）',
 }
-const filters = reactive<{ order_no: string; user_id: number | null; store_id: number | null; pay_status: number | 'refund_pending' | null; status: number | null }>({
-  order_no: '',
+const filters = reactive<{ keyword: string; user_id: number | null; store_id: number | null; pay_status: number | 'refund_pending' | null; status: number | null }>({
+  keyword: '',
   user_id: null,
   store_id: null,
   pay_status: null,
@@ -527,7 +543,7 @@ async function load() {
   loading.value = true
   try {
     const params: Record<string, unknown> = { page: page.value, page_size: pageSize.value }
-    if (filters.order_no) params.order_no = filters.order_no
+    if (filters.keyword.trim()) params.keyword = filters.keyword.trim()
     if (filters.user_id) params.user_id = filters.user_id
     if (filters.store_id) params.store_id = filters.store_id
     if (filters.pay_status === 'refund_pending') params.refund_pending = true
@@ -558,7 +574,7 @@ function onPageSizeChange() {
 }
 
 function reset() {
-  filters.order_no = ''
+  filters.keyword = ''
   filters.user_id = null
   filters.store_id = resolveFilterStoreId()
   filters.pay_status = null
@@ -570,6 +586,34 @@ function filterUnpaid() {
   filters.pay_status = 0
   filters.status = 0
   search()
+}
+
+function canRemoteUnlock(row: any) {
+  return row.pay_status === 1 && (row.status === 0 || row.status === 1)
+}
+
+const unlockingIds = ref(new Set<number>())
+async function remoteUnlock(row: any) {
+  if (!canRemoteUnlock(row) || unlockingIds.value.has(row.id)) return
+  try {
+    await ElMessageBox.confirm(
+      `确定为「${reservationStoreName(row)}」订单 ${row.order_no}（${row.user_nickname || '同学'} · 座位 ${row.seat_code || '-'}）执行远程开门吗？`,
+      '远程开门',
+      { type: 'warning', confirmButtonText: '确认开门', cancelButtonText: '取消' },
+    )
+  } catch {
+    return
+  }
+  unlockingIds.value.add(row.id)
+  try {
+    const res = await http.post(`/admin/reservations/${row.id}/remote-unlock`)
+    ElMessage.success(res.message || '远程开门成功')
+    await load()
+  } catch (e: any) {
+    ElMessage.error(e?.response?.data?.detail || e?.message || '远程开门失败')
+  } finally {
+    unlockingIds.value.delete(row.id)
+  }
 }
 
 function canCancel(row: any) {
@@ -807,11 +851,49 @@ function reloadForStore() {
   void load()
 }
 
+function applyRouteQuery() {
+  const q = route.query
+  const kw = q.keyword ?? q.order_no
+  if (typeof kw === 'string' && kw.trim()) {
+    filters.keyword = kw.trim()
+  } else if (kw === '') {
+    filters.keyword = ''
+  }
+  if (q.pay_status !== undefined) {
+    const ps = Array.isArray(q.pay_status) ? q.pay_status[0] : q.pay_status
+    if (ps === 'refund_pending') {
+      filters.pay_status = 'refund_pending'
+    } else if (ps !== null && ps !== '' && !Number.isNaN(Number(ps))) {
+      filters.pay_status = Number(ps)
+    } else {
+      filters.pay_status = null
+    }
+  }
+  if (q.status !== undefined) {
+    const st = Array.isArray(q.status) ? q.status[0] : q.status
+    if (st !== null && st !== '' && !Number.isNaN(Number(st))) {
+      filters.status = Number(st)
+    } else {
+      filters.status = null
+    }
+  }
+}
+
+watch(
+  () => route.query,
+  () => {
+    applyRouteQuery()
+    page.value = 1
+    void load()
+  },
+)
+
 onMounted(async () => {
   window.addEventListener('resize', onResize)
   const res = await http.get('/admin/stores')
   stores.value = res.data || []
   filters.store_id = resolveFilterStoreId()
+  applyRouteQuery()
   offWorkingStore = onWorkingStoreChange((sid) => {
     filters.store_id = sid
     reloadForStore()
