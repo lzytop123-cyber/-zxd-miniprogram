@@ -286,6 +286,12 @@ function formatCardUsage(billType, startIso, endIso) {
   return '本次使用此卡权益'
 }
 
+function formatMoney(val) {
+  const n = Number(val)
+  if (!Number.isFinite(n)) return 0
+  return Number(n.toFixed(2))
+}
+
 Page({
   data: {
     storeId: null,
@@ -353,8 +359,8 @@ Page({
       seatId: options.seatId,
       seatCode,
       seatDisplay,
-      originalPrice: options.price,
-      price: options.price,
+      originalPrice: formatMoney(options.price),
+      price: formatMoney(options.price),
       billType,
       billTypeLabel: BILL_LABELS[billType] || '按小时',
       reservationId: existingReservationId,
@@ -534,9 +540,9 @@ Page({
       const preview = await request({ url: '/reservation/preview', method: 'POST', data: body })
       if (requestId !== this._priceRequestId) return
       this.setData({
-        price: preview.final_price,
-        discountPrice: preview.discount_price || 0,
-        originalPrice: preview.original_price,
+        price: formatMoney(preview.final_price),
+        discountPrice: Number(preview.discount_price) > 0 ? formatMoney(preview.discount_price) : 0,
+        originalPrice: formatMoney(preview.original_price),
         priceLoading: false,
       })
     } catch (e) {

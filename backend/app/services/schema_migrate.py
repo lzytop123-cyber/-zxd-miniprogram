@@ -30,6 +30,8 @@ MIGRATION_STATEMENTS = [
     "ALTER TABLE home_banners ADD COLUMN link_path VARCHAR(200)",
     "ALTER TABLE home_carousel_settings ADD COLUMN hero_height INTEGER DEFAULT 520",
     "ALTER TABLE home_carousel_settings ADD COLUMN hero_mode VARCHAR(20) DEFAULT 'fullscreen'",
+    "ALTER TABLE home_carousel_settings ADD COLUMN share_title VARCHAR(100)",
+    "ALTER TABLE home_carousel_settings ADD COLUMN share_image_url VARCHAR(500)",
     "ALTER TABLE period_cards ADD COLUMN total_hours NUMERIC(5, 1)",
     "ALTER TABLE meituan_deal_mapping ADD COLUMN platform INTEGER DEFAULT 1",
     "ALTER TABLE reservations ADD COLUMN refund_remark VARCHAR(200)",

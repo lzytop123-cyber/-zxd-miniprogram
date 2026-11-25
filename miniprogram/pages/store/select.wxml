@@ -28,7 +28,7 @@
   </view>
 
   <block wx:else>
-    <view class="list-heading">附近门店 <text>共 {{stores.length}} 家</text></view>
+    <view class="list-heading">选择门店</view>
     <store-card
       wx:for="{{stores}}"
       wx:key="id"

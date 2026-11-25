@@ -1,140 +1,118 @@
 <view class="page-profile page-safe-bottom tabbar-clear">
-  <view class="profile-header {{loginState === 'guest' ? 'guest' : ''}}">
+  <!-- 极净左对齐个人头部 -->
+  <view class="profile-head">
     <block wx:if="{{loginState === 'guest'}}">
-      <view class="guest-header" hover-class="guest-header-hover" bindtap="goLogin">
-        <view class="avatar avatar-placeholder guest"><view class="mi-glyph glyph-lg icon-user"></view></view>
-        <view class="nickname">登录 / 注册</view>
-        <view class="guest-login-tip">登录后记录学习数据 · 领取积分权益</view>
-        <view class="guest-cta">立即登录</view>
+      <view class="user-row" bindtap="goLogin">
+        <view class="avatar avatar-ph avatar-ph--guest">
+          <view class="mi-glyph icon-user"></view>
+        </view>
+        <view class="user-info">
+          <view class="user-name">登录 / 注册</view>
+          <view class="user-sub">登录后同步自习数据与会员权益</view>
+        </view>
+        <view class="guest-pill">去登录</view>
       </view>
     </block>
 
     <block wx:elif="{{loginState === 'loading'}}">
-      <view class="avatar avatar-placeholder"><text class="avatar-glyph">岛</text></view>
-      <view class="nickname">加载中...</view>
+      <view class="user-row">
+        <view class="avatar avatar-ph">岛</view>
+        <view class="user-info">
+          <view class="user-name">加载中…</view>
+        </view>
+      </view>
     </block>
 
     <block wx:elif="{{loginState === 'ready' && user}}">
-      <view class="header-gear" hover-class="header-gear-hover" bindtap="goEdit">
-        <view class="gear-icon"></view>
-      </view>
-      <button class="avatar-picker inline" hover-class="none" open-type="chooseAvatar" bindchooseavatar="onChooseAvatar">
-        <image
-          wx:if="{{avatarDisplay}}"
-          class="avatar"
-          src="{{avatarDisplay}}"
-          mode="aspectFill"
-        />
-        <view wx:else class="avatar avatar-placeholder"><text class="avatar-glyph">岛</text></view>
-      </button>
-      <view class="nickname">{{user.nickname}}</view>
-      <view class="title-badge">{{user.title || '小白'}}</view>
+      <view class="user-row">
+        <button class="avatar-btn" hover-class="none" open-type="chooseAvatar" bindchooseavatar="onChooseAvatar">
+          <image wx:if="{{avatarDisplay}}" class="avatar" src="{{avatarDisplay}}" mode="aspectFill" />
+          <view wx:else class="avatar avatar-ph">岛</view>
+        </button>
 
-      <view class="edit-row" wx:if="{{avatarUploading}}">
-        <view class="btn-outline small">头像更新中...</view>
+        <view class="user-info">
+          <view class="user-name-line">
+            <view class="user-name">{{user.nickname}}</view>
+            <view class="user-badge">{{user.title || '新同学'}}</view>
+          </view>
+          <view class="user-sub-row">
+            <text class="user-sub-item" bindtap="copyUserId">学号 #{{user.id}}</text>
+            <text class="user-sub-dot">·</text>
+            <text class="user-sub-item" wx:if="{{phoneMasked}}">{{phoneMasked}}</text>
+            <text class="user-sub-link" wx:else bindtap="goEdit">绑定手机号 ›</text>
+          </view>
+        </view>
+
+        <view class="settings-btn" hover-class="settings-btn-hover" bindtap="goEdit" aria-role="button" aria-label="编辑资料与设置">
+          <view class="mi-glyph icon-settings"></view>
+        </view>
       </view>
     </block>
   </view>
 
-  <!-- 余额 / 积分 双入口卡（可点跳钱包/积分明细） -->
-  <view class="asset-row" wx:if="{{loginState === 'ready' && user}}">
-    <view class="asset-pill" hover-class="asset-pill-hover" bindtap="go" data-url="{{menuUrls.wallet}}">
+  <!-- 统一会员资产卡 -->
+  <view class="asset-card" wx:if="{{loginState === 'ready' && user}}">
+    <view class="asset-col" hover-class="asset-col-hover" bindtap="go" data-url="{{menuUrls.wallet}}">
       <view class="asset-val">¥{{user.balance}}</view>
-      <view class="asset-key">余额 ›</view>
+      <view class="asset-key">账户余额 ›</view>
     </view>
-    <view class="asset-pill" hover-class="asset-pill-hover" bindtap="go" data-url="{{menuUrls.points}}">
+    <view class="asset-sep"></view>
+    <view class="asset-col" hover-class="asset-col-hover" bindtap="go" data-url="{{menuUrls.points}}">
       <view class="asset-val">{{user.total_points}}</view>
-      <view class="asset-key">积分 ›</view>
+      <view class="asset-key">自习积分 ›</view>
     </view>
   </view>
 
-  <!-- 资料信息（学号 + 手机号），弱视觉存在 -->
-  <view class="info-row" wx:if="{{loginState === 'ready' && user}}">
-    <view class="info-item" bindtap="copyUserId">
-      <text class="info-key">学号</text>
-      <text class="info-val">#{{user.id}}</text>
-      <text class="info-action">复制</text>
-    </view>
-    <view class="info-item" wx:if="{{user.phone}}">
-      <text class="info-key">手机</text>
-      <text class="info-val">{{user.phone}}</text>
-    </view>
-    <view class="info-item info-item--action" wx:else bindtap="goEdit">
-      <text class="info-key">手机</text>
-      <text class="info-val muted">未绑定</text>
-      <text class="info-action">去绑定 ›</text>
-    </view>
-  </view>
-
-  <view class="goal-card card" wx:if="{{loginState === 'ready' && user}}">
-    <view class="goal-card-title">备考方向</view>
-    <view class="goal-chips">
-      <view
-        wx:for="{{goalOptions}}"
-        wx:key="value"
-        class="goal-chip {{user.study_goal === item.value ? 'active' : ''}}"
-        data-value="{{item.value}}"
-        bindtap="saveStudyGoal"
-      >{{item.label}}</view>
-    </view>
-  </view>
-
-  <view class="menu-sect-title">常用</view>
-  <view class="menu-grid card">
-    <view class="menu-item" hover-class="menu-item-hover" bindtap="go" data-url="{{menuUrls.wallet}}">
-      <view class="menu-icon"><view class="mi-glyph icon-wallet"></view></view>
-      <text>钱包</text>
-    </view>
-    <view class="menu-item" hover-class="menu-item-hover" bindtap="go" data-url="{{menuUrls.orders}}">
-      <view class="menu-icon"><view class="mi-glyph icon-orders"></view></view>
-      <text>我的订单</text>
-    </view>
-    <view class="menu-item" hover-class="menu-item-hover" bindtap="goPackages">
-      <view class="menu-icon"><view class="mi-glyph icon-cards"></view></view>
-      <text>我的期限卡</text>
-    </view>
-    <view class="menu-item" hover-class="menu-item-hover" bindtap="go" data-url="{{menuUrls.coupons}}">
-      <view class="menu-icon"><view class="mi-glyph icon-coupons"></view></view>
-      <text>优惠券</text>
-    </view>
-  </view>
-
-  <view class="menu-sect-title">更多</view>
-  <view class="menu-grid card">
-    <view class="menu-item menu-item--msg" hover-class="menu-item-hover" bindtap="go" data-url="{{menuUrls.messages}}">
-      <view class="menu-icon">
-        <view class="mi-glyph icon-megaphone"></view>
-        <view class="msg-badge" wx:if="{{unreadCount > 0}}">{{unreadCount > 99 ? '99+' : unreadCount}}</view>
+  <!-- 常用：清爽 4 宫格 -->
+  <view class="panel-card">
+    <view class="quick-grid">
+      <view class="quick-item" hover-class="quick-item-hover" bindtap="go" data-url="{{menuUrls.orders}}">
+        <view class="quick-icon-wrap"><view class="mi-glyph icon-orders"></view></view>
+        <text class="quick-label">我的订单</text>
       </view>
-      <text>消息中心</text>
-    </view>
-    <view class="menu-item" hover-class="menu-item-hover" bindtap="go" data-url="{{menuUrls.wrongbook}}">
-      <view class="menu-icon"><view class="mi-glyph icon-book-open"></view></view>
-      <text>错题本</text>
-    </view>
-    <view class="menu-item" hover-class="menu-item-hover" bindtap="go" data-url="{{menuUrls.points}}">
-      <view class="menu-icon"><view class="mi-glyph icon-points"></view></view>
-      <text>积分兑换</text>
-    </view>
-    <view class="menu-item" hover-class="menu-item-hover" bindtap="go" data-url="{{menuUrls.invite}}">
-      <view class="menu-icon"><view class="mi-glyph icon-invite"></view></view>
-      <text>邀请有礼</text>
-    </view>
-    <view class="menu-item" hover-class="menu-item-hover" bindtap="go" data-url="{{menuUrls.contact}}">
-      <view class="menu-icon"><view class="mi-glyph icon-contact"></view></view>
-      <text>联系店长</text>
-    </view>
-    <view class="menu-item" wx:if="{{showMarketplace}}" hover-class="menu-item-hover" bindtap="goMarket">
-      <view class="menu-icon"><view class="mi-glyph icon-market"></view></view>
-      <text>上岸集市</text>
+      <view class="quick-item" hover-class="quick-item-hover" bindtap="goPackages">
+        <view class="quick-icon-wrap"><view class="mi-glyph icon-cards"></view></view>
+        <text class="quick-label">我的期限卡</text>
+      </view>
+      <view class="quick-item" hover-class="quick-item-hover" bindtap="go" data-url="{{menuUrls.coupons}}">
+        <view class="quick-icon-wrap"><view class="mi-glyph icon-coupons"></view></view>
+        <text class="quick-label">优惠券</text>
+      </view>
+      <view class="quick-item" hover-class="quick-item-hover" bindtap="go" data-url="{{menuUrls.messages}}">
+        <view class="quick-icon-wrap quick-icon-wrap--msg">
+          <view class="mi-glyph icon-bell"></view>
+          <view class="msg-badge" wx:if="{{unreadCount > 0}}">{{unreadCount > 99 ? '99+' : unreadCount}}</view>
+        </view>
+        <text class="quick-label">消息中心</text>
+      </view>
     </view>
   </view>
 
-  <view class="logout-row" wx:if="{{loginState === 'ready' && user}}">
-    <view class="btn-logout" bindtap="doLogout">退出登录</view>
+  <!-- 更多服务：极简列表行 -->
+  <view class="panel-card list-card">
+    <view class="list-row" hover-class="list-row-hover" bindtap="go" data-url="{{menuUrls.wrongbook}}">
+      <view class="mi-glyph icon-notebook list-icon"></view>
+      <text class="list-label">错题本</text>
+      <text class="list-arrow">›</text>
+    </view>
+    <view class="list-row" hover-class="list-row-hover" bindtap="go" data-url="{{menuUrls.invite}}">
+      <view class="mi-glyph icon-invite list-icon"></view>
+      <text class="list-label">邀请有礼</text>
+      <text class="list-arrow">›</text>
+    </view>
+    <view class="list-row" hover-class="list-row-hover" bindtap="go" data-url="{{menuUrls.contact}}">
+      <view class="mi-glyph icon-contact list-icon"></view>
+      <text class="list-label">联系店长</text>
+      <text class="list-arrow">›</text>
+    </view>
+    <view class="list-row" wx:if="{{showMarketplace}}" hover-class="list-row-hover" bindtap="goMarket">
+      <view class="mi-glyph icon-market list-icon"></view>
+      <text class="list-label">上岸集市</text>
+      <text class="list-arrow">›</text>
+    </view>
   </view>
 
-  <view class="logout-row" style="margin-top:0;font-size:22rpx;color:#8C9BA5;">
+  <view class="legal-row">
     <text bindtap="openAgreement" data-type="user">《用户服务协议》</text>
     <text> · </text>
     <text bindtap="openAgreement" data-type="privacy">《隐私政策》</text>

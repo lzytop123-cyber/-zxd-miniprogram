@@ -102,7 +102,7 @@
       </view>
     </movable-view>
   </movable-area>
-  <view class="zoom-controls">
+  <view class="zoom-controls" wx:if="{{mode==='image'}}">
     <view class="zoom-btn" aria-role="button" aria-label="缩小座位图" catchtap="zoomOut">－</view>
     <view class="zoom-btn" aria-role="button" aria-label="放大座位图" catchtap="zoomIn">＋</view>
   </view>

@@ -2,7 +2,7 @@
   position: absolute;
   inset: 0;
   overflow: hidden;
-  background: linear-gradient(180deg, #f6fbf7 0%, #eef7f1 100%);
+  background: #FFFFFF;
   --wall: rgba(74, 92, 82, 0.92);
   --wall-soft: rgba(74, 92, 82, 0.62);
   --desk: rgba(116, 136, 124, 0.55);
@@ -40,7 +40,7 @@
 }
 
 .plan-canvas--image {
-  background: #f7f9f7;
+  background: #FFFFFF;
 }
 
 .plan-area {
@@ -96,9 +96,9 @@
 .floor {
   position: absolute;
   inset: 0;
-  border-radius: 24rpx;
-  background: linear-gradient(180deg, #fbfdfc 0%, #f3f9f5 100%);
-  box-shadow: inset 0 1rpx 0 rgba(255, 255, 255, 0.9);
+  border-radius: 16rpx;
+  background: #FFFFFF;
+  box-shadow: none;
   overflow: hidden;
 }
 
@@ -107,7 +107,7 @@
   bottom: auto;
   overflow: visible;
   border-radius: 0;
-  background: #eef3f0;
+  background: #FFFFFF;
 }
 
 .floor-bg {
@@ -560,34 +560,29 @@
 }
 
 .seat-chip.available {
-  background: linear-gradient(180deg, #6EC895 0%, #52B788 100%);
-  border-color: var(--green-500);
-  box-shadow: 0 3rpx 10rpx rgba(45, 106, 79, 0.28);
-  animation: seat-pulse 1.8s ease-in-out infinite;
+  background: #2D6A4F;
+  border-color: #1F4E3D;
+  box-shadow: none;
+  animation: none;
 }
 
 .seat-anchor:active .seat-chip.available {
-  transform: scale(1.12);
-  box-shadow: 0 0 0 6rpx rgba(82, 183, 136, 0.22), 0 6rpx 14rpx rgba(45, 106, 79, 0.3);
+  transform: scale(1.08);
+  box-shadow: none;
 }
 
-.seat-chip.reserved {
+.seat-chip.reserved,
+.seat-chip.occupied {
   background: #F4D89A;
   border-color: #C9A227;
   box-shadow: 0 2rpx 6rpx rgba(181, 148, 75, 0.18);
 }
 
-.seat-chip.occupied {
-  background: #C9D0CB;
-  border-color: rgba(90, 105, 96, 0.5);
-  box-shadow: none;
-}
-
 .seat-chip.is-selected {
-  background: linear-gradient(180deg, #2D6A4F 0%, #1B4332 100%);
-  border: 3rpx solid var(--color-bg-card);
-  box-shadow: 0 0 0 5rpx rgba(45, 106, 79, 0.35), 0 4rpx 12rpx rgba(27, 67, 50, 0.35);
-  transform: scale(1.16);
+  background: #1B4332;
+  border: 2rpx solid #FFFFFF;
+  box-shadow: 0 0 0 3rpx #1B4332;
+  transform: scale(1.08);
   animation: none;
 }
 
@@ -600,13 +595,9 @@
   text-shadow: 0 1rpx 1rpx rgba(0, 0, 0, 0.12);
 }
 
-.seat-chip.reserved .seat-chip-label {
-  color: #6B4E13;
-  text-shadow: none;
-}
-
+.seat-chip.reserved .seat-chip-label,
 .seat-chip.occupied .seat-chip-label {
-  color: rgba(58, 70, 62, 0.72);
+  color: #6B4E13;
   text-shadow: none;
 }
 
@@ -616,23 +607,21 @@
 
 /* Raised seats keep the top-down map and its touch coordinates intact. */
 .floor--image:not(.floor--drawn) .seat-chip {
+  width: 34rpx;
+  height: 25rpx;
   --seat-face: #287556;
   --seat-edge: #164936;
   border: 1rpx solid var(--seat-edge);
   border-radius: 6rpx;
   background: var(--seat-face);
-  box-shadow: inset 0 2rpx 0 rgba(255, 255, 255, 0.25), 0 3rpx 0 var(--seat-edge);
+  box-shadow: inset 0 1rpx 0 rgba(255, 255, 255, 0.22), 0 2rpx 0 var(--seat-edge);
   animation: none;
 }
 
-.floor--image:not(.floor--drawn) .seat-chip.reserved {
+.floor--image:not(.floor--drawn) .seat-chip.reserved,
+.floor--image:not(.floor--drawn) .seat-chip.occupied {
   --seat-face: #f5dea7;
   --seat-edge: #a88131;
-}
-
-.floor--image:not(.floor--drawn) .seat-chip.occupied {
-  --seat-face: #d8dfdb;
-  --seat-edge: #87978e;
 }
 
 .floor--image:not(.floor--drawn) .seat-chip.is-selected {
@@ -649,6 +638,7 @@
 }
 
 .floor--image:not(.floor--drawn) .seat-chip-label {
+  font-size: 15rpx;
   font-variant-numeric: tabular-nums;
   text-shadow: none;
 }

@@ -164,3 +164,19 @@
   font-size: 22rpx;
   color: var(--color-text-secondary);
 }
+
+.edit-logout-wrap {
+  margin: 28rpx 32rpx 0;
+}
+
+.btn-edit-logout {
+  height: 88rpx;
+  line-height: 88rpx;
+  text-align: center;
+  border-radius: 20rpx;
+  background: var(--color-bg-card);
+  color: #C0392B;
+  font-size: 28rpx;
+  font-weight: 600;
+  box-shadow: var(--shadow-sm);
+}

@@ -455,7 +455,8 @@ test('global navigation and secondary text colors meet WCAG AA contrast', () => 
   const styles = fs.readFileSync(path.join(ROOT, 'app.wxss'), 'utf8')
   const secondary = styles.match(/--neutral-700:\s*(#[0-9A-F]{6})/i)[1]
 
-  assert.ok(contrastRatio(appConfig.window.navigationBarBackgroundColor, '#FFFFFF') >= 4.5)
+  const navTextHex = appConfig.window.navigationBarTextStyle === 'black' ? '#000000' : '#FFFFFF'
+  assert.ok(contrastRatio(appConfig.window.navigationBarBackgroundColor, navTextHex) >= 4.5)
   assert.ok(contrastRatio(appConfig.tabBar.color, '#FFFFFF') >= 4.5)
   assert.ok(contrastRatio(appConfig.tabBar.selectedColor, '#FFFFFF') >= 4.5)
   assert.ok(contrastRatio(secondary, '#FFFFFF') >= 4.5)

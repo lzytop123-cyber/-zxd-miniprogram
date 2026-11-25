@@ -26,7 +26,7 @@
       <view>正在加载账单…</view>
     </view>
     <view class="empty" wx:elif="{{loadError}}">
-      <view class="empty-icon">⚠️</view>
+      <view class="mi-glyph glyph-xl icon-empty-alert empty-glyph"></view>
       <view>{{loadError}}</view>
       <view class="btn-primary" style="margin-top:20rpx;" bindtap="retryLoad">重新加载</view>
     </view>
@@ -39,7 +39,7 @@
         <view class="log-amt" style="{{item.isPlus ? '' : 'color: #E07A5F;'}}">{{item.amountText}}</view>
       </view>
       <view class="empty" wx:if="{{!logs.length}}">
-        <view class="empty-icon">💰</view>
+        <view class="mi-glyph glyph-xl icon-empty-wallet empty-glyph"></view>
         <view>暂无账单记录</view>
       </view>
     </block>

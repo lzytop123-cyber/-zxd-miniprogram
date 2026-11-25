@@ -1,7 +1,7 @@
 const { request } = require('../../utils/request')
 const auth = require('../../utils/auth')
 const { handleTabScroll } = require('../../utils/tabbar')
-const { syncTabBar, isStudyAssistantEnabled, leaveStudyAssistantIfDisabled } = require('../../utils/features')
+const { syncTabBar } = require('../../utils/features')
 const { enableShareMenu, shareAppMessage, shareTimeline } = require('../../utils/share')
 const { resolveStaticUrl } = require('../../config')
 const { resolveImageForDisplay } = require('../../utils/media')
@@ -18,25 +18,6 @@ async function resolveLeaderboardAvatar(url) {
   }
 }
 
-const WB_STATUS_FILTERS = [
-  { value: null, label: '全部' },
-  { value: 0, label: '未掌握' },
-  { value: 1, label: '仍然错' },
-  { value: 2, label: '已掌握' },
-]
-const WB_STATUS_LABELS = { 0: '未掌握', 1: '仍然错', 2: '已掌握' }
-
-async function decorateWbItem(row) {
-  const item = row || {}
-  const urls = item.image_urls || []
-  const display = await Promise.all(urls.map((u) => resolveImageForDisplay(u)))
-  return {
-    ...item,
-    cover: display[0] || '',
-    status_label: item.status_label || WB_STATUS_LABELS[item.status] || '未掌握',
-  }
-}
-
 // 将累计分钟数格式化为易读的「X时Y分」（不足 1 小时显示「X分钟」）
 function formatStudyMinutes(minutes) {
   const total = Math.max(0, Math.round(Number(minutes) || 0))
@@ -48,8 +29,6 @@ function formatStudyMinutes(minutes) {
 
 Page({
   data: {
-    tab: 'assistant',
-    blocked: false,
     notLoggedIn: false,
 
     // 学习报告
@@ -61,69 +40,26 @@ Page({
     days: 7,
     scopeLabel: '全平台',
     storeId: null,
-
-    // AI 助手
-    greeting: '',
-    suggestions: [],
-    messages: [],
-    draft: '',
-    loading: false,
-    scrollInto: '',
-    introLoaded: false,
-
-    wbSubjects: [],
-    wbSubjectId: null,
-    wbStatusFilters: WB_STATUS_FILTERS,
-    wbStatus: null,
-    wbTags: [],
-    wbTag: '',
-    wbKeyword: '',
-    wbItems: [],
-    wbPage: 1,
-    wbFinished: false,
-    wbLoading: false,
-    wbLoaded: false,
   },
 
   onShareAppMessage() {
-    return shareAppMessage({ title: '知行岛自习空间 · 学习助手' })
+    return shareAppMessage({ title: '知行岛自习空间 · 学习报告' })
   },
 
   onShareTimeline() {
-    return shareTimeline({ title: '知行岛自习空间 · 学习助手' })
-  },
-
-  onLoad() {
-    if (!isStudyAssistantEnabled()) {
-      this.setData({ blocked: true })
-      leaveStudyAssistantIfDisabled()
-    }
+    return shareTimeline({ title: '知行岛自习空间 · 学习报告' })
   },
 
   onShow() {
     enableShareMenu()
     syncTabBar(this, '/pages/report/index')
-    if (!isStudyAssistantEnabled()) {
-      this.setData({ blocked: true })
-      leaveStudyAssistantIfDisabled()
-      return
-    }
-    this.setData({ blocked: false })
     this._tabbarLastTop = 0
     if (typeof auth.isLoggedIn === 'function' && !auth.isLoggedIn()) {
       this.setData({ notLoggedIn: true, reportLoading: false, reportError: '' })
       return
     }
     this.setData({ notLoggedIn: false })
-    if (this.data.tab === 'report') {
-      this.load({ silent: true })
-    }
-    if (this.data.tab === 'assistant' && !this.data.introLoaded) {
-      this.loadIntro()
-    }
-    if (this.data.tab === 'wrongbook') {
-      this.reloadWrongbook()
-    }
+    this.load({ silent: true })
   },
 
   goLogin() {
@@ -139,31 +75,11 @@ Page({
       wx.stopPullDownRefresh()
       return
     }
-    const tasks = []
-    if (this.data.tab === 'report') {
-      tasks.push(this.load({ force: true }))
-    }
-    if (this.data.tab === 'assistant') {
-      this.setData({ introLoaded: false })
-      tasks.push(this.loadIntro({ force: true }))
-    }
-    if (this.data.tab === 'wrongbook') {
-      tasks.push(this.reloadWrongbook())
-    }
-    Promise.all(tasks).finally(() => wx.stopPullDownRefresh())
-  },
-
-  onReachBottom() {
-    if (this.data.tab !== 'wrongbook' || this.data.wbFinished || this.data.wbLoading) return
-    this.loadWrongbookList()
+    this.load({ force: true }).finally(() => wx.stopPullDownRefresh())
   },
 
   onPageScroll(e) {
     handleTabScroll(this, e.scrollTop)
-  },
-
-  onChatScroll(e) {
-    handleTabScroll(this, e.detail.scrollTop)
   },
 
   load(options = {}) {
@@ -224,19 +140,40 @@ Page({
     const { force = false } = options
     const requestId = (this._dailyRequestId || 0) + 1
     this._dailyRequestId = requestId
-    return request({ url: `/report/daily?days=${this.data.days}`, silent: true, force })
+    const span = Number(this.data.days) || 7
+    return request({ url: `/report/daily?days=${span}`, silent: true, force })
       .then((rows) => {
         if (requestId !== this._dailyRequestId) return
-        const list = rows || []
-        const max = list.reduce((m, r) => Math.max(m, r.total_minutes || 0), 0)
-        const daily = list.map((r) => {
-          const md = String(r.stat_date || '').slice(5).replace('-', '/')
-          return {
-            label: md,
-            minutes: r.total_minutes || 0,
-            height: max > 0 ? Math.max(4, Math.round((r.total_minutes / max) * 100)) : 0,
-          }
+        const list = Array.isArray(rows) ? rows : []
+        const byDate = {}
+        list.forEach((r) => {
+          const key = String(r.stat_date || '').slice(0, 10)
+          if (key) byDate[key] = Math.max(0, Math.round(Number(r.total_minutes) || 0))
         })
+
+        // 补齐连续日期轴（避免仅有 1 天记录时画面孤零零一根柱子）
+        const pad = (n) => (n < 10 ? `0${n}` : `${n}`)
+        const now = new Date()
+        const filled = []
+        for (let i = span - 1; i >= 0; i -= 1) {
+          const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() - i)
+          const iso = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
+          filled.push({
+            label: `${pad(d.getMonth() + 1)}/${pad(d.getDate())}`,
+            minutes: byDate[iso] || 0,
+          })
+        }
+        const max = filled.reduce((m, r) => Math.max(m, r.minutes), 0)
+        const daily = max > 0
+          ? filled.map((r) => ({
+            label: r.label,
+            minutes: r.minutes,
+            valueLabel: r.minutes > 0
+              ? (r.minutes >= 60 ? `${+(r.minutes / 60).toFixed(1)}h` : `${r.minutes}m`)
+              : '',
+            height: r.minutes > 0 ? Math.max(8, Math.round((r.minutes / max) * 100)) : 0,
+          }))
+          : []
         this.setData({ daily })
       })
   },
@@ -251,6 +188,14 @@ Page({
         reportLoading: false,
         reportError: '学习趋势加载失败，请检查网络后重试',
       }))
+  },
+
+  setScope(e) {
+    const idx = Number(e.currentTarget.dataset.scope)
+    if ((idx === 0 && this.data.scopeLabel === '全平台') || (idx === 1 && this.data.scopeLabel === '本店')) {
+      return
+    }
+    return this.onScopeChange({ detail: { value: idx } })
   },
 
   onScopeChange(e) {
@@ -315,203 +260,5 @@ Page({
         this._storeId = picked ? picked.id : null
         return this._storeId
       })
-  },
-
-  switchTab(e) {
-    const tab = e.currentTarget.dataset.tab
-    if (tab === this.data.tab) return
-    this.setData({ tab })
-    if (typeof auth.isLoggedIn === 'function' && !auth.isLoggedIn()) return
-    if (tab === 'report') {
-      this.load({ silent: true })
-    }
-    if (tab === 'assistant' && !this.data.introLoaded) {
-      this.loadIntro()
-    }
-    if (tab === 'wrongbook') {
-      this.reloadWrongbook()
-    }
-  },
-
-  reloadWrongbook() {
-    this.setData({ wbPage: 1, wbFinished: false, wbItems: [] })
-    return Promise.all([
-      request({ url: '/wrongbook/subjects', force: true }).then((rows) => {
-        this.setData({ wbSubjects: rows || [] })
-      }),
-      request({ url: '/wrongbook/tags', force: true, silent: true }).then((rows) => {
-        this.setData({ wbTags: rows || [] })
-      }).catch(() => {}),
-      this.loadWrongbookList(),
-    ])
-  },
-
-  loadWrongbookList() {
-    if (this.data.wbLoading) return Promise.resolve()
-    this.setData({ wbLoading: true })
-    const { wbSubjectId, wbStatus, wbTag, wbKeyword, wbPage } = this.data
-    const query = [
-      `page=${wbPage}`,
-      'page_size=20',
-      wbSubjectId != null ? `subject_id=${wbSubjectId}` : '',
-      wbStatus != null ? `status=${wbStatus}` : '',
-      wbTag ? `tag=${encodeURIComponent(wbTag)}` : '',
-      wbKeyword ? `keyword=${encodeURIComponent(wbKeyword)}` : '',
-    ].filter(Boolean).join('&')
-    return request({ url: `/wrongbook/list?${query}`, force: true })
-      .then(async (res) => {
-        const rows = (res && res.items) || []
-        const decorated = await Promise.all(rows.map((row) => decorateWbItem(row)))
-        const wbItems = wbPage === 1 ? decorated : this.data.wbItems.concat(decorated)
-        this.setData({
-          wbItems,
-          wbPage: wbPage + 1,
-          wbFinished: wbItems.length >= (res.total || 0),
-          wbLoading: false,
-          wbLoaded: true,
-        })
-      })
-      .catch(() => {
-        this.setData({ wbLoading: false })
-      })
-  },
-
-  onWbSubject(e) {
-    const id = e.currentTarget.dataset.id
-    const wbSubjectId = id === '' || id == null ? null : Number(id)
-    if (wbSubjectId === this.data.wbSubjectId) return
-    this.setData({ wbSubjectId, wbPage: 1, wbFinished: false, wbItems: [] })
-    this.loadWrongbookList()
-  },
-
-  onWbStatus(e) {
-    const raw = e.currentTarget.dataset.value
-    const wbStatus = raw === '' || raw == null ? null : Number(raw)
-    if (wbStatus === this.data.wbStatus) return
-    this.setData({ wbStatus, wbPage: 1, wbFinished: false, wbItems: [] })
-    this.loadWrongbookList()
-  },
-
-  onWbTag(e) {
-    const tag = e.currentTarget.dataset.tag || ''
-    const wbTag = tag === this.data.wbTag ? '' : tag
-    this.setData({ wbTag, wbPage: 1, wbFinished: false, wbItems: [] })
-    this.loadWrongbookList()
-  },
-
-  onWbKeyword(e) {
-    this.setData({ wbKeyword: e.detail.value || '' })
-  },
-
-  onWbSearch() {
-    this.setData({ wbPage: 1, wbFinished: false, wbItems: [] })
-    this.loadWrongbookList()
-  },
-
-  goWbDetail(e) {
-    wx.navigateTo({ url: `${routes.wrongbookDetail}?id=${e.currentTarget.dataset.id}` })
-  },
-
-  goWbCreate() {
-    wx.navigateTo({ url: routes.wrongbookEdit })
-  },
-
-  goWbSubjects() {
-    wx.navigateTo({ url: routes.wrongbookSubjects })
-  },
-
-  loadIntro(options = {}) {
-    const { force = false } = options
-    this.setData({ introLoaded: true })
-    return request({ url: '/assistant/intro', silent: true, force })
-      .then((intro) => {
-        this.setData({
-          greeting: intro.greeting,
-          suggestions: intro.suggestions || [],
-        })
-      })
-      .catch(() => {
-        if (!this.data.greeting) {
-          this.setData({ greeting: 'Hi，我是知行岛学习助手小岛 🌱，有什么可以帮你的？' })
-        }
-      })
-  },
-
-  onInput(e) {
-    this.setData({ draft: e.detail.value })
-  },
-
-  onSuggestionTap(e) {
-    if (this.data.loading) return
-    this.sendMessage(e.currentTarget.dataset.q)
-  },
-
-  onSend() {
-    const text = (this.data.draft || '').trim()
-    if (!text || this.data.loading) return
-    this.sendMessage(text)
-  },
-
-  sendMessage(text, options = {}) {
-    if (typeof auth.isLoggedIn === 'function' && !auth.isLoggedIn()) {
-      this.goLogin()
-      return
-    }
-    let messages = this.data.messages || []
-    if (!options.isRetry) {
-      this._seq = (this._seq || 0) + 1
-      messages = messages.concat({ _id: `m${this._seq}`, role: 'user', content: text })
-    }
-    this.setData({ messages, draft: '', loading: true })
-    this.scrollToBottom()
-
-    const payload = messages
-      .filter((m) => !m.isError)
-      .map((m) => ({ role: m.role, content: m.content }))
-    request({
-      url: '/assistant/chat',
-      method: 'POST',
-      data: { messages: payload },
-      silent: true,
-      timeout: 60000,
-    })
-      .then((res) => {
-        this._seq = (this._seq || 0) + 1
-        this.setData({
-          messages: this.data.messages.concat({ _id: `m${this._seq}`, role: 'assistant', content: res.reply }),
-          loading: false,
-        })
-        this.scrollToBottom()
-      })
-      .catch(() => {
-        this._seq = (this._seq || 0) + 1
-        this.setData({
-          messages: this.data.messages.concat({
-            _id: `m${this._seq}`,
-            role: 'assistant',
-            content: '网络有点问题，没能回复你，请稍后再试～',
-            isError: true,
-            retryText: text,
-          }),
-          loading: false,
-        })
-        this.scrollToBottom()
-      })
-  },
-
-  retryChatMessage(e) {
-    if (this.data.loading) return
-    const id = e.currentTarget.dataset.id
-    const target = (this.data.messages || []).find((m) => m._id === id)
-    if (!target) return
-    const cleaned = (this.data.messages || []).filter((m) => m._id !== id)
-    this.setData({ messages: cleaned })
-    this.sendMessage(target.retryText || '', { isRetry: true })
-  },
-
-  scrollToBottom() {
-    this.setData({ scrollInto: '' }, () => {
-      this.setData({ scrollInto: 'chat-bottom' })
-    })
   },
 })

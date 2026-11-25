@@ -649,6 +649,8 @@ class HomeCarouselSetting(Base):
     indicator_dots: Mapped[int] = mapped_column(Integer, default=1)
     hero_height: Mapped[int] = mapped_column(Integer, default=680)
     hero_mode: Mapped[str] = mapped_column(String(20), default="fullscreen")
+    share_title: Mapped[str | None] = mapped_column(String(100))
+    share_image_url: Mapped[str | None] = mapped_column(String(500))
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now, onupdate=datetime.now)
 
 

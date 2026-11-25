@@ -525,3 +525,30 @@ page {
   padding: 0;
 }
 
+
+.hero-meta-value {
+  font-variant-numeric: tabular-nums;
+}
+
+.open-footer {
+  gap: 16rpx;
+  padding-top: 8rpx;
+}
+
+.footer-pill {
+  padding: 12rpx 24rpx;
+  border-radius: 999rpx;
+  font-size: 24rpx;
+  font-weight: 600;
+  color: var(--color-text-brand);
+  background: var(--color-bg-page);
+}
+
+.footer-pill:active {
+  opacity: 0.72;
+}
+
+.footer-pill--danger {
+  color: var(--color-danger);
+  background: rgba(224, 122, 95, 0.1);
+}

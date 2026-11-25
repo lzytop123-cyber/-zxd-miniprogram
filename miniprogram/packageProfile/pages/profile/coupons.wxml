@@ -12,7 +12,7 @@
     <view>正在加载优惠券…</view>
   </view>
   <view class="empty" wx:elif="{{loadError && !allCoupons.length}}">
-    <view class="empty-icon">⚠️</view>
+    <view class="mi-glyph glyph-xl icon-empty-alert empty-glyph"></view>
     <view>{{loadError}}</view>
     <view class="btn-primary" style="margin-top:24rpx;" bindtap="retryLoad">重新加载</view>
   </view>
@@ -28,7 +28,7 @@
       <view class="status" wx:else style="background:#EEF2F0;color:#999;">已过期</view>
     </view>
     <view class="empty" wx:if="{{!coupons.length}}">
-      <view class="empty-icon">🏷</view>
+      <view class="mi-glyph glyph-xl icon-empty-ticket empty-glyph"></view>
       <view>{{tab === 0 ? '暂无可用优惠券' : (tab === 1 ? '暂无已使用优惠券' : '暂无过期优惠券')}}</view>
       <view class="empty-hint" wx:if="{{tab === 0}}" bindtap="goPoints" style="color: #2D6A4F; font-weight: 600;">去用自习积分兑换立减券 ›</view>
     </view>

@@ -76,10 +76,8 @@
   margin-top: -52rpx;
   border-radius: 50%;
   border: 6rpx solid var(--color-bg-card);
-  background: linear-gradient(135deg, #52B788 0%, #2D6A4F 100%);
-  box-shadow:
-    0 10rpx 24rpx rgba(45, 106, 79, 0.38),
-    0 2rpx 6rpx rgba(45, 106, 79, 0.18);
+  background: #2D6A4F;
+  box-shadow: 0 6rpx 16rpx rgba(17, 24, 28, 0.14);
   transition: transform 0.16s ease;
 }
 

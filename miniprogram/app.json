@@ -89,10 +89,10 @@
     }
   },
   "window": {
-    "navigationBarBackgroundColor": "#2D6A4F",
+    "navigationBarBackgroundColor": "#FFFFFF",
     "navigationBarTitleText": "知行岛自习室",
-    "navigationBarTextStyle": "white",
-    "backgroundColor": "#F4FAF6"
+    "navigationBarTextStyle": "black",
+    "backgroundColor": "#F6F7F6"
   },
   "tabBar": {
     "custom": true,
@@ -120,7 +120,7 @@
       },
       {
         "pagePath": "pages/report/index",
-        "text": "学习助手",
+        "text": "学习报告",
         "iconPath": "assets/tab-report.png",
         "selectedIconPath": "assets/tab-report-active.png"
       },

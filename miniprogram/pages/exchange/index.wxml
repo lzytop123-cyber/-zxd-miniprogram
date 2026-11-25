@@ -1,7 +1,10 @@
 <view class="page-exchange page-safe-bottom">
   <view class="card exchange-card">
     <view class="store-row">
-      <view class="store-name {{storePicked ? '' : 'store-name-warn'}}">{{storeName || (storesLoading ? '门店加载中…' : '请先选择门店')}}</view>
+      <view class="store-left">
+        <view class="mi-glyph icon-map-pin store-pin"></view>
+        <view class="store-name {{storePicked ? '' : 'store-name-warn'}}">{{storeName || (storesLoading ? '门店加载中…' : '请先选择门店')}}</view>
+      </view>
       <picker
         wx:if="{{stores.length}}"
         mode="selector"
@@ -19,39 +22,39 @@
         class="platform-tab {{platform === 'meituan' ? 'active' : ''}}"
         data-platform="meituan"
         bindtap="onPlatformTap"
-      >美团</view>
+      >
+        <view class="platform-dot platform-dot--meituan"></view>
+        <text>美团</text>
+      </view>
       <view
         class="platform-tab {{platform === 'douyin' ? 'active' : ''}}"
         data-platform="douyin"
         bindtap="onPlatformTap"
-      >抖音</view>
+      >
+        <view class="platform-dot platform-dot--douyin"></view>
+        <text>抖音</text>
+      </view>
     </view>
-    <view class="exchange-header">
-      <view class="exchange-icon">🎟</view>
-      <view class="exchange-title">{{platformLabel}}团购兑换</view>
-    </view>
-    <view class="hint">{{platform === 'douyin' ? '扫码或相册识别抖音券码，或手动输入12位券号' : '扫码或相册识别券码'}}</view>
 
     <view class="code-field">
       <input
         class="code-input"
-        placeholder="{{platform === 'douyin' ? '请输入12位券号' : '请输入券码'}}"
+        placeholder="{{platform === 'douyin' ? '请输入或粘贴12位抖音券码' : '请输入或粘贴美团券码'}}"
         value="{{code}}"
         bindinput="onInput"
         maxlength="{{platform === 'douyin' ? 256 : 32}}"
         confirm-type="done"
         bindconfirm="onSubmitTap"
       />
-      <view class="code-scan {{loading || scanning ? 'disabled' : ''}}" bindtap="onScanTap">
-        <text class="code-scan-icon">📷</text>
+      <view wx:if="{{code}}" class="code-clear" bindtap="clearCode">×</view>
+      <view wx:else class="code-paste" bindtap="pasteCode">粘贴</view>
+      <view class="code-scan {{loading || scanning ? 'disabled' : ''}}" bindtap="onScanTap" aria-role="button" aria-label="扫码或相册识别券码">
+        <view class="mi-glyph icon-scan"></view>
       </view>
     </view>
+    <view class="code-tip">支持手动输入、粘贴或右侧扫码 / 相册识别</view>
 
     <view class="btn-primary {{loading || !storeId || !storePicked ? 'disabled' : ''}}" bindtap="onSubmitTap">立即兑换</view>
-    <view class="exchange-result" wx:if="{{resultTitle}}">
-      <view class="exchange-result-title">{{resultTitle}}</view>
-      <view class="exchange-result-line" wx:for="{{resultLines}}" wx:key="*this">{{item}}</view>
-    </view>
     <view class="link-records" bindtap="goRecords">查看兑换记录 ›</view>
   </view>
 </view>

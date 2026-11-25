@@ -14,7 +14,6 @@ const DEFAULT_TTL = {
   '/exchange/records': 60 * 1000,
   '/report/summary': 60 * 1000,
   '/report/leaderboard': 60 * 1000,
-  '/assistant/intro': 300 * 1000,
   '/reservation/active/list': 15 * 1000,
 }
 

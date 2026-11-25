@@ -7,6 +7,7 @@ const { syncTabBar, setFeatures, isMarketplaceEnabled } = require('../../utils/f
 const {
   enableShareMenu,
   savePendingInvite,
+  setShareConfig,
   shareAppMessage,
   shareTimeline,
 } = require('../../utils/share')
@@ -72,14 +73,14 @@ Page({
 
   onShareAppMessage() {
     return shareAppMessage({
-      title: '知行岛自习空间 · 专注学习每一天',
+      title: '沉浸自习，来知行岛',
       path: '/pages/home/index',
     })
   },
 
   onShareTimeline() {
     return shareTimeline({
-      title: '知行岛自习空间 · 专注学习每一天',
+      title: '沉浸自习，来知行岛',
     })
   },
 
@@ -122,6 +123,7 @@ Page({
   },
 
   async _applyBannersFromRaw(raw, carousel) {
+    if (carousel && typeof setShareConfig === 'function') setShareConfig(carousel)
     const heroHeight = carousel.hero_height || 680
     const nextSig = bannerSignature(raw)
 
@@ -235,6 +237,7 @@ Page({
       if (!cached) return
 
       const carousel = cached.carousel || this.data.carousel
+      if (carousel && typeof setShareConfig === 'function') setShareConfig(carousel)
       const heroHeight = carousel.hero_height || 680
       this.setData({ carousel, heroHeight })
 

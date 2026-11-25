@@ -3,14 +3,37 @@
   padding-bottom: 32rpx;
 }
 
+.empty-glyph {
+  margin: 0 auto 16rpx;
+}
+
 .item-card {
   margin-bottom: 24rpx;
 }
 
+.item-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16rpx;
+}
+
 .item-card .name {
+  flex: 1;
+  min-width: 0;
   font-size: 30rpx;
   font-weight: 700;
   color: var(--color-text-brand);
+}
+
+.status-pill {
+  flex-shrink: 0;
+  padding: 4rpx 14rpx;
+  border-radius: 999rpx;
+  font-size: 22rpx;
+  font-weight: 600;
+  color: var(--color-primary);
+  background: var(--color-primary-soft);
 }
 
 .item-card .info {

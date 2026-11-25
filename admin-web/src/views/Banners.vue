@@ -61,6 +61,62 @@
       </el-form>
     </el-card>
 
+    <el-card shadow="never" class="settings-card">
+      <template #header>
+        <div class="settings-header">
+          <span>小程序微信分享卡片设置</span>
+          <el-button type="primary" size="small" :loading="savingCarousel" @click="saveCarousel">保存分享设置</el-button>
+        </div>
+      </template>
+      <el-row :gutter="24" align="middle">
+        <el-col :xs="24" :md="14">
+          <el-form :model="carousel" label-width="96px" class="carousel-form">
+            <el-form-item label="转发标题">
+              <el-input
+                v-model="carousel.share_title"
+                maxlength="40"
+                show-word-limit
+                clearable
+                placeholder="留空则使用默认：沉浸自习，来知行岛"
+              />
+              <div class="field-hint">建议 8–16 字，简洁有记忆点（顶部灰字已自带小程序名）</div>
+            </el-form-item>
+            <el-form-item label="5:4 封面图">
+              <div class="share-upload-actions">
+                <el-upload
+                  :show-file-list="false"
+                  accept="image/jpeg,image/png,image/webp"
+                  :http-request="uploadShareImage"
+                >
+                  <el-button :loading="uploadingShare" type="primary" plain size="small">上传封面图</el-button>
+                </el-upload>
+                <el-button
+                  v-if="carousel.share_image_url"
+                  size="small"
+                  @click="carousel.share_image_url = ''"
+                >恢复内置默认图</el-button>
+              </div>
+              <div class="field-hint">推荐比例 5:4（如 750×600 px），小于 2MB；修改保存后小程序无需重新提审即可生效</div>
+            </el-form-item>
+          </el-form>
+        </el-col>
+        <el-col :xs="24" :md="10">
+          <div class="wx-share-preview">
+            <div class="wx-share-app">
+              <span class="wx-share-dot"></span>
+              <span>知行岛自习空间</span>
+            </div>
+            <div class="wx-share-title">{{ carousel.share_title?.trim() || '沉浸自习，来知行岛' }}</div>
+            <div class="wx-share-img-wrap">
+              <img v-if="carousel.share_image_url" :src="carousel.share_image_url" class="wx-share-img" alt="分享封面预览" />
+              <div v-else class="wx-share-img wx-share-img--default">使用小程序内置默认 5:4 封面图</div>
+            </div>
+            <div class="wx-share-foot">小程序</div>
+          </div>
+        </el-col>
+      </el-row>
+    </el-card>
+
     <el-table :data="list" v-loading="loading" stripe class="banner-table">
       <el-table-column prop="sort_order" label="排序" width="70" />
       <el-table-column label="样式" width="100">
@@ -172,6 +228,7 @@ const loading = ref(false)
 const saving = ref(false)
 const savingCarousel = ref(false)
 const uploading = ref(false)
+const uploadingShare = ref(false)
 const showDialog = ref(false)
 const editingId = ref<number | null>(null)
 const form = reactive<any>({})
@@ -182,6 +239,8 @@ const carousel = reactive({
   indicator_dots: true,
   hero_height: 680,
   hero_mode: 'fullscreen',
+  share_title: '',
+  share_image_url: '',
 })
 
 const carouselIntervalSec = computed({
@@ -233,6 +292,21 @@ async function uploadImage(options: { file: File }) {
     ElMessage.success('图片已上传')
   } finally {
     uploading.value = false
+  }
+}
+
+async function uploadShareImage(options: { file: File }) {
+  uploadingShare.value = true
+  try {
+    const fd = new FormData()
+    fd.append('file', options.file)
+    const res = await http.post('/admin/banners/upload-image', fd, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    })
+    carousel.share_image_url = res.data.url
+    ElMessage.success('分享封面已上传，请点击「保存分享设置」生效')
+  } finally {
+    uploadingShare.value = false
   }
 }
 
@@ -334,5 +408,73 @@ onMounted(async () => {
   border-radius: 8px;
   border: 1px solid #eee;
   cursor: pointer;
+}
+.share-upload-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.wx-share-preview {
+  width: 248px;
+  margin: 0 auto;
+  padding: 12px;
+  background: #fff;
+  border: 1px solid #ebeef5;
+  border-radius: 10px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.04);
+}
+.wx-share-app {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: #8c8c8c;
+  margin-bottom: 6px;
+}
+.wx-share-dot {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #1f4e3d;
+  display: inline-block;
+}
+.wx-share-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #191919;
+  line-height: 1.35;
+  margin-bottom: 8px;
+  word-break: break-word;
+}
+.wx-share-img-wrap {
+  width: 100%;
+  aspect-ratio: 5 / 4;
+  border-radius: 4px;
+  overflow: hidden;
+  background: #f5f7f6;
+}
+.wx-share-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.wx-share-img--default {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 12px;
+  box-sizing: border-box;
+  text-align: center;
+  font-size: 12px;
+  color: #2d6a4f;
+  background: #ebf3ee;
+}
+.wx-share-foot {
+  margin-top: 8px;
+  padding-top: 6px;
+  border-top: 1px solid #f2f2f2;
+  font-size: 11px;
+  color: #999;
 }
 </style>

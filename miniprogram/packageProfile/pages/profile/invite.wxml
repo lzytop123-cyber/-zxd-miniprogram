@@ -29,7 +29,7 @@
       <view class="pts">+{{item.reward_points}} 积分</view>
     </view>
     <view class="empty" wx:if="{{!records.length}}">
-      <view class="empty-icon">🌱</view>
+      <view class="mi-glyph glyph-xl icon-leaf empty-glyph"></view>
       <view>暂未邀请好友，快转发给同桌吧</view>
     </view>
   </view>

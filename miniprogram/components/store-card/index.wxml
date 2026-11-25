@@ -10,7 +10,7 @@
     <view wx:else class="cover cover-placeholder">
       <view class="placeholder-bg"></view>
       <view class="placeholder-content">
-        <view class="placeholder-icon">📚</view>
+        <view class="mi-glyph glyph-lg icon-book mi-glyph--invert" style="margin:0 auto 12rpx;"></view>
         <text class="cover-logo">知行岛自习室</text>
       </view>
     </view>

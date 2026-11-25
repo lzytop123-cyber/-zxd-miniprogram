@@ -406,3 +406,100 @@
   background: rgba(255, 255, 255, 0.92);
   box-shadow: var(--shadow-brand-soft);
 }
+
+.bk-sec-sub {
+  font-size: 22rpx;
+  color: var(--color-text-secondary);
+  font-weight: 500;
+}
+
+.seat-list-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4rpx 0;
+}
+
+.seat-list-toggle {
+  font-size: 24rpx;
+  color: var(--color-primary);
+  font-weight: 600;
+}
+
+.bk-bottom {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24rpx;
+}
+
+.bk-bottom-price {
+  display: flex;
+  align-items: baseline;
+  gap: 8rpx;
+  flex-shrink: 0;
+}
+
+.bk-price-label {
+  font-size: 24rpx;
+  color: var(--color-text-secondary);
+}
+
+.bk-price-val {
+  font-size: 40rpx;
+  font-weight: 800;
+  color: var(--color-text-brand);
+  font-variant-numeric: tabular-nums;
+}
+
+.bk-price-hint {
+  font-size: 24rpx;
+  color: var(--color-text-secondary);
+}
+
+.bk-bottom .bk-cta {
+  flex: 1;
+  max-width: 380rpx;
+  padding: 24rpx 0;
+}
+
+/* ============ 极净白底 + 扁平纯色精修 ============ */
+.bk-hero {
+  padding: 20rpx 32rpx 12rpx;
+  background: transparent;
+  border-radius: 0;
+}
+
+.bk-hero-store {
+  font-size: 32rpx;
+  font-weight: 700;
+  color: var(--color-text);
+  text-shadow: none;
+}
+
+.bk-card:first-of-type {
+  margin-top: 8rpx;
+}
+
+.bk-card {
+  border-radius: 24rpx;
+  border: 1rpx solid rgba(17, 24, 28, 0.05);
+  box-shadow: var(--shadow-sm);
+}
+
+.type-primary.active {
+  background: #2D6A4F;
+  border-color: #2D6A4F;
+  box-shadow: none;
+}
+
+.bk-cta {
+  background: #2D6A4F;
+  box-shadow: none;
+  border-radius: 999rpx;
+}
+
+.bk-cta--disabled {
+  background: #DCE2DF;
+  color: #7D8B84;
+}

@@ -6,20 +6,19 @@ const { handleTabScroll } = require('../../utils/tabbar')
 const { syncTabBar, isMarketplaceEnabled } = require('../../utils/features')
 const { enableShareMenu, shareAppMessage, shareTimeline } = require('../../utils/share')
 
-const GOAL_OPTIONS = [
-  { value: 'kaoyan', label: '考研' },
-  { value: 'kaogong', label: '考公' },
-  { value: 'other', label: '其他' },
-]
+function maskPhone(phone) {
+  const s = String(phone || '').replace(/\D/g, '')
+  if (s.length < 7) return ''
+  return `${s.slice(0, 3)}****${s.slice(-4)}`
+}
 
 Page({
   data: {
     loginState: 'loading',
     user: null,
+    phoneMasked: '',
     avatarDisplay: '',
     avatarUploading: false,
-    saving: false,
-    goalOptions: GOAL_OPTIONS,
     showMarketplace: isMarketplaceEnabled(),
     menuUrls: {
       wallet: routes.profileWallet,
@@ -107,6 +106,7 @@ Page({
     this.setData({
       loginState: 'ready',
       user: normalized,
+      phoneMasked: maskPhone(normalized && normalized.phone),
       avatarDisplay: pickAvatarDisplay(localAvatar, normalized),
     })
   },
@@ -140,22 +140,6 @@ Page({
     }
   },
 
-  async saveStudyGoal(e) {
-    const value = e.currentTarget.dataset.value
-    const next = this.data.user?.study_goal === value ? '' : value
-    if (this.data.saving) return
-    this.setData({ saving: true })
-    try {
-      const user = await auth.saveProfile({ studyGoal: next })
-      wx.showToast({ title: '已更新', icon: 'success' })
-      await this.applyUser(user, this.data.avatarDisplay)
-    } catch (err) {
-      wx.showToast({ title: err.detail || '保存失败', icon: 'none' })
-    } finally {
-      this.setData({ saving: false })
-    }
-  },
-
   goEdit() {
     if (!auth.requireLogin('/pages/profile/index')) return
     wx.navigateTo({ url: routes.profileEdit })
@@ -163,20 +147,6 @@ Page({
 
   goLogin() {
     auth.goLogin('/pages/profile/index', { replace: true })
-  },
-
-  doLogout() {
-    wx.showModal({
-      title: '退出登录',
-      content: '退出后需重新登录',
-      confirmColor: '#2D6A4F',
-      success: (res) => {
-        if (!res.confirm) return
-        auth.logout()
-        this.setData({ loginState: 'guest', user: null, avatarDisplay: '' })
-        wx.showToast({ title: '已退出', icon: 'none' })
-      },
-    })
   },
 
   copyUserId() {

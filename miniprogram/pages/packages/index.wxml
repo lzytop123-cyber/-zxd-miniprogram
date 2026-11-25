@@ -47,7 +47,7 @@
     </view>
 
     <view class="buy-empty" wx:else>
-      <view class="empty-icon">🎫</view>
+      <view class="mi-glyph glyph-xl icon-empty-ticket empty-glyph"></view>
       <view>该门店暂无可购套餐</view>
     </view>
   </view>

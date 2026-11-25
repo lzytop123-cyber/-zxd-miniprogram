@@ -172,6 +172,7 @@ Page({
     seatLoadError: '',
     previewLoading: false,
     seatTipDismissed: false,
+    seatListExpanded: false,
     showSeatMap: false,
     seatMapMode: 'legacy',
     seatMapImage: '',
@@ -194,6 +195,10 @@ Page({
     dailyPassSpan: 0,
     dailyPassStartMin: '',
     dailyPassStartMax: '',
+  },
+
+  toggleSeatList() {
+    this.setData({ seatListExpanded: !this.data.seatListExpanded })
   },
 
   onLoad(options) {

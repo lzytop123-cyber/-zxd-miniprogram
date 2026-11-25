@@ -2949,9 +2949,12 @@ class AdminCarouselSettingRequest(BaseModel):
     indicator_dots: bool = True
     hero_height: int = 680
     hero_mode: str = "fullscreen"
+    share_title: str | None = None
+    share_image_url: str | None = None
 
 
 def _carousel_setting_dict(row: HomeCarouselSetting) -> dict:
+    raw_share_img = (getattr(row, "share_image_url", None) or "").strip()
     return {
         "autoplay": bool(row.autoplay),
         "interval": row.interval,
@@ -2959,6 +2962,8 @@ def _carousel_setting_dict(row: HomeCarouselSetting) -> dict:
         "indicator_dots": bool(row.indicator_dots),
         "hero_height": row.hero_height,
         "hero_mode": row.hero_mode or "fullscreen",
+        "share_title": (getattr(row, "share_title", None) or "").strip(),
+        "share_image_url": public_static_url(raw_share_img) if raw_share_img else "",
     }
 
 
@@ -2992,6 +2997,10 @@ def update_carousel_settings_admin(
     row.indicator_dots = 1 if body.indicator_dots else 0
     row.hero_height = max(360, min(body.hero_height, 880))
     row.hero_mode = body.hero_mode if body.hero_mode in ("fullscreen", "card") else "fullscreen"
+    if body.share_title is not None:
+        row.share_title = body.share_title.strip()[:100] or None
+    if body.share_image_url is not None:
+        row.share_image_url = body.share_image_url.strip()[:500] or None
     db.commit()
     db.refresh(row)
     from app.api.routes.home import invalidate_home_cache

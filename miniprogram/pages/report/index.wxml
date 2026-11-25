@@ -1,53 +1,47 @@
-<view class="page-report {{tab==='assistant' ? 'chat-mode' : ''}}">
-  <view wx:if="{{blocked}}" class="blocked-tip">功能暂未开放，正在返回首页…</view>
-  <view wx:elif="{{notLoggedIn}}" class="card" style="margin:32rpx 24rpx;padding:64rpx 32rpx;text-align:center;">
-    <view style="font-size:32rpx;font-weight:600;margin-bottom:12rpx;">登录后开启学习助手与报告</view>
-    <view style="font-size:26rpx;color:#666;margin-bottom:36rpx;">查看自习趋势、排行榜并使用 AI 学习助手</view>
-    <view class="btn-primary" bindtap="goLogin">去登录</view>
-  </view>
-  <block wx:else>
-  <!-- 顶部分段切换 -->
-  <view class="seg-wrap">
-    <view class="seg">
-      <view class="seg-item {{tab==='assistant' ? 'on' : ''}}" bindtap="switchTab" data-tab="assistant">AI助手</view>
-      <view class="seg-item {{tab==='report' ? 'on' : ''}}" bindtap="switchTab" data-tab="report">学习报告</view>
-    </view>
+<view class="page-report">
+  <view wx:if="{{notLoggedIn}}" class="card guest-report-card">
+    <view class="mi-glyph glyph-xl icon-book-open empty-glyph"></view>
+    <view class="guest-report-title">登录后查看学习报告</view>
+    <view class="guest-report-desc">查看累计自习时长、学习趋势与排行榜</view>
+    <view class="btn-primary guest-report-btn" bindtap="goLogin">去登录</view>
   </view>
 
-  <!-- ============ 学习报告 ============ -->
-  <view wx:if="{{tab==='report'}}" class="report-body">
+  <view wx:else class="report-body">
     <view class="report-loading" wx:if="{{reportLoading && !summary && !daily.length && !leaderboard.length}}">正在加载学习报告…</view>
     <view class="report-error" wx:if="{{reportError}}">
       <view>{{reportError}}</view>
       <view class="report-retry" bindtap="retryReport">重新加载报告</view>
     </view>
-    <!-- scope 切换靠右浮 -->
-    <view class="report-scope-row">
-      <picker mode="selector" range="{{['全平台','本店']}}" bindchange="onScopeChange">
-        <view class="scope">{{scopeLabel}} ▼</view>
-      </picker>
-    </view>
 
-    <!-- 卡 A：个人成绩 -->
-    <view class="card report-card" wx:if="{{summary}}">
-      <view class="my-rank" wx:if="{{summary}}">
-        <view class="rank-no" wx:if="{{summary.rank}}">#{{summary.rank}}</view>
-        <view class="title-badge">{{summary.title}}</view>
-        <view class="beat">超越了 {{summary.beat_percent}}% 的学员</view>
+    <!-- 卡 A：深森绿品牌数据主卡 -->
+    <view class="hero-summary" wx:if="{{summary}}">
+      <view class="hero-summary-head">
+        <view class="hero-title-pill">{{summary.title || '新同学'}}</view>
+        <view class="hero-rank" wx:if="{{summary.rank}}">
+          <text class="hero-rank-label">当前排名</text>
+          <text class="hero-rank-no">#{{summary.rank}}</text>
+        </view>
       </view>
-      <view class="stat-row" wx:if="{{summary}}">
-        <view class="stat">
-          <view class="num">{{summary.total_sessions}}</view>
-          <view class="stat-label">次数</view>
+
+      <view class="hero-stats">
+        <view class="hero-stat">
+          <view class="hero-stat-num">{{summary.total_hours}}<text class="hero-stat-unit">时</text>{{summary.total_minutes_remainder}}<text class="hero-stat-unit">分</text></view>
+          <view class="hero-stat-label">累计时长</view>
         </view>
-        <view class="stat">
-          <view class="num">{{summary.total_hours}}时{{summary.total_minutes_remainder}}分</view>
-          <view class="stat-label">时长</view>
+        <view class="hero-stat-sep"></view>
+        <view class="hero-stat">
+          <view class="hero-stat-num">{{summary.total_sessions}}<text class="hero-stat-unit">次</text></view>
+          <view class="hero-stat-label">自习次数</view>
         </view>
-        <view class="stat">
-          <view class="num">{{summary.daily_avg_minutes}}分</view>
-          <view class="stat-label">日均</view>
+        <view class="hero-stat-sep"></view>
+        <view class="hero-stat">
+          <view class="hero-stat-num">{{summary.daily_avg_minutes}}<text class="hero-stat-unit">分</text></view>
+          <view class="hero-stat-label">日均时长</view>
         </view>
+      </view>
+
+      <view class="hero-beat" wx:if="{{summary.beat_percent != null}}">
+        超越了 {{summary.beat_percent}}% 的同岛学员
       </view>
     </view>
 
@@ -55,13 +49,14 @@
     <view class="card report-card">
       <view class="card-head">
         <text class="card-head-title">学习趋势</text>
-        <view class="tabs">
-          <view class="chip {{days===7?'active':''}}" bindtap="setDays" data-d="7">近7日</view>
-          <view class="chip {{days===30?'active':''}}" bindtap="setDays" data-d="30">近30日</view>
+        <view class="seg-mini">
+          <view class="seg-mini-item {{days===7?'active':''}}" bindtap="setDays" data-d="7">近7日</view>
+          <view class="seg-mini-item {{days===30?'active':''}}" bindtap="setDays" data-d="30">近30日</view>
         </view>
       </view>
-      <view class="daily-chart" wx:if="{{daily.length}}">
+      <view class="daily-chart {{days===30?'daily-chart--dense':''}}" wx:if="{{daily.length}}">
         <view class="daily-bar" wx:for="{{daily}}" wx:key="label">
+          <text class="daily-bar-val" wx:if="{{days===7 && item.valueLabel}}">{{item.valueLabel}}</text>
           <view class="daily-bar-track">
             <view class="daily-bar-fill" style="height: {{item.height}}%"></view>
           </view>
@@ -75,10 +70,14 @@
     <view class="card report-card">
       <view class="card-head">
         <text class="card-head-title">排行榜</text>
+        <view class="seg-mini">
+          <view class="seg-mini-item {{scopeLabel==='全平台'?'active':''}}" bindtap="setScope" data-scope="0">全平台</view>
+          <view class="seg-mini-item {{scopeLabel==='本店'?'active':''}}" bindtap="setScope" data-scope="1">本店</view>
+        </view>
       </view>
       <view class="rank-list">
         <view class="rank-item {{item.is_self?'self':''}}" wx:for="{{leaderboard}}" wx:key="rank">
-          <text class="rank">{{item.rank === 1 ? '🏆' : item.rank}}</text>
+          <view class="rank {{item.rank <= 3 ? 'rank-medal rank-medal--' + item.rank : ''}}">{{item.rank}}</view>
           <image wx:if="{{item.avatar_url}}" class="rank-avatar" src="{{item.avatar_url}}" mode="aspectFill" />
           <view wx:else class="rank-avatar rank-avatar-ph">岛</view>
           <text class="name">{{item.nickname}}</text>
@@ -88,76 +87,4 @@
       </view>
     </view>
   </view>
-
-  <!-- ============ AI 助手 ============ -->
-  <block wx:else>
-    <scroll-view
-      class="chat-scroll"
-      scroll-y
-      scroll-into-view="{{scrollInto}}"
-      scroll-with-animation
-      bindscroll="onChatScroll"
-    >
-      <view class="chat-inner">
-        <view class="msg-row left" wx:if="{{greeting}}">
-          <view class="avatar bot">岛</view>
-          <view class="bubble bot">
-            <text>{{greeting}}</text>
-          </view>
-        </view>
-
-        <view class="suggestions" wx:if="{{suggestions.length && !messages.length}}">
-          <view
-            class="sug-chip"
-            wx:for="{{suggestions}}"
-            wx:key="*this"
-            data-q="{{item}}"
-            bindtap="onSuggestionTap"
-          >{{item}}</view>
-        </view>
-
-        <view
-          wx:for="{{messages}}"
-          wx:key="_id"
-          class="msg-row {{item.role === 'user' ? 'right' : 'left'}}"
-        >
-          <view wx:if="{{item.role !== 'user'}}" class="avatar bot">岛</view>
-          <view class="bubble {{item.role === 'user' ? 'user' : 'bot'}}">
-            <text>{{item.content}}</text>
-            <view
-              wx:if="{{item.isError}}"
-              data-id="{{item._id}}"
-              bindtap="retryChatMessage"
-              style="margin-top:12rpx;color:#2D6A4F;font-size:24rpx;font-weight:600;"
-            >重试 ↻</view>
-          </view>
-        </view>
-
-        <view class="msg-row left" wx:if="{{loading}}">
-          <view class="avatar bot">岛</view>
-          <view class="bubble bot typing">
-            <view class="dot"></view>
-            <view class="dot"></view>
-            <view class="dot"></view>
-          </view>
-        </view>
-
-        <view id="chat-bottom" class="bottom-anchor"></view>
-      </view>
-    </scroll-view>
-
-    <view class="chat-input-bar">
-      <input
-        class="chat-input"
-        value="{{draft}}"
-        placeholder="问点什么吧…"
-        confirm-type="send"
-        bindinput="onInput"
-        bindconfirm="onSend"
-        disabled="{{loading}}"
-      />
-      <view class="chat-send {{(draft && !loading) ? '' : 'disabled'}}" bindtap="onSend">发送</view>
-    </view>
-  </block>
-  </block>
 </view>

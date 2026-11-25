@@ -62,4 +62,8 @@
     <view class="btn-primary setup-save" bindtap="saveProfile">保存</view>
     <view class="setup-note">学号 #{{user.id}}</view>
   </view>
+
+  <view wx:if="{{!loading}}" class="edit-logout-wrap">
+    <view class="btn-edit-logout" bindtap="doLogout">退出登录</view>
+  </view>
 </view>

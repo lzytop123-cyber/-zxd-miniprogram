@@ -183,4 +183,20 @@ Page({
       this.setData({ saving: false })
     }
   },
+
+  doLogout() {
+    wx.showModal({
+      title: '退出登录',
+      content: '退出后需重新登录',
+      confirmColor: '#2D6A4F',
+      success: (res) => {
+        if (!res.confirm) return
+        auth.logout()
+        wx.showToast({ title: '已退出', icon: 'none' })
+        setTimeout(() => {
+          wx.switchTab({ url: '/pages/profile/index' })
+        }, 400)
+      },
+    })
+  },
 })

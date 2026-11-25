@@ -85,6 +85,26 @@ Page({
     this.setData({ code: e.detail.value.trim() })
   },
 
+  clearCode() {
+    this.setData({ code: '' })
+  },
+
+  pasteCode() {
+    wx.getClipboardData({
+      success: (res) => {
+        const text = String((res && res.data) || '').trim()
+        if (!text) {
+          wx.showToast({ title: '剪贴板为空', icon: 'none' })
+          return
+        }
+        this.setData({ code: text })
+      },
+      fail: () => {
+        wx.showToast({ title: '无法读取剪贴板', icon: 'none' })
+      },
+    })
+  },
+
   _applyScanResult(res) {
     const { fillCodeFromScanResult } = require('./utils/voucherScan')
     const parsed = fillCodeFromScanResult(res, { platform: this.data.platform })

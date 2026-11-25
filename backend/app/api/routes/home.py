@@ -49,6 +49,8 @@ DEFAULT_CAROUSEL = {
     "indicator_dots": True,
     "hero_height": 680,
     "hero_mode": "fullscreen",
+    "share_title": "",
+    "share_image_url": "",
 }
 
 
@@ -84,6 +86,7 @@ def _banner_visible(data: dict) -> bool:
 def _carousel_from_row(row: HomeCarouselSetting | None) -> dict:
     if not row:
         return DEFAULT_CAROUSEL.copy()
+    raw_share_img = _banner_field(getattr(row, "share_image_url", None))
     return {
         "autoplay": bool(row.autoplay),
         "interval": max(2000, row.interval or 5000),
@@ -91,6 +94,8 @@ def _carousel_from_row(row: HomeCarouselSetting | None) -> dict:
         "indicator_dots": bool(row.indicator_dots),
         "hero_height": max(360, min(row.hero_height or 680, 880)),
         "hero_mode": (row.hero_mode or "fullscreen").strip() or "fullscreen",
+        "share_title": _banner_field(getattr(row, "share_title", None)),
+        "share_image_url": public_static_url(raw_share_img) if raw_share_img else "",
     }
 
 

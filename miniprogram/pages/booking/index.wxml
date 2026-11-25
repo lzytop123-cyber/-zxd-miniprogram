@@ -49,8 +49,10 @@
     <view class="bk-divider"></view>
 
     <!-- 段2：时间 -->
-    <view class="bk-sec"><text class="bk-sec-title">使用时间</text></view>
-    <view class="hint hint--sec" wx:if="{{billType !== 'night'}}">{{storeHoursHint}}</view>
+    <view class="bk-sec">
+      <text class="bk-sec-title">使用时间</text>
+      <text class="bk-sec-sub" wx:if="{{billType !== 'night'}}">{{storeHoursHint}}</text>
+    </view>
 
     <!-- 按小时 -->
     <block wx:if="{{billType==='hourly'}}">
@@ -70,7 +72,6 @@
         <view class="chip {{quickHours===4?'active':''}}" bindtap="setHours" data-h="4">4小时</view>
         <view class="chip {{quickHours===8?'active':''}}" bindtap="setHours" data-h="8">8小时</view>
       </view>
-      <view class="hint">{{hourlyHint}}</view>
     </block>
 
     <!-- 天卡 -->
@@ -184,9 +185,7 @@
       <view class="hint" wx:else>{{nightHint}}</view>
     </block>
 
-    <view class="time-summary" wx:if="{{timeSummary}}">
-      <text class="ts-icon">🕑</text>{{timeSummary}}
-    </view>
+    <view class="time-summary" wx:if="{{timeSummary && billType !== 'hourly'}}">{{timeSummary}}</view>
     <view class="preview-error" wx:if="{{previewError}}">{{previewError}}</view>
   </view>
 
@@ -210,15 +209,6 @@
       <view class="seat-legend-item"><view class="seat-dot available"></view><text>可选</text></view>
       <view class="seat-legend-item"><view class="seat-dot selected"></view><text>已选</text></view>
       <view class="seat-legend-item"><view class="seat-dot reserved"></view><text>已约</text></view>
-      <view class="seat-count">
-        <text wx:if="{{seatMapMode === 'image' && seatMapReady && seatMapMarkers.length}}">共 {{seatMapMarkers.length}} 座</text>
-        <text wx:if="{{seatMapMode === 'image' && seatMapReady && seatMapMarkers.length && !seatsLoading && !seatLoadError}}"> · </text>
-        <block wx:if="{{!seatsLoading && !seatLoadError}}">
-          <text>该时段可订 </text>
-          <text class="seat-count-num">{{availableSeatCount}}</text>
-          <text> 座</text>
-        </block>
-      </view>
     </view>
 
     <view class="seat-load-error" wx:if="{{seatLoadError}}">
@@ -243,24 +233,28 @@
     <view class="seat-map-empty" wx:else>请先选择时间</view>
 
     <view class="seat-list" wx:if="{{seatGroups.length && !seatLoadError}}">
-      <view class="seat-list-title">列表选座</view>
-      <view class="seat-list-hint">单手操作时，可直接按区域选择空座</view>
-      <view class="seat-list-group" wx:for="{{seatGroups}}" wx:key="name" wx:for-item="group">
-        <view class="seat-list-group-name">{{group.name}}</view>
-        <view class="seat-list-options">
-          <view
-            class="seat-list-option {{selectedId===item.id?'active':''}}"
-            aria-role="button"
-            aria-label="{{selectedId===item.id?'已选择座位':''}}{{group.name}}{{item.label}}号"
-            wx:for="{{group.seats}}"
-            wx:key="id"
-            data-id="{{item.id}}"
-            data-code="{{item.code}}"
-            data-status="{{item.status}}"
-            bindtap="selectSeat"
-          >{{item.label}}号</view>
-        </view>
+      <view class="seat-list-head" bindtap="toggleSeatList">
+        <view class="seat-list-title">列表选座</view>
+        <view class="seat-list-toggle">{{seatListExpanded ? '收起 ▴' : '展开 ▾'}}</view>
       </view>
+      <block wx:if="{{seatListExpanded}}">
+        <view class="seat-list-group" wx:for="{{seatGroups}}" wx:key="name" wx:for-item="group">
+          <view class="seat-list-group-name">{{group.name}}</view>
+          <view class="seat-list-options">
+            <view
+              class="seat-list-option {{selectedId===item.id?'active':''}}"
+              aria-role="button"
+              aria-label="{{selectedId===item.id?'已选择座位':''}}{{group.name}}{{item.label}}号"
+              wx:for="{{group.seats}}"
+              wx:key="id"
+              data-id="{{item.id}}"
+              data-code="{{item.code}}"
+              data-status="{{item.status}}"
+              bindtap="selectSeat"
+            >{{item.label}}号</view>
+          </view>
+        </view>
+      </block>
     </view>
   </view>
 
@@ -270,21 +264,36 @@
     module.exports = {
       text: function(loading, err, seatId, preview) {
         if (loading) return '计算中…'
-        if (err) return '请检查使用时间'
+        if (err) return '请检查时间'
         if (!seatId) return '请选择座位'
         if (preview && preview.seat_id === seatId) return '立即预定'
         return '请稍候…'
       },
       ready: function(seatId, preview, loading) {
         return !!(seatId && preview && !loading && preview.seat_id === seatId)
+      },
+      price: function(val) {
+        var n = parseFloat(val)
+        if (isNaN(n)) return '0'
+        var s = n.toFixed(2)
+        if (s.slice(-3) === '.00') return s.slice(0, -3)
+        if (s.slice(-1) === '0') return s.slice(0, -1)
+        return s
       }
     }
   </wxs>
 
-  <!-- 底部 CTA：禁用时文案说明缺什么 -->
+  <!-- 底部 CTA：左价格 + 右按钮 -->
   <view class="bk-bottom">
+    <view class="bk-bottom-price" wx:if="{{seatId && preview && preview.seat_id === seatId && !previewLoading}}">
+      <text class="bk-price-label">预估</text>
+      <text class="bk-price-val">¥{{cta.price(preview.final_price)}}</text>
+    </view>
+    <view class="bk-bottom-price bk-bottom-price--muted" wx:else>
+      <text class="bk-price-hint">{{seatId ? (previewLoading ? '计算价格中…' : '选择时间后计价') : '请选择座位'}}</text>
+    </view>
     <view
-      class="bk-cta full {{cta.ready(seatId, preview, previewLoading) ? '' : 'bk-cta--disabled'}}"
+      class="bk-cta {{cta.ready(seatId, preview, previewLoading) ? '' : 'bk-cta--disabled'}}"
       bindtap="goOrder"
     >{{cta.text(previewLoading, previewError, seatId, preview)}}</view>
   </view>

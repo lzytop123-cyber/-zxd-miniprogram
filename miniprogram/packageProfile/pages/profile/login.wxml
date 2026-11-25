@@ -23,17 +23,6 @@
       >{{phoneBtnText}}</button>
       <view wx:else class="btn-primary welcome-main disabled" bindtap="onNeedAgree">{{phoneBtnText}}</view>
 
-      <button
-        wx:if="{{agreed}}"
-        class="welcome-secondary welcome-phone-btn welcome-secondary-btn"
-        open-type="getPhoneNumber"
-        bindgetphonenumber="onPhoneLogin"
-        hover-class="none"
-        loading="{{phoneLogging}}"
-        disabled="{{phoneLogging}}"
-      >一键快捷登录/注册</button>
-      <view wx:else class="welcome-secondary disabled" bindtap="onNeedAgree">一键快捷登录/注册</view>
-
       <view class="welcome-links">
         <text class="welcome-skip" bindtap="onSkipLogin">取消 / 暂不登录</text>
       </view>
