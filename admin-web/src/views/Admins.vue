@@ -36,7 +36,7 @@
         </template>
       </el-table-column>
       <el-table-column prop="created_at" label="创建时间" width="170" />
-      <el-table-column label="操作" width="90" fixed="right">
+      <el-table-column label="操作" width="90" :fixed="isMobile ? false : 'right'">
         <template #default="{ row }">
           <el-button
             v-if="canEditRow(row)"
@@ -98,6 +98,8 @@
 </template>
 
 <script setup lang="ts">
+import { useIsMobile } from '../composables/useIsMobile'
+const isMobile = useIsMobile()
 import { onMounted, reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import http from '../api/http'

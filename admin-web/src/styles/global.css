@@ -195,3 +195,214 @@ body {
 .text-muted { color: var(--muted); }
 .text-ink { color: var(--ink); }
 .tnum { font-variant-numeric: tabular-nums; }
+
+/* ============ 移动端通用卡片列表 ============ */
+.m-card-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.m-card {
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 14px;
+  box-shadow: 0 1px 3px rgba(20, 22, 30, 0.03);
+}
+.m-card-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 8px;
+  padding-bottom: 10px;
+  margin-bottom: 10px;
+  border-bottom: 1px dashed var(--line);
+}
+.m-card-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink);
+  word-break: break-all;
+}
+.m-card-sub {
+  font-size: 12px;
+  color: var(--muted);
+  margin-top: 2px;
+}
+.m-card-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  justify-content: flex-end;
+  flex-shrink: 0;
+}
+.m-card-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px 12px;
+  font-size: 12.5px;
+}
+.m-card-field {
+  min-width: 0;
+}
+.m-card-field.full {
+  grid-column: 1 / -1;
+}
+.m-card-field .k {
+  display: block;
+  font-size: 11px;
+  color: var(--muted);
+  margin-bottom: 2px;
+}
+.m-card-field .v {
+  color: var(--ink);
+  word-break: break-word;
+}
+.m-card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+}
+.m-card-actions .el-button {
+  margin-left: 0 !important;
+}
+.m-filter-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.m-filter-bar .el-input {
+  flex: 1;
+}
+.m-empty {
+  padding: 36px 16px;
+  text-align: center;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+/* ============ 移动端全局响应式兜底 (<= 768px) ============ */
+@media (max-width: 768px) {
+  body {
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  /* 卡片头部和内边距收紧 */
+  .el-card__header {
+    padding: 12px 14px;
+  }
+  .el-card__body {
+    padding: 14px;
+  }
+
+  /* 页面常见 header-row 自动换行，防止按钮/筛选被挤出卡片 */
+  .header-row {
+    flex-wrap: wrap !important;
+    gap: 10px !important;
+  }
+
+  /* Dialog / Drawer 统一适配手机屏幕宽度 */
+  .el-dialog {
+    width: 94vw !important;
+    max-width: 94vw !important;
+    margin: 5vh auto 24px !important;
+  }
+  .el-dialog__header {
+    padding: 14px 16px 12px !important;
+  }
+  .el-dialog__body {
+    padding: 16px !important;
+    max-height: 70dvh;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  .el-dialog__footer {
+    padding: 12px 16px !important;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 8px;
+  }
+  .el-dialog__footer .el-button {
+    margin-left: 0 !important;
+  }
+  .el-drawer {
+    width: 100vw !important;
+    max-width: 100vw !important;
+    --el-drawer-padding-primary: 16px;
+  }
+  .el-drawer__header {
+    margin-bottom: 12px !important;
+    padding-bottom: 12px;
+  }
+  .el-drawer__body {
+    padding: 0 16px 24px !important;
+  }
+  .el-popover.el-popper {
+    max-width: calc(100vw - 16px) !important;
+  }
+  .el-message-box {
+    width: min(92vw, 420px) !important;
+  }
+
+  /* 常规表单：label 置顶，避免 100px~160px 固定 label-width 挤扁输入框 */
+  .el-form:not(.el-form--inline) .el-form-item {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    margin-bottom: 14px;
+  }
+  .el-form:not(.el-form--inline) .el-form-item__label {
+    width: auto !important;
+    max-width: 100% !important;
+    justify-content: flex-start !important;
+    text-align: left !important;
+    line-height: 1.4 !important;
+    padding: 0 0 6px 0 !important;
+    height: auto !important;
+  }
+  .el-form:not(.el-form--inline) .el-form-item__content {
+    margin-left: 0 !important;
+  }
+
+  /* 行内筛选表单：自适应换行、避免固定宽度溢出 */
+  .el-form--inline {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 10px;
+  }
+  .el-form--inline .el-form-item {
+    margin-right: 0 !important;
+    margin-bottom: 4px !important;
+    max-width: 100%;
+  }
+  .el-form--inline .el-form-item__content {
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  /* 表格触控滚动优化 */
+  .el-table__body-wrapper,
+  .el-scrollbar__wrap {
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* 分页允许换行居中 */
+  .el-pagination {
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 6px 2px;
+  }
+
+  /* 描述列表在小屏下防撑破 */
+  .el-descriptions__label {
+    white-space: nowrap;
+  }
+  .el-descriptions__content {
+    word-break: break-word;
+  }
+}

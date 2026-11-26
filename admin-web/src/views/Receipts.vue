@@ -77,7 +77,113 @@
         <span class="muted">显示全部待核对核销，不限年月。参考价不计入汇总；已经手工记过账的券请关联原收款。</span>
         <el-button type="primary" :loading="reconciling" :disabled="!total" @click="bulkReconcile">一键核对</el-button>
       </div>
-      <el-table v-if="tab === 'receipts'" :data="receipts" v-loading="listLoading" stripe empty-text="暂无收款记录，可登记收款或切换年月查看">
+      <!-- 手机端卡片列表 -->
+      <div v-if="isMobile && tab === 'receipts'" v-loading="listLoading" class="m-card-list">
+        <div v-for="row in receipts" :key="row.id" class="m-card">
+          <div class="m-card-head">
+            <div>
+              <div class="m-card-title">{{ channels[row.channel as Channel] }} · ¥{{ money(row.amount) }}</div>
+              <div class="m-card-sub">#{{ row.id }} · {{ row.customer || '未填付款人' }}</div>
+            </div>
+            <div class="m-card-tags">
+              <el-tag v-if="row.received_on" type="info" size="small">{{ row.received_on }}</el-tag>
+              <el-tag v-else type="warning" size="small">待补日期</el-tag>
+              <el-tag v-if="row.refund_needs_review" size="small" type="warning">退款待核实</el-tag>
+            </div>
+          </div>
+          <div class="m-card-grid">
+            <div class="m-card-field">
+              <span class="k">门店</span>
+              <span class="v">{{ storeName(row.store_id) }}</span>
+            </div>
+            <div class="m-card-field">
+              <span class="k">累计退款</span>
+              <span class="v tnum">¥{{ money(row.refunded_amount) }}</span>
+            </div>
+            <div class="m-card-field full" v-if="row.reference">
+              <span class="k">流水号 / 订单号</span>
+              <span class="v tnum">{{ row.reference }}</span>
+            </div>
+            <div class="m-card-field full" v-if="row.remark">
+              <span class="k">备注</span>
+              <span class="v">{{ row.remark }}</span>
+            </div>
+          </div>
+          <div class="m-card-actions">
+            <el-button v-if="!row.received_on" size="small" type="primary" plain @click="openDate(row)">补收款日期</el-button>
+            <el-button v-else-if="Number(row.remaining) > 0" size="small" type="primary" plain @click="openRefund(row)">登记退款</el-button>
+            <span v-else class="muted">已全额退款</span>
+          </div>
+        </div>
+        <div v-if="!listLoading && !receipts.length" class="m-empty">暂无收款记录，可登记收款或切换年月查看</div>
+      </div>
+
+      <div v-else-if="isMobile && tab === 'refunds'" v-loading="listLoading" class="m-card-list">
+        <div v-for="row in refunds" :key="row.id" class="m-card">
+          <div class="m-card-head">
+            <div>
+              <div class="m-card-title">{{ channels[row.channel as Channel] }} · -¥{{ money(row.amount) }}</div>
+              <div class="m-card-sub">原收款 #{{ row.receipt_id }} · {{ row.customer || '-' }}</div>
+            </div>
+            <div class="m-card-tags">
+              <el-tag type="success" size="small">已完成退款</el-tag>
+            </div>
+          </div>
+          <div class="m-card-grid">
+            <div class="m-card-field">
+              <span class="k">退款日期</span>
+              <span class="v tnum">{{ row.refunded_on }}</span>
+            </div>
+            <div class="m-card-field full" v-if="row.reference">
+              <span class="k">原流水号 / 订单号</span>
+              <span class="v tnum">{{ row.reference }}</span>
+            </div>
+            <div class="m-card-field full" v-if="row.reason">
+              <span class="k">退款原因</span>
+              <span class="v">{{ row.reason }}</span>
+            </div>
+          </div>
+        </div>
+        <div v-if="!listLoading && !refunds.length" class="m-empty">所选期间暂无已登记退款</div>
+      </div>
+
+      <div v-else-if="isMobile && tab === 'platforms'" v-loading="listLoading" class="m-card-list">
+        <div v-for="row in platforms" :key="row.id" class="m-card">
+          <div class="m-card-head">
+            <div>
+              <div class="m-card-title">{{ row.deal_name || '团购核销' }}</div>
+              <div class="m-card-sub">{{ row.channel ? channels[row.channel as Channel] : '待确认' }} · {{ row.customer || '-' }}</div>
+            </div>
+            <div class="m-card-tags">
+              <el-tag type="warning" size="small">{{ row.received_on || '待确认日期' }}</el-tag>
+            </div>
+          </div>
+          <div class="m-card-grid">
+            <div class="m-card-field">
+              <span class="k">接口实付</span>
+              <span class="v tnum">{{ row.amount === null ? '待核对' : `¥${money(row.amount)}` }}</span>
+            </div>
+            <div class="m-card-field">
+              <span class="k">参考价</span>
+              <span class="v tnum">{{ row.reference_price === null ? '—' : `¥${money(row.reference_price)}` }}</span>
+            </div>
+            <div class="m-card-field full" v-if="row.reference">
+              <span class="k">券码 / 流水号</span>
+              <span class="v tnum">{{ row.reference }}</span>
+            </div>
+            <div class="m-card-field full">
+              <span class="k">待核对原因</span>
+              <span class="v">{{ row.reason }}</span>
+            </div>
+          </div>
+          <div class="m-card-actions">
+            <el-button size="small" type="primary" plain @click="openPlatform(row)">核对入账</el-button>
+          </div>
+        </div>
+        <div v-if="!listLoading && !platforms.length" class="m-empty">暂无待核对核销</div>
+      </div>
+
+      <el-table v-else-if="tab === 'receipts'" :data="receipts" v-loading="listLoading" stripe empty-text="暂无收款记录，可登记收款或切换年月查看">
         <el-table-column prop="id" label="编号" width="75" />
         <el-table-column label="收款日期" width="135"><template #default="{ row }"><span v-if="row.received_on">{{ row.received_on }}</span><el-tag v-else type="warning" size="small">待补日期</el-tag></template></el-table-column>
         <el-table-column label="渠道" width="155"><template #default="{ row }">{{ channels[row.channel as Channel] }}</template></el-table-column>
@@ -88,7 +194,7 @@
         <el-table-column prop="reference" label="流水号 / 订单号" min-width="180" show-overflow-tooltip />
         <el-table-column prop="remark" label="备注" min-width="140" show-overflow-tooltip />
         <el-table-column label="来源 / 状态" width="140"><template #default="{ row }"><span>{{ row.source_label }}</span><div v-if="row.refund_needs_review"><el-tag size="small" type="warning">退款待核实</el-tag></div></template></el-table-column>
-        <el-table-column label="操作" width="115" fixed="right"><template #default="{ row }">
+        <el-table-column label="操作" width="115" :fixed="isMobile ? false : 'right'"><template #default="{ row }">
           <el-button v-if="!row.received_on" link type="primary" @click="openDate(row)">补收款日期</el-button>
           <el-button v-else-if="Number(row.remaining) > 0" link type="primary" @click="openRefund(row)">登记退款</el-button>
           <span v-else class="muted">已全额退款</span>
@@ -113,9 +219,9 @@
         <el-table-column label="接口实付（元）" width="135" align="right"><template #default="{ row }">{{ row.amount === null ? '待核对' : money(row.amount) }}</template></el-table-column>
         <el-table-column label="参考价（元）" width="125" align="right"><template #default="{ row }">{{ row.reference_price === null ? '—' : money(row.reference_price) }}</template></el-table-column>
         <el-table-column prop="reason" label="待核对原因" min-width="240" />
-        <el-table-column label="操作" width="100" fixed="right"><template #default="{ row }"><el-button link type="primary" @click="openPlatform(row)">核对入账</el-button></template></el-table-column>
+        <el-table-column label="操作" width="100" :fixed="isMobile ? false : 'right'"><template #default="{ row }"><el-button link type="primary" @click="openPlatform(row)">核对入账</el-button></template></el-table-column>
       </el-table>
-      <div class="pager"><el-pagination v-model:current-page="page" :page-size="20" :total="total" layout="total, prev, pager, next" @current-change="loadList" /></div>
+      <div class="pager"><el-pagination v-model:current-page="page" :page-size="20" :total="total" :layout="isMobile ? 'prev, pager, next' : 'total, prev, pager, next'" @current-change="loadList" /></div>
     </el-card>
     <p class="footnote">每个月只统计该月收款，退款从原收款月份扣除，不记到退款当天。净收款 = 当月收款 − 这些收款上已登记的退款。选定一家门店时只统计该店收款；全部门店是各店合计，同一笔不会重复计算。美团、抖音按核销日期及已确认金额统计，不是扣佣后的到账额。退款记录页仍按退款日期列出。退款登记不自动退钱，也不变更余额、套餐或预约权益。</p>
 
@@ -177,7 +283,10 @@ import { computed, onMounted, onUnmounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { isHqAdmin } from '../utils/adminAuth'
 import { getWorkingStoreId, onWorkingStoreChange, workingStoreParams } from '../utils/workingStore'
+import { useIsMobile } from '../composables/useIsMobile'
 import http from '../api/http'
+
+const isMobile = useIsMobile()
 
 type Channel = 'meituan' | 'douyin' | 'wechat_pay' | 'wechat_transfer'
 type ManualChannel = Exclude<Channel, 'wechat_pay'>

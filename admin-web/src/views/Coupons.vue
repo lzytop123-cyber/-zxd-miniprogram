@@ -19,7 +19,7 @@
           {{ row.status === 0 ? '未使用' : '已使用' }}
         </template>
       </el-table-column>
-      <el-table-column label="操作" width="90" fixed="right">
+      <el-table-column label="操作" width="90" :fixed="isMobile ? false : 'right'">
         <template #default="{ row }">
           <el-button v-if="row.status === 0" link type="danger" @click="remove(row)">删除</el-button>
           <span v-else class="muted">-</span>
@@ -50,6 +50,8 @@
 </template>
 
 <script setup lang="ts">
+import { useIsMobile } from '../composables/useIsMobile'
+const isMobile = useIsMobile()
 import { onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import http from '../api/http'

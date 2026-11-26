@@ -528,6 +528,22 @@ onUnmounted(() => offWorkingStore?.())
   .two-col { grid-template-columns: 1fr; }
   .feature-grid { grid-template-columns: 1fr; }
 }
+@media (max-width: 768px) {
+  .greet { margin-bottom: 14px; gap: 10px; }
+  .greet h1 { font-size: 20px; }
+  .quick { width: 100%; justify-content: space-between; flex-wrap: wrap; gap: 8px; }
+  .kpi { padding: 16px; }
+  .kpi-value { font-size: 26px; }
+  .mini { padding: 12px; gap: 10px; }
+  .mini-value { font-size: 18px; }
+  .panel { padding: 14px 16px; margin-bottom: 12px; }
+  .panel-head { flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+  .todo { padding: 12px 14px; }
+  .todo-value { font-size: 22px; }
+  .revenue-chart { height: 220px; }
+  .collapse-panel summary { padding: 14px 16px; }
+  .feature-grid { padding: 4px 16px 14px; }
+}
 @media (prefers-reduced-motion: reduce) {
   .dashboard > *, .live-dot, .kpi-progress .bar i, .chart-bar { animation: none; transition: none; }
 }

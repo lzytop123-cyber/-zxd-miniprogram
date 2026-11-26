@@ -10,8 +10,23 @@
       </div>
     </template>
 
-    <el-form inline class="filters" @submit.prevent>
-      <el-form-item label="搜索">
+    <!-- 手机端快捷搜索栏 -->
+    <div v-if="isMobile" class="m-filter-bar">
+      <el-input
+        v-model="filters.keyword"
+        placeholder="手机号 / 昵称 / 订单号"
+        clearable
+        @keyup.enter="search"
+        @clear="search"
+      />
+      <el-button type="primary" @click="search">查</el-button>
+      <el-button @click="showMobileFilters = !showMobileFilters">
+        {{ showMobileFilters ? '收起' : '筛选' }}
+      </el-button>
+    </div>
+
+    <el-form v-show="!isMobile || showMobileFilters" inline class="filters" @submit.prevent>
+      <el-form-item v-if="!isMobile" label="搜索">
         <el-input
           v-model="filters.keyword"
           placeholder="手机号 / 昵称 / 订单号"
@@ -52,6 +67,7 @@
     </el-form>
 
     <el-alert
+      v-if="!isMobile"
       type="info"
       :closable="true"
       show-icon
@@ -59,7 +75,102 @@
       class="tip"
     />
 
+    <!-- 手机端卡片列表 -->
+    <div v-if="isMobile" v-loading="loading" class="m-card-list">
+      <div v-for="row in list" :key="row.id" class="m-card">
+        <div class="m-card-head">
+          <div>
+            <div class="m-card-title">
+              {{ row.user_nickname || '同学' }}
+              <span class="m-seat-badge" v-if="row.seat_code">{{ row.seat_code }}</span>
+            </div>
+            <div class="m-card-sub">ID {{ row.user_id }} · {{ row.store_name || '-' }}</div>
+          </div>
+          <div class="m-card-tags">
+            <el-tag :type="row.pay_status === 1 ? 'success' : row.pay_status === 2 ? 'info' : 'warning'" size="small">
+              {{ refundLabels[row.refund_state] || ['待付', '已付', '退款'][row.pay_status] || row.pay_status }}
+            </el-tag>
+            <el-tag :type="statusTagType(row.status)" size="small">
+              {{ row.status_label || statusLabel(row.status) }}
+            </el-tag>
+          </div>
+        </div>
+        <div class="m-card-grid">
+          <div class="m-card-field">
+            <span class="k">套餐 / 金额</span>
+            <span class="v">{{ row.usage_label || row.bill_type_label || billLabel(row.bill_type) }} · <b>{{ priceText(row) }}</b></span>
+          </div>
+          <div class="m-card-field">
+            <span class="k">来源</span>
+            <span class="v">{{ row.pay_source_label || payTypeLabel(row.pay_type) }}</span>
+          </div>
+          <div class="m-card-field full">
+            <span class="k">预约时段</span>
+            <span class="v tnum">{{ formatTime(row.start_time) }} 至 {{ formatTime(row.end_time) }}</span>
+          </div>
+          <div class="m-card-field" v-if="row.check_in_time">
+            <span class="k">入座时间</span>
+            <span class="v tnum">{{ formatTime(row.check_in_time) }}</span>
+          </div>
+          <div class="m-card-field full">
+            <span class="k">订单号</span>
+            <span class="v tnum">{{ row.order_no }}</span>
+          </div>
+        </div>
+        <div
+          v-if="canRemoteUnlock(row) || canChangeSeat(row) || row.status === 1 || canCancel(row) || row.refund_state === 'pending' || (row.pay_status === 1 && row.refund_state !== 'pending')"
+          class="m-card-actions"
+        >
+          <el-button
+            v-if="canRemoteUnlock(row)"
+            size="small"
+            type="success"
+            plain
+            :loading="unlockingIds.has(row.id)"
+            @click="remoteUnlock(row)"
+          >远程开门</el-button>
+          <el-button
+            v-if="canChangeSeat(row)"
+            size="small"
+            type="primary"
+            plain
+            @click="openChangeSeat(row)"
+          >换座</el-button>
+          <el-button
+            v-if="row.status === 1"
+            size="small"
+            type="warning"
+            plain
+            @click="forceCheckout(row)"
+          >强制离座</el-button>
+          <el-button
+            v-if="row.refund_state === 'pending'"
+            size="small"
+            type="warning"
+            plain
+            :loading="retryingRefunds.has(row.id)"
+            @click="retryRefund(row)"
+          >重试退款</el-button>
+          <el-button
+            v-if="row.pay_status === 1 && row.refund_state !== 'pending'"
+            size="small"
+            plain
+            @click="openRefund(row)"
+          >登记退款</el-button>
+          <el-button
+            v-if="canCancel(row)"
+            size="small"
+            type="danger"
+            plain
+            @click="cancelOrder(row)"
+          >取消</el-button>
+        </div>
+      </div>
+      <div v-if="!loading && !list.length" class="m-empty">暂无预约订单</div>
+    </div>
+
     <el-table
+      v-else
       :data="list"
       v-loading="loading"
       stripe
@@ -68,7 +179,7 @@
       :max-height="tableMaxHeight"
       class="order-table"
     >
-      <el-table-column prop="order_no" label="订单号" width="158" fixed />
+      <el-table-column prop="order_no" label="订单号" width="158" :fixed="isMobile ? false : true" />
       <el-table-column label="用户" width="108">
         <template #default="{ row }">
           <div class="cell-main">{{ row.user_nickname || '-' }}</div>
@@ -118,7 +229,7 @@
       <el-table-column label="说明" min-width="120" show-overflow-tooltip>
         <template #default="{ row }">{{ row.status_hint || '-' }}</template>
       </el-table-column>
-      <el-table-column label="操作" width="250" fixed="right">
+      <el-table-column label="操作" width="250" :fixed="isMobile ? false : 'right'">
         <template #default="{ row }">
           <el-button
             v-if="canRemoteUnlock(row)"
@@ -317,7 +428,7 @@
         v-model:page-size="pageSize"
         :total="total"
         :page-sizes="[10, 20, 50]"
-        layout="total, sizes, prev, pager, next"
+        :layout="isMobile ? 'prev, pager, next' : 'total, sizes, prev, pager, next'"
         @current-change="load"
         @size-change="onPageSizeChange"
       />
@@ -330,9 +441,12 @@ import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { onWorkingStoreChange, resolveFilterStoreId } from '../utils/workingStore'
+import { useIsMobile } from '../composables/useIsMobile'
 import http from '../api/http'
 
 const route = useRoute()
+const isMobile = useIsMobile()
+const showMobileFilters = ref(false)
 
 const billTypeMap: Record<string, string> = {
   hourly: '按小时',
@@ -917,7 +1031,17 @@ onUnmounted(() => {
 .cell-main { line-height: 1.3; }
 .sub { font-size: 12px; color: #999; line-height: 1.3; }
 .change-seat-meta { line-height: 1.8; }
-.seat-legend { display: flex; gap: 14px; margin: 10px 0 8px; font-size: 12px; color: #666; }
+.seat-legend { display: flex; flex-wrap: wrap; gap: 8px 14px; margin: 10px 0 8px; font-size: 12px; color: #666; }
+.m-seat-badge {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 6px;
+  border-radius: 6px;
+  background: rgba(255, 208, 0, 0.22);
+  color: #7a5a00;
+  font-size: 12px;
+  font-weight: 700;
+}
 .seat-legend .dot {
   display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 4px; vertical-align: -1px;
 }

@@ -38,7 +38,7 @@
       </el-table-column>
       <el-table-column prop="hit_count" label="触发次数" width="90" />
       <el-table-column prop="last_coupon_code" label="最近券码" width="140" />
-      <el-table-column label="操作" width="160" fixed="right">
+      <el-table-column label="操作" width="160" :fixed="isMobile ? false : 'right'">
         <template #default="{ row }">
           <el-button type="primary" link @click="openResolve(row)">一键配置</el-button>
           <el-button type="info" link @click="dismiss(row)">忽略</el-button>
@@ -64,7 +64,7 @@
           <el-tag :type="row.is_active ? 'success' : 'info'">{{ row.is_active ? '启用' : '停用' }}</el-tag>
         </template>
       </el-table-column>
-      <el-table-column label="操作" width="180" fixed="right">
+      <el-table-column label="操作" width="180" :fixed="isMobile ? false : 'right'">
         <template #default="{ row }">
           <el-button link type="primary" @click="openEdit(row)">编辑</el-button>
           <el-button link type="primary" @click="toggleLimit(row)">
@@ -97,6 +97,8 @@
 </template>
 
 <script setup lang="ts">
+import { useIsMobile } from '../composables/useIsMobile'
+const isMobile = useIsMobile()
 import { computed, onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import http from '../api/http'

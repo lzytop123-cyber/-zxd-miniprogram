@@ -58,7 +58,7 @@
         </template>
       </el-table-column>
       <el-table-column prop="created_at" label="发放时间" width="170" />
-      <el-table-column label="操作" width="160" fixed="right">
+      <el-table-column label="操作" width="160" :fixed="isMobile ? false : 'right'">
         <template #default="{ row }">
           <el-button link type="primary" @click="openEdit(row)">运维</el-button>
           <el-button v-if="row.status === 1" link type="danger" @click="revoke(row)">作废</el-button>
@@ -129,6 +129,8 @@
 </template>
 
 <script setup lang="ts">
+import { useIsMobile } from '../composables/useIsMobile'
+const isMobile = useIsMobile()
 import { onMounted, onUnmounted, reactive, ref } from 'vue'
 import { onWorkingStoreChange, resolveFilterStoreId, workingStoreParams } from '../utils/workingStore'
 import { useRoute } from 'vue-router'

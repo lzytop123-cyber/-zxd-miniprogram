@@ -1,25 +1,46 @@
 <template>
   <div class="shell" :class="{ collapsed, drawer: mobileOpen }">
+    <!-- 移动端遮罩层（独立元素，确保点击可关闭） -->
+    <div v-if="mobileOpen" class="drawer-mask" @click="mobileOpen = false" />
+
     <!-- 侧栏 -->
-    <aside class="aside" @click.self="mobileOpen = false">
+    <aside class="aside">
       <div class="brand">
         <div class="brand-mark">知</div>
-        <div class="brand-text" v-show="!collapsed">
+        <div class="brand-text" v-show="!collapsed || isMobile">
           <b>知行岛后台</b>
           <span>v {{ version }}</span>
         </div>
+        <button class="drawer-close mobile-only" type="button" aria-label="关闭菜单" @click="mobileOpen = false">
+          <el-icon><Close /></el-icon>
+        </button>
+      </div>
+
+      <div v-if="isMobile && (isHq || boundStoreName)" class="aside-store">
+        <span class="aside-store-label">{{ isHq ? '当前门店' : '所属门店' }}</span>
+        <el-select
+          v-if="isHq"
+          v-model="workingStore"
+          size="small"
+          style="width: 100%"
+          @change="onWorkingStorePick"
+        >
+          <el-option label="全部门店" :value="0" />
+          <el-option v-for="s in storeOptions" :key="s.id" :label="s.name" :value="s.id" />
+        </el-select>
+        <div v-else class="aside-store-locked">{{ boundStoreName }}</div>
       </div>
 
       <div class="aside-scroll">
         <el-menu
           :default-active="route.path"
-          :collapse="collapsed"
+          :collapse="collapsed && !isMobile"
           :collapse-transition="false"
           router
           class="nav"
         >
           <template v-for="item in menu" :key="item.title">
-            <el-menu-item v-if="!item.children" :index="item.path">
+            <el-menu-item v-if="!item.children" :index="item.path" @click="mobileOpen = false">
               <el-icon><component :is="item.icon" /></el-icon>
               <template #title><span>{{ item.title }}</span></template>
             </el-menu-item>
@@ -28,7 +49,7 @@
                 <el-icon><component :is="item.icon" /></el-icon>
                 <span>{{ item.title }}</span>
               </template>
-              <el-menu-item v-for="c in item.children" :key="c.path" :index="c.path">
+              <el-menu-item v-for="c in item.children" :key="c.path" :index="c.path" @click="mobileOpen = false">
                 <span class="sub-dot"></span>{{ c.title }}
               </el-menu-item>
             </el-sub-menu>
@@ -36,7 +57,7 @@
         </el-menu>
       </div>
 
-      <button class="collapse-btn" @click="collapsed = !collapsed" :title="collapsed ? '展开' : '收起'">
+      <button class="collapse-btn desktop-only" @click="collapsed = !collapsed" :title="collapsed ? '展开' : '收起'">
         <el-icon><component :is="collapsed ? Expand : Fold" /></el-icon>
       </button>
     </aside>
@@ -45,7 +66,7 @@
     <div class="main">
       <header class="topbar">
         <div class="tl">
-          <button class="icon-btn mobile-only" @click="mobileOpen = !mobileOpen"><el-icon><Menu /></el-icon></button>
+          <button class="icon-btn mobile-only" aria-label="打开菜单" @click="mobileOpen = !mobileOpen"><el-icon><Menu /></el-icon></button>
           <div class="crumb">
             <span class="c-group">{{ crumb.group }}</span>
             <el-icon class="c-sep"><ArrowRight /></el-icon>
@@ -58,7 +79,7 @@
             <el-select
               v-model="workingStore"
               size="small"
-              style="width: 168px"
+              class="store-select"
               @change="onWorkingStorePick"
             >
               <el-option label="全部门店" :value="0" />
@@ -69,14 +90,14 @@
             <span class="store-switch-label">本店</span>
             <span class="store-locked-name">{{ boundStoreName }}</span>
           </div>
-          <button class="search-btn" @click="openSearch">
+          <button class="search-btn" aria-label="快速跳转" @click="openSearch">
             <el-icon><Search /></el-icon>
             <span>快速跳转功能页面</span>
             <kbd>{{ macLike ? '⌘' : 'Ctrl' }} K</kbd>
           </button>
-          <el-popover placement="bottom-end" width="320" trigger="click" @show="loadNotifications(false)">
+          <el-popover placement="bottom-end" :width="isMobile ? 296 : 320" trigger="click" @show="loadNotifications(false)">
             <template #reference>
-              <button class="icon-btn notify"><el-icon><Bell /></el-icon><span v-if="notifyCount" class="notify-dot">{{ notifyCount }}</span></button>
+              <button class="icon-btn notify" aria-label="待办提醒"><el-icon><Bell /></el-icon><span v-if="notifyCount" class="notify-dot">{{ notifyCount }}</span></button>
             </template>
             <div class="notify-panel">
               <div class="np-head"><b>待办提醒</b><a v-if="notifications.length" @click="clearNotify">全部忽略</a></div>
@@ -109,6 +130,30 @@
       <main class="content"><router-view /></main>
     </div>
 
+    <!-- 移动端底部快捷导航 -->
+    <nav class="mobile-tabbar mobile-only" aria-label="快捷导航">
+      <button
+        v-for="tab in mobileTabs"
+        :key="tab.path"
+        type="button"
+        class="tab-item"
+        :class="{ active: route.path === tab.path }"
+        @click="router.push(tab.path)"
+      >
+        <el-icon><component :is="tab.icon" /></el-icon>
+        <span>{{ tab.label }}</span>
+      </button>
+      <button
+        type="button"
+        class="tab-item"
+        :class="{ active: mobileOpen }"
+        @click="mobileOpen = true"
+      >
+        <el-icon><Grid /></el-icon>
+        <span>更多</span>
+      </button>
+    </nav>
+
     <!-- 搜索命令面板 -->
     <el-dialog v-model="searchOpen" width="min(560px, 92vw)" :show-close="false" class="cmdk-dialog">
       <template #header>
@@ -132,23 +177,28 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import {
-  ArrowDown, ArrowRight, Bell, Calendar, Cpu, Fold, Expand, Grid, HomeFilled, Key,
+  ArrowDown, ArrowRight, Bell, Calendar, Close, Cpu, Fold, Expand, Grid, HomeFilled, Key,
   Menu, Monitor, Reading, Search, Setting, ShoppingBag, SwitchButton,
   Ticket, TrendCharts, User, Wallet, Warning,
 } from '@element-plus/icons-vue'
 import { adminSessionTick, canAccessPath, clearAdminSession, getAdminStoreName, isHqAdmin, setAdminPermissions } from '../utils/adminAuth'
 import { getWorkingStoreId, onWorkingStoreChange, setWorkingStoreId, workingStoreParams } from '../utils/workingStore'
+import { useIsMobile } from '../composables/useIsMobile'
 import http from '../api/http'
 
 const route = useRoute()
 const router = useRouter()
+const isMobile = useIsMobile()
 
 const collapsed = ref(false)
 const mobileOpen = ref(false)
+watch(() => route.fullPath, () => {
+  mobileOpen.value = false
+})
 const searchOpen = ref(false)
 const searchQuery = ref('')
 const version = '2.0'
@@ -269,6 +319,18 @@ const menu = computed(() => {
       return { ...item, children }
     })
     .filter(Boolean) as typeof allMenu
+})
+
+const mobileTabs = computed(() => {
+  void adminSessionTick.value
+  const candidates = [
+    { label: '总览', path: '/dashboard', icon: TrendCharts },
+    { label: '占座', path: '/live-board', icon: Monitor },
+    { label: '订单', path: '/reservations', icon: Calendar },
+    { label: '收款', path: '/receipts', icon: Wallet },
+    { label: '用户', path: '/users', icon: User },
+  ]
+  return candidates.filter((t) => canAccessPath(t.path)).slice(0, 4)
 })
 
 // ============ 面包屑 ============
@@ -431,16 +493,24 @@ onUnmounted(() => {
   display: grid;
   grid-template-columns: 240px 1fr;
   height: 100vh;
+  height: 100dvh;
   background: var(--surface-2);
   transition: grid-template-columns 0.25s cubic-bezier(0.16, 1, 0.3, 1);
 }
 .shell.collapsed { grid-template-columns: 68px 1fr; }
+
+.drawer-mask {
+  display: none;
+}
 
 .store-switch {
   display: flex;
   align-items: center;
   gap: 8px;
   margin-right: 4px;
+}
+.store-select {
+  width: 168px;
 }
 .store-switch-label {
   font-size: 12px;
@@ -658,26 +728,139 @@ onUnmounted(() => {
 .cmdk-empty { padding: 32px 16px; text-align: center; color: var(--muted); font-size: 13px; }
 
 /* ============ 内容区 ============ */
-.content { flex: 1; min-height: 0; overflow: auto; padding: 20px 24px; }
+.content { flex: 1; min-height: 0; overflow: auto; padding: 20px 24px; -webkit-overflow-scrolling: touch; }
+
+.drawer-close {
+  margin-left: auto;
+  background: rgba(255,255,255,0.08);
+  border: 0;
+  color: #d0d1d6;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+.aside-store {
+  padding: 12px 16px;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.aside-store-label {
+  font-size: 11px;
+  color: #8a8b93;
+}
+.aside-store-locked {
+  font-size: 13px;
+  font-weight: 600;
+  color: #f5f5f7;
+}
+.mobile-tabbar {
+  display: none;
+}
 
 /* ============ 响应式 ============ */
 @media (max-width: 768px) {
   .shell { grid-template-columns: 1fr !important; }
-  .aside {
-    position: fixed; top: 0; left: 0; bottom: 0; width: 260px; z-index: 1000;
-    transform: translateX(-100%);
-    transition: transform 0.25s ease;
-  }
-  .shell.drawer .aside { transform: translateX(0); box-shadow: 20px 0 60px rgba(0,0,0,0.3); }
-  .shell.drawer::after {
-    content: ''; position: fixed; inset: 0; background: rgba(0,0,0,0.4); z-index: 999;
+  .desktop-only { display: none !important; }
+  .drawer-mask {
+    display: block;
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.45);
+    z-index: 999;
     animation: fade-in 0.2s ease;
   }
+  .aside {
+    position: fixed; top: 0; left: 0; bottom: 0; width: 272px; max-width: 82vw; z-index: 1000;
+    transform: translateX(-100%);
+    transition: transform 0.25s ease;
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  .shell.drawer .aside { transform: translateX(0); box-shadow: 20px 0 60px rgba(0,0,0,0.3); }
   @keyframes fade-in { from { opacity: 0 } to { opacity: 1 } }
+
   .mobile-only { display: inline-flex; }
-  .search-btn { min-width: 0; padding: 8px; }
+  .topbar {
+    padding: 0 10px;
+    height: 52px;
+    gap: 6px;
+  }
+  .tl {
+    gap: 4px;
+    min-width: 0;
+    flex: 1;
+  }
+  .tr {
+    gap: 4px;
+    flex-shrink: 0;
+  }
+  .crumb {
+    min-width: 0;
+    overflow: hidden;
+  }
+  .c-group, .c-sep { display: none; }
+  .c-page {
+    font-size: 15px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .store-switch {
+    margin-right: 0;
+  }
+  .store-switch-label { display: none; }
+  .store-select { width: 104px; }
+  .store-switch--locked { display: none; }
+  .icon-btn { width: 34px; height: 34px; padding: 6px; }
+  .search-btn { min-width: 0; width: 34px; height: 34px; padding: 0; justify-content: center; }
   .search-btn span, .search-btn kbd { display: none; }
+  .user-chip { padding: 3px 6px 3px 3px; gap: 4px; }
   .uname { display: none; }
-  .content { padding: 16px; }
+
+  .content {
+    padding: 12px 12px calc(72px + env(safe-area-inset-bottom));
+  }
+
+  .mobile-tabbar {
+    display: flex;
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 900;
+    background: rgba(255, 255, 255, 0.96);
+    backdrop-filter: blur(16px);
+    border-top: 1px solid var(--line);
+    padding: 6px 4px calc(6px + env(safe-area-inset-bottom));
+    justify-content: space-around;
+    align-items: center;
+  }
+  .tab-item {
+    flex: 1;
+    border: 0;
+    background: transparent;
+    color: var(--ink-3);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    padding: 4px 0;
+    font-size: 11px;
+    font-weight: 500;
+    cursor: pointer;
+    min-width: 0;
+  }
+  .tab-item .el-icon {
+    font-size: 20px;
+  }
+  .tab-item.active {
+    color: #b88200;
+    font-weight: 600;
+  }
 }
 </style>

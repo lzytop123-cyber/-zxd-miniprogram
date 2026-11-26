@@ -63,7 +63,7 @@
       </el-table-column>
       <el-table-column prop="reason" label="错因" min-width="140" show-overflow-tooltip />
       <el-table-column prop="updated_at" label="更新时间" width="170" />
-      <el-table-column label="操作" width="140" fixed="right">
+      <el-table-column label="操作" width="140" :fixed="isMobile ? false : 'right'">
         <template #default="{ row }">
           <el-button link type="primary" @click="openDetail(row)">详情</el-button>
           <el-button link type="danger" @click="remove(row)">删除</el-button>
@@ -167,6 +167,8 @@
 </template>
 
 <script setup lang="ts">
+import { useIsMobile } from '../composables/useIsMobile'
+const isMobile = useIsMobile()
 import { onMounted, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import http from '../api/http'

@@ -21,7 +21,7 @@
     </template>
 
     <el-row :gutter="12" class="stats-row" v-if="stats">
-      <el-col :span="6" v-for="item in stats.breakdown" :key="item.key">
+      <el-col :xs="12" :sm="6" v-for="item in stats.breakdown" :key="item.key" class="stat-col">
         <div class="mini-stat" :class="{ active: studyGoal === item.key }" @click="filterByGoal(item.key)">
           <div class="mini-label">{{ item.label }}</div>
           <div class="mini-value">{{ item.count }}</div>
@@ -29,7 +29,50 @@
       </el-col>
     </el-row>
 
-    <el-table :data="list" v-loading="loading" stripe @row-click="openDetail">
+    <!-- 手机端卡片列表 -->
+    <div v-if="isMobile" v-loading="loading" class="m-card-list">
+      <div v-for="row in list" :key="row.id" class="m-card" @click="openDetail(row)">
+        <div class="m-card-head">
+          <div>
+            <div class="m-card-title">{{ row.nickname || '未命名用户' }}</div>
+            <div class="m-card-sub">学号 #{{ row.id }} · {{ row.phone || '未绑手机' }}</div>
+          </div>
+          <div class="m-card-tags">
+            <el-tag v-if="row.study_goal_label" :type="goalTagType(row.study_goal)" size="small">
+              {{ row.study_goal_label }}
+            </el-tag>
+            <el-tag v-if="row.needs_profile_setup" type="warning" size="small">待完善</el-tag>
+            <el-tag v-else type="success" size="small">已完善</el-tag>
+          </div>
+        </div>
+        <div class="m-card-grid">
+          <div class="m-card-field">
+            <span class="k">余额</span>
+            <span class="v tnum"><b>¥{{ row.balance }}</b></span>
+          </div>
+          <div class="m-card-field">
+            <span class="k">积分</span>
+            <span class="v tnum">{{ row.total_points }}</span>
+          </div>
+          <div class="m-card-field" v-if="row.title">
+            <span class="k">称号</span>
+            <span class="v">{{ row.title }}</span>
+          </div>
+          <div class="m-card-field">
+            <span class="k">注册时间</span>
+            <span class="v tnum">{{ row.created_at }}</span>
+          </div>
+        </div>
+        <div class="m-card-actions">
+          <el-button size="small" type="success" plain @click.stop="openDetail(row, 'balance')">余额/编辑</el-button>
+          <el-button size="small" type="primary" plain @click.stop="openDetail(row, 'orders')">详情</el-button>
+          <el-button size="small" type="danger" plain @click.stop="removeUser(row)">删除</el-button>
+        </div>
+      </div>
+      <div v-if="!loading && !list.length" class="m-empty">暂无用户</div>
+    </div>
+
+    <el-table v-else :data="list" v-loading="loading" stripe @row-click="openDetail">
       <el-table-column prop="id" label="学号" width="70" />
       <el-table-column prop="nickname" label="昵称" min-width="120" />
       <el-table-column prop="phone" label="手机号" width="130" />
@@ -54,7 +97,7 @@
       <el-table-column prop="total_points" label="积分" width="80" />
       <el-table-column prop="invite_code" label="邀请码" width="100" />
       <el-table-column prop="created_at" label="注册时间" width="170" />
-      <el-table-column label="操作" width="200" fixed="right">
+      <el-table-column label="操作" width="200" :fixed="isMobile ? false : 'right'">
         <template #default="{ row }">
           <el-button link type="success" @click.stop="openDetail(row, 'balance')">余额/编辑</el-button>
           <el-button link type="primary" @click.stop="openDetail(row, 'orders')">详情</el-button>
@@ -67,14 +110,14 @@
       <el-pagination
         v-model:current-page="page"
         :total="total"
-        layout="total, prev, pager, next"
+        :layout="isMobile ? 'prev, pager, next' : 'total, prev, pager, next'"
         @current-change="load"
       />
     </div>
 
     <el-drawer v-model="showDetail" :title="`用户 #${detail?.id || ''}`" size="640px">
       <template v-if="detail">
-        <el-descriptions :column="2" border>
+        <el-descriptions :column="isMobile ? 1 : 2" border>
           <el-descriptions-item label="学号 ID">{{ detail.id }}</el-descriptions-item>
           <el-descriptions-item label="昵称">{{ detail.nickname || '-' }}</el-descriptions-item>
           <el-descriptions-item label="手机号">{{ detail.phone || '-' }}</el-descriptions-item>
@@ -145,7 +188,7 @@
               </el-table-column>
               <el-table-column prop="status_label" label="状态" width="90" />
               <el-table-column prop="start_time" label="开始" min-width="140" />
-              <el-table-column label="操作" width="84" fixed="right">
+              <el-table-column label="操作" width="84" :fixed="isMobile ? false : 'right'">
                 <template #default="{ row }">
                   <el-button link type="primary" size="small" @click="goHandleOrder(row.order_no)">处理订单</el-button>
                 </template>
@@ -211,8 +254,10 @@ import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import http from '../api/http'
 import { parsePageResult } from '../utils/pageData'
+import { useIsMobile } from '../composables/useIsMobile'
 
 const router = useRouter()
+const isMobile = useIsMobile()
 
 const list = ref<any[]>([])
 const loading = ref(false)
@@ -384,6 +429,7 @@ onMounted(async () => {
 .header-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
 .filters { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 .stats-row { margin-bottom: 16px; }
+.stat-col { margin-bottom: 8px; }
 .mini-stat {
   padding: 12px 16px;
   border-radius: 8px;

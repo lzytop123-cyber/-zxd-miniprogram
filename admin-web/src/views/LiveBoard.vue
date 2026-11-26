@@ -20,8 +20,8 @@
         >
           即将到期 {{ expiring.length }}
         </el-button>
-        <span class="clock">{{ clock }}</span>
-        <el-button size="small" @click="toggleFull">
+        <span class="clock" v-if="!isMobile">{{ clock }}</span>
+        <el-button v-if="!isMobile" size="small" @click="toggleFull">
           {{ isFull ? '退出全屏' : '全屏' }}
         </el-button>
       </div>
@@ -106,7 +106,56 @@
       <el-button size="small" @click="reload">重试</el-button>
     </div>
     <div v-if="!data && !boardError" class="board-notice" role="status">正在加载门店座位…</div>
-    <div v-if="seats.length" class="map-wrap">
+
+    <!-- 手机端视图切换 + 状态筛选 -->
+    <div v-if="isMobile && (seats.length || unplacedSeats.length)" class="mobile-controls">
+      <div class="view-switch">
+        <button type="button" :class="{ active: mobileView === 'list' }" @click="mobileView = 'list'">列表视图</button>
+        <button type="button" :class="{ active: mobileView === 'map' }" @click="mobileView = 'map'">平面图（可横滑）</button>
+      </div>
+      <div v-if="mobileView === 'list'" class="state-pills">
+        <button type="button" :class="{ active: mobileStateFilter === 'all' }" @click="mobileStateFilter = 'all'">全部 {{ allSeats.length }}</button>
+        <button type="button" :class="{ active: mobileStateFilter === 'occupied' }" @click="mobileStateFilter = 'occupied'">在座 {{ data?.counts?.occupied ?? 0 }}</button>
+        <button type="button" :class="{ active: mobileStateFilter === 'booked' }" @click="mobileStateFilter = 'booked'">已预约 {{ data?.counts?.booked ?? 0 }}</button>
+        <button type="button" :class="{ active: mobileStateFilter === 'free' }" @click="mobileStateFilter = 'free'">空闲 {{ data?.counts?.free ?? 0 }}</button>
+      </div>
+    </div>
+
+    <!-- 手机端列表视图 -->
+    <div v-if="isMobile && mobileView === 'list' && allSeats.length" class="mobile-seat-list">
+      <div
+        v-for="seat in filteredMobileSeats"
+        :key="seat.id"
+        class="m-seat-card"
+        :class="['ms-' + seat.state, { clickable: !!seat.info }]"
+        @click="openSeatDetail(seat)"
+      >
+        <div class="m-seat-left">
+          <div class="m-seat-code">{{ seat.seat_code }}</div>
+          <div class="m-seat-zone">{{ seat.zone_name || '默认区' }}</div>
+        </div>
+        <div class="m-seat-mid">
+          <template v-if="seat.info">
+            <div class="m-seat-user">
+              <b>{{ seat.info.user }}</b>
+              <span class="m-seat-tag" :class="'b-' + seat.state">
+                {{ seat.info.checked_in ? '已入座' : '未到店' }}
+              </span>
+            </div>
+            <div class="m-seat-meta">
+              {{ seat.info.bill_type }} · {{ seat.info.is_hourly ? seat.info.today_hours : `预计离场 ${seat.info.leave_at}` }}
+            </div>
+          </template>
+          <div v-else class="m-seat-empty">
+            {{ stateLabels[seat.state] || seat.state }}
+          </div>
+        </div>
+        <div v-if="seat.info" class="m-seat-act">详情 ›</div>
+      </div>
+      <div v-if="!filteredMobileSeats.length" class="board-notice">该状态下暂无座位</div>
+    </div>
+
+    <div v-if="seats.length && (!isMobile || mobileView === 'map')" class="map-wrap">
       <div
         class="floor-map"
         :class="{ 'floor-map--image': isImageMap }"
@@ -252,10 +301,14 @@ import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import http from '../api/http'
 import { useRequiredStoreId } from '../composables/useWorkingStore'
+import { useIsMobile } from '../composables/useIsMobile'
 import { resolveRequiredStoreId, setWorkingStoreId } from '../utils/workingStore'
 import { isHqAdmin } from '../utils/adminAuth'
 
 const router = useRouter()
+const isMobile = useIsMobile()
+const mobileView = ref<'list' | 'map'>('list')
+const mobileStateFilter = ref<'all' | 'occupied' | 'booked' | 'free'>('all')
 
 const stores = ref<any[]>([])
 const storeId = ref<number | null>(null)
@@ -277,6 +330,18 @@ const seats = computed<any[]>(() =>
 const unplacedSeats = computed<any[]>(() =>
   (data.value?.seats || []).filter((s: any) => s.left_pct == null || s.top_pct == null)
 )
+const allSeats = computed<any[]>(() => {
+  const rank: Record<string, number> = { occupied: 0, booked: 1, free: 2, disabled: 3 }
+  return [...(data.value?.seats || [])].sort((a: any, b: any) => {
+    const r = (rank[a.state] ?? 9) - (rank[b.state] ?? 9)
+    if (r !== 0) return r
+    return String(a.seat_code || '').localeCompare(String(b.seat_code || ''), 'zh-CN', { numeric: true })
+  })
+})
+const filteredMobileSeats = computed<any[]>(() => {
+  if (mobileStateFilter.value === 'all') return allSeats.value
+  return allSeats.value.filter((s: any) => s.state === mobileStateFilter.value)
+})
 
 const isImageMap = computed(() => data.value?.map_mode === 'image' && !!data.value?.map_image_url)
 const mapImageUrl = computed(() => data.value?.map_image_url || '')
@@ -768,4 +833,107 @@ onUnmounted(() => {
 .expire-panel .phone { color: #8b95a1; margin-left: 8px; font-size: 12px; }
 .detail-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .detail-row .mono { font-family: 'Consolas', 'Menlo', monospace; }
+
+.mobile-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.view-switch {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  background: #171c24;
+  border: 1px solid #232a35;
+  border-radius: 10px;
+  padding: 3px;
+  gap: 4px;
+}
+.view-switch button {
+  border: 0;
+  background: transparent;
+  color: #8b95a1;
+  padding: 8px 10px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+}
+.view-switch button.active {
+  background: #FFD000;
+  color: #14161a;
+  font-weight: 600;
+}
+.state-pills {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+}
+.state-pills button {
+  flex-shrink: 0;
+  border: 1px solid #232a35;
+  background: #171c24;
+  color: #c1c9d3;
+  border-radius: 999px;
+  padding: 5px 12px;
+  font-size: 12px;
+  cursor: pointer;
+}
+.state-pills button.active {
+  border-color: #FFD000;
+  color: #FFD000;
+  background: rgba(255, 208, 0, 0.12);
+}
+.mobile-seat-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.m-seat-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  border-radius: 10px;
+  background: #171c24;
+  border: 1px solid #232a35;
+  border-left: 4px solid #4b5563;
+}
+.m-seat-card.ms-occupied { border-left-color: #ff6b6b; }
+.m-seat-card.ms-booked { border-left-color: #f5a623; }
+.m-seat-card.ms-free { border-left-color: #7ed957; }
+.m-seat-card.clickable { cursor: pointer; }
+.m-seat-left { min-width: 60px; }
+.m-seat-code { font-size: 16px; font-weight: 700; color: #f5f5f7; }
+.m-seat-zone { font-size: 11px; color: #8b95a1; margin-top: 2px; }
+.m-seat-mid { flex: 1; min-width: 0; }
+.m-seat-user { display: flex; align-items: center; gap: 6px; font-size: 14px; color: #f5f5f7; }
+.m-seat-tag {
+  font-size: 11px;
+  padding: 1px 6px;
+  border-radius: 999px;
+}
+.m-seat-tag.b-occupied { background: rgba(255,107,107,0.18); color: #ff8080; }
+.m-seat-tag.b-booked { background: rgba(245,166,35,0.18); color: #ffb84d; }
+.m-seat-meta { font-size: 12px; color: #9aa5b1; margin-top: 3px; }
+.m-seat-empty { font-size: 13px; color: #8b95a1; }
+.m-seat-act { font-size: 12px; color: #FFD000; flex-shrink: 0; }
+
+@media (max-width: 768px) {
+  .board { padding: 12px; gap: 12px; border-radius: 10px; }
+  .brand { font-size: 17px; }
+  .stat-bar { padding: 12px 14px; gap: 12px; }
+  .rate { min-width: 72px; }
+  .rate-num { font-size: 30px; }
+  .rate-suffix { font-size: 16px; }
+  .map-wrap {
+    justify-content: flex-start;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  .floor-map {
+    min-width: 680px;
+  }
+  .seat .pop { display: none !important; }
+}
 </style>

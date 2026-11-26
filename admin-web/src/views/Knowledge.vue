@@ -54,7 +54,7 @@
           {{ formatTime(row.updated_at || row.created_at) }}
         </template>
       </el-table-column>
-      <el-table-column label="操作" width="90" fixed="right">
+      <el-table-column label="操作" width="90" :fixed="isMobile ? false : 'right'">
         <template #default="{ row }">
           <el-button link type="danger" :loading="deletingId === row.id" @click="removeDoc(row)">
             删除
@@ -85,6 +85,8 @@
 </template>
 
 <script setup lang="ts">
+import { useIsMobile } from '../composables/useIsMobile'
+const isMobile = useIsMobile()
 import { onMounted, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import type { UploadRequestOptions } from 'element-plus'

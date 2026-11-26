@@ -55,7 +55,7 @@
             class="marker"
             :class="{ active: m.seat_id === selectedSeatId }"
             :style="{ left: m.x_pct + '%', top: m.y_pct + '%' }"
-            @mousedown.stop.prevent="startDrag($event, m)"
+            @pointerdown.stop.prevent="startDrag($event, m)"
             @click.stop="selectedSeatId = m.seat_id"
           >
             {{ seatLabel(m.seat_id) }}
@@ -279,11 +279,11 @@ function removeMarker(seatId: number | null) {
   markers.value = markers.value.filter((m) => m.seat_id !== seatId)
 }
 
-let drag: { seatId: number; move: (e: MouseEvent) => void; up: () => void } | null = null
+let drag: { seatId: number; move: (e: PointerEvent) => void; up: () => void } | null = null
 
-function startDrag(e: MouseEvent, m: Marker) {
+function startDrag(_e: PointerEvent, m: Marker) {
   selectedSeatId.value = m.seat_id
-  const move = (ev: MouseEvent) => {
+  const move = (ev: PointerEvent) => {
     if (!canvasRef.value) return
     const rect = canvasRef.value.getBoundingClientRect()
     if (!rect.width || !rect.height) return
@@ -292,20 +292,23 @@ function startDrag(e: MouseEvent, m: Marker) {
     upsertMarker(m.seat_id, x, y)
   }
   const up = () => {
-    window.removeEventListener('mousemove', move)
-    window.removeEventListener('mouseup', up)
+    window.removeEventListener('pointermove', move)
+    window.removeEventListener('pointerup', up)
+    window.removeEventListener('pointercancel', up)
     drag = null
   }
   drag = { seatId: m.seat_id, move, up }
-  window.addEventListener('mousemove', move)
-  window.addEventListener('mouseup', up)
+  window.addEventListener('pointermove', move)
+  window.addEventListener('pointerup', up)
+  window.addEventListener('pointercancel', up)
 }
 
 onBeforeUnmount(() => {
   active = false
   if (drag) {
-    window.removeEventListener('mousemove', drag.move)
-    window.removeEventListener('mouseup', drag.up)
+    window.removeEventListener('pointermove', drag.move)
+    window.removeEventListener('pointerup', drag.up)
+    window.removeEventListener('pointercancel', drag.up)
   }
 })
 
@@ -417,6 +420,7 @@ defineExpose({ reload: load })
   align-items: center;
   justify-content: center;
   cursor: grab;
+  touch-action: none;
   box-shadow: 0 2px 6px rgba(0,0,0,.15);
 }
 .marker.active { background: #67c23a; outline: 2px solid #fff; }
