@@ -14,8 +14,16 @@
     <div v-if="isMobile" class="m-filter-bar">
       <el-input
         v-model="filters.keyword"
-        placeholder="手机号 / 昵称 / 订单号"
+        placeholder="手机 / 昵称 / 订单号"
         clearable
+        @keyup.enter="search"
+        @clear="search"
+      />
+      <el-input
+        v-model="filters.seat_code"
+        placeholder="座位"
+        clearable
+        class="m-seat-input"
         @keyup.enter="search"
         @clear="search"
       />
@@ -33,6 +41,16 @@
           clearable
           style="width:200px"
           @keyup.enter="search"
+        />
+      </el-form-item>
+      <el-form-item v-if="!isMobile" label="座位">
+        <el-input
+          v-model="filters.seat_code"
+          placeholder="座位号，如 18 / A01"
+          clearable
+          style="width:140px"
+          @keyup.enter="search"
+          @clear="search"
         />
       </el-form-item>
       <el-form-item label="用户ID">
@@ -93,6 +111,7 @@
             <el-tag :type="statusTagType(row.status)" size="small">
               {{ row.status_label || statusLabel(row.status) }}
             </el-tag>
+            <el-tag v-if="row.on_leave_today" type="warning" effect="dark" size="small">请假中</el-tag>
           </div>
         </div>
         <div class="m-card-grid">
@@ -118,17 +137,24 @@
           </div>
         </div>
         <div
-          v-if="canRemoteUnlock(row) || canChangeSeat(row) || row.status === 1 || canCancel(row) || row.refund_state === 'pending' || (row.pay_status === 1 && row.refund_state !== 'pending')"
+          v-if="canRemoteUnlock(row) || canChangeSeat(row) || canManageLeave(row) || row.status === 1 || canCancel(row) || row.refund_state === 'pending' || (row.pay_status === 1 && row.refund_state !== 'pending')"
           class="m-card-actions"
         >
           <el-button
-            v-if="canRemoteUnlock(row)"
+            v-if="canRemoteUnlock(row) && !row.on_leave_today"
             size="small"
             type="success"
             plain
             :loading="unlockingIds.has(row.id)"
             @click="remoteUnlock(row)"
           >远程开门</el-button>
+          <el-button
+            v-if="canManageLeave(row)"
+            size="small"
+            type="warning"
+            plain
+            @click="openLeave(row)"
+          >请假 ({{ row.leave_used || 0 }}/{{ row.leave_limit || 3 }})</el-button>
           <el-button
             v-if="canChangeSeat(row)"
             size="small"
@@ -210,11 +236,14 @@
           <div v-if="row.refund_remark" class="sub">{{ row.refund_remark }}</div>
         </template>
       </el-table-column>
-      <el-table-column label="状态" width="78">
+      <el-table-column label="状态" width="92">
         <template #default="{ row }">
           <el-tag :type="statusTagType(row.status)" size="small">
             {{ row.status_label || statusLabel(row.status) }}
           </el-tag>
+          <div v-if="row.on_leave_today" style="margin-top:4px">
+            <el-tag type="warning" effect="dark" size="small">请假中</el-tag>
+          </div>
         </template>
       </el-table-column>
       <el-table-column label="预约时段" width="148">
@@ -229,15 +258,21 @@
       <el-table-column label="说明" min-width="120" show-overflow-tooltip>
         <template #default="{ row }">{{ row.status_hint || '-' }}</template>
       </el-table-column>
-      <el-table-column label="操作" width="250" :fixed="isMobile ? false : 'right'">
+      <el-table-column label="操作" width="280" :fixed="isMobile ? false : 'right'">
         <template #default="{ row }">
           <el-button
-            v-if="canRemoteUnlock(row)"
+            v-if="canRemoteUnlock(row) && !row.on_leave_today"
             link
             type="success"
             :loading="unlockingIds.has(row.id)"
             @click="remoteUnlock(row)"
           >远程开门</el-button>
+          <el-button
+            v-if="canManageLeave(row)"
+            link
+            type="warning"
+            @click="openLeave(row)"
+          >请假({{ row.leave_used || 0 }}/{{ row.leave_limit || 3 }})</el-button>
           <el-button
             v-if="canChangeSeat(row)"
             link
@@ -422,6 +457,137 @@
       </template>
     </el-dialog>
 
+    <!-- 月卡请假弹窗 -->
+    <el-dialog v-model="leaveVisible" title="月卡请假 / 顺延管理" width="560px" destroy-on-close @closed="resetLeave">
+      <div v-loading="leaveLoading">
+        <div v-if="leaveRow" class="leave-meta">
+          <div>
+            订单 <strong>{{ leaveRow.order_no }}</strong> · {{ leaveRow.user_nickname || '同学' }} · 座位 <strong>{{ leaveRow.seat_code || '-' }}</strong>
+          </div>
+          <div class="sub">
+            当前预约期：{{ leaveInfo.start_time || formatTime(leaveRow.start_time) }} 至 {{ leaveInfo.end_time || formatTime(leaveRow.end_time) }}
+            · 已请假 <strong>{{ leaveInfo.used_count }}/{{ leaveInfo.limit }}</strong> 次
+          </div>
+        </div>
+
+        <template v-if="leaveInfo.eligible && leaveInfo.used_count < leaveInfo.limit">
+          <div class="leave-section-title">办理新请假（方案 A：释放请假期间座位，结束日期按天顺延）</div>
+          <el-form label-width="96px">
+            <el-form-item label="开始日期">
+              <el-date-picker
+                v-model="leaveForm.start_date"
+                type="date"
+                value-format="YYYY-MM-DD"
+                placeholder="选择请假开始日"
+                style="width:100%"
+                @change="clearLeavePreview"
+              />
+            </el-form-item>
+            <el-form-item label="结束日期">
+              <el-date-picker
+                v-model="leaveForm.end_date"
+                type="date"
+                value-format="YYYY-MM-DD"
+                placeholder="选择请假结束日（含当天）"
+                style="width:100%"
+                @change="clearLeavePreview"
+              />
+            </el-form-item>
+            <el-form-item label="请假原因">
+              <el-input v-model="leaveForm.reason" placeholder="可选，如回家/生病/出差" maxlength="200" />
+            </el-form-item>
+            <el-form-item>
+              <el-button type="primary" plain :loading="leavePreviewLoading" @click="previewLeave">
+                检测顺延与座位
+              </el-button>
+            </el-form-item>
+
+            <template v-if="leavePreview">
+              <el-alert
+                :type="leavePreview.original_seat_available ? 'success' : 'warning'"
+                :closable="false"
+                show-icon
+                class="tip"
+                :title="`本次请假 ${leavePreview.days} 天，结束时间顺延至 ${leavePreview.new_end_time}`"
+                :description="
+                  leavePreview.original_seat_available
+                    ? `原座位 ${leavePreview.original_seat_code} 在顺延时段空闲，将自动沿用原座。`
+                    : `原座位 ${leavePreview.original_seat_code} 在顺延时段已被订单 ${leavePreview.conflict_order_no} 占用，请在下方选择同店替代座位。`
+                "
+              />
+              <el-form-item v-if="!leavePreview.original_seat_available" label="替代座位" required>
+                <el-select
+                  v-model="leaveForm.target_seat_id"
+                  placeholder="请选择同店可用座位"
+                  filterable
+                  style="width:100%"
+                >
+                  <el-option
+                    v-for="s in leavePreview.alternative_seats"
+                    :key="s.id"
+                    :label="`${s.seat_code}${s.zone_name ? ' · ' + s.zone_name : ''}`"
+                    :value="s.id"
+                  />
+                </el-select>
+                <div v-if="!leavePreview.alternative_seats.length" class="sub" style="color:#dc2626;margin-top:4px">
+                  顺延时段该门店暂无全时段空闲替代座，需先协调排座后再办理。
+                </div>
+              </el-form-item>
+            </template>
+          </el-form>
+        </template>
+        <el-alert
+          v-else-if="!leaveLoading"
+          type="info"
+          :closable="false"
+          show-icon
+          class="tip"
+          :title="leaveInfo.used_count >= leaveInfo.limit ? `该月卡已用完 ${leaveInfo.limit} 次请假额度` : '当前订单状态不可新增请假'"
+        />
+
+        <div class="leave-section-title">请假记录</div>
+        <div v-if="leaveInfo.leaves.length" class="leave-list">
+          <div v-for="lv in leaveInfo.leaves" :key="lv.id" class="leave-item">
+            <div class="leave-item-main">
+              <div>
+                <strong>{{ lv.start_date }} 至 {{ lv.end_date }}</strong>
+                <span class="sub">（{{ lv.days }} 天）</span>
+                <el-tag :type="lv.status === 'active' ? (lv.is_ongoing ? 'warning' : 'success') : 'info'" size="small" style="margin-left:6px">
+                  {{ lv.status === 'cancelled' ? '已撤销' : lv.is_ongoing ? '请假中' : '生效中' }}
+                </el-tag>
+              </div>
+              <div class="sub">
+                顺延至 {{ lv.new_end_time }}
+                <template v-if="lv.target_seat_code && lv.target_seat_code !== lv.original_seat_code">
+                  · 换座 {{ lv.original_seat_code }} → {{ lv.target_seat_code }}
+                </template>
+                <template v-if="lv.reason"> · {{ lv.reason }}</template>
+              </div>
+            </div>
+            <el-button
+              v-if="lv.can_cancel"
+              size="small"
+              type="danger"
+              plain
+              :loading="cancellingLeaveId === lv.id"
+              @click="cancelLeave(lv)"
+            >{{ lv.is_ongoing ? '提前恢复' : '撤销请假' }}</el-button>
+          </div>
+        </div>
+        <div v-else class="sub">暂无请假记录</div>
+      </div>
+      <template #footer>
+        <el-button @click="leaveVisible = false">关闭</el-button>
+        <el-button
+          v-if="leaveInfo.eligible && leaveInfo.used_count < leaveInfo.limit"
+          type="primary"
+          :loading="leaveSubmitting"
+          :disabled="!canSubmitLeave"
+          @click="submitLeave"
+        >确认办理请假</el-button>
+      </template>
+    </el-dialog>
+
     <div class="pager">
       <el-pagination
         v-model:current-page="page"
@@ -518,8 +684,9 @@ const refundLabels: Record<string, string> = {
   manual: '人工登记退款',
   recorded: '已退款（来源未核实）',
 }
-const filters = reactive<{ keyword: string; user_id: number | null; store_id: number | null; pay_status: number | 'refund_pending' | null; status: number | null }>({
+const filters = reactive<{ keyword: string; seat_code: string; user_id: number | null; store_id: number | null; pay_status: number | 'refund_pending' | null; status: number | null }>({
   keyword: '',
+  seat_code: '',
   user_id: null,
   store_id: null,
   pay_status: null,
@@ -658,6 +825,7 @@ async function load() {
   try {
     const params: Record<string, unknown> = { page: page.value, page_size: pageSize.value }
     if (filters.keyword.trim()) params.keyword = filters.keyword.trim()
+    if (filters.seat_code.trim()) params.seat_code = filters.seat_code.trim()
     if (filters.user_id) params.user_id = filters.user_id
     if (filters.store_id) params.store_id = filters.store_id
     if (filters.pay_status === 'refund_pending') params.refund_pending = true
@@ -689,6 +857,7 @@ function onPageSizeChange() {
 
 function reset() {
   filters.keyword = ''
+  filters.seat_code = ''
   filters.user_id = null
   filters.store_id = resolveFilterStoreId()
   filters.pay_status = null
@@ -704,6 +873,166 @@ function filterUnpaid() {
 
 function canRemoteUnlock(row: any) {
   return row.pay_status === 1 && (row.status === 0 || row.status === 1)
+}
+
+function canManageLeave(row: any) {
+  return !!(row.leave_eligible || (row.leave_limit > 0 && row.leave_used > 0))
+}
+
+const leaveVisible = ref(false)
+const leaveLoading = ref(false)
+const leavePreviewLoading = ref(false)
+const leaveSubmitting = ref(false)
+const cancellingLeaveId = ref<number | null>(null)
+const leaveRow = ref<any>(null)
+const leavePreview = ref<any>(null)
+const leaveInfo = reactive<{
+  eligible: boolean
+  used_count: number
+  limit: number
+  start_time: string
+  end_time: string
+  leaves: any[]
+}>({
+  eligible: false,
+  used_count: 0,
+  limit: 3,
+  start_time: '',
+  end_time: '',
+  leaves: [],
+})
+const leaveForm = reactive<{
+  start_date: string
+  end_date: string
+  target_seat_id: number | null
+  reason: string
+}>({
+  start_date: '',
+  end_date: '',
+  target_seat_id: null,
+  reason: '',
+})
+
+const canSubmitLeave = computed(() => {
+  if (!leavePreview.value) return false
+  if (leavePreview.value.original_seat_available) return true
+  return !!leaveForm.target_seat_id
+})
+
+function clearLeavePreview() {
+  leavePreview.value = null
+  leaveForm.target_seat_id = null
+}
+
+function resetLeave() {
+  leaveRow.value = null
+  leavePreview.value = null
+  leaveForm.start_date = ''
+  leaveForm.end_date = ''
+  leaveForm.target_seat_id = null
+  leaveForm.reason = ''
+  leaveInfo.eligible = false
+  leaveInfo.used_count = 0
+  leaveInfo.limit = 3
+  leaveInfo.start_time = ''
+  leaveInfo.end_time = ''
+  leaveInfo.leaves = []
+}
+
+async function refreshLeaveInfo() {
+  if (!leaveRow.value) return
+  leaveLoading.value = true
+  try {
+    const res = await http.get(`/admin/reservations/${leaveRow.value.id}/leaves`)
+    const d = res.data || {}
+    leaveInfo.eligible = !!d.eligible
+    leaveInfo.used_count = Number(d.used_count || 0)
+    leaveInfo.limit = Number(d.limit || 3)
+    leaveInfo.start_time = d.start_time || ''
+    leaveInfo.end_time = d.end_time || ''
+    leaveInfo.leaves = d.leaves || []
+  } catch (e: any) {
+    ElMessage.error(e?.response?.data?.detail || e?.message || '加载请假信息失败')
+  } finally {
+    leaveLoading.value = false
+  }
+}
+
+async function openLeave(row: any) {
+  resetLeave()
+  leaveRow.value = row
+  leaveVisible.value = true
+  await refreshLeaveInfo()
+}
+
+async function previewLeave() {
+  if (!leaveRow.value) return
+  if (!leaveForm.start_date || !leaveForm.end_date) {
+    ElMessage.warning('请先选择请假开始日期和结束日期')
+    return
+  }
+  leavePreviewLoading.value = true
+  try {
+    const res = await http.post(`/admin/reservations/${leaveRow.value.id}/leaves/preview`, {
+      start_date: leaveForm.start_date,
+      end_date: leaveForm.end_date,
+    })
+    leavePreview.value = res.data
+    leaveForm.target_seat_id = null
+  } catch (e: any) {
+    leavePreview.value = null
+    ElMessage.error(e?.response?.data?.detail || e?.message || '检测失败')
+  } finally {
+    leavePreviewLoading.value = false
+  }
+}
+
+async function submitLeave() {
+  if (!leaveRow.value || !canSubmitLeave.value) return
+  leaveSubmitting.value = true
+  try {
+    const res = await http.post(`/admin/reservations/${leaveRow.value.id}/leaves`, {
+      start_date: leaveForm.start_date,
+      end_date: leaveForm.end_date,
+      target_seat_id: leavePreview.value?.original_seat_available ? null : leaveForm.target_seat_id,
+      reason: leaveForm.reason.trim() || null,
+    })
+    ElMessage.success(res.message || '月卡请假已办理')
+    leaveForm.start_date = ''
+    leaveForm.end_date = ''
+    leaveForm.reason = ''
+    clearLeavePreview()
+    await refreshLeaveInfo()
+    await load()
+  } catch (e: any) {
+    ElMessage.error(e?.response?.data?.detail || e?.message || '办理请假失败')
+  } finally {
+    leaveSubmitting.value = false
+  }
+}
+
+async function cancelLeave(lv: any) {
+  if (!leaveRow.value) return
+  const title = lv.is_ongoing ? '提前恢复月卡' : '撤销请假'
+  const msg = lv.is_ongoing
+    ? `确定从今日起提前恢复月卡使用吗？将扣回未休天数的顺延时间（${lv.start_date} 起已休天数保留）。`
+    : `确定撤销 ${lv.start_date} 至 ${lv.end_date} 的请假吗？将扣回顺延的 ${lv.days} 天并退回 1 次请假额度。`
+  try {
+    await ElMessageBox.confirm(msg, title, { type: 'warning', confirmButtonText: '确定', cancelButtonText: '取消' })
+  } catch {
+    return
+  }
+  cancellingLeaveId.value = lv.id
+  try {
+    const res = await http.post(`/admin/reservations/${leaveRow.value.id}/leaves/${lv.id}/cancel`)
+    ElMessage.success(res.message || '已处理')
+    await refreshLeaveInfo()
+    await load()
+  } catch (e: any) {
+    ElMessage.error(e?.response?.data?.detail || e?.message || '操作失败')
+  } finally {
+    cancellingLeaveId.value = null
+  }
 }
 
 const unlockingIds = ref(new Set<number>())
@@ -1042,6 +1371,10 @@ onUnmounted(() => {
   font-size: 12px;
   font-weight: 700;
 }
+.m-seat-input {
+  width: 78px;
+  flex: none !important;
+}
 .seat-legend .dot {
   display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 4px; vertical-align: -1px;
 }
@@ -1085,4 +1418,37 @@ onUnmounted(() => {
 .create-user-row { display: flex; gap: 8px; width: 100%; }
 .create-user-picked { margin-top: 6px; color: #2D6A4F; font-size: 13px; }
 .pager { margin-top: 12px; display: flex; justify-content: flex-end; }
+.leave-meta {
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: #f8fafc;
+  border: 1px solid #eceef2;
+  margin-bottom: 14px;
+  line-height: 1.7;
+}
+.leave-section-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: #16171d;
+  margin: 14px 0 10px;
+}
+.leave-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.leave-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid #eceef2;
+  border-radius: 10px;
+  background: #fff;
+}
+.leave-item-main {
+  min-width: 0;
+  line-height: 1.6;
+}
 </style>

@@ -166,3 +166,156 @@
   margin-top: 24rpx;
   font-weight: 600;
 }
+
+/* ============ 核销结果卡 & 自定义稳定成功弹窗 ============ */
+.exchange-error {
+  margin-top: 24rpx;
+  padding: 22rpx 24rpx;
+  border-radius: 16rpx;
+  background: #FEF3F2;
+  border: 1rpx solid rgba(217, 72, 59, 0.2);
+}
+
+.exchange-error-title {
+  font-size: 26rpx;
+  font-weight: 700;
+  color: #B42318;
+  margin-bottom: 6rpx;
+}
+
+.exchange-error-desc {
+  font-size: 24rpx;
+  line-height: 1.5;
+  color: #7A271A;
+}
+
+.exchange-result {
+  margin-top: 24rpx;
+  padding: 24rpx;
+  border-radius: 20rpx;
+  background: #F4F9F6;
+  border: 1rpx solid rgba(45, 106, 79, 0.14);
+}
+
+.exchange-result-head {
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+  margin-bottom: 12rpx;
+}
+
+.exchange-result-badge {
+  width: 36rpx;
+  height: 36rpx;
+  line-height: 36rpx;
+  text-align: center;
+  border-radius: 50%;
+  background: #2D6A4F;
+  color: #FFFFFF;
+  font-size: 22rpx;
+  font-weight: 700;
+}
+
+.exchange-result-title {
+  font-size: 30rpx;
+  font-weight: 700;
+  color: #11181C;
+}
+
+.exchange-result-line {
+  font-size: 25rpx;
+  line-height: 1.65;
+  color: var(--color-text-secondary);
+}
+
+.exchange-result-actions {
+  display: flex;
+  gap: 16rpx;
+  margin-top: 20rpx;
+}
+
+.result-btn {
+  flex: 1;
+  height: 76rpx;
+  line-height: 76rpx;
+  text-align: center;
+  border-radius: 999rpx;
+  font-size: 26rpx;
+  font-weight: 600;
+}
+
+.result-btn--ghost {
+  background: #FFFFFF;
+  color: #2D6A4F;
+  border: 1rpx solid rgba(45, 106, 79, 0.28);
+}
+
+.result-btn--primary {
+  background: #2D6A4F;
+  color: #FFFFFF;
+}
+
+.success-mask {
+  position: fixed;
+  inset: 0;
+  z-index: 999;
+  background: rgba(17, 24, 28, 0.48);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 48rpx;
+}
+
+.success-dialog {
+  width: 100%;
+  max-width: 600rpx;
+  padding: 44rpx 36rpx 32rpx;
+  border-radius: 28rpx;
+  background: #FFFFFF;
+  text-align: center;
+  box-shadow: 0 16rpx 48rpx rgba(17, 24, 28, 0.16);
+}
+
+.success-check {
+  width: 88rpx;
+  height: 88rpx;
+  line-height: 88rpx;
+  margin: 0 auto 20rpx;
+  border-radius: 50%;
+  background: #EBF3EE;
+  color: #2D6A4F;
+  font-size: 44rpx;
+  font-weight: 800;
+}
+
+.success-title {
+  font-size: 36rpx;
+  font-weight: 700;
+  color: #11181C;
+  margin-bottom: 20rpx;
+}
+
+.success-lines {
+  padding: 20rpx 24rpx;
+  border-radius: 16rpx;
+  background: #F6F8F7;
+  text-align: left;
+  margin-bottom: 28rpx;
+}
+
+.success-line {
+  font-size: 26rpx;
+  line-height: 1.7;
+  color: #3D5245;
+}
+
+.success-actions {
+  display: flex;
+  gap: 16rpx;
+}
+
+.success-close {
+  margin-top: 24rpx;
+  font-size: 24rpx;
+  color: var(--color-text-secondary);
+}

@@ -742,6 +742,35 @@ class StoreCalendarDay(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
 
 
+class ReservationLeave(Base):
+    """月卡请假/停卡记录（每张月卡最多 3 次，方案 A：原订单顺延并排座）"""
+
+    __tablename__ = "reservation_leaves"
+    __table_args__ = (
+        Index("ix_res_leaves_res_status", "reservation_id", "status"),
+        Index("ix_res_leaves_card_status", "period_card_id", "status"),
+        Index("ix_res_leaves_store_dates", "store_id", "start_date", "end_date"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    reservation_id: Mapped[int] = mapped_column(Integer, ForeignKey("reservations.id"), nullable=False)
+    period_card_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("period_cards.id"))
+    user_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"), nullable=False)
+    store_id: Mapped[int] = mapped_column(Integer, ForeignKey("stores.id"), nullable=False)
+    start_date: Mapped[date] = mapped_column(Date, nullable=False)
+    end_date: Mapped[date] = mapped_column(Date, nullable=False)
+    days: Mapped[int] = mapped_column(Integer, nullable=False)
+    status: Mapped[str] = mapped_column(String(20), default="active", nullable=False)  # active / cancelled
+    prev_end_time: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    new_end_time: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    original_seat_id: Mapped[int] = mapped_column(Integer, ForeignKey("seats.id"), nullable=False)
+    target_seat_id: Mapped[int] = mapped_column(Integer, ForeignKey("seats.id"), nullable=False)
+    reason: Mapped[str | None] = mapped_column(String(200))
+    created_by_admin_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("admin_users.id"))
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
+    cancelled_at: Mapped[datetime | None] = mapped_column(DateTime)
+
+
 # 上岸集市模型（独立模块）
 from app.models.receipts import Receipt, ReceiptRefund  # noqa: E402
 from app.models.wrongbook import WrongbookSubject, WrongQuestion  # noqa: E402

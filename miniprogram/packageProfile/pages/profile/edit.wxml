@@ -6,10 +6,12 @@
     <view class="setup-desc">完善头像、昵称与备考方向</view>
 
     <button
+      wx:if="{{canUseChooseAvatar}}"
       class="avatar-picker"
-      hover-class="none"
+      hover-class="avatar-picker-hover"
       open-type="chooseAvatar"
       bindchooseavatar="onChooseAvatar"
+      binderror="onChooseAvatarError"
       disabled="{{avatarUploading}}"
     >
       <image
@@ -19,8 +21,18 @@
         mode="aspectFill"
       />
       <view wx:else class="avatar avatar-placeholder avatar-placeholder--add">+</view>
+      <view class="avatar-tip">{{avatarUploading ? '同步中…' : '点击更换头像'}}</view>
     </button>
-    <view class="avatar-tip">{{avatarUploading ? '同步中…' : '点击更换头像'}}</view>
+    <view wx:else class="avatar-picker" bindtap="chooseAvatarFromAlbum">
+      <image
+        wx:if="{{avatarDisplay}}"
+        class="avatar"
+        src="{{avatarDisplay}}"
+        mode="aspectFill"
+      />
+      <view wx:else class="avatar avatar-placeholder avatar-placeholder--add">+</view>
+      <view class="avatar-tip">{{avatarUploading ? '同步中…' : '点击从相册更换头像'}}</view>
+    </view>
 
     <view class="nickname-field">
       <view class="field-label">昵称</view>

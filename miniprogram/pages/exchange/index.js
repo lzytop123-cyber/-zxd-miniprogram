@@ -18,6 +18,9 @@ Page({
     scanning: false,
     resultTitle: '',
     resultLines: [],
+    lastRedeemedBillType: 'hourly',
+    showSuccessModal: false,
+    errorMsg: '',
   },
 
   onLoad(options) {
@@ -41,6 +44,8 @@ Page({
       code: '',
       resultTitle: '',
       resultLines: [],
+      showSuccessModal: false,
+      errorMsg: '',
     })
     wx.setNavigationBarTitle({ title: `${platformLabel}团购兑换` })
   },
@@ -78,15 +83,16 @@ Page({
       storeName: store.name,
       storeIndex: idx,
       storePicked: true,
+      errorMsg: '',
     })
   },
 
   onInput(e) {
-    this.setData({ code: e.detail.value.trim() })
+    this.setData({ code: e.detail.value.trim(), errorMsg: '' })
   },
 
   clearCode() {
-    this.setData({ code: '' })
+    this.setData({ code: '', errorMsg: '' })
   },
 
   pasteCode() {
@@ -97,7 +103,7 @@ Page({
           wx.showToast({ title: '剪贴板为空', icon: 'none' })
           return
         }
-        this.setData({ code: text })
+        this.setData({ code: text, errorMsg: '' })
       },
       fail: () => {
         wx.showToast({ title: '无法读取剪贴板', icon: 'none' })
@@ -112,7 +118,7 @@ Page({
       wx.showToast({ title: parsed.message, icon: 'none', duration: 2500 })
       return false
     }
-    this.setData({ code: parsed.code })
+    this.setData({ code: parsed.code, errorMsg: '' })
     wx.showToast({ title: '券码已填入', icon: 'success' })
     return true
   },
@@ -176,18 +182,15 @@ Page({
       const { toDouyinSubmitCode } = require('./utils/voucherScan')
       code = toDouyinSubmitCode(inputCode)
     }
-    this.setData({ loading: true, code: inputCode, resultTitle: '', resultLines: [] })
-    wx.showLoading({ title: '连接核销中…', mask: true })
-    const showAfterLoading = (fn) => {
-      let ran = false
-      const run = () => {
-        if (ran) return
-        ran = true
-        setTimeout(fn, 200)
-      }
-      wx.hideLoading({ complete: run, fail: run })
-      setTimeout(run, 500)
-    }
+    this.setData({
+      loading: true,
+      code: inputCode,
+      resultTitle: '',
+      resultLines: [],
+      showSuccessModal: false,
+      errorMsg: '',
+    })
+
     try {
       let result
       if (platform === 'douyin') {
@@ -216,58 +219,57 @@ Page({
       } else if (payload.remaining_sessions != null) {
         lines.push(`含 ${payload.remaining_sessions} 次`)
       }
+      const billType =
+        payload.card_type === 'night_monthly'
+          ? 'night'
+          : payload.card_type || 'hourly'
+
       invalidateCache('/user/cards')
       invalidateCache('/exchange/records')
-      this.setData({ loading: false, code: '', resultTitle: '核销成功', resultLines: lines })
-      showAfterLoading(() => {
-        wx.showModal({
-          title: '核销成功',
-          content: lines.join('\n'),
-          confirmText: '去选座预约',
-          cancelText: '查看卡包',
-          showCancel: true,
-          confirmColor: '#2D6A4F',
-          success: (res) => {
-            if (res.confirm) {
-              const billType =
-                payload.card_type === 'night_monthly'
-                  ? 'night'
-                  : payload.card_type || 'hourly'
-              wx.navigateTo({
-                url: `${routes.bookingIndex}?storeId=${storeId}&billType=${billType}`,
-                fail: () => wx.navigateTo({ url: routes.profileCards }),
-              })
-            } else {
-              wx.navigateTo({
-                url: routes.profileCards,
-                fail: () => wx.switchTab({ url: '/pages/profile/index' }),
-              })
-            }
-          },
-        })
+      this.setData({
+        loading: false,
+        code: '',
+        resultTitle: '核销成功',
+        resultLines: lines,
+        lastRedeemedBillType: billType,
+        showSuccessModal: true,
+        errorMsg: '',
       })
+      wx.vibrateShort({ type: 'medium' })
     } catch (e) {
-      const msg = e.detail || e.message || '兑换失败'
-      showAfterLoading(() => {
-        if (msg.includes('dealId') || msg.includes('未配置')) {
-          wx.showModal({
-            title: '暂未支持该团购券',
-            content: '该团购商品暂未完成门店配置，您的券未被核销，请联系店长处理后再试。',
-            showCancel: false,
-          })
-        } else if (msg.includes('仅适用于') || msg.includes('不适用于当前门店')) {
-          wx.showModal({
-            title: '请切换门店',
-            content: `${msg}\n\n该券未被核销`,
-            showCancel: false,
-          })
-        } else {
-          wx.showToast({ title: msg, icon: 'none', duration: 3000 })
-        }
-      })
+      const rawMsg = e.detail || e.message || '兑换失败，请稍后重试'
+      let friendlyMsg = rawMsg
+      if (rawMsg.includes('dealId') || rawMsg.includes('未配置')) {
+        friendlyMsg = '该团购商品暂未完成门店配置，您的券未被核销，请联系店长处理后再试。'
+      } else if (rawMsg.includes('仅适用于') || rawMsg.includes('不适用于当前门店')) {
+        friendlyMsg = `${rawMsg}（该券未被核销，请切换上方门店后重试）`
+      }
+      this.setData({ loading: false, errorMsg: friendlyMsg })
+      wx.showToast({ title: friendlyMsg.slice(0, 22), icon: 'none', duration: 2800 })
     } finally {
-      this.setData({ loading: false })
+      if (this.data.loading) this.setData({ loading: false })
     }
+  },
+
+  closeSuccessModal() {
+    this.setData({ showSuccessModal: false })
+  },
+
+  goBookAfterSuccess() {
+    const { storeId, lastRedeemedBillType } = this.data
+    this.setData({ showSuccessModal: false })
+    wx.navigateTo({
+      url: `${routes.bookingIndex}?storeId=${storeId}&billType=${lastRedeemedBillType || 'hourly'}`,
+      fail: () => wx.navigateTo({ url: routes.profileCards }),
+    })
+  },
+
+  goMyCards() {
+    this.setData({ showSuccessModal: false })
+    wx.navigateTo({
+      url: routes.profileCards,
+      fail: () => wx.switchTab({ url: '/pages/profile/index' }),
+    })
   },
 
   goRecords() {

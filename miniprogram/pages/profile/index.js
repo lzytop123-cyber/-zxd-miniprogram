@@ -114,10 +114,14 @@ Page({
   async onChooseAvatar(e) {
     const avatarUrl = e?.detail?.avatarUrl
     if (!avatarUrl) {
-      wx.showToast({ title: '未获取到头像，请重试', icon: 'none' })
+      this.goEdit()
       return
     }
     await this._uploadAvatarFile(avatarUrl)
+  },
+
+  onChooseAvatarError() {
+    this.goEdit()
   },
 
   async _uploadAvatarFile(avatarUrl) {

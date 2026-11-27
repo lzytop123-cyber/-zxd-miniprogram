@@ -29,14 +29,21 @@
 }
 
 .avatar-picker {
+  width: 240rpx;
   margin: 32rpx auto 0;
-  padding: 0;
+  padding: 8rpx 0;
   background: transparent;
   line-height: normal;
   display: flex;
   flex-direction: column;
   align-items: center;
+  justify-content: center;
   overflow: visible;
+  border: none;
+}
+
+.avatar-picker-hover {
+  opacity: 0.72;
 }
 
 .avatar-picker .avatar {

@@ -25,7 +25,7 @@
 
     <block wx:elif="{{loginState === 'ready' && user}}">
       <view class="user-row">
-        <button class="avatar-btn" hover-class="none" open-type="chooseAvatar" bindchooseavatar="onChooseAvatar">
+        <button class="avatar-btn" hover-class="none" open-type="chooseAvatar" bindchooseavatar="onChooseAvatar" binderror="onChooseAvatarError">
           <image wx:if="{{avatarDisplay}}" class="avatar" src="{{avatarDisplay}}" mode="aspectFill" />
           <view wx:else class="avatar avatar-ph">岛</view>
         </button>

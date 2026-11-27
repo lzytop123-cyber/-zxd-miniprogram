@@ -31,6 +31,7 @@ Page({
     avatarDisplay: '',
     avatarUploading: false,
     saving: false,
+    canUseChooseAvatar: typeof wx.canIUse === 'function' ? wx.canIUse('button.open-type.chooseAvatar') : true,
     goalOptions: GOAL_OPTIONS,
   },
 
@@ -100,10 +101,48 @@ Page({
   async onChooseAvatar(e) {
     const avatarUrl = e?.detail?.avatarUrl
     if (!avatarUrl) {
-      wx.showToast({ title: '未获取到头像，请重试', icon: 'none' })
+      this.chooseAvatarFromAlbum()
       return
     }
     await this._uploadAvatarFile(avatarUrl)
+  },
+
+  onChooseAvatarError() {
+    this.setData({ canUseChooseAvatar: false })
+    this.chooseAvatarFromAlbum()
+  },
+
+  chooseAvatarFromAlbum() {
+    if (this.data.avatarUploading) return
+    const pick = typeof wx.chooseMedia === 'function'
+      ? () => new Promise((resolve, reject) => {
+        wx.chooseMedia({
+          count: 1,
+          mediaType: ['image'],
+          sourceType: ['album', 'camera'],
+          sizeType: ['compressed'],
+          success: (res) => resolve(res?.tempFiles?.[0]?.tempFilePath || ''),
+          fail: reject,
+        })
+      })
+      : () => new Promise((resolve, reject) => {
+        wx.chooseImage({
+          count: 1,
+          sizeType: ['compressed'],
+          sourceType: ['album', 'camera'],
+          success: (res) => resolve(res?.tempFilePaths?.[0] || ''),
+          fail: reject,
+        })
+      })
+    pick()
+      .then((filePath) => {
+        if (filePath) return this._uploadAvatarFile(filePath)
+      })
+      .catch((err) => {
+        const msg = String((err && err.errMsg) || '')
+        if (msg.includes('cancel')) return
+        wx.showToast({ title: '暂无法打开相册，请检查小程序隐私权限设置', icon: 'none' })
+      })
   },
 
   async _uploadAvatarFile(avatarUrl) {
@@ -148,17 +187,8 @@ Page({
     const { draftNickname, draftStudyGoal, saving, user, avatarUploading, avatarDisplay } = this.data
     if (saving || avatarUploading) return
 
-    const nickname = draftNickname.trim()
+    const nickname = draftNickname.trim() || (user?.nickname || `知行岛友${user?.id || ''}`.trim())
     const avatarTempPath = isLocalAvatarPath(avatarDisplay) ? avatarDisplay : undefined
-    const hasAvatar = !!(avatarTempPath || user?.avatar_url)
-    if (!hasAvatar) {
-      wx.showToast({ title: '请设置头像', icon: 'none' })
-      return
-    }
-    if (!nickname) {
-      wx.showToast({ title: '请填写昵称', icon: 'none' })
-      return
-    }
 
     this.setData({ saving: true })
     wx.showLoading({ title: '保存中...' })

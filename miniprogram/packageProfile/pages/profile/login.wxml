@@ -53,14 +53,16 @@
   </view>
 
   <view class="setup-card card" wx:elif="{{step === 'setup' && user}}">
-    <view class="setup-title">设置学员资料</view>
-    <view class="setup-desc">选择头像和昵称，即可预约自习</view>
+    <view class="setup-title">完善学员资料</view>
+    <view class="setup-desc">可选择头像与昵称，也可直接开始使用</view>
 
     <button
+      wx:if="{{canUseChooseAvatar}}"
       class="avatar-picker"
-      hover-class="none"
+      hover-class="avatar-picker-hover"
       open-type="chooseAvatar"
       bindchooseavatar="onChooseAvatar"
+      binderror="onChooseAvatarError"
       disabled="{{avatarUploading}}"
     >
       <image
@@ -70,15 +72,25 @@
         mode="aspectFill"
       />
       <view wx:else class="avatar avatar-placeholder avatar-placeholder--add">+</view>
+      <view class="avatar-tip">{{avatarUploading ? '同步中…' : '点击设置头像（选填）'}}</view>
     </button>
-    <view class="avatar-tip">{{avatarUploading ? '同步中…' : '点击选择微信头像'}}</view>
+    <view wx:else class="avatar-picker" bindtap="chooseAvatarFromAlbum">
+      <image
+        wx:if="{{avatarDisplay}}"
+        class="avatar"
+        src="{{avatarDisplay}}"
+        mode="aspectFill"
+      />
+      <view wx:else class="avatar avatar-placeholder avatar-placeholder--add">+</view>
+      <view class="avatar-tip">{{avatarUploading ? '同步中…' : '点击从相册选择头像（选填）'}}</view>
+    </view>
 
     <view class="nickname-field">
-      <view class="field-label">昵称</view>
+      <view class="field-label">昵称（选填）</view>
       <input
         type="nickname"
         class="nickname-input"
-        placeholder="输入昵称"
+        placeholder="输入昵称，留空自动生成"
         value="{{draftNickname}}"
         bindinput="onNicknameInput"
         bindblur="onNicknameBlur"
@@ -99,6 +111,6 @@
     </view>
 
     <view class="btn-primary setup-save" bindtap="saveProfile">开始使用</view>
-    <view class="setup-note">学号 #{{user.id}}</view>
+    <view class="setup-skip" bindtap="skipProfileSetup">跳过，稍后在「我的」设置</view>
   </view>
 </view>

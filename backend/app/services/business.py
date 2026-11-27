@@ -283,23 +283,48 @@ def _intervals_overlap(a_start: datetime, a_end: datetime, b_start: datetime, b_
     return a_start < b_end and a_end > b_start
 
 
+def _date_in_leaves(day, leave_ranges: list[tuple] | None) -> bool:
+    if not leave_ranges:
+        return False
+    return any(s <= day <= e for s, e in leave_ranges)
+
+
 def reservation_blocks_interval(
     reservation: Reservation,
     query_start: datetime,
     query_end: datetime,
+    leave_ranges: list[tuple] | None = None,
 ) -> bool:
-    """该预约是否在 query 时段内占用座位（夜读按每日可用时段，非全天）。"""
-    if reservation.bill_type in NIGHT_BILL_TYPES:
-        return _night_reservation_blocks_interval(reservation, query_start, query_end)
-    return _intervals_overlap(
+    """该预约是否在 query 时段内占用座位（夜读按每日可用时段；请假停卡日自动释放座位）。"""
+    if not _intervals_overlap(
         reservation.start_time, reservation.end_time, query_start, query_end
-    )
+    ):
+        return False
+    if reservation.bill_type in NIGHT_BILL_TYPES:
+        return _night_reservation_blocks_interval(
+            reservation, query_start, query_end, leave_ranges=leave_ranges
+        )
+    if not leave_ranges:
+        return True
+    overlap_start = max(reservation.start_time, query_start)
+    overlap_end = min(reservation.end_time, query_end)
+    if overlap_start >= overlap_end:
+        return False
+    day = overlap_start.date()
+    # overlap_end 刚好落在 00:00:00 时不算占用当天
+    last_day = (overlap_end - timedelta(microseconds=1)).date()
+    while day <= last_day:
+        if not _date_in_leaves(day, leave_ranges):
+            return True
+        day += timedelta(days=1)
+    return False
 
 
 def _night_reservation_blocks_interval(
     reservation: Reservation,
     query_start: datetime,
     query_end: datetime,
+    leave_ranges: list[tuple] | None = None,
 ) -> bool:
     from app.services.store_hours import night_seat_block_window_for_date
 
@@ -310,11 +335,12 @@ def _night_reservation_blocks_interval(
 
     day = overlap_start
     while day <= overlap_end:
-        win_start, win_end, _ = night_seat_block_window_for_date(day)
-        block_start = datetime.combine(day, win_start)
-        block_end = datetime.combine(day, win_end)
-        if _intervals_overlap(block_start, block_end, query_start, query_end):
-            return True
+        if not _date_in_leaves(day, leave_ranges):
+            win_start, win_end, _ = night_seat_block_window_for_date(day)
+            block_start = datetime.combine(day, win_start)
+            block_end = datetime.combine(day, win_end)
+            if _intervals_overlap(block_start, block_end, query_start, query_end):
+                return True
         day += timedelta(days=1)
     return False
 
@@ -340,11 +366,17 @@ def find_seat_conflict(
     exclude_reservation_id: int | None = None,
 ) -> Reservation | None:
     """查找与时段真正冲突的已支付预约。"""
+    from app.services.reservation_leave import get_active_leaves_map
+
     query = _seat_conflict_query(seat_id, start, end)
     if exclude_reservation_id:
         query = query.where(Reservation.id != exclude_reservation_id)
-    for reservation in db.scalars(query).all():
-        if reservation_blocks_interval(reservation, start, end):
+    rows = db.scalars(query).all()
+    leaves_map = get_active_leaves_map(db, [r.id for r in rows])
+    for reservation in rows:
+        if reservation_blocks_interval(
+            reservation, start, end, leave_ranges=leaves_map.get(reservation.id)
+        ):
             return reservation
     return None
 
@@ -356,6 +388,8 @@ def find_busy_seat_ids(
     end: datetime,
 ) -> set[int]:
     """批量判断哪些座位在时段内被占用。"""
+    from app.services.reservation_leave import get_active_leaves_map
+
     if not seat_ids:
         return set()
     now = datetime.now()
@@ -369,14 +403,19 @@ def find_busy_seat_ids(
             Reservation.end_time > start,
         )
     ).all()
+    leaves_map = get_active_leaves_map(db, [r.id for r in reservations])
     busy: set[int] = set()
     for reservation in reservations:
-        if reservation_blocks_interval(reservation, start, end):
+        if reservation_blocks_interval(
+            reservation, start, end, leave_ranges=leaves_map.get(reservation.id)
+        ):
             busy.add(reservation.seat_id)
     return busy
 
 
 def get_seat_status(db: Session, seat_id: int, at: datetime | None = None) -> str:
+    from app.services.reservation_leave import get_active_leaves_map
+
     at = at or datetime.now()
     seat = db.get(Seat, seat_id)
     if not seat or seat.status != 1:
@@ -392,16 +431,21 @@ def get_seat_status(db: Session, seat_id: int, at: datetime | None = None) -> st
             Reservation.end_time > at,
         )
     ).all()
+    leaves_map = get_active_leaves_map(db, [r.id for r in candidates])
 
     moment_end = at + timedelta(seconds=1)
     for reservation in candidates:
-        if reservation_blocks_interval(reservation, at, moment_end):
+        if reservation_blocks_interval(
+            reservation, at, moment_end, leave_ranges=leaves_map.get(reservation.id)
+        ):
             return "occupied" if reservation.status == 1 else "reserved"
 
     for reservation in candidates:
         if reservation.status != 0:
             continue
-        if reservation_blocks_interval(reservation, at, at + timedelta(hours=2)):
+        if reservation_blocks_interval(
+            reservation, at, at + timedelta(hours=2), leave_ranges=leaves_map.get(reservation.id)
+        ):
             return "reserved"
 
     return "available"
@@ -411,6 +455,8 @@ def get_seats_status_map(
     db: Session, seats: list[Seat], at: datetime | None = None
 ) -> dict[int, str]:
     """批量计算多个座位在指定时刻的状态（消除逐座 N+1 查询）。"""
+    from app.services.reservation_leave import get_active_leaves_map
+
     at = at or datetime.now()
     result: dict[int, str] = {}
     active_ids: list[int] = []
@@ -432,6 +478,7 @@ def get_seats_status_map(
             Reservation.start_time < window_end,
         )
     ).all()
+    leaves_map = get_active_leaves_map(db, [r.id for r in candidates])
 
     by_seat: dict[int, list[Reservation]] = {}
     for res in candidates:
@@ -445,12 +492,16 @@ def get_seats_status_map(
             continue
         status = "available"
         for res in rows:
-            if reservation_blocks_interval(res, at, moment_end):
+            if reservation_blocks_interval(
+                res, at, moment_end, leave_ranges=leaves_map.get(res.id)
+            ):
                 status = "occupied" if res.status == 1 else "reserved"
                 break
         if status == "available":
             for res in rows:
-                if res.status == 0 and reservation_blocks_interval(res, at, window_end):
+                if res.status == 0 and reservation_blocks_interval(
+                    res, at, window_end, leave_ranges=leaves_map.get(res.id)
+                ):
                     status = "reserved"
                     break
         result[sid] = status

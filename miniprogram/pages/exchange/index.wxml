@@ -42,19 +42,57 @@
         placeholder="{{platform === 'douyin' ? '请输入或粘贴12位抖音券码' : '请输入或粘贴美团券码'}}"
         value="{{code}}"
         bindinput="onInput"
+        disabled="{{loading}}"
         maxlength="{{platform === 'douyin' ? 256 : 32}}"
         confirm-type="done"
         bindconfirm="onSubmitTap"
       />
-      <view wx:if="{{code}}" class="code-clear" bindtap="clearCode">×</view>
-      <view wx:else class="code-paste" bindtap="pasteCode">粘贴</view>
+      <view wx:if="{{code && !loading}}" class="code-clear" bindtap="clearCode">×</view>
+      <view wx:elif="{{!code && !loading}}" class="code-paste" bindtap="pasteCode">粘贴</view>
       <view class="code-scan {{loading || scanning ? 'disabled' : ''}}" bindtap="onScanTap" aria-role="button" aria-label="扫码或相册识别券码">
         <view class="mi-glyph icon-scan"></view>
       </view>
     </view>
     <view class="code-tip">支持手动输入、粘贴或右侧扫码 / 相册识别</view>
 
-    <view class="btn-primary {{loading || !storeId || !storePicked ? 'disabled' : ''}}" bindtap="onSubmitTap">立即兑换</view>
+    <view class="btn-primary {{loading || !storeId || !storePicked ? 'disabled' : ''}}" bindtap="onSubmitTap">
+      {{loading ? '正在核销中…' : '立即兑换'}}
+    </view>
+
+    <!-- 页面内兜底结果卡（防止系统弹窗被关闭后看不到信息） -->
+    <view class="exchange-error" wx:if="{{errorMsg}}">
+      <view class="exchange-error-title">核销未成功</view>
+      <view class="exchange-error-desc">{{errorMsg}}</view>
+    </view>
+
+    <view class="exchange-result" wx:if="{{resultTitle}}">
+      <view class="exchange-result-head">
+        <view class="exchange-result-badge">✓</view>
+        <view class="exchange-result-title">{{resultTitle}}</view>
+      </view>
+      <view class="exchange-result-line" wx:for="{{resultLines}}" wx:key="*this">{{item}}</view>
+      <view class="exchange-result-actions">
+        <view class="result-btn result-btn--ghost" bindtap="goMyCards">查看卡包</view>
+        <view class="result-btn result-btn--primary" bindtap="goBookAfterSuccess">去选座预约</view>
+      </view>
+    </view>
+
     <view class="link-records" bindtap="goRecords">查看兑换记录 ›</view>
+  </view>
+
+  <!-- 自定义成功弹窗（不依赖原生 wx.showModal，100% 稳定弹出） -->
+  <view class="success-mask" wx:if="{{showSuccessModal}}" catchtouchmove="true">
+    <view class="success-dialog">
+      <view class="success-check">✓</view>
+      <view class="success-title">核销成功</view>
+      <view class="success-lines">
+        <view class="success-line" wx:for="{{resultLines}}" wx:key="*this">{{item}}</view>
+      </view>
+      <view class="success-actions">
+        <view class="result-btn result-btn--ghost" bindtap="goMyCards">查看卡包</view>
+        <view class="result-btn result-btn--primary" bindtap="goBookAfterSuccess">去选座预约</view>
+      </view>
+      <view class="success-close" bindtap="closeSuccessModal">继续核销其他券</view>
+    </view>
   </view>
 </view>

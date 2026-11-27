@@ -206,6 +206,7 @@ def admin_reservations(
     status: int | None = None,
     order_no: str | None = None,
     user_id: int | None = None,
+    seat_code: str | None = None,
     keyword: str | None = None,
     admin: AdminUser = Depends(get_current_admin),
     db: Session = Depends(get_db),
@@ -232,6 +233,19 @@ def admin_reservations(
         query = query.where(Reservation.order_no.contains(order_no.strip()))
     if user_id:
         query = query.where(Reservation.user_id == user_id)
+    if seat_code and seat_code.strip():
+        sc = seat_code.strip().lower()
+        exact_q = select(Seat.id).where(func.lower(Seat.seat_code) == sc)
+        if store_id:
+            exact_q = exact_q.where(Seat.store_id == store_id)
+        exact_ids = db.scalars(exact_q).all()
+        if exact_ids:
+            query = query.where(Reservation.seat_id.in_(exact_ids))
+        else:
+            fuzzy_q = select(Seat.id).where(func.lower(Seat.seat_code).contains(sc))
+            if store_id:
+                fuzzy_q = fuzzy_q.where(Seat.store_id == store_id)
+            query = query.where(Reservation.seat_id.in_(fuzzy_q))
     if keyword and keyword.strip():
         kw = keyword.strip()
         matched_user_ids = select(User.id).where(
@@ -1325,6 +1339,27 @@ def _reservation_admin_item(db: Session, r: Reservation) -> dict | None:
         else "recorded" if r.pay_status == 2
         else None
     )
+    from app.services.reservation_leave import (
+        MONTHLY_LEAVE_LIMIT,
+        count_used_leaves,
+        is_monthly_leave_eligible,
+        is_reservation_on_leave,
+    )
+    leave_eligible = is_monthly_leave_eligible(r) and r.pay_status == 1 and r.status in (0, 1)
+    base["leave_eligible"] = leave_eligible
+    if is_monthly_leave_eligible(r):
+        base["leave_used"] = count_used_leaves(db, r)
+        base["leave_limit"] = MONTHLY_LEAVE_LIMIT
+        today_leave = is_reservation_on_leave(db, r.id)
+        base["on_leave_today"] = today_leave is not None
+        base["active_leave_range"] = (
+            f"{today_leave.start_date} ~ {today_leave.end_date}" if today_leave else None
+        )
+    else:
+        base["leave_used"] = 0
+        base["leave_limit"] = 0
+        base["on_leave_today"] = False
+        base["active_leave_range"] = None
     return base
 
 
@@ -1508,12 +1543,105 @@ async def admin_reservation_remote_unlock(
     if not reservation:
         raise HTTPException(status_code=404, detail="订单不存在")
     assert_store_access(admin, reservation.store_id)
+    from app.services.reservation_leave import is_reservation_on_leave
+    active_leave = is_reservation_on_leave(db, reservation.id)
+    if active_leave:
+        raise HTTPException(
+            status_code=400,
+            detail=f"该月卡当前处于请假停卡期（{active_leave.start_date} 至 {active_leave.end_date}），暂不可远程开门",
+        )
     try:
         data = await admin_remote_unlock(db, reservation)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
     db.commit()
     return ResponseModel(message="远程开门成功", data=data)
+
+
+class AdminMonthlyLeavePreviewBody(BaseModel):
+    start_date: date
+    end_date: date
+
+
+class AdminMonthlyLeaveCreateBody(BaseModel):
+    start_date: date
+    end_date: date
+    target_seat_id: int | None = None
+    reason: str | None = None
+
+
+@router.get("/reservations/{reservation_id}/leaves", response_model=ResponseModel)
+def admin_reservation_leaves(
+    reservation_id: int,
+    admin: AdminUser = Depends(get_current_admin),
+    db: Session = Depends(get_db),
+):
+    reservation = db.get(Reservation, reservation_id)
+    if not reservation:
+        raise HTTPException(status_code=404, detail="订单不存在")
+    assert_store_access(admin, reservation.store_id)
+    from app.services.reservation_leave import list_reservation_leaves_payload
+    return ResponseModel(data=list_reservation_leaves_payload(db, reservation))
+
+
+@router.post("/reservations/{reservation_id}/leaves/preview", response_model=ResponseModel)
+def admin_reservation_leave_preview(
+    reservation_id: int,
+    body: AdminMonthlyLeavePreviewBody,
+    admin: AdminUser = Depends(get_current_admin),
+    db: Session = Depends(get_db),
+):
+    reservation = db.get(Reservation, reservation_id)
+    if not reservation:
+        raise HTTPException(status_code=404, detail="订单不存在")
+    assert_store_access(admin, reservation.store_id)
+    from app.services.reservation_leave import preview_monthly_leave
+    return ResponseModel(data=preview_monthly_leave(db, reservation, body.start_date, body.end_date))
+
+
+@router.post("/reservations/{reservation_id}/leaves", response_model=ResponseModel)
+def admin_reservation_leave_create(
+    reservation_id: int,
+    body: AdminMonthlyLeaveCreateBody,
+    admin: AdminUser = Depends(get_current_admin),
+    db: Session = Depends(get_db),
+):
+    reservation = db.get(Reservation, reservation_id)
+    if not reservation:
+        raise HTTPException(status_code=404, detail="订单不存在")
+    assert_store_access(admin, reservation.store_id)
+    from app.services.reservation_leave import create_monthly_leave
+    data = create_monthly_leave(
+        db,
+        reservation,
+        start_date=body.start_date,
+        end_date=body.end_date,
+        admin=admin,
+        target_seat_id=body.target_seat_id,
+        reason=body.reason,
+    )
+    return ResponseModel(message="月卡请假已办理并顺延", data=data)
+
+
+@router.post("/reservations/{reservation_id}/leaves/{leave_id}/cancel", response_model=ResponseModel)
+def admin_reservation_leave_cancel(
+    reservation_id: int,
+    leave_id: int,
+    admin: AdminUser = Depends(get_current_admin),
+    db: Session = Depends(get_db),
+):
+    from app.models import ReservationLeave
+    from app.services.reservation_leave import cancel_or_resume_monthly_leave
+
+    reservation = db.get(Reservation, reservation_id)
+    if not reservation:
+        raise HTTPException(status_code=404, detail="订单不存在")
+    assert_store_access(admin, reservation.store_id)
+    leave = db.get(ReservationLeave, leave_id)
+    if not leave or leave.reservation_id != reservation.id:
+        raise HTTPException(status_code=404, detail="请假记录不存在")
+    data = cancel_or_resume_monthly_leave(db, leave, admin)
+    return ResponseModel(message=data["message"], data=data)
 
 
 @router.post("/reservations/{reservation_id}/force-checkout", response_model=ResponseModel)

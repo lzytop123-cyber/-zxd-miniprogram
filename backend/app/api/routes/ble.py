@@ -61,6 +61,13 @@ def get_ble_key(
         raise HTTPException(status_code=404, detail="订单不存在")
     if reservation.pay_status != 1:
         raise HTTPException(status_code=400, detail="订单未支付")
+    from app.services.reservation_leave import is_reservation_on_leave
+    active_leave = is_reservation_on_leave(db, reservation.id)
+    if active_leave:
+        raise HTTPException(
+            status_code=400,
+            detail=f"该月卡当前处于请假停卡期（{active_leave.start_date} 至 {active_leave.end_date}），暂不可开门",
+        )
     if not reservation_unlock_allowed(reservation):
         detail = reservation_unlock_message(reservation) or "当前无法开门"
         raise HTTPException(status_code=400, detail=detail)
@@ -140,6 +147,14 @@ async def remote_unlock_door(
         raise HTTPException(status_code=404, detail="订单不存在")
     if reservation.pay_status != 1:
         raise HTTPException(status_code=400, detail="订单未支付")
+
+    from app.services.reservation_leave import is_reservation_on_leave
+    active_leave = is_reservation_on_leave(db, reservation.id)
+    if active_leave:
+        raise HTTPException(
+            status_code=400,
+            detail=f"该月卡当前处于请假停卡期（{active_leave.start_date} 至 {active_leave.end_date}），暂不可开门",
+        )
 
     if not reservation_unlock_allowed(reservation):
         detail = reservation_unlock_message(reservation) or "当前无法开门"

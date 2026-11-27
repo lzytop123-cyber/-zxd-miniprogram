@@ -43,6 +43,7 @@ Page({
     avatarUploading: false,
     saving: false,
     phoneLogging: false,
+    canUseChooseAvatar: typeof wx.canIUse === 'function' ? wx.canIUse('button.open-type.chooseAvatar') : true,
     goalOptions: GOAL_OPTIONS,
   },
 
@@ -233,10 +234,59 @@ Page({
   async onChooseAvatar(e) {
     const avatarUrl = e?.detail?.avatarUrl
     if (!avatarUrl) {
-      wx.showToast({ title: '未获取到头像，请重试', icon: 'none' })
+      // 安卓或隐私未就绪时自动回退相册选择，确保点击一定有响应
+      this.chooseAvatarFromAlbum()
       return
     }
     await this._uploadAvatarFile(avatarUrl)
+  },
+
+  onChooseAvatarError() {
+    this.setData({ canUseChooseAvatar: false })
+    this.chooseAvatarFromAlbum()
+  },
+
+  chooseAvatarFromAlbum() {
+    if (this.data.avatarUploading) return
+    const pick = typeof wx.chooseMedia === 'function'
+      ? () => new Promise((resolve, reject) => {
+        wx.chooseMedia({
+          count: 1,
+          mediaType: ['image'],
+          sourceType: ['album', 'camera'],
+          sizeType: ['compressed'],
+          success: (res) => resolve(res?.tempFiles?.[0]?.tempFilePath || ''),
+          fail: reject,
+        })
+      })
+      : () => new Promise((resolve, reject) => {
+        wx.chooseImage({
+          count: 1,
+          sizeType: ['compressed'],
+          sourceType: ['album', 'camera'],
+          success: (res) => resolve(res?.tempFilePaths?.[0] || ''),
+          fail: reject,
+        })
+      })
+
+    pick()
+      .then((filePath) => {
+        if (filePath) return this._uploadAvatarFile(filePath)
+      })
+      .catch((err) => {
+        const msg = String((err && err.errMsg) || '')
+        if (msg.includes('cancel')) return
+        if (msg.includes('privacy') || msg.includes('scope')) {
+          wx.showModal({
+            title: '提示',
+            content: '当前环境暂未开启头像相册权限，可直接点击下方「开始使用」使用默认头像进入。',
+            showCancel: false,
+            confirmColor: '#2D6A4F',
+          })
+          return
+        }
+        wx.showToast({ title: '可直接使用默认头像继续', icon: 'none' })
+      })
   },
 
   async _uploadAvatarFile(avatarUrl) {
@@ -280,21 +330,17 @@ Page({
     this.setData({ draftStudyGoal: next })
   },
 
+  skipProfileSetup() {
+    auth.finishLoginRedirect(this.data.redirect)
+  },
+
   async saveProfile() {
     const { draftNickname, draftStudyGoal, saving, user, avatarUploading, avatarDisplay } = this.data
     if (saving || avatarUploading) return
 
-    const nickname = draftNickname.trim()
+    const fallbackName = `知行岛友${user?.id || ''}`.trim()
+    const nickname = draftNickname.trim() || (user?.nickname && user.nickname !== auth.DEFAULT_NICKNAME ? user.nickname : fallbackName)
     const avatarTempPath = isLocalAvatarPath(avatarDisplay) ? avatarDisplay : undefined
-    const hasAvatar = !!(avatarTempPath || user?.avatar_url)
-    if (!hasAvatar) {
-      wx.showToast({ title: '请设置头像', icon: 'none' })
-      return
-    }
-    if (!nickname) {
-      wx.showToast({ title: '请填写昵称', icon: 'none' })
-      return
-    }
 
     this.setData({ saving: true })
     wx.showLoading({ title: '保存中...' })
@@ -305,14 +351,9 @@ Page({
         avatarTempPath,
       })
       auth.syncAppUser(profile)
-      if (profile?.needs_profile_setup) {
-        wx.hideLoading()
-        wx.showToast({ title: '请设置头像', icon: 'none' })
-        return
-      }
       wx.hideLoading()
       wx.showToast({ title: '欢迎加入知行岛', icon: 'success' })
-      setTimeout(() => auth.finishLoginRedirect(this.data.redirect), 800)
+      setTimeout(() => auth.finishLoginRedirect(this.data.redirect), 600)
     } catch (err) {
       wx.hideLoading()
       wx.showToast({ title: err.detail || err.message || '保存失败', icon: 'none' })
